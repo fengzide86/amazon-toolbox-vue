@@ -6,10 +6,23 @@ import asyncio
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from httpx import AsyncClient, ASGITransport
+from unittest.mock import patch
 
 # 设置测试环境变量
 import os
 os.environ["APP_ENV"] = "test"
+
+# 在导入 app 之前，将 Limiter.limit 装饰器替换为无操作装饰器
+# 这样所有路由的频率限制都会被禁用
+def _noop_limit(*args, **kwargs):
+    """无操作的 limit 装饰器，用于测试环境"""
+    def decorator(func):
+        return func
+    return decorator
+
+# 补丁 Limiter.limit 方法
+import slowapi
+slowapi.Limiter.limit = _noop_limit
 
 from database import Base, get_db
 from core.config import settings
