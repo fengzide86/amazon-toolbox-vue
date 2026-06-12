@@ -9,6 +9,12 @@ from models import Plan, Setting
 from core.security import hash_password
 
 
+def get_data(response):
+    """从统一响应格式中提取 data 字段"""
+    body = response.json()
+    return body.get("data", body)
+
+
 class TestGetPlans:
     """获取套餐列表测试"""
     
@@ -18,7 +24,7 @@ class TestGetPlans:
         response = await client.get("/api/plans")
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert isinstance(data, list)
         assert len(data) == 0
     
@@ -34,7 +40,7 @@ class TestGetPlans:
         response = await client.get("/api/plans")
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data) == 2
         assert data[0]["name"] in ["月度套餐", "年度套餐"]
     
@@ -49,7 +55,7 @@ class TestGetPlans:
         response = await client.get("/api/plans")
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data) == 1
         assert data[0]["name"] == "有效套餐"
 
@@ -71,7 +77,7 @@ class TestCreatePlan:
         response = await client.post("/api/plans", json=plan_data, headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["name"] == "新套餐"
         assert float(data["price"]) == 199.00
         assert data["duration_days"] == 60
@@ -109,7 +115,7 @@ class TestUpdatePlan:
         response = await client.put(f"/api/plans/{plan.id}", json=update_data, headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["name"] == "更新后套餐"
         assert float(data["price"]) == 149.00
     
