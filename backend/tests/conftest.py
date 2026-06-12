@@ -170,3 +170,21 @@ def sample_feedback_data():
         "content": "这是一个测试工单内容",
         "status": "pending"
     }
+
+
+# ===== 响应格式辅助函数 =====
+
+def get_data(response):
+    """从统一响应格式 {"success": True, "data": ...} 中提取 data 字段"""
+    body = response.json()
+    if isinstance(body, dict) and "data" in body:
+        return body["data"]
+    return body
+
+
+def get_json(response):
+    """获取响应 JSON 的 data 部分（兼容旧格式）"""
+    body = response.json()
+    if isinstance(body, dict) and "data" in body:
+        return body["data"]
+    return body

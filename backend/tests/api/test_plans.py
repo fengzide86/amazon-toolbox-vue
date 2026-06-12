@@ -124,7 +124,10 @@ class TestUpdatePlan:
         """测试更新不存在的套餐"""
         response = await client.put("/api/plans/99999", json={"name": "不存在"}, headers=auth_headers)
         
-        assert response.status_code == 404
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is False
+        assert "不存在" in body["message"]
 
 
 class TestDeletePlan:
@@ -153,4 +156,7 @@ class TestDeletePlan:
         """测试删除不存在的套餐"""
         response = await client.delete("/api/plans/99999", headers=auth_headers)
         
-        assert response.status_code == 404
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is False
+        assert "不存在" in body["message"]
