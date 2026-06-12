@@ -32,6 +32,15 @@
 - 生产分支 `main`，开发分支 `feature/xxx`，修复分支 `fix/xxx`
 - 提交格式：`feat/fix/docs/refactor/test: 描述`
 - 用户说"保存代码" → `git add . && git commit && git push`
+- **代理配置**：Clash 代理 `http://127.0.0.1:7897`，git push 失败时配置：
+  ```
+  git config --global http.proxy http://127.0.0.1:7897
+  git config --global https.proxy http://127.0.0.1:7897
+  git push
+  # 推送完成后取消代理
+  git config --global --unset http.proxy
+  git config --global --unset https.proxy
+  ```
 
 ## 测试规范
 
