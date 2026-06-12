@@ -1,0 +1,66 @@
+{
+  "name": "amazon-toolbox",
+  "version": "1.0.5",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --mode development",
+    "build": "vite build --mode production",
+    "preview": "vite preview",
+    "electron:dev": "vite build --mode production && electron .",
+    "electron:build": "vite build --mode production && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win nsis",
+    "electron:preview": "electron .",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@sentry/vue": "^10.57.0",
+    "chart.js": "^4.5.1",
+    "electron-updater": "^6.8.3",
+    "pinia": "^3.0.4",
+    "vue": "^3.4.21",
+    "vue-chartjs": "^5.3.3",
+    "vue-router": "^4.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.4",
+    "@vue/test-utils": "^2.4.11",
+    "electron": "^42.3.3",
+    "electron-builder": "^26.8.1",
+    "happy-dom": "^20.10.2",
+    "jsdom": "^29.1.1",
+    "vite": "^5.1.6",
+    "vitest": "^4.1.8"
+  },
+  "build": {
+    "appId": "com.amazon.toolbox",
+    "productName": "亚马逊赛训效率工具箱",
+    "directories": {
+      "output": "release"
+    },
+    "extraFiles": [],
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "亚马逊工具箱"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "http://8.130.113.104:8000/updates/",
+      "channel": "latest"
+    }
+  }
+}

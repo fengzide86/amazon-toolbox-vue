@@ -1,0 +1,101 @@
+# CI/CD 测试工作流
+# 每次提交代码或创建 PR 时自动运行测试
+
+name: Test
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  # 后端测试
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      
+      - name: Run tests
+        run: |
+          cd backend
+          pytest -v --tb=short
+      
+      - name: Run tests with coverage
+        run: |
+          cd backend
+          pip install pytest-cov
+          pytest --cov=. --cov-report=xml --cov-report=html
+      
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/htmlcov/
+
+  # 前端测试
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -D vitest @vitejs/plugin-vue jsdom
+      
+      - name: Run tests
+        run: npm run test:run
+      
+      - name: Run tests with coverage
+        run: npm install -D @vitest/coverage-v8 && npm run test:coverage
+      
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage/
+
+  # 测试报告汇总
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test]
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          echo "Backend tests: ${{ needs.backend-test.result }}"
+          echo "Frontend tests: ${{ needs.frontend-test.result }}"
+          
+          if [ "${{ needs.backend-test.result }}" != "success" ] || [ "${{ needs.frontend-test.result }}" != "success" ]; then
+            echo "❌ Some tests failed!"
+            exit 1
+          fi
+          
+          echo "✅ All tests passed!"
