@@ -1,0 +1,82 @@
+@echo off
+chcp 65001 >nul
+echo ============================================
+echo   Amazon Toolbox - Build
+echo ============================================
+echo.
+cd /d "%~dp0"
+
+echo [0/4] Cleaning old release...
+if exist "release" (
+    echo Deleting old release directory...
+    rd /s /q "release" 2>nul
+    if exist "release" (
+        echo Warning: release directory cannot be deleted, may be locked by antivirus
+        pause
+        exit /b 1
+    )
+    echo release directory deleted
+)
+echo.
+
+echo [1/4] Building frontend...
+echo.
+call npm run build
+if errorlevel 1 (
+    echo Frontend build failed!
+    pause
+    exit /b 1
+)
+echo Frontend build complete!
+echo.
+
+echo [2/4] Packaging backend as exe...
+echo.
+cd backend
+python -m PyInstaller --noconfirm --onefile --console --name toolbox-backend --distpath ..\electron --workpath build --specpath build --hidden-import aiosqlite --hidden-import uvicorn.logging --hidden-import uvicorn.loops --hidden-import uvicorn.loops.auto --hidden-import uvicorn.protocols --hidden-import uvicorn.protocols.http --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan --hidden-import uvicorn.lifespan.on --hidden-import sqlalchemy.ext.asyncio --hidden-import sqlalchemy.dialects.sqlite --hidden-import starlette.middleware --hidden-import starlette.middleware.cors --hidden-import core.config --hidden-import core.security --hidden-import core.exceptions --hidden-import core.logging --hidden-import routers.auth --hidden-import routers.dashboard --hidden-import routers.plans --hidden-import routers.auth_codes --hidden-import routers.orders --hidden-import routers.users --hidden-import routers.logs --hidden-import routers.feedback --hidden-import routers.profit --hidden-import routers.settings --hidden-import routers.tools --hidden-import routers.updates --hidden-import routers.devices --hidden-import services.seed_service main.py
+if errorlevel 1 (
+    echo Backend packaging failed!
+    pause
+    exit /b 1
+)
+cd ..
+echo Backend packaging complete!
+echo.
+
+echo [3/4] Copying startup script...
+echo.
+copy /Y "electron\start-backend.bat" "electron\start-backend.bat" >nul 2>&1
+echo Startup script ready
+echo.
+
+echo [4/4] Generating installer...
+echo.
+:: 设置 Electron 国内镜像源（加速下载）
+set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
+set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
+set CSC_IDENTITY_AUTO_DISCOVERY=false
+call npx electron-builder --win nsis
+if errorlevel 1 (
+    echo Installer generation failed!
+    echo.
+    echo Possible causes:
+    echo 1. Antivirus locked release directory
+    echo 2. Previous program process not closed
+    echo.
+    echo Solutions:
+    echo 1. Close all related programs
+    echo 2. Temporarily disable antivirus real-time protection
+    echo 3. Manually delete release directory and retry
+    pause
+    exit /b 1
+)
+echo.
+
+:: 从 package.json 读取版本号
+for /f "tokens=2 delims=:, " %%a in ('findstr /c:"\"version\"" package.json') do set PKG_VERSION=%%~a
+echo ============================================
+echo   Build complete!
+echo   Installer: release\Amazon Toolbox Setup %PKG_VERSION%.exe
+echo ============================================
+echo.
+pause
