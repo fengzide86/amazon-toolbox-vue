@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
 from models import Order, AuthCode, User, RunLog, Feedback, Plan
+from tests.conftest import get_data
 
 
 class TestGetDashboard:
@@ -18,7 +19,7 @@ class TestGetDashboard:
         response = await client.get("/api/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["total_revenue"] == 0
         assert data["total_orders"] == 0
         assert data["active_codes"] == 0
@@ -40,7 +41,7 @@ class TestGetDashboard:
         response = await client.get("/api/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["total_orders"] == 3
         assert data["total_revenue"] == 298.00  # 只计算 paid 和 refunded
     
@@ -55,7 +56,7 @@ class TestGetDashboard:
         response = await client.get("/api/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["total_users"] == 2
     
     @pytest.mark.asyncio
@@ -70,7 +71,7 @@ class TestGetDashboard:
         response = await client.get("/api/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["active_codes"] == 2
     
     @pytest.mark.asyncio
@@ -84,7 +85,7 @@ class TestGetDashboard:
         response = await client.get("/api/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["pending_tickets"] == 1
     
     @pytest.mark.asyncio
@@ -104,7 +105,7 @@ class TestGetDashboardCharts:
         response = await client.get("/api/dashboard/charts", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert "revenue_trend" in data
         assert "plan_distribution" in data
         assert "tool_success_rate" in data
@@ -121,7 +122,7 @@ class TestGetDashboardCharts:
         response = await client.get("/api/dashboard/charts", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data["revenue_trend"]) == 7
         # 今天的数据应该有值
         today_data = data["revenue_trend"][-1]
@@ -144,7 +145,7 @@ class TestGetDashboardCharts:
         response = await client.get("/api/dashboard/charts", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data["plan_distribution"]) >= 2
     
     @pytest.mark.asyncio
@@ -161,7 +162,7 @@ class TestGetDashboardCharts:
         response = await client.get("/api/dashboard/charts", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data["tool_success_rate"]) >= 1
         # 工具A的成功率应该是 67% (2/3)
         tool_a = next((t for t in data["tool_success_rate"] if t["name"] == "工具A"), None)

@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import RunLog, User, AuthCode, Plan
+from tests.conftest import get_data
 
 
 async def seed_logs(db_session: AsyncSession):
@@ -34,35 +35,35 @@ async def seed_logs(db_session: AsyncSession):
 class TestGetLogs:
     """获取日志列表"""
 
-    async def test_get_logs_empty(self, client: AsyncClient):
+    async def test_get_logs_empty(self, client: AsyncClient, auth_headers: dict):
         """无日志时返回空列表"""
-        resp = await client.get("/api/logs")
+        resp = await client.get("/api/logs", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert get_data(resp) == []
 
-    async def test_get_logs_with_data(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_logs_with_data(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """有日志时返回数据"""
         user = await seed_logs(db_session)
-        resp = await client.get("/api/logs", params={"user_id": user.id})
+        resp = await client.get("/api/logs", params={"user_id": user.id}, headers=auth_headers)
         assert resp.status_code == 200
-        data = resp.json()
+        data = get_data(resp)
         assert len(data) == 3
 
-    async def test_get_logs_filter_by_tool(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_logs_filter_by_tool(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """按工具名筛选"""
         user = await seed_logs(db_session)
-        resp = await client.get("/api/logs", params={"user_id": user.id, "tool_name": "工具A"})
+        resp = await client.get("/api/logs", params={"user_id": user.id, "tool_name": "工具A"}, headers=auth_headers)
         assert resp.status_code == 200
-        data = resp.json()
+        data = get_data(resp)
         assert len(data) == 2
         assert all(log["tool_name"] == "工具A" for log in data)
 
-    async def test_get_logs_filter_by_status(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_logs_filter_by_status(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """按状态筛选"""
         user = await seed_logs(db_session)
-        resp = await client.get("/api/logs", params={"user_id": user.id, "status": "success"})
+        resp = await client.get("/api/logs", params={"user_id": user.id, "status": "success"}, headers=auth_headers)
         assert resp.status_code == 200
-        data = resp.json()
+        data = get_data(resp)
         assert len(data) == 2
         assert all(log["status"] == "success" for log in data)
 
@@ -71,18 +72,18 @@ class TestGetLogs:
 class TestGetLogTools:
     """获取工具名称列表"""
 
-    async def test_get_log_tools_empty(self, client: AsyncClient):
+    async def test_get_log_tools_empty(self, client: AsyncClient, auth_headers: dict):
         """无日志时返回空列表"""
-        resp = await client.get("/api/logs/tools")
+        resp = await client.get("/api/logs/tools", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert get_data(resp) == []
 
-    async def test_get_log_tools_unique(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_log_tools_unique(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """返回去重的工具名"""
         await seed_logs(db_session)
-        resp = await client.get("/api/logs/tools")
+        resp = await client.get("/api/logs/tools", headers=auth_headers)
         assert resp.status_code == 200
-        data = resp.json()
+        data = get_data(resp)
         assert "工具A" in data
         assert "工具B" in data
         assert len(data) == 2
@@ -92,16 +93,16 @@ class TestGetLogTools:
 class TestExportLogs:
     """导出日志 CSV"""
 
-    async def test_export_logs_empty(self, client: AsyncClient):
+    async def test_export_logs_empty(self, client: AsyncClient, auth_headers: dict):
         """无日志时导出空 CSV"""
-        resp = await client.get("/api/logs/export")
+        resp = await client.get("/api/logs/export", headers=auth_headers)
         assert resp.status_code == 200
         assert "text/csv" in resp.headers.get("content-type", "")
 
-    async def test_export_logs_with_data(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_export_logs_with_data(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """有日志时导出含数据"""
         await seed_logs(db_session)
-        resp = await client.get("/api/logs/export")
+        resp = await client.get("/api/logs/export", headers=auth_headers)
         assert resp.status_code == 200
         content = resp.text
         assert "工具A" in content

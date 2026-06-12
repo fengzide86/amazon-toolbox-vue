@@ -7,23 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import User, Setting
 from core.security import hash_password
+from tests.conftest import get_data
 
 
 class TestGetUsers:
     """获取用户列表测试"""
     
     @pytest.mark.asyncio
-    async def test_get_users_empty(self, client: AsyncClient):
+    async def test_get_users_empty(self, client: AsyncClient, auth_headers: dict):
         """测试获取空用户列表"""
-        response = await client.get("/api/users")
+        response = await client.get("/api/users", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert isinstance(data, list)
         assert len(data) == 0
     
     @pytest.mark.asyncio
-    async def test_get_users_with_data(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_users_with_data(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """测试获取用户列表（有数据）"""
         # 创建测试用户
         user1 = User(name="用户1", phone="13800138001", device_id="device-001")
@@ -31,15 +32,15 @@ class TestGetUsers:
         db_session.add_all([user1, user2])
         await db_session.commit()
         
-        response = await client.get("/api/users")
+        response = await client.get("/api/users", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data) == 2
         assert data[0]["name"] in ["用户1", "用户2"]
     
     @pytest.mark.asyncio
-    async def test_get_users_pagination(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_users_pagination(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """测试用户列表分页"""
         # 创建多个用户
         for i in range(15):
@@ -48,15 +49,15 @@ class TestGetUsers:
         await db_session.commit()
         
         # 第一页
-        response = await client.get("/api/users?page=1&page_size=10")
+        response = await client.get("/api/users?page=1&page_size=10", headers=auth_headers)
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data) == 10
         
         # 第二页
-        response = await client.get("/api/users?page=2&page_size=10")
+        response = await client.get("/api/users?page=2&page_size=10", headers=auth_headers)
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert len(data) == 5
 
 
@@ -64,25 +65,27 @@ class TestGetUser:
     """获取用户详情测试"""
     
     @pytest.mark.asyncio
-    async def test_get_user_success(self, client: AsyncClient, db_session: AsyncSession):
+    async def test_get_user_success(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """测试成功获取用户详情"""
         user = User(name="测试用户", phone="13800138000", device_id="test-device")
         db_session.add(user)
         await db_session.commit()
         
-        response = await client.get(f"/api/users/{user.id}")
+        response = await client.get(f"/api/users/{user.id}", headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["name"] == "测试用户"
         assert data["phone"] == "13800138000"
     
     @pytest.mark.asyncio
-    async def test_get_user_not_found(self, client: AsyncClient):
+    async def test_get_user_not_found(self, client: AsyncClient, auth_headers: dict):
         """测试获取不存在的用户"""
-        response = await client.get("/api/users/99999")
+        response = await client.get("/api/users/99999", headers=auth_headers)
         
-        assert response.status_code == 404
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is False
 
 
 class TestUpdateUser:
@@ -99,7 +102,7 @@ class TestUpdateUser:
         response = await client.put(f"/api/users/{user.id}", json=update_data, headers=auth_headers)
         
         assert response.status_code == 200
-        data = response.json()
+        data = get_data(response)
         assert data["name"] == "新名字"
         assert data["phone"] == "13900139000"
     
@@ -120,4 +123,6 @@ class TestUpdateUser:
         """测试更新不存在的用户"""
         response = await client.put("/api/users/99999", json={"name": "不存在"}, headers=auth_headers)
         
-        assert response.status_code == 404
+        assert response.status_code == 200
+        body = response.json()
+        assert body["success"] is False

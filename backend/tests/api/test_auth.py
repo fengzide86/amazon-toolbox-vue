@@ -22,7 +22,8 @@ class TestHealthCheck:
         data = response.json()
         assert data["status"] == "ok"
         assert "version" in data
-        assert "db_type" in data
+        assert "checks" in data
+        assert data["checks"]["database"]["status"] == "ok"
 
 
 class TestAdminLogin:

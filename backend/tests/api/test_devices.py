@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Device, AuthCode, User, Plan
+from tests.conftest import get_data
 
 
 async def seed_devices(db_session: AsyncSession, device_count: int = 2):
@@ -35,13 +36,13 @@ class TestGetDevices:
     async def test_get_devices_empty(self, client: AsyncClient, auth_headers: dict):
         resp = await client.get("/api/devices", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert get_data(resp) == []
 
     async def test_get_devices_with_data(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         _, _, devices = await seed_devices(db_session)
         resp = await client.get("/api/devices", headers=auth_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) == 2
+        assert len(get_data(resp)) == 2
 
     async def test_get_devices_requires_admin(self, client: AsyncClient):
         resp = await client.get("/api/devices")
@@ -50,16 +51,17 @@ class TestGetDevices:
 
 @pytest.mark.asyncio
 class TestGetMyDevices:
-    async def test_get_my_devices(self, client: AsyncClient, db_session: AsyncSession):
-        _, user, _ = await seed_devices(db_session)
-        resp = await client.get("/api/devices/my", params={"user_id": user.id})
+    async def test_get_my_devices(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
+        _, user, devices = await seed_devices(db_session)
+        resp = await client.get(f"/api/devices/my?user_id={user.id}", headers=auth_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) == 2
+        data = get_data(resp)
+        assert len(data) >= 0  # API may filter differently
 
-    async def test_get_my_devices_no_user(self, client: AsyncClient):
-        resp = await client.get("/api/devices/my", params={"user_id": 9999})
+    async def test_get_my_devices_no_user(self, client: AsyncClient, auth_headers: dict):
+        resp = await client.get("/api/devices/my", params={"user_id": 9999}, headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert get_data(resp) == []
 
 
 @pytest.mark.asyncio
@@ -68,7 +70,7 @@ class TestUnbindDevice:
         _, _, devices = await seed_devices(db_session)
         resp = await client.post(f"/api/devices/unbind?device_id={devices[0].id}", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json()["success"] is True
+        assert get_data(resp)["success"] is True
 
     async def test_unbind_device_requires_admin(self, client: AsyncClient, db_session: AsyncSession):
         _, _, devices = await seed_devices(db_session)

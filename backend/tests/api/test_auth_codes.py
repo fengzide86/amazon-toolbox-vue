@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Plan, AuthCode
+from tests.conftest import get_data
 
 
 async def seed_plans(db_session: AsyncSession):
@@ -90,7 +91,7 @@ class TestPlanCodePrefix:
         plans = await seed_plans(db_session)
         resp = await client.get("/api/plans")
         assert resp.status_code == 200
-        data = resp.json()
+        data = get_data(resp)
         svip = next(p for p in data if p["price"] == 999)
         assert svip["code_prefix"] == "SVIP"
 
@@ -98,6 +99,6 @@ class TestPlanCodePrefix:
         """无前缀的套餐 code_prefix 为 null"""
         plans = await seed_plans(db_session)
         resp = await client.get("/api/plans")
-        data = resp.json()
+        data = get_data(resp)
         basic = next(p for p in data if p["price"] == 99)
         assert basic["code_prefix"] is None
