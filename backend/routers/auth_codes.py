@@ -31,8 +31,13 @@ def generate_random_code(length: int = 6) -> str:
 
 
 @router.get("", response_model=List[AuthCodeResponse])
-async def get_auth_codes(page: int = 1, page_size: int = 100, db: AsyncSession = Depends(get_db)):
-    """获取授权码列表（支持分页）"""
+async def get_auth_codes(
+    page: int = 1,
+    page_size: int = 100,
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(get_current_admin)
+):
+    """获取授权码列表（支持分页）- 仅管理员"""
     offset = (page - 1) * page_size
     result = await db.execute(
         select(AuthCode)
