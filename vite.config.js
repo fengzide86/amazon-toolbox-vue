@@ -1,11 +1,8 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig(({ mode }) => {
-  // 加载环境变量：.env.development 或 .env.production
-  const env = loadEnv(mode, process.cwd(), '')
-
   return {
     plugins: [vue()],
     resolve: {
@@ -18,10 +15,49 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       open: true
     },
-    // 将环境变量注入前端代码
-    define: {
-      'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE || 'http://8.130.113.104:8000'),
-      'import.meta.env.VITE_ENV': JSON.stringify(env.VITE_ENV || 'production')
-    }
+    // 预构建依赖，加速开发服务器启动
+    optimizeDeps: {
+      include: [
+        'vue',
+        'vue-router',
+        'pinia',
+        'chart.js',
+        'vue-chartjs',
+      ],
+      exclude: [
+        // Sentry 体积大，不预构建
+      ]
+    },
+    build: {
+      // 代码分割策略
+      rollupOptions: {
+        output: {
+          // 手动分割 chunk
+          manualChunks: {
+            'vendor-vue': ['vue', 'vue-router', 'pinia'],
+            'vendor-chart': ['chart.js', 'vue-chartjs'],
+            'vendor-sentry': mode === 'production' ? ['@sentry/vue'] : undefined,
+          },
+          // 减小 chunk 大小警告阈值
+          chunkFileNames: 'assets/js/[name]-[hash].js',
+          entryFileNames: 'assets/js/[name]-[hash].js',
+          assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+        }
+      },
+      // 生产环境移除 console 和 debugger
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: mode === 'production',
+          drop_debugger: true,
+        }
+      },
+      // 分包大小警告阈值（KB）
+      chunkSizeWarningLimit: 500,
+      // CSS 代码分离
+      cssCodeSplit: true,
+      // 生成 sourcemap（仅开发环境）
+      sourcemap: mode !== 'production',
+    },
   }
 })

@@ -45,8 +45,8 @@ describe('LoginView', () => {
   describe('渲染测试', () => {
     it('应该正确渲染登录页面', () => {
       const wrapper = mountWithPinia(LoginView)
-      expect(wrapper.find('.login-container').exists()).toBe(true)
-      expect(wrapper.find('.login-card').exists()).toBe(true)
+      expect(wrapper.find('.login-page').exists()).toBe(true)
+      expect(wrapper.find('.login-form-card').exists()).toBe(true)
     })
 
     it('应该显示应用标题', () => {
@@ -270,10 +270,9 @@ describe('LoginView', () => {
 
       expect(wrapper.find('.modal-overlay').classes()).toContain('show')
       
-      // 模拟 Escape 键
-      const event = new KeyboardEvent('keydown', { key: 'Escape' })
-      document.dispatchEvent(event)
-      await wrapper.vm.$nextTick()
+      // 模拟点击遮罩层关闭（组件通过 @click.self 实现）
+      const overlay = wrapper.find('.modal-overlay')
+      await overlay.trigger('click')
       
       expect(wrapper.find('.modal-overlay').classes()).not.toContain('show')
     })

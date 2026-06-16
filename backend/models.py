@@ -40,6 +40,25 @@ class LogStatus:
     FAILED = "failed"      # 失败
 
 
+class ChatSessionStatus:
+    """对话会话状态"""
+    ACTIVE = "active"          # 进行中
+    RESOLVED = "resolved"      # 已解决
+    TRANSFERRED = "transferred"  # 已转人工
+
+
+class KnowledgeCategory:
+    """知识库分类"""
+    INSTALL = "安装教程"
+    AUTH = "授权说明"
+    USAGE = "使用教程"
+    ERROR = "报错处理"
+    PLAN = "套餐说明"
+    REFUND = "退款规则"
+    CONTEST = "比赛须知"
+    OTHER = "其他"
+
+
 # ===== 数据模型 =====
 
 # 1. settings - 系统设置（键值对）
@@ -205,4 +224,96 @@ class ProfitRecord(Base):
     
     __table_args__ = (
         Index('ix_profit_order', 'order_id'),
+    )
+
+
+# ===== AI 客服相关模型 =====
+
+# 9. knowledge_base - 知识库
+class KnowledgeBase(Base):
+    __tablename__ = "knowledge_base"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(50), nullable=False, index=True)       # 分类
+    title = Column(String(200), nullable=False)                     # 标题
+    content = Column(Text, nullable=False)                          # 内容(Markdown)
+    keywords = Column(Text, nullable=True)                          # 关键词(JSON数组)
+    priority = Column(String(10), default="medium")                 # high/medium/low
+    status = Column(String(20), default="active", index=True)       # active/disabled
+    vector_id = Column(String(100), nullable=True)                  # ChromaDB向量ID
+    view_count = Column(Integer, default=0)                         # 查看次数
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('ix_knowledge_category_status', 'category', 'status'),
+    )
+
+
+# 10. chat_sessions - AI对话会话
+class ChatSession(Base):
+    __tablename__ = "chat_sessions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    session_id = Column(String(100), unique=True, nullable=False, index=True)
+    status = Column(String(20), default="active", index=True)       # active/resolved/transferred
+    message_count = Column(Integer, default=0)
+    ai_resolved = Column(Boolean, default=False)                    # AI是否解决
+    transferred_to_human = Column(Boolean, default=False)           # 是否转人工
+    satisfaction = Column(Integer, nullable=True)                   # 满意度1-5
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+    resolved_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('ix_chat_sessions_user_status', 'user_id', 'status'),
+    )
+
+
+# 11. chat_messages - AI对话消息
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(100), nullable=False, index=True)
+    role = Column(String(20), nullable=False)                       # user/ai/system
+    content = Column(Text, nullable=False)
+    knowledge_ids = Column(Text, nullable=True)                     # 引用的知识ID(JSON数组)
+    created_at = Column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        Index('ix_chat_messages_session', 'session_id', 'created_at'),
+    )
+
+
+# 12. chat_config - AI客服配置
+class ChatConfig(Base):
+    __tablename__ = "chat_config"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(100), unique=True, nullable=False)
+    value = Column(Text, nullable=True)
+    description = Column(String(200), nullable=True)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+# ===== 公告系统 =====
+
+class AnnouncementStatus:
+    """公告状态"""
+    DRAFT = "draft"        # 草稿
+    PUBLISHED = "published"  # 已发布
+    EXPIRED = "expired"    # 已过期
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    type = Column(String(20), default="info", index=True)  # info/warning/success/urgent
+    status = Column(String(20), default="draft", index=True)  # draft/published/expired
+    priority = Column(Integer, default=0)  # 优先级，越大越靠前
+    expires_at = Column(DateTime, nullable=True)  # 过期时间
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('ix_announcements_status_priority', 'status', 'priority'),
     )

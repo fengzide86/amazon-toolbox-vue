@@ -9,6 +9,7 @@
     --color-accent-light: #818CF8;
     --color-gold: #F59E0B;
     --color-background: #F8FAFC;
+    --color-body-bg: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #DBEAFE 100%);
     --color-foreground: #020617;
     --color-muted: #64748B;
     --color-border: #E2E8F0;
@@ -72,9 +73,44 @@ input, textarea, select, button, a, [role="button"] {
 
 body {
     font-family: var(--font-family);
-    background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #DBEAFE 100%);
+    background: var(--color-body-bg);
     color: var(--color-foreground);
     min-height: 100vh;
+}
+
+/* ===== Shared Sidebar Footer Styles ===== */
+.sidebar-footer {
+    margin-top: auto;
+    padding: 0.75rem;
+    border-top: 1px solid var(--color-border);
+}
+
+.btn-logout {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.625rem;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.btn-logout:hover {
+    background: rgba(220, 38, 38, 0.06);
+    border-color: rgba(220, 38, 38, 0.3);
+    color: var(--color-destructive);
+}
+
+.btn-logout svg {
+    width: 16px;
+    height: 16px;
 }
 
 /* ===== Focus Styles (Accessibility) ===== */
@@ -91,12 +127,19 @@ a:focus-visible {
 }
 
 /* ===== Page Transition ===== */
-.page-enter-active,
-.page-leave-active {
-    transition: opacity 0.3s ease;
+.page-enter-active {
+    transition: opacity var(--transition-slow), transform var(--transition-slow);
 }
 
-.page-enter-from,
+.page-leave-active {
+    transition: opacity var(--transition);
+}
+
+.page-enter-from {
+    opacity: 0;
+    transform: translateY(12px);
+}
+
 .page-leave-to {
     opacity: 0;
 }
@@ -840,6 +883,27 @@ a:focus-visible {
     border-top: 1px solid var(--color-border);
 }
 
+/* ===== Form Row (表单行) ===== */
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    padding: var(--spacing-md);
+}
+
+.form-row .form-input {
+    width: auto;
+    min-width: 160px;
+}
+
+/* ===== Empty Row (表格空行) ===== */
+.empty-row {
+    text-align: center;
+    color: var(--color-muted);
+    padding: 2rem;
+}
+
 /* ===== Filter Bar (筛选栏) ===== */
 .filter-bar {
     display: flex;
@@ -969,8 +1033,9 @@ a:focus-visible {
 }
 
 @keyframes toastIn {
-    from { opacity: 0; transform: translateX(100px); }
-    to { opacity: 1; transform: translateX(0); }
+    0% { opacity: 0; transform: translateX(100px) scale(0.9); }
+    70% { transform: translateX(-4px) scale(1.02); }
+    100% { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 @keyframes toastOut {
@@ -1140,6 +1205,230 @@ a:focus-visible {
     }
 }
 
+/* ===== Dark Mode ===== */
+[data-theme="dark"],
+.dark-mode {
+    --color-primary: #F1F5F9;
+    --color-foreground: #E2E8F0;
+    --color-background: #0F172A;
+    --color-muted: #94A3B8;
+    --color-border: #1E293B;
+    --color-border-light: #1E293B;
+    --color-destructive: #F87171;
+    --color-destructive-hover: #EF4444;
+    --color-warning: #FBBF24;
+    --color-success: #34D399;
+    --color-info: #22D3EE;
+    --color-purple: #A78BFA;
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] body,
+.dark-mode body {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+    color: var(--color-foreground);
+}
+
+[data-theme="dark"] .sidebar,
+[data-theme="dark"] .table-card,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .card,
+[data-theme="dark"] .chart-card,
+[data-theme="dark"] .modal,
+[data-theme="dark"] .kickout-card,
+[data-theme="dark"] .tool-running-card {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+[data-theme="dark"] .header {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: #334155;
+}
+
+[data-theme="dark"] .data-table th {
+    background: #0F172A;
+    border-color: #334155;
+}
+
+[data-theme="dark"] .data-table td {
+    border-color: #334155;
+}
+
+[data-theme="dark"] .data-table tr:hover td {
+    background: #334155;
+}
+
+[data-theme="dark"] .form-input {
+    background: #0F172A;
+    border-color: #334155;
+    color: var(--color-foreground);
+}
+
+[data-theme="dark"] .btn-secondary {
+    background: #334155;
+    border-color: #475569;
+    color: var(--color-foreground);
+}
+
+[data-theme="dark"] .btn-secondary:hover:not(:disabled) {
+    background: #475569;
+}
+
+[data-theme="dark"] .btn-ghost {
+    border-color: #334155;
+}
+
+[data-theme="dark"] .btn-ghost:hover:not(:disabled) {
+    background: #334155;
+}
+
+[data-theme="dark"] .pagination-btn {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+[data-theme="dark"] .pagination-btn:hover:not(:disabled) {
+    background: #334155;
+}
+
+[data-theme="dark"] .sidebar-nav a:hover {
+    background: #334155;
+}
+
+[data-theme="dark"] .empty-state-icon {
+    background: #334155;
+}
+
+[data-theme="dark"] .chart-header .period {
+    background: #334155;
+}
+
+[data-theme="dark"] .progress-bar-container {
+    background: #334155;
+}
+
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
+}
+
+/* Dark mode toggle button */
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.theme-toggle:hover {
+    background: var(--color-border-light);
+    color: var(--color-primary);
+}
+
+.theme-toggle svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ===== Custom Scrollbar ===== */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-muted);
+}
+
+/* ===== Tool Card Stagger Animation ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tool-card {
+    opacity: 0;
+    animation: fadeInUp 400ms ease forwards;
+}
+
+.tool-card:nth-child(1) { animation-delay: 0ms; }
+.tool-card:nth-child(2) { animation-delay: 50ms; }
+.tool-card:nth-child(3) { animation-delay: 100ms; }
+.tool-card:nth-child(4) { animation-delay: 150ms; }
+.tool-card:nth-child(5) { animation-delay: 200ms; }
+.tool-card:nth-child(6) { animation-delay: 250ms; }
+.tool-card:nth-child(7) { animation-delay: 300ms; }
+.tool-card:nth-child(8) { animation-delay: 350ms; }
+.tool-card:nth-child(9) { animation-delay: 400ms; }
+.tool-card:nth-child(10) { animation-delay: 450ms; }
+.tool-card:nth-child(11) { animation-delay: 500ms; }
+.tool-card:nth-child(12) { animation-delay: 550ms; }
+
+/* ===== Modal Form Row ===== */
+.modal-form-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.modal-form-row label {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.modal-input {
+  width: 100px;
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+}
+
+.modal-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+}
+
+/* ===== Table Actions ===== */
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-table {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  min-height: 28px;
+}
+
 /* ===== Reduced Motion (Accessibility) ===== */
 @media (prefers-reduced-motion: reduce) {
     *,
@@ -1149,5 +1438,10 @@ a:focus-visible {
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+    
+    .tool-card {
+        opacity: 1;
+        animation: none;
     }
 }

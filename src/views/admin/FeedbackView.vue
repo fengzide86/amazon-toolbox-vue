@@ -1,11 +1,9 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 1.5rem;">
-      工单管理
-    </h2>
+    <h2 class="page-title">工单管理</h2>
 
-    <div class="filter-bar" style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
-      <select v-model="filterStatus" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
+    <div class="filter-bar">
+      <select v-model="filterStatus" class="form-input">
         <option value="">全部状态</option>
         <option value="pending">待处理</option>
         <option value="processing">处理中</option>

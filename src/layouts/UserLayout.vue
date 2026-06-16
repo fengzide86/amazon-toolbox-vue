@@ -10,9 +10,13 @@
     ></div>
     
     <div class="layout">
-      <UserSidebar :class="{ 'mobile-open': showMobileSidebar }" />
+      <UserSidebar 
+        :class="{ 'mobile-open': showMobileSidebar }" 
+        ref="sidebarRef"
+      />
       <main class="content">
         <Breadcrumb />
+        <AnnouncementBanner />
         <router-view />
       </main>
     </div>
@@ -42,9 +46,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Auth, showToast, getDeviceId } from '@/utils'
+import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
 import { checkAuthStatus } from '@/utils/api'
 import AppHeader from '@/components/AppHeader.vue'
 import UserSidebar from '@/components/UserSidebar.vue'
@@ -55,6 +60,7 @@ const route = useRoute()
 const showKickout = ref(false)
 const kickoutMessage = ref('')
 const showMobileSidebar = ref(false)
+const sidebarRef = ref(null)
 let pollTimer = null
 let initialTimer = null
 
@@ -62,11 +68,44 @@ function toggleSidebar() {
   showMobileSidebar.value = !showMobileSidebar.value
   // 防止背景滚动
   document.body.style.overflow = showMobileSidebar.value ? 'hidden' : ''
+  
+  // 焦点管理：侧边栏打开时将焦点移入侧边栏
+  if (showMobileSidebar.value) {
+    nextTick(() => {
+      const firstLink = sidebarRef.value?.$el?.querySelector('.sidebar-nav a')
+      if (firstLink) {
+        firstLink.focus()
+      }
+    })
+  }
 }
 
 function closeSidebar() {
   showMobileSidebar.value = false
   document.body.style.overflow = ''
+}
+
+// 键盘导航：Escape 关闭侧边栏
+function handleKeydown(e) {
+  if (e.key === 'Escape' && showMobileSidebar.value) {
+    closeSidebar()
+  }
+  
+  // Tab 键焦点限制在侧边栏内
+  if (e.key === 'Tab' && showMobileSidebar.value && sidebarRef.value) {
+    const sidebar = sidebarRef.value.$el
+    const focusable = sidebar.querySelectorAll('a, button, [tabindex]:not([tabindex="-1"])')
+    const first = focusable[0]
+    const last = focusable[focusable.length - 1]
+    
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
 }
 
 function goToLogin() {
@@ -121,11 +160,13 @@ router.afterEach(() => {
 
 onMounted(() => {
   startPolling()
+  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   stopPolling()
   document.body.style.overflow = ''
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 

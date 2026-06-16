@@ -54,7 +54,7 @@ describe('UserSidebar', () => {
         }
       })
       const links = wrapper.findAll('a')
-      expect(links.length).toBe(6) // 6个导航项
+      expect(links.length).toBe(7) // 7个导航项（包含AI客服）
     })
 
     it('应该包含正确的导航项目', () => {
@@ -72,6 +72,7 @@ describe('UserSidebar', () => {
       expect(text).toContain('常见问题')
       expect(text).toContain('套餐价格')
       expect(text).toContain('设备管理')
+      expect(text).toContain('AI 客服')
     })
 
     it('应该渲染退出登录按钮', () => {
@@ -106,6 +107,7 @@ describe('UserSidebar', () => {
       expect(routes).toContain('/user/faq')
       expect(routes).toContain('/user/plans')
       expect(routes).toContain('/user/devices')
+      expect(routes).toContain('/user/ai-chat')
     })
 
     it('当前页面应该有 aria-current 属性标记 active', () => {

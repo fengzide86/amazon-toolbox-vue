@@ -1,8 +1,6 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 1.5rem;">
-      分润管理
-    </h2>
+    <h2 class="page-title">分润管理</h2>
 
     <!-- 分润统计卡片 -->
     <section class="stats-row">

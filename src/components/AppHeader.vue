@@ -61,26 +61,6 @@ function handleLogout() {
 </script>
 
 <style scoped>
-.header-inner {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
 /* 汉堡菜单按钮 */
 .hamburger-btn {
   display: none;
@@ -109,32 +89,6 @@ function handleLogout() {
   color: var(--color-primary);
 }
 
-/* 用户信息区域 */
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.5rem 0.875rem;
-  background: var(--color-border-light);
-  border-radius: var(--radius-md);
-  font-size: 0.85rem;
-  color: var(--color-primary);
-  font-weight: 500;
-}
-
-.user-avatar {
-  width: 28px;
-  height: 28px;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-light));
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
 /* 退出按钮 */
 .header-logout-btn {
   display: flex;
@@ -157,8 +111,8 @@ function handleLogout() {
 }
 
 .header-logout-btn:hover {
-  background: rgba(220, 38, 38, 0.06);
-  border-color: rgba(220, 38, 38, 0.2);
+  background: rgba(var(--color-destructive-rgb, 239, 68, 68), 0.06);
+  border-color: rgba(var(--color-destructive-rgb, 239, 68, 68), 0.2);
   color: var(--color-destructive);
 }
 

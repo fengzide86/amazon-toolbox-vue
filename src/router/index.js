@@ -64,6 +64,12 @@ const routes = [
         name: 'UserDevices',
         component: () => import('@/views/user/DevicesView.vue'),
         meta: { title: '设备管理' }
+      },
+      {
+        path: 'ai-chat',
+        name: 'UserAIChat',
+        component: () => import('@/views/user/AIChatView.vue'),
+        meta: { title: 'AI 客服' }
       }
     ]
   },
@@ -117,6 +123,24 @@ const routes = [
         name: 'AdminFeedback',
         component: () => import('@/views/admin/FeedbackView.vue'),
         meta: { title: '工单管理' }
+      },
+      {
+        path: 'knowledge',
+        name: 'AdminKnowledge',
+        component: () => import('@/views/admin/KnowledgeView.vue'),
+        meta: { title: '知识库管理' }
+      },
+      {
+        path: 'ai-chat',
+        name: 'AdminAIChat',
+        component: () => import('@/views/admin/AIChatView.vue'),
+        meta: { title: 'AI 客服管理' }
+      },
+      {
+        path: 'announcements',
+        name: 'AdminAnnouncements',
+        component: () => import('@/views/admin/AnnouncementsView.vue'),
+        meta: { title: '公告管理' }
       }
     ]
   }

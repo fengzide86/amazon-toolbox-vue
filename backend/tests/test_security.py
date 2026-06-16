@@ -87,14 +87,15 @@ class TestPasswordFallback:
         assert match is True
         assert needs_upgrade is False
     
-    def test_plaintext_password_needs_upgrade(self):
-        """测试明文密码需要升级"""
+    def test_plaintext_password_rejected(self):
+        """测试明文密码不再被接受（安全修复）"""
         password = "plaintext_password"
         
         match, needs_upgrade = verify_password_fallback(password, password)
         
-        assert match is True
-        assert needs_upgrade is True
+        # 明文密码不再被接受
+        assert match is False
+        assert needs_upgrade is False
     
     def test_wrong_password_no_match(self):
         """测试错误密码不匹配"""

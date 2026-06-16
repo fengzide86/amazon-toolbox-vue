@@ -49,6 +49,14 @@
           设备管理
         </router-link>
       </li>
+      <li>
+        <router-link to="/user/ai-chat" active-class="active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+          </svg>
+          AI 客服
+        </router-link>
+      </li>
     </ul>
     <div class="sidebar-footer">
       <button class="btn-logout" @click="handleLogout" aria-label="退出登录">

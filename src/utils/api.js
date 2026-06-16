@@ -432,5 +432,136 @@ export function userUnbindDevice(deviceId, userId) {
     return request(`/api/devices/user-unbind?device_id=${deviceId}&user_id=${userId}`, { method: 'POST' });
 }
 
+// ===== 知识库管理 API =====
+
+// 获取知识库列表
+export function getKnowledgeList(params = {}) {
+    return api.get('/api/knowledge', params);
+}
+
+// 获取知识库分类
+export function getKnowledgeCategories() {
+    return api.get('/api/knowledge/categories');
+}
+
+// 获取知识库统计
+export function getKnowledgeStats() {
+    return api.get('/api/knowledge/stats');
+}
+
+// 获取知识条目详情
+export function getKnowledge(id) {
+    return api.get(`/api/knowledge/${id}`);
+}
+
+// 创建知识条目
+export function createKnowledge(data) {
+    return api.post('/api/knowledge', data);
+}
+
+// 更新知识条目
+export function updateKnowledge(id, data) {
+    return api.put(`/api/knowledge/${id}`, data);
+}
+
+// 删除知识条目
+export function deleteKnowledge(id) {
+    return api.delete(`/api/knowledge/${id}`);
+}
+
+// 批量导入知识
+export function batchImportKnowledge(items) {
+    return api.post('/api/knowledge/batch-import', items);
+}
+
+// 同步到向量库
+export function syncKnowledgeVector() {
+    return api.post('/api/knowledge/sync-vector');
+}
+
+// ===== AI 客服 API =====
+
+// 创建会话
+export function createChatSession() {
+    return api.post('/api/ai-chat/session');
+}
+
+// 获取会话详情
+export function getChatSession(sessionId) {
+    return api.get(`/api/ai-chat/session/${sessionId}`);
+}
+
+// 发送消息（非流式）
+export function sendChatMessage(sessionId, message) {
+    return api.post(`/api/ai-chat/session/${sessionId}/message`, { message });
+}
+
+// 标记已解决
+export function resolveChatSession(sessionId, satisfaction = null) {
+    return api.post(`/api/ai-chat/session/${sessionId}/resolve`, { satisfaction });
+}
+
+// 转人工
+export function transferChatToHuman(sessionId) {
+    return api.post(`/api/ai-chat/session/${sessionId}/transfer`);
+}
+
+// 满意度评分
+export function rateChatSession(sessionId, satisfaction) {
+    return api.post(`/api/ai-chat/session/${sessionId}/rate`, { satisfaction });
+}
+
+// 获取对话历史
+export function getChatHistory(page = 1, pageSize = 10) {
+    return api.get('/api/ai-chat/history', { page, page_size: pageSize });
+}
+
+// 获取 AI 客服配置
+export function getAIChatConfig() {
+    return api.get('/api/ai-chat/admin/config');
+}
+
+// 更新 AI 客服配置
+export function updateAIChatConfig(data) {
+    return api.put('/api/ai-chat/admin/config', data);
+}
+
+// 获取所有对话记录（管理员）
+export function getAdminChatSessions(params = {}) {
+    return api.get('/api/ai-chat/admin/sessions', params);
+}
+
+// 获取对话详情（管理员）
+export function getAdminChatSession(sessionId) {
+    return api.get(`/api/ai-chat/admin/sessions/${sessionId}`);
+}
+
+// 获取 AI 客服统计
+export function getAIChatStats() {
+    return api.get('/api/ai-chat/admin/stats');
+}
+
+// ===== Announcements =====
+export function getAnnouncements(status) {
+    const params = status ? { status } : {};
+    return api.get('/api/announcements', params);
+}
+
+export function getActiveAnnouncements() {
+    return api.get('/api/announcements/active');
+}
+
+export function createAnnouncement(data) {
+    return api.post('/api/announcements', data);
+}
+
+export function updateAnnouncement(id, data) {
+    return api.put(`/api/announcements/${id}`, data);
+}
+
+export function deleteAnnouncement(id) {
+    return api.delete(`/api/announcements/${id}`);
+}
+
 // 导出 API_BASE 供其他模块使用
 export { API_BASE };

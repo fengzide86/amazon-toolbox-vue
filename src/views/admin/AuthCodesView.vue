@@ -1,29 +1,27 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 1.5rem;">
-      授权码管理
-    </h2>
+    <h2 class="page-title">授权码管理</h2>
 
     <div class="table-card" style="margin-bottom: 1.5rem;">
       <div class="table-header">
         <h3>生成新授权码</h3>
       </div>
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-        <select v-model="selectedPlanId" class="btn btn-secondary">
+      <div class="generate-form">
+        <select v-model="selectedPlanId" class="form-input" style="max-width: 200px;">
           <option v-for="plan in plans" :key="plan.id" :value="plan.id">{{ plan.name }} - ¥{{ plan.price }}</option>
         </select>
-        <input type="number" v-model.number="generateCount" class="btn btn-secondary" placeholder="数量" style="width: 120px; padding: 0.6rem 1rem; text-align: left;" min="1" max="100">
-        <div style="display:flex;align-items:center;gap:0.5rem;">
-          <label style="font-size:0.85rem;color:var(--color-muted);">最大设备数</label>
-          <input type="number" v-model.number="maxDevices" class="btn btn-secondary" style="width:80px;padding:0.5rem 0.8rem;text-align:left;" min="1" max="10">
+        <input type="number" v-model.number="generateCount" class="form-input" placeholder="数量" style="width: 120px;" min="1" max="100">
+        <div class="device-input-group">
+          <label>最大设备数</label>
+          <input type="number" v-model.number="maxDevices" class="form-input" style="width:80px;" min="1" max="10">
         </div>
         <button class="btn btn-primary" @click="handleGenerate" :disabled="isLoading">
           {{ isLoading ? '生成中...' : '生成授权码' }}
         </button>
-        <button v-if="generatedCodes.length" class="btn btn-secondary" @click="copyCodes" style="padding: 0.6rem 1rem;">
+        <button v-if="generatedCodes.length" class="btn btn-secondary" @click="copyCodes">
           📋 一键复制
         </button>
-        <span v-if="generatedCodes.length" style="font-size: 0.85rem; color: var(--color-accent);">
+        <span v-if="generatedCodes.length" class="generated-count">
           已生成 {{ generatedCodes.length }} 个
         </span>
       </div>
@@ -35,9 +33,9 @@
     <section class="table-card">
       <div class="table-header">
         <h3>授权码列表</h3>
-        <div style="display:flex;gap:0.5rem;align-items:center;">
-          <input v-model="searchText" class="btn btn-secondary" placeholder="搜索授权码/设备..." style="padding:0.4rem 0.8rem;font-size:0.85rem;width:180px;text-align:left;">
-          <select v-model="filterStatus" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+        <div class="filter-bar">
+          <input v-model="searchText" class="form-input" placeholder="搜索授权码/设备..." style="width:180px;">
+          <select v-model="filterStatus" class="form-input">
             <option value="">全部状态</option>
             <option value="unused">未使用</option>
             <option value="active">已激活</option>
@@ -46,7 +44,7 @@
           </select>
         </div>
       </div>
-      <span style="font-size: 0.85rem; color: var(--color-muted); padding: 0 1rem;">共 {{ filteredCodes.length }} 个</span>
+      <span class="text-muted" style="padding: 0 1rem;">共 {{ filteredCodes.length }} 个</span>
       <table class="data-table">
         <thead>
           <tr>
@@ -98,9 +96,9 @@
       <div class="modal">
         <h3>修改最大设备数</h3>
         <p>授权码：{{ editingCode?.code }}</p>
-        <div style="display:flex;align-items:center;gap:1rem;margin:1rem 0;">
-          <label style="font-size:0.9rem;">最大设备数：</label>
-          <input v-model.number="newMaxDevices" type="number" min="1" max="20" class="btn btn-secondary" style="width:80px;padding:0.5rem 0.8rem;text-align:left;">
+        <div class="modal-form-row">
+          <label>最大设备数：</label>
+          <input v-model.number="newMaxDevices" type="number" min="1" max="20" class="form-input modal-input">
         </div>
         <div class="modal-btns">
           <button class="btn btn-primary" @click="saveMaxDevices">确认</button>
@@ -114,12 +112,12 @@
       <div class="modal">
         <h3>授权码延期</h3>
         <p>授权码：{{ extendingCode?.code }}</p>
-        <p style="font-size:0.8rem;color:var(--color-muted);margin-top:0.25rem;">
+        <p class="modal-subtitle">
           当前过期时间：{{ formatDate(extendingCode?.expires_at) }}
         </p>
-        <div style="display:flex;align-items:center;gap:1rem;margin:1rem 0;">
-          <label style="font-size:0.9rem;">延期天数：</label>
-          <input v-model.number="extendDays" type="number" min="1" max="365" class="btn btn-secondary" style="width:100px;padding:0.5rem 0.8rem;text-align:left;">
+        <div class="modal-form-row">
+          <label>延期天数：</label>
+          <input v-model.number="extendDays" type="number" min="1" max="365" class="form-input modal-input">
         </div>
         <div class="modal-btns">
           <button class="btn btn-primary" @click="confirmExtend">确认延期</button>
@@ -323,6 +321,31 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.generate-form {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+}
+
+.device-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.device-input-group label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.generated-count {
+  font-size: 0.85rem;
+  color: var(--color-accent);
+}
+
 .filter-bar { padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border); }
 .generated-codes { margin-top: 1rem; padding: 1rem; background: #f0f9ff; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .code-tag { padding: 0.4rem 0.8rem; background: var(--color-accent); color: white; border-radius: 6px; font-family: monospace; font-size: 0.85rem; }
