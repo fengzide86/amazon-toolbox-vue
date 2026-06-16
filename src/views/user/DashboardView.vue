@@ -19,51 +19,50 @@
     </div>
 
     <h2 class="page-title">欢迎回来！</h2>
-    <section class="stats-row">
-      <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(16,185,129,0.1);">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+
+    <!-- Bento Grid 布局 -->
+    <section class="bento-grid">
+      <!-- 授权状态 - 大卡片 -->
+      <article class="bento-card bento-card-large status-card">
+        <div class="card-header-row">
+          <div class="card-icon" style="background: linear-gradient(135deg, #10B981, #34D399);">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </div>
+          <span class="status-badge-active">已激活</span>
         </div>
-        <div class="stat-content">
-          <div class="stat-label">授权状态</div>
-          <div class="stat-value" style="color: #10B981;">已激活</div>
-          <div class="stat-sub">剩余 {{ countdownText }}</div>
+        <div class="card-body">
+          <div class="card-label">授权状态</div>
+          <div class="card-value countdown-value">{{ countdownText }}</div>
+          <div class="card-sub">套餐：{{ planName }} · 有效期至 {{ expiryDate }}</div>
         </div>
       </article>
-      <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(99,102,241,0.1);">
+
+      <!-- 已使用工具 -->
+      <article class="bento-card">
+        <div class="card-icon" style="background: linear-gradient(135deg, #6366F1, #818CF8);">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
-        <div class="stat-content">
-          <div class="stat-label">已使用工具</div>
-          <div class="stat-value" style="color: #6366F1;">{{ toolCount }}</div>
-          <div class="stat-sub">今日 {{ todayRuns }} 次</div>
+        <div class="card-body">
+          <div class="card-label">已使用工具</div>
+          <div class="card-value" style="color: #6366F1;">{{ toolCount }}</div>
+          <div class="card-sub">今日 {{ todayRuns }} 次</div>
         </div>
       </article>
-      <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(6,182,212,0.1);">
+
+      <!-- 成功率 -->
+      <article class="bento-card">
+        <div class="card-icon" style="background: linear-gradient(135deg, #06B6D4, #22D3EE);">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
         </div>
-        <div class="stat-content">
-          <div class="stat-label">运行成功次数</div>
-          <div class="stat-value" style="color: #06B6D4;">{{ successCount }}</div>
-          <div class="stat-sub">成功率 {{ successRate }}%</div>
+        <div class="card-body">
+          <div class="card-label">成功率</div>
+          <div class="card-value" style="color: #06B6D4;">{{ successRate }}%</div>
+          <div class="card-sub">成功 {{ successCount }} 次</div>
         </div>
       </article>
-      <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(139,92,246,0.1);">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">套餐类型</div>
-          <div class="stat-value" style="color: #8B5CF6; font-size: 1.25rem;">{{ planName }}</div>
-          <div class="stat-sub">有效期至 {{ expiryDate }}</div>
-        </div>
-      </article>
-    </section>
 
-    <section class="charts-grid">
-      <div class="chart-card">
+      <!-- 工具使用趋势 - 宽卡片 -->
+      <article class="bento-card bento-card-wide chart-card">
         <div class="chart-header">
           <h3>工具使用记录（近7天）</h3>
           <span class="period">本周</span>
@@ -72,17 +71,19 @@
           <BarChart v-if="chartsLoaded" :data="barChartData" :options="barChartOptions" />
           <div v-else class="chart-loading">加载中...</div>
         </div>
-      </div>
-      <div class="chart-card">
+      </article>
+
+      <!-- 工具成功率分布 -->
+      <article class="bento-card chart-card">
         <div class="chart-header">
-          <h3>工具成功率</h3>
+          <h3>工具分布</h3>
           <span class="period">近30天</span>
         </div>
-        <div class="chart-container">
+        <div class="chart-container chart-container-sm">
           <DoughnutChart v-if="chartsLoaded" :data="doughnutChartData" :options="doughnutChartOptions" />
           <div v-else class="chart-loading">加载中...</div>
         </div>
-      </div>
+      </article>
     </section>
 
     <section class="table-card">
@@ -391,26 +392,203 @@ onUnmounted(() => {
   color: var(--color-foreground);
 }
 
-.page-title { font-family: var(--font-heading); font-size: 1.875rem; font-weight: 700; color: var(--color-primary); margin-bottom: 1.5rem; }
-.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-.stat-card { display: flex; align-items: center; gap: 1rem; padding: 1.25rem; background: white; border-radius: 16px; border: 1px solid var(--color-border); transition: box-shadow 0.2s; }
-.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-.stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.stat-icon svg { width: 24px; height: 24px; }
-.stat-content { flex: 1; }
-.stat-label { font-size: 0.8rem; color: var(--color-muted); font-weight: 500; }
-.stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
-.stat-sub { font-size: 0.75rem; color: var(--color-muted); margin-top: 0.25rem; }
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-.chart-card { background: white; border-radius: 16px; border: 1px solid var(--color-border); padding: 1.25rem; }
-.chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.chart-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-primary); }
-.chart-header .period { font-size: 0.8rem; color: var(--color-muted); }
-.chart-container { position: relative; height: 220px; }
-.chart-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-muted); }
-.badge { padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
-.badge-success { background: rgba(16,185,129,0.1); color: #10B981; }
-.badge-error { background: rgba(239,68,68,0.1); color: #EF4444; }
-.empty-row { text-align: center; color: var(--color-muted); padding: 1rem; }
-@media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+/* ===== Bento Grid 布局 ===== */
+.page-title {
+  font-family: var(--font-heading);
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 1.5rem;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: auto auto;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.bento-card {
+  background: var(--color-background, white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bento-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+}
+
+/* 大卡片 - 占 2 列 */
+.bento-card-large {
+  grid-column: span 2;
+}
+
+/* 宽卡片 - 占 2 列 */
+.bento-card-wide {
+  grid-column: span 2;
+}
+
+/* 状态卡片特殊样式 */
+.status-card {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.03), rgba(52, 211, 153, 0.03));
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-icon svg {
+  width: 22px;
+  height: 22px;
+  color: white;
+}
+
+.status-badge-active {
+  padding: 0.25rem 0.75rem;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.card-label {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.card-value {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.2;
+}
+
+.countdown-value {
+  font-size: 1.25rem;
+}
+
+.card-sub {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+/* 图表卡片 */
+.chart-card {
+  background: var(--color-background, white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  padding: 1.25rem;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.chart-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.chart-header .period {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  padding: 0.25rem 0.6rem;
+  background: var(--color-border-light);
+  border-radius: var(--radius-sm);
+}
+
+.chart-container {
+  position: relative;
+  height: 200px;
+}
+
+.chart-container-sm {
+  height: 180px;
+}
+
+.chart-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-muted);
+}
+
+/* 表格 */
+.badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: rgba(16,185,129,0.1);
+  color: #10B981;
+}
+
+.badge-error {
+  background: rgba(239,68,68,0.1);
+  color: #EF4444;
+}
+
+.empty-row {
+  text-align: center;
+  color: var(--color-muted);
+  padding: 1rem;
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .bento-card-large,
+  .bento-card-wide {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  .bento-card-large,
+  .bento-card-wide {
+    grid-column: span 1;
+  }
+}
 </style>

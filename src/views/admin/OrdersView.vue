@@ -1,8 +1,6 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 1.5rem;">
-      订单管理
-    </h2>
+    <h2 class="page-title">订单管理</h2>
 
     <section class="stats-row" style="margin-bottom: 1.5rem;">
       <article class="stat-card">
@@ -28,13 +26,13 @@
       <div class="table-header">
         <h3>创建新订单</h3>
       </div>
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
-        <select v-model="newOrder.plan_id" class="btn btn-secondary">
+      <div class="form-row">
+        <select v-model="newOrder.plan_id" class="form-input">
           <option v-for="plan in plans" :key="plan.id" :value="plan.id">{{ plan.name }} - ¥{{ plan.price }}</option>
         </select>
-        <input v-model="newOrder.channel" class="btn btn-secondary" placeholder="渠道（如微信/支付宝）" style="padding: 0.6rem 1rem; text-align: left;">
-        <input v-model="newOrder.responsible" class="btn btn-secondary" placeholder="负责人" style="padding: 0.6rem 1rem; text-align: left; width: 120px;">
-        <select v-model="newOrder.status" class="btn btn-secondary">
+        <input v-model="newOrder.channel" class="form-input" placeholder="渠道（如微信/支付宝）">
+        <input v-model="newOrder.responsible" class="form-input" placeholder="负责人" style="width: 120px;">
+        <select v-model="newOrder.status" class="form-input">
           <option value="pending">待确认</option>
           <option value="paid">已付款</option>
         </select>
@@ -47,14 +45,14 @@
     <section class="table-card">
       <div class="table-header">
         <h3>全部订单</h3>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <select v-model="filterStatus" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+        <div class="filter-bar">
+          <select v-model="filterStatus" class="form-input">
             <option value="">全部状态</option>
             <option value="paid">已付款</option>
             <option value="pending">待确认</option>
             <option value="refunded">已退款</option>
           </select>
-          <button class="btn btn-secondary" @click="exportOrdersData" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem;">
+          <button class="btn btn-secondary btn-sm" @click="exportOrdersData">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
@@ -88,14 +86,14 @@
             </td>
             <td>{{ formatTime(order.created_at) }}</td>
             <td>
-              <button v-if="order.status === 'pending'" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
+              <button v-if="order.status === 'pending'" class="btn btn-secondary btn-table"
                 @click="markPaid(order)">确认付款</button>
-              <button v-if="order.status === 'paid'" class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; color: var(--color-destructive);"
+              <button v-if="order.status === 'paid'" class="btn btn-secondary btn-table" style="color: var(--color-destructive);"
                 @click="refund(order)">退款</button>
             </td>
           </tr>
           <tr v-if="!filteredOrders.length">
-            <td colspan="8" style="text-align:center;color:var(--color-muted);padding:2rem;">暂无订单</td>
+            <td colspan="8" class="empty-row">暂无订单</td>
           </tr>
         </tbody>
       </table>

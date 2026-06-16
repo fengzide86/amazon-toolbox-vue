@@ -1,8 +1,6 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 1.5rem;">
-      系统设置
-    </h2>
+    <h2 class="page-title">系统设置</h2>
 
     <section class="table-card" style="margin-bottom: 1.5rem;">
       <div class="table-header">
@@ -15,7 +13,7 @@
             <div style="font-size: 0.85rem; color: var(--color-muted); margin-top: 0.25rem;">用于管理后台登录</div>
           </div>
           <div style="display:flex;gap:0.5rem;">
-            <input type="password" v-model="adminPassword" class="btn btn-secondary" placeholder="新密码" style="width: 200px; padding: 0.5rem 1rem; text-align: left;">
+            <input type="password" v-model="adminPassword" class="form-input" placeholder="新密码" style="width: 200px;">
             <button class="btn btn-primary" style="padding: 0.5rem 1rem;" @click="savePassword">更新密码</button>
           </div>
         </div>
@@ -25,7 +23,7 @@
             <div style="font-size: 0.85rem; color: var(--color-muted); margin-top: 0.25rem;">显示在登录页和帮助页面</div>
           </div>
           <div style="display:flex;gap:0.5rem;">
-            <input type="text" v-model="wechatId" class="btn btn-secondary" placeholder="客服微信号" style="width: 250px; padding: 0.5rem 1rem; text-align: left;">
+            <input type="text" v-model="wechatId" class="form-input" placeholder="客服微信号" style="width: 250px;">
             <button class="btn btn-primary" style="padding: 0.5rem 1rem;" @click="saveWechat">保存</button>
           </div>
         </div>

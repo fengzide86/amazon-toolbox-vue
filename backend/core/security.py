@@ -60,25 +60,21 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def verify_password_fallback(password: str, stored: str) -> tuple[bool, bool]:
-    """验证密码，支持旧版明文密码的自动升级
+    """验证密码（仅支持 bcrypt 哈希）
     
     Args:
         password: 明文密码
-        stored: 存储的密码（可能是 bcrypt 哈希或明文）
+        stored: 存储的 bcrypt 哈希密码
         
     Returns:
-        (是否匹配, 是否需要升级)
+        (是否匹配, 是否需要升级) - 第二个值始终为 False
     """
-    # 首先尝试 bcrypt 验证
+    # 仅支持 bcrypt 验证
     try:
         if bcrypt.checkpw(password.encode('utf-8'), stored.encode('utf-8')):
             return True, False
     except Exception:
         pass
-    
-    # 降级到明文比较（旧版本兼容）
-    if stored == password:
-        return True, True
     
     return False, False
 

@@ -54,7 +54,7 @@ describe('AdminSidebar', () => {
         }
       })
       const links = wrapper.findAll('a')
-      expect(links.length).toBe(7) // 7个导航项
+      expect(links.length).toBe(10) // 10个导航项（包含公告管理）
     })
 
     it('应该包含正确的导航项目', () => {
@@ -73,6 +73,8 @@ describe('AdminSidebar', () => {
       expect(text).toContain('系统设置')
       expect(text).toContain('用户管理')
       expect(text).toContain('工单管理')
+      expect(text).toContain('知识库管理')
+      expect(text).toContain('AI 客服管理')
     })
 
     it('应该渲染退出登录按钮', () => {
@@ -108,6 +110,8 @@ describe('AdminSidebar', () => {
       expect(routes).toContain('/admin/settings')
       expect(routes).toContain('/admin/users')
       expect(routes).toContain('/admin/feedback')
+      expect(routes).toContain('/admin/knowledge')
+      expect(routes).toContain('/admin/ai-chat')
     })
 
     it('当前页面应该有 aria-current 属性标记 active', () => {

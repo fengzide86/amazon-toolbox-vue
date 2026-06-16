@@ -99,20 +99,26 @@ class DashboardService:
         
         now = datetime.now()
         
-        # 收入趋势（近7天）
+        # 收入趋势（近7天）- 使用 GROUP BY 一次性查询，避免 N+1 问题
+        start_date = (now - timedelta(days=6)).date()
+        revenue_result = await self.db.execute(
+            select(
+                func.date(Order.created_at).label('day'),
+                func.coalesce(func.sum(Order.amount), 0).label('total')
+            ).where(
+                func.date(Order.created_at) >= start_date,
+                Order.status.in_(["paid", "refunded"])
+            ).group_by(func.date(Order.created_at))
+        )
+        revenue_by_day = {str(row[0]): float(row[1]) for row in revenue_result.all()}
+        
         revenue_trend = []
         for i in range(6, -1, -1):
             day = now - timedelta(days=i)
             day_str = day.strftime('%Y-%m-%d')
             day_name = calendar.day_abbr[day.weekday()]
-            result = await self.db.execute(
-                select(func.coalesce(func.sum(Order.amount), 0)).where(
-                    func.date(Order.created_at) == day_str,
-                    Order.status.in_(["paid", "refunded"])
-                )
-            )
-            amount = result.scalar() or 0
-            revenue_trend.append({"date": day_name, "amount": float(amount)})
+            amount = revenue_by_day.get(day_str, 0)
+            revenue_trend.append({"date": day_name, "amount": amount})
         
         # 套餐分布
         plan_dist_result = await self.db.execute(

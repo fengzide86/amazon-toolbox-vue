@@ -1,11 +1,9 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin-bottom: 1.5rem;">
-      用户管理
-    </h2>
+    <h2 class="page-title">用户管理</h2>
 
-    <div class="filter-bar" style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem;flex-wrap:wrap;">
-      <input v-model="searchText" class="btn btn-secondary" placeholder="搜索用户/设备..." style="padding:0.5rem 1rem;text-align:left;min-width:200px;">
+    <div class="filter-bar">
+      <input v-model="searchText" class="form-input" placeholder="搜索用户/设备..." style="min-width:200px;">
       <span style="font-size:0.85rem;color:var(--color-muted);">共 {{ filteredUsers.length }} 个用户</span>
     </div>
 
@@ -28,21 +26,21 @@
           <tr v-for="user in filteredUsers" :key="user.id">
             <td>{{ user.id }}</td>
             <td>
-              <input v-if="editingUser?.id === user.id" v-model="editingUser.name" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:100px;">
+              <input v-if="editingUser?.id === user.id" v-model="editingUser.name" class="form-input" style="width:100px;">
               <span v-else>{{ user.name || '-' }}</span>
             </td>
             <td>
-              <input v-if="editingUser?.id === user.id" v-model="editingUser.phone" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:120px;">
+              <input v-if="editingUser?.id === user.id" v-model="editingUser.phone" class="form-input" style="width:120px;">
               <span v-else>{{ user.phone || '-' }}</span>
             </td>
             <td style="font-size:0.85rem;">{{ user.device_name || '-' }}</td>
             <td style="font-family:monospace;font-size:0.8rem;">{{ user.device_id || '-' }}</td>
             <td>
-              <input v-if="editingUser?.id === user.id" v-model.number="editingUser.total_seats" type="number" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:60px;">
+              <input v-if="editingUser?.id === user.id" v-model.number="editingUser.total_seats" type="number" class="form-input" style="width:60px;">
               <span v-else>{{ user.total_seats }}</span>
             </td>
             <td>
-              <input v-if="editingUser?.id === user.id" v-model.number="editingUser.extra_devices" type="number" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:60px;">
+              <input v-if="editingUser?.id === user.id" v-model.number="editingUser.extra_devices" type="number" class="form-input" style="width:60px;">
               <span v-else>{{ user.extra_devices }}</span>
             </td>
             <td>{{ formatTime(user.created_at) }}</td>

@@ -48,6 +48,9 @@ from routers import (
     tools,
     updates,
     devices,
+    knowledge,
+    ai_chat,
+    announcements,
 )
 
 # 导入服务模块
@@ -215,6 +218,9 @@ app.include_router(settings_router.router, prefix="/api/settings", tags=["系统
 app.include_router(tools.router, prefix="/api/tools", tags=["工具配置"])
 app.include_router(updates.router, prefix="/api/updates", tags=["自动更新"])
 app.include_router(devices.router, prefix="/api/devices", tags=["设备管理"])
+app.include_router(knowledge.router, prefix="/api/knowledge", tags=["知识库管理"])
+app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["AI客服"])
+app.include_router(announcements.router, prefix="/api/announcements", tags=["公告管理"])
 
 
 # ===== 增强的健康检查接口 =====

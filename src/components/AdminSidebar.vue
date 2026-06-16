@@ -58,6 +58,30 @@
           工单管理
         </router-link>
       </li>
+      <li>
+        <router-link to="/admin/knowledge" active-class="active" :aria-current="isActive('/admin/knowledge') ? 'page' : undefined">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+          知识库管理
+        </router-link>
+      </li>
+      <li>
+        <router-link to="/admin/ai-chat" active-class="active" :aria-current="isActive('/admin/ai-chat') ? 'page' : undefined">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+          </svg>
+          AI 客服管理
+        </router-link>
+      </li>
+      <li>
+        <router-link to="/admin/announcements" active-class="active" :aria-current="isActive('/admin/announcements') ? 'page' : undefined">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+          公告管理
+        </router-link>
+      </li>
     </ul>
     <div class="sidebar-footer">
       <button class="btn-logout" @click="handleLogout" aria-label="退出登录">
@@ -92,37 +116,5 @@ function handleLogout() {
 </script>
 
 <style scoped>
-.sidebar-footer {
-  margin-top: auto;
-  padding: 0.75rem;
-  border-top: 1px solid var(--color-border);
-}
-
-.btn-logout {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem;
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.btn-logout:hover {
-  background: rgba(220, 38, 38, 0.06);
-  border-color: rgba(220, 38, 38, 0.3);
-  color: var(--color-destructive);
-}
-
-.btn-logout svg {
-  width: 16px;
-  height: 16px;
-}
+/* sidebar-footer and btn-logout styles are defined globally in main.css */
 </style>

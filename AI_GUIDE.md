@@ -54,6 +54,17 @@
 - 部署后端：`python deploy_to_server.py`
 - 发布前端：上传 `release/` 到服务器 `/opt/amazon-toolbox/backend/updates/`
 
+## 新增 API 路由
+
+- `/api/knowledge` — 知识库管理
+- `/api/ai-chat` — AI 客服对话
+- `/api/announcements` — 公告系统
+
+## 构建验证
+
+- `npm run build:verify` — 打包后自动检查 API 地址是否正确
+-  vite.config.js 中不要用 `define` 块注入环境变量，Vite 原生处理 `.env`
+
 ## 常见坑
 
 | 现象 | 原因 |

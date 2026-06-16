@@ -75,10 +75,26 @@ class Settings:
     # 默认分润比例
     DEFAULT_PROFIT_RATIOS: dict = None
     
+    # ===== AI 客服配置 =====
+    AI_PROVIDER: str = "qwen"                    # qwen/openai/ollama
+    QWEN_API_KEY: str = ""                       # 通义千问API Key
+    QWEN_MODEL: str = "qwen-turbo"               # 对话模型
+    QWEN_EMBEDDING_MODEL: str = "text-embedding-v2"  # Embedding模型
+    CHROMA_PERSIST_DIR: str = "./chroma_db"      # ChromaDB数据目录
+    AI_CHAT_MAX_RETRIES: int = 2                 # AI最大重试次数
+    AI_CHAT_MAX_HISTORY: int = 5                 # 对话历史轮数
+    
     def __init__(self):
-        # 初始化 CORS 配置
-        cors_env = os.getenv("CORS_ORIGINS", "*")
-        self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",")]
+        # 初始化 CORS 配置（生产环境禁止使用 *）
+        cors_env = os.getenv("CORS_ORIGINS", "")
+        if cors_env == "*":
+            import warnings
+            warnings.warn(
+                "CORS_ORIGINS='*' 在生产环境中极不安全！请设置具体的域名列表。",
+                UserWarning,
+                stacklevel=2,
+            )
+        self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()] if cors_env else ["*"]
         
         # ===== 初始化数据库配置 =====
         # 优先使用环境变量，否则根据环境自动选择
@@ -98,7 +114,18 @@ class Settings:
         
         # ===== 初始化 JWT 配置 =====
         # 生产环境必须设置强密码！
-        self.JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-secret-key-change-in-production")
+        jwt_key = os.getenv("JWT_SECRET_KEY", "")
+        if not jwt_key or jwt_key == "dev-secret-key-change-in-production":
+            import secrets
+            import warnings
+            warnings.warn(
+                "JWT_SECRET_KEY 未设置或使用默认值！已自动生成随机密钥。"
+                "请在 .env 文件中设置 JWT_SECRET_KEY 以确保重启后 Token 不失效。",
+                UserWarning,
+                stacklevel=2,
+            )
+            jwt_key = secrets.token_urlsafe(48)
+        self.JWT_SECRET_KEY = jwt_key
         
         # ===== 初始化 Redis 配置 =====
         self.REDIS_URL = os.getenv("REDIS_URL")  # 例如: redis://localhost:6379/0
@@ -108,6 +135,13 @@ class Settings:
             "tech": 0.30, "market": 0.25, "product": 0.15,
             "service": 0.15, "coordination": 0.10, "record": 0.05
         }
+        
+        # ===== 初始化 AI 客服配置 =====
+        self.AI_PROVIDER = os.getenv("AI_PROVIDER", "qwen").lower()
+        self.QWEN_API_KEY = os.getenv("QWEN_API_KEY", "")
+        self.QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-turbo")
+        self.QWEN_EMBEDDING_MODEL = os.getenv("QWEN_EMBEDDING_MODEL", "text-embedding-v2")
+        self.CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
     
     def _get_db_path(self) -> str:
         """获取数据库路径：始终使用用户 AppData 目录"""

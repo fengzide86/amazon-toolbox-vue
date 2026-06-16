@@ -251,3 +251,36 @@ class DashboardData(BaseModel):
     today_runs: int
     pending_tickets: int
     recent_logs: List[dict]
+
+
+# ===== Announcements =====
+class AnnouncementCreate(BaseModel):
+    title: str
+    content: str
+    type: Optional[str] = "info"
+    status: Optional[str] = "draft"
+    priority: Optional[int] = 0
+    expires_at: Optional[datetime] = None
+
+
+class AnnouncementUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    type: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[int] = None
+    expires_at: Optional[datetime] = None
+
+
+class AnnouncementOut(BaseModel):
+    id: int
+    title: str
+    content: str
+    type: str
+    status: str
+    priority: int
+    expires_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

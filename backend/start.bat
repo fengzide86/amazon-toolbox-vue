@@ -3,11 +3,28 @@ echo ============================================
 echo   亚马逊赛训效率工具箱 - 后端服务启动
 echo ============================================
 echo.
-echo 正在安装依赖...
-pip install -r requirements.txt
+
+REM 设置虚拟环境路径（D盘）
+set VENV_DIR=D:\amazon-toolbox-vue\venv
+set PYTHON=%VENV_DIR%\Scripts\python.exe
+set PIP=%VENV_DIR%\Scripts\pip.exe
+
+REM 检查虚拟环境是否存在
+if not exist "%PYTHON%" (
+    echo [错误] 虚拟环境不存在: %VENV_DIR%
+    echo 请先运行: python -m venv %VENV_DIR%
+    echo 然后运行: %PIP% install -r requirements.txt chromadb
+    pause
+    exit /b 1
+)
+
+echo [OK] 使用虚拟环境: %VENV_DIR%
+echo.
+echo 正在检查依赖...
+%PIP% install -r requirements.txt --quiet
 echo.
 echo 正在启动后端服务 (http://localhost:8000)...
 echo API文档: http://localhost:8000/docs
 echo.
-python main.py
+%PYTHON% main.py
 pause
