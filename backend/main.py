@@ -52,6 +52,7 @@ from routers import (
     ai_chat,
     announcements,
 )
+from routers import help as help_router  # 避免与内置 help 冲突
 
 # 导入服务模块
 from services.seed_service import seed_initial_data
@@ -103,6 +104,20 @@ async def lifespan(app: FastAPI):
     
     logger.info(f"数据库类型: {settings.DB_TYPE}")
     logger.info(f"Redis: {'已配置' if cache.redis else '未配置（使用内存缓存）'}")
+    
+    # 安全检查
+    security_result = settings.check_security()
+    if security_result["errors"]:
+        logger.error("发现以下安全错误（高风险）：")
+        for err in security_result["errors"]:
+            logger.error(f"  [ERROR] {err}")
+    if security_result["warnings"]:
+        logger.warning("发现以下安全警告：")
+        for warn in security_result["warnings"]:
+            logger.warning(f"  [WARN] {warn}")
+    if not security_result["errors"] and not security_result["warnings"]:
+        logger.info("安全检查通过")
+    
     logger.info(f"{settings.APP_NAME} v{settings.APP_VERSION} 启动完成")
     logger.info("=" * 60)
     
@@ -221,6 +236,7 @@ app.include_router(devices.router, prefix="/api/devices", tags=["设备管理"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["知识库管理"])
 app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["AI客服"])
 app.include_router(announcements.router, prefix="/api/announcements", tags=["公告管理"])
+app.include_router(help_router.router, prefix="/api/help", tags=["帮助查询"])
 
 
 # ===== 增强的健康检查接口 =====

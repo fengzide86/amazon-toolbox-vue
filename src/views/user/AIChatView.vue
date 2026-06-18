@@ -96,6 +96,9 @@
 import { ref, nextTick, onMounted } from 'vue'
 import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
+
+const platformStore = usePlatformStore()
 
 const sessionId = ref(null)
 const messages = ref([])
@@ -133,7 +136,7 @@ function scrollToBottom() {
 
 async function startNewSession() {
   try {
-    const res = await createChatSession()
+    const res = await createChatSession({ platform_key: platformStore.currentPlatform })
     sessionId.value = res.session_id
     nextMsgId = 1
     messages.value = [{
@@ -168,7 +171,7 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
-    const res = await sendChatMessage(sessionId.value, text)
+    const res = await sendChatMessage(sessionId.value, text, { platform_key: platformStore.currentPlatform })
     messages.value.push({
       id: nextMsgId++,
       role: 'ai',

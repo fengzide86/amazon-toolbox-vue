@@ -134,10 +134,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getFeedbacks, updateFeedback, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
+const platformStore = usePlatformStore()
 const feedbacks = ref([])
 const filterStatus = ref('')
 const showDetailModal = ref(false)
@@ -220,11 +222,14 @@ function previewImage(url) {
 
 async function loadData() {
   try {
-    feedbacks.value = await getFeedbacks()
+    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
+    feedbacks.value = await getFeedbacks({ platform_key: platformKey })
   } catch (err) {
     showToast('数据加载失败', 'error')
   }
 }
+
+watch(() => platformStore.adminPlatform, () => { loadData() })
 
 onMounted(loadData)
 </script>

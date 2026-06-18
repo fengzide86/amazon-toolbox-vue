@@ -19,6 +19,8 @@ async def get_list(
     category: str = None,
     status: str = None,
     keyword: str = None,
+    platform_key: str = None,
+    capability_key: str = None,
     page: int = 1,
     page_size: int = 20
 ) -> Dict[str, Any]:
@@ -32,6 +34,22 @@ async def get_list(
     if status:
         query = query.where(KnowledgeBase.status == status)
         count_query = count_query.where(KnowledgeBase.status == status)
+    if platform_key:
+        from sqlalchemy import or_
+        platform_cond = or_(
+            KnowledgeBase.platform_key == platform_key,
+            KnowledgeBase.platform_key.is_(None)
+        )
+        query = query.where(platform_cond)
+        count_query = count_query.where(platform_cond)
+    if capability_key:
+        from sqlalchemy import or_
+        cap_cond = or_(
+            KnowledgeBase.capability_key == capability_key,
+            KnowledgeBase.capability_key.is_(None)
+        )
+        query = query.where(cap_cond)
+        count_query = count_query.where(cap_cond)
     if keyword:
         like_pattern = f"%{keyword}%"
         query = query.where(
@@ -87,7 +105,9 @@ async def create(
     title: str,
     content: str,
     keywords: List[str] = None,
-    priority: str = "medium"
+    priority: str = "medium",
+    platform_key: str = None,
+    capability_key: str = None,
 ) -> Dict:
     """创建知识条目"""
     item = KnowledgeBase(
@@ -97,6 +117,8 @@ async def create(
         keywords=json.dumps(keywords or [], ensure_ascii=False),
         priority=priority,
         status="active",
+        platform_key=platform_key,
+        capability_key=capability_key,
     )
     db.add(item)
     await db.commit()
@@ -133,6 +155,8 @@ async def update(
     keywords: List[str] = None,
     priority: str = None,
     status: str = None,
+    platform_key: str = None,
+    capability_key: str = None,
 ) -> Optional[Dict]:
     """更新知识条目"""
     result = await db.execute(
@@ -154,6 +178,10 @@ async def update(
         item.priority = priority
     if status is not None:
         item.status = status
+    if platform_key is not None:
+        item.platform_key = platform_key
+    if capability_key is not None:
+        item.capability_key = capability_key
 
     await db.commit()
 
@@ -318,6 +346,8 @@ def _knowledge_to_dict(item: KnowledgeBase) -> Dict:
         "status": item.status,
         "vector_id": item.vector_id,
         "view_count": item.view_count or 0,
+        "platform_key": getattr(item, 'platform_key', None),
+        "capability_key": getattr(item, 'capability_key', None),
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
     }
