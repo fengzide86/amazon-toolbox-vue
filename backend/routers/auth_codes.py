@@ -2,7 +2,7 @@
 授权码管理路由模块
 包含授权码的生成、查询、更新、删除等接口
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -18,6 +18,7 @@ from schemas import AuthCodeGenerate, AuthCodeUpdate, AuthCodeResponse
 from core.logging import get_logger
 from core.exceptions import NotFoundException, ConflictException
 from core.dependencies import get_current_admin
+from core.audit import log_admin_action
 
 logger = get_logger(__name__)
 
@@ -50,7 +51,7 @@ async def get_auth_codes(
 
 
 @router.post("/batch-generate")
-async def batch_generate_codes(req: AuthCodeGenerate, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
+async def batch_generate_codes(req: AuthCodeGenerate, request: Request, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     """批量生成授权码
     
     格式: 前缀-日期MMDD-随机6位
@@ -105,11 +106,24 @@ async def batch_generate_codes(req: AuthCodeGenerate, db: AsyncSession = Depends
 
     await db.commit()
     logger.info(f"批量生成 {req.count} 个授权码，前缀: {code_prefix or plan_name}")
+    
+    # 审计日志
+    await log_admin_action(
+        db,
+        user_id=_admin.get("user_id"),
+        user_name=_admin.get("name", "admin"),
+        action="batch_create_auth_codes",
+        target_type="auth_code",
+        detail={"count": req.count, "prefix": code_prefix or plan_name, "codes": codes[:5]},
+        request=request,
+    )
+    await db.commit()
+    
     return {"success": True, "codes": codes, "count": req.count}
 
 
 @router.put("/{code_id}", response_model=AuthCodeResponse)
-async def update_auth_code(code_id: int, req: AuthCodeUpdate, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
+async def update_auth_code(code_id: int, req: AuthCodeUpdate, request: Request, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     """更新授权码信息"""
     result = await db.execute(
         select(AuthCode).options(selectinload(AuthCode.devices)).where(AuthCode.id == code_id)
@@ -125,11 +139,25 @@ async def update_auth_code(code_id: int, req: AuthCodeUpdate, db: AsyncSession =
     await db.commit()
     await db.refresh(code_obj)
     logger.info(f"更新授权码: {code_obj.code}")
+    
+    # 审计日志
+    await log_admin_action(
+        db,
+        user_id=_admin.get("user_id"),
+        user_name=_admin.get("name", "admin"),
+        action="update_auth_code",
+        target_type="auth_code",
+        target_id=code_id,
+        detail={"code": code_obj.code, "changes": req.model_dump(exclude_none=True)},
+        request=request,
+    )
+    await db.commit()
+    
     return code_obj
 
 
 @router.delete("/{code_id}")
-async def delete_auth_code(code_id: int, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
+async def delete_auth_code(code_id: int, request: Request, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     """删除授权码"""
     result = await db.execute(select(AuthCode).where(AuthCode.id == code_id))
     code_obj = result.scalars().first()
@@ -140,6 +168,17 @@ async def delete_auth_code(code_id: int, db: AsyncSession = Depends(get_db), _ad
         # 先删除关联的设备记录，避免外键约束失败
         await db.execute(delete(Device).where(Device.auth_code_id == code_id))
         await db.delete(code_obj)
+        # 审计日志
+        await log_admin_action(
+            db,
+            user_id=_admin.get("user_id"),
+            user_name=_admin.get("name", "admin"),
+            action="delete_auth_code",
+            target_type="auth_code",
+            target_id=code_id,
+            detail={"code": code_obj.code},
+            request=request,
+        )
         await db.commit()
         logger.info(f"删除授权码: {code_obj.code}")
         return {"success": True}

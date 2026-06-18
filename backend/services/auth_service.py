@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import AuthCode, User, Device, Plan, Setting
+from models import AuthCode, User, Device, Plan, Setting, AuthSeat
 from schemas import VerifyRequest, VerifyResponse
 from core.security import (
     verify_password_fallback, hash_password,
@@ -31,16 +31,19 @@ class AuthService:
         self,
         code: str,
         device_id: str,
-        device_name: str
+        device_name: str,
+        platform_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """授权码验证（用户登录）
         
         流程:
         1. 验证授权码是否存在
         2. 检查授权码状态（冻结、过期、删除）
-        3. 首次激活时创建用户记录
-        4. 多设备支持：检查设备绑定情况
-        5. 返回 JWT Token
+        3. 检查平台权限（1.5 新增）
+        4. 首次激活时创建用户记录
+        5. 席位检查（1.5 新增）
+        6. 多设备支持：检查设备绑定情况
+        7. 返回 JWT Token
         """
         code = code.strip()
         
@@ -63,7 +66,18 @@ class AuthService:
         if code_obj.status == "expired" or (code_obj.expires_at and code_obj.expires_at < datetime.now()):
             return error_response("授权码已过期", ErrorCodes.AUTH_CODE_EXPIRED)
         
-        # 3. 首次激活
+        # 3. 检查平台权限（1.5 新增）
+        if platform_key:
+            platform_scope = code_obj.platform_scope or "amazon"  # 默认亚马逊
+            allowed_platforms = [p.strip() for p in platform_scope.split(",")]
+            if platform_key not in allowed_platforms:
+                platform_name = "亚马逊" if platform_key == "amazon" else "速卖通"
+                return error_response(
+                    f"当前授权码不包含{platform_name}平台权限，如需使用请升级授权",
+                    ErrorCodes.AUTH_CODE_INVALID
+                )
+        
+        # 4. 首次激活
         if code_obj.status == "unused":
             code_obj.status = "active"
             code_obj.device_id = device_id
@@ -86,14 +100,74 @@ class AuthService:
                 auth_code_id=code_obj.id,
                 device_id=device_id,
                 device_name=device_name,
-                total_seats=1,
+                total_seats=code_obj.seat_limit or 1,
             )
             self.db.add(user)
             await self.db.flush()
             code_obj.user_id = user.id
             logger.info(f"授权码 {code} 首次激活，用户ID: {user.id}")
         
-        # 4. 多设备支持
+        # 5. 席位检查（1.5 新增）
+        seat_limit = code_obj.seat_limit or 1
+        
+        # 检查当前设备是否已有席位
+        existing_seat = await self.db.execute(
+            select(AuthSeat).where(
+                AuthSeat.auth_code_id == code_obj.id,
+                AuthSeat.device_id == device_id,
+                AuthSeat.status == "active"
+            )
+        )
+        seat_obj = existing_seat.scalars().first()
+        
+        if not seat_obj:
+            # 检查席位数是否已满
+            active_seats_count = await self.db.execute(
+                select(func.count(AuthSeat.id)).where(
+                    AuthSeat.auth_code_id == code_obj.id,
+                    AuthSeat.status == "active"
+                )
+            )
+            active_seats = active_seats_count.scalar() or 0
+            
+            if active_seats >= seat_limit:
+                return error_response(
+                    f"该授权码席位数已满({seat_limit}席)，请联系管理员升级",
+                    ErrorCodes.DEVICE_LIMIT_EXCEEDED
+                )
+            
+            # 创建新席位
+            seat_obj = AuthSeat(
+                auth_code_id=code_obj.id,
+                user_id=code_obj.user_id,
+                device_id=device_id,
+                device_name=device_name,
+                seat_no=active_seats + 1,
+                status="active"
+            )
+            self.db.add(seat_obj)
+            await self.db.flush()
+            
+            # P2: 并发安全 - 创建后二次检查席位数
+            recheck_count = await self.db.execute(
+                select(func.count(AuthSeat.id)).where(
+                    AuthSeat.auth_code_id == code_obj.id,
+                    AuthSeat.status == "active"
+                )
+            )
+            recheck_seats = recheck_count.scalar() or 0
+            if recheck_seats > seat_limit:
+                # 超限，回滚当前席位
+                seat_obj.status = "inactive"
+                await self.db.flush()
+                return error_response(
+                    f"该授权码席位数已满({seat_limit}席)，请联系管理员升级",
+                    ErrorCodes.DEVICE_LIMIT_EXCEEDED
+                )
+            
+            logger.info(f"授权码 {code} 创建新席位 #{active_seats + 1}")
+        
+        # 6. 多设备支持
         existing_device = await self.db.execute(
             select(Device).where(
                 Device.auth_code_id == code_obj.id,
@@ -125,7 +199,7 @@ class AuthService:
             await self.db.flush()
             logger.info(f"授权码 {code} 绑定新设备: {device_name}")
         
-        # 5. 提交事务
+        # 7. 提交事务
         try:
             await self.db.commit()
         except Exception as e:
@@ -133,7 +207,7 @@ class AuthService:
             logger.error(f"验证过程出错: {e}")
             return error_response("验证过程出错，请重试", ErrorCodes.DATABASE_ERROR)
         
-        # 6. 获取套餐名称
+        # 8. 获取套餐名称
         plan_name = "未知"
         if code_obj.plan_id:
             plan_result = await self.db.execute(
@@ -141,12 +215,30 @@ class AuthService:
             )
             plan_name = plan_result.scalar() or "未知"
         
-        # 7. 生成 JWT Token
+        # 9. 获取席位和设备统计
+        active_seats_count = await self.db.execute(
+            select(func.count(AuthSeat.id)).where(
+                AuthSeat.auth_code_id == code_obj.id,
+                AuthSeat.status == "active"
+            )
+        )
+        active_seats = active_seats_count.scalar() or 0
+        
+        device_count_result = await self.db.execute(
+            select(func.count(Device.id)).where(Device.auth_code_id == code_obj.id)
+        )
+        device_count = device_count_result.scalar() or 0
+        
+        # 10. 生成 JWT Token
         token = create_access_token(data={
             "user_id": code_obj.user_id,
             "role": "user",
             "auth_code_id": code_obj.id,
         })
+        
+        # 解析平台权限
+        platform_scope = code_obj.platform_scope or "amazon"
+        platform_list = [p.strip() for p in platform_scope.split(",")]
         
         return success_response(
             data={
@@ -156,6 +248,13 @@ class AuthService:
                 "plan_name": plan_name,
                 "expires_at": code_obj.expires_at.isoformat() if code_obj.expires_at else None,
                 "device_id": code_obj.device_id,
+                # 1.5 新增字段
+                "platform_scope": platform_list,
+                "scene_type": code_obj.scene_type,
+                "seat_limit": seat_limit,
+                "seat_used": active_seats,
+                "max_devices": code_obj.max_devices or 1,
+                "device_used": device_count,
             },
             message="验证成功"
         )
