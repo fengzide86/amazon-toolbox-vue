@@ -29,6 +29,7 @@ async def get_logs(
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
     tool_name: Optional[str] = Query(None, description="工具名称"),
     status: Optional[str] = Query(None, description="状态 (success/failed)"),
+    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
     limit: int = Query(200, ge=1, le=1000, description="返回数量限制"),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -41,6 +42,7 @@ async def get_logs(
         end_date: 结束日期
         tool_name: 工具名称
         status: 状态筛选
+        platform_key: 平台标识（1.5 新增）
         limit: 返回数量限制
     """
     query = select(RunLog)
@@ -79,6 +81,10 @@ async def get_logs(
     # 状态筛选
     if status:
         query = query.where(RunLog.status == status)
+    
+    # 平台筛选（1.5 新增）
+    if platform_key:
+        query = query.where(RunLog.platform_key == platform_key)
     
     # 排序和限制
     query = query.order_by(RunLog.created_at.desc()).limit(limit)

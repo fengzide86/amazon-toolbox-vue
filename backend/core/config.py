@@ -158,6 +158,47 @@ class Settings:
         else:
             # SQLite 异步连接 URL
             return f"sqlite+aiosqlite:///{self.DB_PATH}"
+    
+    def check_security(self) -> dict:
+        """
+        生产环境安全检查
+        返回: {"warnings": [], "errors": []}
+        - warnings: 低风险警告，不阻止启动
+        - errors: 高风险错误，建议修复后再启动
+        """
+        result = {"warnings": [], "errors": []}
+        is_production = not self.DEBUG
+        
+        # 1. JWT_SECRET_KEY 长度检查
+        if not self.JWT_SECRET_KEY or len(self.JWT_SECRET_KEY) < 32:
+            result["errors"].append("JWT_SECRET_KEY 未设置或长度不足 32 位，存在安全风险")
+        
+        # 2. CORS 配置检查（仅生产环境）
+        if is_production and "*" in self.CORS_ORIGINS:
+            result["warnings"].append("生产环境 CORS_ORIGINS 不应包含 *，请设置具体域名")
+        
+        # 3. DEBUG 模式检查
+        if self.DEBUG:
+            result["warnings"].append("DEBUG 模式已启用，生产环境应设置 DEBUG=False")
+        
+        # 4. 默认管理员密码检查
+        if self.DEFAULT_ADMIN_PASSWORD == "admin123":
+            result["warnings"].append("使用默认管理员密码 'admin123'，请尽快修改")
+        
+        # 5. MySQL 密码检查（仅生产环境）
+        if is_production and self.DB_TYPE == "mysql" and not self.MYSQL_PASSWORD:
+            result["errors"].append("生产环境 MySQL 密码未设置")
+        
+        # 6. AI Key 检查（仅生产环境）
+        if is_production and not self.QWEN_API_KEY:
+            result["warnings"].append("生产环境未配置 QWEN_API_KEY，AI 客服功能将不可用")
+        
+        # 7. 更新地址检查（仅生产环境）
+        update_url = os.getenv("UPDATE_URL", "")
+        if is_production and (not update_url or "localhost" in update_url or "127.0.0.1" in update_url):
+            result["warnings"].append("生产环境 UPDATE_URL 未设置或仍为本地地址")
+        
+        return result
 
 
 # 全局配置实例

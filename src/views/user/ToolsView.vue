@@ -65,10 +65,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getTools, getToolCategories, createLog } from '@/utils/api'
 import { runToolSimulation, showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
+const platformStore = usePlatformStore()
 const tools = ref([])
 const categories = ref([
   { id: 'all', name: '全部工具', sort_order: 0 },
@@ -100,13 +102,21 @@ const filteredTools = computed(() => {
     )
   }
   
+  // 速卖通平台下过滤掉 FBA/AGL
+  if (platformStore.currentPlatform === 'aliexpress') {
+    result = result.filter(t => t.capability_key !== 'fba_agl')
+  }
+  
   return result
 })
 
 // 加载工具数据
 async function loadData() {
   try {
-    tools.value = await getTools()
+    const params = {
+      platform_key: platformStore.currentPlatform
+    }
+    tools.value = await getTools(params)
   } catch (err) {
     showToast('工具加载失败', 'error')
   }
@@ -154,12 +164,26 @@ function getCategoryName(catId) {
   return cat ? cat.name : '未分类'
 }
 
+// 检查平台权限
+function checkPlatformPermission() {
+  const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
+  const platformScope = authData.platform_scope
+  return platformStore.hasPlatformPermission(platformScope, platformStore.currentPlatform)
+}
+
 // 运行工具
 async function runTool(tool) {
   if (tool.status !== 'online') {
     showToast(`${tool.name} 正在维护中`, 'warning')
     return
   }
+  
+  // 检查平台权限
+  if (!checkPlatformPermission()) {
+    showToast('当前授权暂未包含该平台，如需使用请升级授权', 'error')
+    return
+  }
+  
   showToast(`正在启动 ${tool.name}...`, 'info')
   runToolSimulation(tool.name)
 
@@ -171,10 +195,18 @@ async function runTool(tool) {
       device_id: userInfo.device_id || null,
       tool_name: tool.name,
       module: tool.module,
-      status: 'success'
+      status: 'success',
+      platform_key: platformStore.currentPlatform,
+      capability_key: tool.capability_key,
+      tool_id: tool.id
     })
   } catch (err) {}
 }
+
+// 监听平台变化
+watch(() => platformStore.currentPlatform, () => {
+  loadData()
+})
 
 onMounted(() => {
   loadData()

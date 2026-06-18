@@ -137,12 +137,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getDashboard, getOrders, getPlans, getDashboardCharts } from '@/utils/api'
 import { showToast } from '@/utils'
 import { Line as LineChart, Doughnut as DoughnutChart, Bar as BarChart } from 'vue-chartjs'
 import '@/utils/chart' // 按需注册 Chart.js
+import { usePlatformStore } from '@/stores/platform'
 
+const platformStore = usePlatformStore()
 const dashboardData = ref({})
 const recentOrders = ref([])
 const plans = ref([])
@@ -234,8 +236,12 @@ function formatTime(timeStr) {
 
 async function loadData() {
   try {
+    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
     const [dashRes, ordersRes, plansRes, chartsRes] = await Promise.all([
-      getDashboard(), getOrders(), getPlans(), getDashboardCharts()
+      getDashboard({ platform_key: platformKey }), 
+      getOrders(), 
+      getPlans(), 
+      getDashboardCharts({ platform_key: platformKey })
     ])
     dashboardData.value = dashRes
     recentOrders.value = ordersRes.slice(0, 5)
@@ -247,6 +253,8 @@ async function loadData() {
     showToast('数据加载失败，请检查后端服务', 'error')
   }
 }
+
+watch(() => platformStore.adminPlatform, () => { loadData() })
 
 onMounted(loadData)
 </script>

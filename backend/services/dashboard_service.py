@@ -23,12 +23,23 @@ class DashboardService:
     def __init__(self, db: AsyncSession):
         self.db = db
     
-    async def get_dashboard_stats(self) -> Dict[str, Any]:
+    async def get_dashboard_stats(self, platform_key: str = None) -> Dict[str, Any]:
         """获取数据总览（带缓存）"""
-        # 尝试缓存
-        cached = await cache.get(CacheKeys.DASHBOARD_STATS)
+        # 尝试缓存（按平台区分）
+        cache_key = f"{CacheKeys.DASHBOARD_STATS}:{platform_key or 'all'}"
+        cached = await cache.get(cache_key)
         if cached:
             return cached
+        
+        # 构建平台过滤条件（兼容旧数据：platform_key 为空视为全部）
+        run_log_filter = []
+        feedback_filter = []
+        if platform_key:
+            from sqlalchemy import or_
+            platform_cond = or_(RunLog.platform_key == platform_key, RunLog.platform_key.is_(None))
+            run_log_filter.append(platform_cond)
+            feedback_cond = or_(Feedback.platform_key == platform_key, Feedback.platform_key.is_(None))
+            feedback_filter.append(feedback_cond)
         
         # 总收入
         revenue_result = await self.db.execute(
@@ -50,27 +61,31 @@ class DashboardService:
         users_result = await self.db.execute(select(func.count(User.id)))
         total_users = users_result.scalar() or 0
         
-        # 今日运行次数
+        # 今日运行次数（按平台过滤）
         today = datetime.now().date()
-        today_runs_result = await self.db.execute(
-            select(func.count(RunLog.id)).where(func.date(RunLog.created_at) == today)
-        )
+        today_query = select(func.count(RunLog.id)).where(func.date(RunLog.created_at) == today)
+        for cond in run_log_filter:
+            today_query = today_query.where(cond)
+        today_runs_result = await self.db.execute(today_query)
         today_runs = today_runs_result.scalar() or 0
         
-        # 待处理工单数
-        pending_result = await self.db.execute(
-            select(func.count(Feedback.id)).where(Feedback.status == "pending")
-        )
+        # 待处理工单数（按平台过滤）
+        pending_query = select(func.count(Feedback.id)).where(Feedback.status == "pending")
+        for cond in feedback_filter:
+            pending_query = pending_query.where(cond)
+        pending_result = await self.db.execute(pending_query)
         pending_tickets = pending_result.scalar() or 0
         
-        # 最近运行日志
-        logs_result = await self.db.execute(
-            select(RunLog).order_by(desc(RunLog.created_at)).limit(10)
-        )
+        # 最近运行日志（按平台过滤）
+        logs_query = select(RunLog).order_by(desc(RunLog.created_at)).limit(10)
+        for cond in run_log_filter:
+            logs_query = logs_query.where(cond)
+        logs_result = await self.db.execute(logs_query)
         recent_logs = [
             {
                 "id": l.id, "tool_name": l.tool_name, "module": l.module,
-                "status": l.status, "created_at": l.created_at.isoformat() if l.created_at else None
+                "status": l.status, "created_at": l.created_at.isoformat() if l.created_at else None,
+                "platform_key": getattr(l, 'platform_key', None),
             }
             for l in logs_result.scalars().all()
         ]
@@ -86,14 +101,15 @@ class DashboardService:
         })
         
         # 缓存60秒
-        await cache.set(CacheKeys.DASHBOARD_STATS, result, ttl=60)
+        await cache.set(cache_key, result, ttl=60)
         
         return result
     
-    async def get_dashboard_charts(self) -> Dict[str, Any]:
+    async def get_dashboard_charts(self, platform_key: str = None) -> Dict[str, Any]:
         """获取图表数据（带缓存）"""
-        # 尝试缓存
-        cached = await cache.get(CacheKeys.DASHBOARD_CHARTS)
+        # 尝试缓存（按平台区分）
+        cache_key = f"{CacheKeys.DASHBOARD_CHARTS}:{platform_key or 'all'}"
+        cached = await cache.get(cache_key)
         if cached:
             return cached
         
@@ -131,15 +147,20 @@ class DashboardService:
             for name, count in plan_dist_result.all()
         ]
         
-        # 工具成功率
-        tool_rate_result = await self.db.execute(
-            select(
-                RunLog.tool_name,
-                func.count(RunLog.id),
-                func.sum(case((RunLog.status == "success", 1), else_=0))
+        # 工具成功率（按平台过滤）
+        tool_query = select(
+            RunLog.tool_name,
+            func.count(RunLog.id),
+            func.sum(case((RunLog.status == "success", 1), else_=0))
+        ).group_by(RunLog.tool_name)
+        
+        if platform_key:
+            from sqlalchemy import or_
+            tool_query = tool_query.where(
+                or_(RunLog.platform_key == platform_key, RunLog.platform_key.is_(None))
             )
-            .group_by(RunLog.tool_name)
-        )
+        
+        tool_rate_result = await self.db.execute(tool_query)
         tool_success_rate = []
         for name, total, success_count in tool_rate_result.all():
             rate = round((success_count or 0) / total * 100) if total > 0 else 0
@@ -152,7 +173,7 @@ class DashboardService:
         })
         
         # 缓存60秒
-        await cache.set(CacheKeys.DASHBOARD_CHARTS, result, ttl=60)
+        await cache.set(cache_key, result, ttl=60)
         
         return result
     
