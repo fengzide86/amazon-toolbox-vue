@@ -212,7 +212,10 @@ async def batch_generate_codes(req: AuthCodeGenerate, request: Request, db: Asyn
             plan_id=req.plan_id, 
             status="unused", 
             expires_at=expires_at,
-            max_devices=req.max_devices if req.max_devices else 1
+            max_devices=req.max_devices if req.max_devices else 1,
+            platform_scope=req.platform_scope or "amazon",
+            scene_type=req.scene_type or "competition",
+            seat_limit=req.seat_limit if req.seat_limit else (req.max_devices if req.max_devices else 1)
         )
         db.add(code_obj)
         codes.append(code_str)

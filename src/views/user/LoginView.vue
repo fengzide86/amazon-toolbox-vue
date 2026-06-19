@@ -317,6 +317,10 @@ function handleLogin() {
         })
         userStore.setDevice(deviceId.value, deviceName.value)
         Auth.set(authCode.value.trim())
+        // 存储平台权限信息供 AppHeader 使用
+        if (res.data.platform_scope) {
+          localStorage.setItem('toolbox_platform_scope', JSON.stringify(res.data.platform_scope))
+        }
         showSuccess.value = true
         showToast('授权成功！正在跳转...', 'success')
         setTimeout(() => {

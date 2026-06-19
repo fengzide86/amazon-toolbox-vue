@@ -35,8 +35,20 @@ export const usePlatformStore = defineStore('platform', () => {
     try {
       const response = await fetch(`${API_BASE}/api/tools/platforms`)
       const data = await response.json()
-      if (data.success) {
-        availablePlatforms.value = data.data || []
+      // API 可能返回数组或 {success, data} 格式
+      if (Array.isArray(data)) {
+        availablePlatforms.value = data
+      } else if (data.success && data.data) {
+        availablePlatforms.value = data.data
+      } else if (data.data && Array.isArray(data.data)) {
+        availablePlatforms.value = data.data
+      }
+      // 如果返回为空，使用默认配置
+      if (!availablePlatforms.value.length) {
+        availablePlatforms.value = [
+          { key: 'amazon', name: '亚马逊', short_name: '亚马逊', status: 'available', sort_order: 1 },
+          { key: 'aliexpress', name: '速卖通', short_name: '速卖通', status: 'available', sort_order: 2 }
+        ]
       }
     } catch (error) {
       console.error('加载平台配置失败:', error)

@@ -10,10 +10,23 @@
         <select v-model="selectedPlanId" class="form-input" style="max-width: 200px;">
           <option v-for="plan in plans" :key="plan.id" :value="plan.id">{{ plan.name }} - ¥{{ plan.price }}</option>
         </select>
-        <input type="number" v-model.number="generateCount" class="form-input" placeholder="数量" style="width: 120px;" min="1" max="100">
+        <select v-model="selectedPlatformScope" class="form-input" style="max-width: 160px;">
+          <option value="amazon">亚马逊</option>
+          <option value="aliexpress">速卖通</option>
+          <option value="amazon,aliexpress">双平台</option>
+        </select>
+        <select v-model="selectedSceneType" class="form-input" style="max-width: 120px;">
+          <option value="competition">比赛</option>
+          <option value="course">课程</option>
+        </select>
+        <input type="number" v-model.number="generateCount" class="form-input" placeholder="数量" style="width: 100px;" min="1" max="100">
         <div class="device-input-group">
-          <label>最大设备数</label>
-          <input type="number" v-model.number="maxDevices" class="form-input" style="width:80px;" min="1" max="10">
+          <label>席位数</label>
+          <input type="number" v-model.number="seatLimit" class="form-input" style="width:60px;" min="1" max="10">
+        </div>
+        <div class="device-input-group">
+          <label>设备数</label>
+          <input type="number" v-model.number="maxDevices" class="form-input" style="width:60px;" min="1" max="10">
         </div>
         <button class="btn btn-primary" @click="handleGenerate" :disabled="isLoading">
           {{ isLoading ? '生成中...' : '生成授权码' }}
@@ -181,7 +194,10 @@ import { showToast } from '@/utils'
 const authCodes = ref([])
 const plans = ref([])
 const selectedPlanId = ref(2)
+const selectedPlatformScope = ref('amazon')
+const selectedSceneType = ref('competition')
 const generateCount = ref(1)
+const seatLimit = ref(1)
 const maxDevices = ref(1)
 const isLoading = ref(false)
 const generatedCodes = ref([])
@@ -289,6 +305,9 @@ async function handleGenerate() {
     const res = await batchGenerateAuthCodes({
       plan_id: selectedPlanId.value,
       count: generateCount.value,
+      platform_scope: selectedPlatformScope.value,
+      scene_type: selectedSceneType.value,
+      seat_limit: seatLimit.value,
       max_devices: maxDevices.value
     })
     if (res.success) {

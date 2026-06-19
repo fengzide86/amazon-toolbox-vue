@@ -94,7 +94,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
-import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory } from '@/utils/api'
+import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, api } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 
@@ -171,6 +171,51 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
+    // 1. 先查询 FAQ（不调用 AI）
+    const faqRes = await api.post('/api/help/query', {
+      question: text,
+      platform_key: platformStore.currentPlatform,
+    })
+
+    if (faqRes.success && faqRes.data) {
+      if (faqRes.data.matched && !faqRes.data.ai_used) {
+        // FAQ 命中，直接展示答案，不调用 AI
+        messages.value.push({
+          id: nextMsgId++,
+          role: 'ai',
+          content: faqRes.data.answer,
+          knowledge_ids: faqRes.data.faq_id ? [faqRes.data.faq_id] : [],
+          created_at: new Date().toISOString()
+        })
+        lastAiMessage.value = faqRes.data.answer
+        showActions.value = true
+        isLoading.value = false
+        scrollToBottom()
+        return
+      }
+
+      if (faqRes.data.need_ai) {
+        // FAQ 未命中，提示用户是否使用 AI 诊断
+        messages.value.push({
+          id: nextMsgId++,
+          role: 'ai',
+          content: '未找到匹配的 FAQ 答案。是否使用 AI 智能诊断来帮您解答？',
+          created_at: new Date().toISOString()
+        })
+        // 添加 AI 诊断按钮
+        messages.value.push({
+          id: nextMsgId++,
+          role: 'system',
+          content: '__AI_DIAGNOSIS_PROMPT__',
+          created_at: new Date().toISOString()
+        })
+        isLoading.value = false
+        scrollToBottom()
+        return
+      }
+    }
+
+    // 2. FAQ 未命中且用户确认，或 FAQ 查询失败，调用 AI
     const res = await sendChatMessage(sessionId.value, text, { platform_key: platformStore.currentPlatform })
     messages.value.push({
       id: nextMsgId++,
@@ -189,6 +234,43 @@ async function sendMessage() {
       created_at: new Date().toISOString()
     })
     showToast('发送失败', 'error')
+  } finally {
+    isLoading.value = false
+    scrollToBottom()
+  }
+}
+
+// AI 诊断确认
+async function confirmAIDiagnosis() {
+  // 找到最后一个用户消息
+  const lastUserMsg = [...messages.value].reverse().find(m => m.role === 'user')
+  if (!lastUserMsg) return
+
+  // 移除提示消息
+  messages.value = messages.value.filter(m => m.content !== '__AI_DIAGNOSIS_PROMPT__')
+
+  isLoading.value = true
+  scrollToBottom()
+
+  try {
+    const res = await sendChatMessage(sessionId.value, lastUserMsg.content, { platform_key: platformStore.currentPlatform })
+    messages.value.push({
+      id: nextMsgId++,
+      role: 'ai',
+      content: res.reply,
+      knowledge_ids: res.knowledge_refs?.map(r => r.id) || [],
+      created_at: new Date().toISOString()
+    })
+    lastAiMessage.value = res.reply
+    showActions.value = true
+  } catch (err) {
+    messages.value.push({
+      id: nextMsgId++,
+      role: 'ai',
+      content: '抱歉，AI 诊断失败，请检查网络连接后重试。',
+      created_at: new Date().toISOString()
+    })
+    showToast('AI 诊断失败', 'error')
   } finally {
     isLoading.value = false
     scrollToBottom()
