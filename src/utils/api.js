@@ -362,14 +362,14 @@ export function updateFeedback(id, data) {
     return api.put(`/api/feedback/${id}`, data);
 }
 
-// 获取数据看板
-export function getDashboard() {
-    return api.get('/api/dashboard');
+// 获取数据看板（支持平台过滤）
+export function getDashboard(params = {}) {
+    return api.get('/api/dashboard', params);
 }
 
-// 获取图表数据
-export function getDashboardCharts() {
-    return api.get('/api/dashboard/charts');
+// 获取图表数据（支持平台过滤）
+export function getDashboardCharts(params = {}) {
+    return api.get('/api/dashboard/charts', params);
 }
 
 // 获取分润记录（支持平台过滤）
