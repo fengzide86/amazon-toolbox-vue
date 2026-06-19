@@ -89,7 +89,11 @@ const showPlatformSwitcher = computed(() => platformStore.availablePlatforms.len
 const currentPlatform = computed(() => platformStore.currentPlatform)
 const adminPlatform = computed(() => platformStore.adminPlatform)
 const availablePlatformsForUser = computed(() => {
-  // 获取用户授权的平台权限
+  // 管理员显示所有可用平台，不受 platform_scope 限制
+  if (props.isAdmin) {
+    return platformStore.availablePlatforms.filter(p => p.status === 'available')
+  }
+  // 用户端根据授权权限过滤
   const platformScope = getPlatformScope()
   return platformStore.getAvailablePlatformsForUser(platformScope)
 })
