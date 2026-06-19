@@ -143,6 +143,28 @@ async def _migrate_sqlite():
         ("feedback", "replied_at", "DATETIME"),
         ("feedback", "screenshots", "TEXT"),
         ("feedback", "updated_at", "DATETIME"),
+        # ===== 1.5 新增字段 =====
+        # auth_codes 表 - 平台权限、场景、席位
+        ("auth_codes", "platform_scope", "TEXT"),
+        ("auth_codes", "scene_type", "VARCHAR(50)"),
+        ("auth_codes", "seat_limit", "INTEGER DEFAULT 1"),
+        # run_logs 表 - 平台化字段
+        ("run_logs", "auth_code_id", "INTEGER"),
+        ("run_logs", "platform_key", "VARCHAR(50)"),
+        ("run_logs", "capability_key", "VARCHAR(100)"),
+        ("run_logs", "script_key", "VARCHAR(100)"),
+        ("run_logs", "tool_id", "VARCHAR(100)"),
+        # feedback 表 - 平台化字段
+        ("feedback", "platform_key", "VARCHAR(50)"),
+        ("feedback", "capability_key", "VARCHAR(100)"),
+        ("feedback", "tool_id", "VARCHAR(100)"),
+        ("feedback", "run_log_id", "INTEGER"),
+        # knowledge_base 表 - 平台化字段
+        ("knowledge_base", "platform_key", "VARCHAR(50)"),
+        ("knowledge_base", "capability_key", "VARCHAR(100)"),
+        # chat_sessions 表 - 平台化字段
+        ("chat_sessions", "platform_key", "VARCHAR(50)"),
+        ("chat_sessions", "capability_key", "VARCHAR(100)"),
     ]
     
     for table, column, definition in migrations:
@@ -185,6 +207,28 @@ async def _migrate_mysql():
         ("feedback", "replied_at", "DATETIME"),
         ("feedback", "screenshots", "TEXT"),
         ("feedback", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        # ===== 1.5 新增字段 =====
+        # auth_codes 表 - 平台权限、场景、席位
+        ("auth_codes", "platform_scope", "TEXT"),
+        ("auth_codes", "scene_type", "VARCHAR(50)"),
+        ("auth_codes", "seat_limit", "INT DEFAULT 1"),
+        # run_logs 表 - 平台化字段
+        ("run_logs", "auth_code_id", "INT"),
+        ("run_logs", "platform_key", "VARCHAR(50)"),
+        ("run_logs", "capability_key", "VARCHAR(100)"),
+        ("run_logs", "script_key", "VARCHAR(100)"),
+        ("run_logs", "tool_id", "VARCHAR(100)"),
+        # feedback 表 - 平台化字段
+        ("feedback", "platform_key", "VARCHAR(50)"),
+        ("feedback", "capability_key", "VARCHAR(100)"),
+        ("feedback", "tool_id", "VARCHAR(100)"),
+        ("feedback", "run_log_id", "INT"),
+        # knowledge_base 表 - 平台化字段
+        ("knowledge_base", "platform_key", "VARCHAR(50)"),
+        ("knowledge_base", "capability_key", "VARCHAR(100)"),
+        # chat_sessions 表 - 平台化字段
+        ("chat_sessions", "platform_key", "VARCHAR(50)"),
+        ("chat_sessions", "capability_key", "VARCHAR(100)"),
     ]
     
     async with async_session_maker() as session:

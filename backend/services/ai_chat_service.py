@@ -16,6 +16,31 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# ===== AI 回退提示 =====
+FALLBACK_REPLIES = {
+    "no_api_key": "抱歉，AI 客服暂未配置。您可以先查看 FAQ，或提交工单联系人工客服。",
+    "timeout": "AI 响应超时，请稍后再试。如问题持续，请提交工单联系人工客服。",
+    "rate_limit": "当前咨询人数较多，AI 暂时繁忙。请稍后再试或提交工单。",
+    "provider_error": "AI 服务暂时不可用，请稍后再试。您也可以查看 FAQ 或提交工单。",
+    "invalid_config": "AI 配置异常，请联系管理员或提交工单。",
+    "unknown_error": "AI 诊断暂时不可用。您可以查看 FAQ 或提交工单联系人工客服。",
+}
+
+# ===== 敏感内容检测 =====
+SENSITIVE_KEYWORDS = ["暴力", "色情", "赌博", "毒品", "诈骗", "政治敏感", "反动"]
+SENSITIVE_CONTENT_REPLY = "AI 诊断仅支持工具、授权、安装、报错和平台操作问题。如涉及其他问题，请提交工单联系人工客服。"
+
+
+def _check_sensitive_content(message: str) -> bool:
+    """
+    检测敏感内容
+    仅用于 AI 诊断输入和输出，不影响普通 FAQ 查询
+    """
+    if not message:
+        return False
+    message_lower = message.lower()
+    return any(kw in message_lower for kw in SENSITIVE_KEYWORDS)
+
 # 默认配置
 DEFAULT_CONFIG = {
     "welcome_message": "你好！我是亚马逊工具箱智能客服 🤖\n请问有什么可以帮你的？",
@@ -155,6 +180,28 @@ async def send_message(
     )
     await db.commit()
 
+    # 敏感内容检测（仅用于 AI 诊断，不影响 FAQ）
+    if _check_sensitive_content(user_message):
+        ai_reply = SENSITIVE_CONTENT_REPLY
+        # 保存 AI 回复
+        ai_msg = ChatMessage(
+            session_id=session_id,
+            role="ai",
+            content=ai_reply,
+        )
+        db.add(ai_msg)
+        await db.execute(
+            sql_update(ChatSession)
+            .where(ChatSession.session_id == session_id)
+            .values(message_count=ChatSession.message_count + 1)
+        )
+        await db.commit()
+        return {
+            "reply": ai_reply,
+            "knowledge_refs": [],
+            "session_id": session_id,
+        }
+
     # 检索知识库
     knowledge_results = []
     try:
@@ -172,16 +219,28 @@ async def send_message(
     config = await get_config(db)
     messages = await _build_ai_messages(db, session_id, user_message, knowledge_results, config)
 
-    # 调用 AI
+    # 调用 AI（带错误分类和回退）
+    ai_reply = None
+    error_type = None
     try:
         ai_reply = await ai_provider.chat_completion(messages)
     except Exception as e:
+        error_str = str(e).lower()
         logger.error(f"AI 对话失败: {e}")
-        # 检查是否是 API Key 未配置
+        
+        # 错误分类
         if not settings.QWEN_API_KEY:
-            ai_reply = '抱歉，AI 客服暂未配置，请点击「转人工客服」联系人工客服，我们将尽快为您解答。'
+            error_type = "no_api_key"
+        elif "timeout" in error_str or "timed out" in error_str:
+            error_type = "timeout"
+        elif "rate limit" in error_str or "429" in error_str:
+            error_type = "rate_limit"
+        elif "invalid" in error_str or "config" in error_str:
+            error_type = "invalid_config"
         else:
-            ai_reply = '抱歉，AI 服务暂时不可用，请稍后再试。如果问题持续，请点击「转人工客服」联系人工客服。'
+            error_type = "provider_error"
+        
+        ai_reply = FALLBACK_REPLIES.get(error_type, FALLBACK_REPLIES["unknown_error"])
 
     # 保存 AI 消息
     knowledge_ids = [str(r["knowledge_id"]) for r in knowledge_results if r.get("knowledge_id")]

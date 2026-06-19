@@ -4,7 +4,6 @@
       <h2 class="page-title">个人日志与问题反馈</h2>
     </div>
 
-    <!-- 日志筛选 -->
     <section class="table-card">
       <div class="table-header">
         <h3>运行日志</h3>
@@ -16,7 +15,6 @@
         </button>
       </div>
       
-      <!-- 筛选器 -->
       <div class="filters">
         <div class="filter-group">
           <label>开始日期</label>
@@ -73,7 +71,6 @@
       </table>
     </section>
 
-    <!-- 问题反馈 -->
     <section class="table-card" style="margin-top: 1.5rem;">
       <div class="table-header">
         <h3>问题反馈</h3>
@@ -87,7 +84,6 @@
         </div>
         <textarea v-model="feedbackContent" class="form-textarea" placeholder="问题描述（选填）" rows="3"></textarea>
         
-        <!-- 截图上传 -->
         <div class="screenshot-section">
           <label class="screenshot-label">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -122,7 +118,6 @@
         </div>
       </div>
 
-      <!-- 反馈记录 -->
       <div v-if="myFeedbacks.length" class="feedback-list">
         <h4>我的反馈记录</h4>
         <div v-for="fb in myFeedbacks" :key="fb.id" class="feedback-item">
@@ -131,12 +126,9 @@
             <span :class="['status-badge', fb.status]">{{ getStatusText(fb.status) }}</span>
           </div>
           <div class="feedback-content">{{ fb.content || '无描述' }}</div>
-          
-          <!-- 截图展示 -->
           <div v-if="fb.screenshots" class="feedback-screenshots">
             <img v-for="(url, i) in parseScreenshots(fb.screenshots)" :key="i" :src="url" alt="反馈截图" @click="previewImage(url)">
           </div>
-          
           <div v-if="fb.admin_reply" class="admin-reply">
             <strong>管理员回复：</strong>
             <span>{{ fb.admin_reply }}</span>
@@ -145,7 +137,6 @@
       </div>
     </section>
 
-    <!-- 图片预览弹窗 -->
     <div v-if="previewUrl" class="image-preview-overlay" @click="previewUrl = null">
       <img :src="previewUrl" @click.stop>
       <button class="close-preview" @click="previewUrl = null">
@@ -158,10 +149,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { getLogs, getLogTools, exportLogs, createFeedback, getMyFeedbacks, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
+const platformStore = usePlatformStore()
 const logs = ref([])
 const myFeedbacks = ref([])
 const feedbackTitle = ref('')
@@ -242,6 +235,7 @@ async function submitFeedback() {
     const formData = new FormData()
     formData.append('title', feedbackTitle.value.trim())
     formData.append('content', feedbackContent.value.trim())
+    formData.append('platform_key', platformStore.currentPlatform)
     if (userInfo.user_id) formData.append('user_id', userInfo.user_id)
     
     screenshots.value.forEach(item => {
@@ -271,7 +265,7 @@ async function submitFeedback() {
 
 async function loadLogs() {
   try {
-    const params = {}
+    const params = { platform_key: platformStore.currentPlatform }
     if (filters.value.startDate) params.start_date = filters.value.startDate
     if (filters.value.endDate) params.end_date = filters.value.endDate
     if (filters.value.toolName) params.tool_name = filters.value.toolName
@@ -296,7 +290,7 @@ function resetFilters() {
 
 async function exportLogsData() {
   try {
-    const params = {}
+    const params = { platform_key: platformStore.currentPlatform }
     if (filters.value.startDate) params.start_date = filters.value.startDate
     if (filters.value.endDate) params.end_date = filters.value.endDate
     if (filters.value.toolName) params.tool_name = filters.value.toolName
@@ -320,6 +314,8 @@ async function loadFeedbacks() {
     myFeedbacks.value = await getMyFeedbacks()
   } catch (err) {}
 }
+
+watch(() => platformStore.currentPlatform, () => { loadLogs() })
 
 onMounted(() => { 
   loadLogs()

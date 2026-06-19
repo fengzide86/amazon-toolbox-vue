@@ -137,9 +137,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, createKnowledge, updateKnowledge, deleteKnowledge, syncKnowledgeVector } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
+
+const platformStore = usePlatformStore()
 
 const list = ref([])
 const total = ref(0)
@@ -163,6 +166,8 @@ const form = ref({
   content: '',
   priority: 'medium',
   status: 'active',
+  platform_key: '',
+  capability_key: '',
 })
 
 async function loadData() {
@@ -170,6 +175,8 @@ async function loadData() {
     const params = { page: page.value, page_size: pageSize }
     if (filterCategory.value) params.category = filterCategory.value
     if (searchKeyword.value) params.keyword = searchKeyword.value
+    const pk = platformStore.adminPlatform
+    if (pk && pk !== 'all') params.platform_key = pk
     const res = await getKnowledgeList(params)
     list.value = res.items || []
     total.value = res.total || 0
@@ -188,7 +195,8 @@ async function loadMeta() {
 
 function openCreate() {
   editingId.value = null
-  form.value = { category: '安装教程', title: '', content: '', priority: 'medium', status: 'active' }
+  const pk = platformStore.adminPlatform
+  form.value = { category: '安装教程', title: '', content: '', priority: 'medium', status: 'active', platform_key: (pk && pk !== 'all') ? pk : '', capability_key: '' }
   keywordsStr.value = ''
   showModal.value = true
 }
@@ -201,6 +209,8 @@ function openEdit(item) {
     content: item.content,
     priority: item.priority,
     status: item.status,
+    platform_key: item.platform_key || '',
+    capability_key: item.capability_key || '',
   }
   keywordsStr.value = (item.keywords || []).join(', ')
   showModal.value = true
