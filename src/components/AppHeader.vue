@@ -228,7 +228,7 @@ onMounted(() => {
 .platform-options {
   display: flex;
   gap: 4px;
-  background: var(--color-bg-secondary);
+  background: #F1F5F9;
   border-radius: var(--radius-md);
   padding: 2px;
 }
@@ -247,14 +247,15 @@ onMounted(() => {
 }
 
 .platform-btn:hover:not(.disabled) {
-  color: var(--color-text);
-  background: var(--color-bg);
+  color: var(--color-primary);
+  background: white;
 }
 
 .platform-btn.active {
-  color: var(--color-primary);
-  background: var(--color-bg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  color: white;
+  background: var(--color-accent);
+  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.3);
+  font-weight: 600;
 }
 
 .platform-btn.disabled {
