@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" data-testid="user-layout">
     <AppHeader :is-admin="false" @toggle-sidebar="toggleSidebar" />
     
     <!-- 移动端侧边栏遮罩 -->
@@ -14,7 +14,7 @@
         :class="{ 'mobile-open': showMobileSidebar }" 
         ref="sidebarRef"
       />
-      <main class="content">
+      <main class="content" data-testid="user-content">
         <Breadcrumb />
         <AnnouncementBanner />
         <router-view />

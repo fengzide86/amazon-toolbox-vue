@@ -10,10 +10,23 @@
         <select v-model="selectedPlanId" class="form-input" style="max-width: 200px;">
           <option v-for="plan in plans" :key="plan.id" :value="plan.id">{{ plan.name }} - ¥{{ plan.price }}</option>
         </select>
-        <input type="number" v-model.number="generateCount" class="form-input" placeholder="数量" style="width: 120px;" min="1" max="100">
+        <select v-model="selectedPlatformScope" class="form-input" style="max-width: 160px;">
+          <option value="amazon">亚马逊</option>
+          <option value="aliexpress">速卖通</option>
+          <option value="amazon,aliexpress">双平台</option>
+        </select>
+        <select v-model="selectedSceneType" class="form-input" style="max-width: 120px;">
+          <option value="competition">比赛</option>
+          <option value="course">课程</option>
+        </select>
+        <input type="number" v-model.number="generateCount" class="form-input" placeholder="数量" style="width: 100px;" min="1" max="100">
         <div class="device-input-group">
-          <label>最大设备数</label>
-          <input type="number" v-model.number="maxDevices" class="form-input" style="width:80px;" min="1" max="10">
+          <label>席位数</label>
+          <input type="number" v-model.number="seatLimit" class="form-input" style="width:60px;" min="1" max="10">
+        </div>
+        <div class="device-input-group">
+          <label>设备数</label>
+          <input type="number" v-model.number="maxDevices" class="form-input" style="width:60px;" min="1" max="10">
         </div>
         <button class="btn btn-primary" @click="handleGenerate" :disabled="isLoading">
           {{ isLoading ? '生成中...' : '生成授权码' }}
@@ -50,8 +63,9 @@
           <tr>
             <th>授权码</th>
             <th>套餐</th>
+            <th>平台权限</th>
             <th>状态</th>
-            <th>绑定设备</th>
+            <th>席位</th>
             <th>设备数</th>
             <th>过期时间</th>
             <th>操作</th>
@@ -59,17 +73,33 @@
         </thead>
         <tbody>
           <tr v-for="code in filteredCodes" :key="code.id">
-            <td style="font-family:monospace;font-size:0.85rem">{{ code.code }}</td>
-            <td>{{ getPlanName(code.plan_id) }}</td>
+            <td style="font-family:monospace;font-size:0.85rem">
+              <a href="#" @click.prevent="openDetail(code)" style="color:var(--color-primary);text-decoration:none;">{{ code.code }}</a>
+            </td>
+            <td>{{ code.plan_name || getPlanName(code.plan_id) }}</td>
+            <td>
+              <span v-for="p in (code.platform_scope || ['amazon'])" :key="p" class="platform-tag" :class="'platform-' + p">
+                {{ p === 'amazon' ? '亚马逊' : '速卖通' }}
+              </span>
+            </td>
             <td><span :class="['status-dot', getStatusClass(code.status)]"></span>{{ getStatusText(code.status) }}</td>
-            <td style="font-size:0.8rem;">{{ code.device_name || '未绑定' }}</td>
+            <td>
+              <span class="seat-badge" v-if="code.seat_limit">
+                {{ code.seat_used || 0 }}/{{ code.seat_limit }}
+              </span>
+              <span v-else style="color:var(--color-muted);">-</span>
+            </td>
             <td>
               <span class="device-badge" :class="getDeviceClass(code)" @click="editMaxDevices(code)" title="点击修改">
-                {{ getDeviceCount(code) }}/{{ code.max_devices || 1 }}
+                {{ code.device_used || getDeviceCount(code) }}/{{ code.max_devices || 1 }}
               </span>
             </td>
             <td style="font-size:0.8rem;">{{ formatDate(code.expires_at) }}</td>
             <td>
+              <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
+                @click="openDetail(code)">
+                详情
+              </button>
               <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
                 @click="toggleFreeze(code)" :disabled="code.status === 'expired'">
                 {{ code.status === 'frozen' ? '解冻' : '冻结' }}
@@ -85,7 +115,7 @@
             </td>
           </tr>
           <tr v-if="!filteredCodes.length">
-            <td colspan="7" style="text-align:center;color:var(--color-muted);padding:2rem;">暂无数据</td>
+            <td colspan="8" style="text-align:center;color:var(--color-muted);padding:2rem;">暂无数据</td>
           </tr>
         </tbody>
       </table>
@@ -125,6 +155,34 @@
         </div>
       </div>
     </div>
+
+    <!-- 授权码详情弹窗 -->
+    <div class="modal-overlay" :class="{ show: showDetailModal }" @click.self="showDetailModal = false">
+      <div class="modal" style="max-width:520px;">
+        <h3>授权码详情</h3>
+        <div v-if="detailData" class="detail-grid">
+          <div class="detail-row"><span class="detail-label">授权码</span><span class="detail-value" style="font-family:monospace;">{{ detailData.code }}</span></div>
+          <div class="detail-row"><span class="detail-label">套餐</span><span class="detail-value">{{ detailData.plan_name || getPlanName(detailData.plan_id) }}</span></div>
+          <div class="detail-row"><span class="detail-label">状态</span><span class="detail-value"><span :class="['status-dot', getStatusClass(detailData.status)]"></span>{{ getStatusText(detailData.status) }}</span></div>
+          <div class="detail-row"><span class="detail-label">平台权限</span><span class="detail-value"><span v-for="p in (detailData.platform_scope || ['amazon'])" :key="p" class="platform-tag" :class="'platform-' + p">{{ p === 'amazon' ? '亚马逊' : '速卖通' }}</span></span></div>
+          <div class="detail-row"><span class="detail-label">场景类型</span><span class="detail-value">{{ detailData.scene_type || '-' }}</span></div>
+          <div class="detail-row"><span class="detail-label">席位</span><span class="detail-value"><strong>{{ detailData.seat_used || 0 }}</strong> / {{ detailData.seat_limit || '-' }}</span></div>
+          <div class="detail-row"><span class="detail-label">设备数</span><span class="detail-value"><strong>{{ detailData.device_used || 0 }}</strong> / {{ detailData.max_devices || '-' }}</span></div>
+          <div class="detail-row"><span class="detail-label">过期时间</span><span class="detail-value">{{ formatDate(detailData.expires_at) }}</span></div>
+          <div class="detail-row"><span class="detail-label">创建时间</span><span class="detail-value">{{ formatDate(detailData.created_at) }}</span></div>
+          <div v-if="detailData.devices && detailData.devices.length" class="detail-section">
+            <div class="detail-label" style="margin-bottom:0.5rem;">绑定设备</div>
+            <div v-for="dev in detailData.devices" :key="dev.id" class="device-item">
+              {{ dev.device_name || dev.device_id }} <span style="color:var(--color-muted);font-size:0.75rem;">{{ formatDate(dev.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else style="text-align:center;padding:2rem;color:var(--color-muted);">加载中...</div>
+        <div class="modal-btns" style="margin-top:1.5rem;">
+          <button class="btn btn-secondary" @click="showDetailModal = false">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -136,7 +194,10 @@ import { showToast } from '@/utils'
 const authCodes = ref([])
 const plans = ref([])
 const selectedPlanId = ref(2)
+const selectedPlatformScope = ref('amazon')
+const selectedSceneType = ref('competition')
 const generateCount = ref(1)
+const seatLimit = ref(1)
 const maxDevices = ref(1)
 const isLoading = ref(false)
 const generatedCodes = ref([])
@@ -153,6 +214,10 @@ const newMaxDevices = ref(1)
 const showExtendModal = ref(false)
 const extendingCode = ref(null)
 const extendDays = ref(30)
+
+// 详情弹窗
+const showDetailModal = ref(false)
+const detailData = ref(null)
 
 const filteredCodes = computed(() => {
   let codes = authCodes.value
@@ -240,6 +305,9 @@ async function handleGenerate() {
     const res = await batchGenerateAuthCodes({
       plan_id: selectedPlanId.value,
       count: generateCount.value,
+      platform_scope: selectedPlatformScope.value,
+      scene_type: selectedSceneType.value,
+      seat_limit: seatLimit.value,
       max_devices: maxDevices.value
     })
     if (res.success) {
@@ -317,6 +385,16 @@ function copyCodes() {
   })
 }
 
+async function openDetail(code) {
+  try {
+    const res = await api.get(`/auth-codes/${code.id}`)
+    detailData.value = res.data
+    showDetailModal.value = true
+  } catch (err) {
+    showToast('获取详情失败', 'error')
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -360,4 +438,21 @@ onMounted(loadData)
 .modal p { color: var(--color-muted); font-size: 0.85rem; font-family: monospace; }
 .modal-btns { display: flex; gap: 0.75rem; margin-top: 1rem; }
 .modal-btns button { flex: 1; padding: 0.75rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+
+/* 平台标签 */
+.platform-tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-right: 0.25rem; }
+.platform-amazon { background: rgba(255,153,0,0.1); color: #FF9900; }
+.platform-aliexpress { background: rgba(255,70,0,0.1); color: #FF4600; }
+
+/* 席位徽章 */
+.seat-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(16,185,129,0.1); color: #10B981; }
+
+/* 详情弹窗 */
+.detail-grid { display: flex; flex-direction: column; gap: 0.75rem; }
+.detail-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); }
+.detail-row:last-child { border-bottom: none; }
+.detail-label { width: 100px; font-size: 0.85rem; color: var(--color-muted); flex-shrink: 0; }
+.detail-value { flex: 1; font-size: 0.9rem; color: var(--color-text); }
+.detail-section { margin-top: 1rem; }
+.device-item { padding: 0.5rem; background: var(--color-bg); border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.85rem; }
 </style>

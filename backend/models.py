@@ -104,8 +104,15 @@ class AuthCode(Base):
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     
+    # ===== 1.5 新增字段 =====
+    platform_scope = Column(Text, nullable=True)  # 平台权限: amazon / aliexpress / amazon,aliexpress
+    scene_type = Column(String(50), nullable=True, index=True)  # 场景: competition / course
+    seat_limit = Column(Integer, default=1)  # 席位数
+    
     # 关联设备列表
     devices = relationship("Device", backref="auth_code", lazy="selectin")
+    # 关联席位
+    seats = relationship("AuthSeat", backref="auth_code", lazy="selectin")
 
     __table_args__ = (
         Index('ix_auth_codes_status_expires', 'status', 'expires_at'),
@@ -122,6 +129,25 @@ class Device(Base):
 
     __table_args__ = (
         Index('ix_devices_auth_code_device', 'auth_code_id', 'device_id'),
+    )
+
+
+# 3c. auth_seats - 席位绑定表 (1.5 新增)
+class AuthSeat(Base):
+    __tablename__ = "auth_seats"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    auth_code_id = Column(Integer, ForeignKey("auth_codes.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    device_id = Column(String(200), nullable=True, index=True)
+    device_name = Column(String(200), nullable=True)
+    seat_no = Column(Integer, nullable=True)
+    status = Column(String(20), default="active", index=True)  # active/inactive
+    activated_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('ix_auth_seats_code_status', 'auth_code_id', 'status'),
+        Index('ix_auth_seats_user_device', 'user_id', 'device_id'),
     )
 
 
@@ -179,10 +205,18 @@ class RunLog(Base):
     error_code = Column(String(100), nullable=True)
     detail = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now(), index=True)
+    
+    # ===== 1.5 新增字段 =====
+    auth_code_id = Column(Integer, ForeignKey("auth_codes.id"), nullable=True, index=True)
+    platform_key = Column(String(50), nullable=True, index=True)  # amazon / aliexpress
+    capability_key = Column(String(100), nullable=True, index=True)  # register / listing / ads 等
+    script_key = Column(String(100), nullable=True, index=True)  # amz_register / ae_register 等
+    tool_id = Column(String(100), nullable=True, index=True)  # 工具配置ID
 
     __table_args__ = (
         Index('ix_run_logs_user_created', 'user_id', 'created_at'),
         Index('ix_run_logs_tool_created', 'tool_name', 'created_at'),
+        Index('ix_run_logs_platform', 'platform_key', 'created_at'),
     )
 
 
@@ -203,9 +237,16 @@ class Feedback(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
+    # ===== 1.5 新增字段 =====
+    platform_key = Column(String(50), nullable=True, index=True)  # amazon / aliexpress
+    capability_key = Column(String(100), nullable=True, index=True)  # 工具能力key
+    tool_id = Column(String(100), nullable=True, index=True)  # 工具配置ID
+    run_log_id = Column(Integer, ForeignKey("run_logs.id"), nullable=True, index=True)  # 关联日志
+    
     __table_args__ = (
         Index('ix_feedback_status_created', 'status', 'created_at'),
         Index('ix_feedback_user_status', 'user_id', 'status'),
+        Index('ix_feedback_platform', 'platform_key', 'created_at'),
     )
 
 
@@ -243,9 +284,14 @@ class KnowledgeBase(Base):
     view_count = Column(Integer, default=0)                         # 查看次数
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # ===== 1.5 新增字段 =====
+    platform_key = Column(String(50), nullable=True, index=True)  # amazon / aliexpress / null=全平台
+    capability_key = Column(String(100), nullable=True, index=True)  # 工具能力key / null=平台通用
 
     __table_args__ = (
         Index('ix_knowledge_category_status', 'category', 'status'),
+        Index('ix_knowledge_platform', 'platform_key', 'status'),
     )
 
 
@@ -262,9 +308,14 @@ class ChatSession(Base):
     satisfaction = Column(Integer, nullable=True)                   # 满意度1-5
     created_at = Column(DateTime, server_default=func.now(), index=True)
     resolved_at = Column(DateTime, nullable=True)
+    
+    # ===== 1.5 新增字段 =====
+    platform_key = Column(String(50), nullable=True, index=True)  # amazon / aliexpress
+    capability_key = Column(String(100), nullable=True, index=True)  # 工具能力key
 
     __table_args__ = (
         Index('ix_chat_sessions_user_status', 'user_id', 'status'),
+        Index('ix_chat_sessions_platform', 'platform_key', 'created_at'),
     )
 
 
@@ -316,4 +367,57 @@ class Announcement(Base):
 
     __table_args__ = (
         Index('ix_announcements_status_priority', 'status', 'priority'),
+    )
+
+
+# ===== 1.5.1 Launch Token 权限兜底 =====
+
+class LaunchTokenStatus:
+    """启动令牌状态"""
+    PENDING = "pending"      # 待使用
+    USED = "used"            # 已使用
+    EXPIRED = "expired"      # 已过期
+
+
+class LaunchToken(Base):
+    """启动令牌"""
+    __tablename__ = "launch_tokens"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    user_id = Column(Integer, nullable=False)
+    auth_code_id = Column(Integer, nullable=False)
+    platform_key = Column(String(50), nullable=False)
+    tool_id = Column(String(100), nullable=False)
+    script_key = Column(String(100), nullable=False)
+    device_id = Column(String(255), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    status = Column(String(20), default="pending", nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    __table_args__ = (
+        Index('ix_launch_tokens_expires', 'expires_at'),
+    )
+
+
+# ===== 审计日志 =====
+class AuditLog(Base):
+    """审计日志 - 记录管理员关键操作"""
+    __tablename__ = "audit_logs"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, nullable=True, index=True)
+    user_name = Column(String(100), nullable=True)
+    action = Column(String(100), nullable=False, index=True)
+    target_type = Column(String(100), nullable=True, index=True)
+    target_id = Column(String(100), nullable=True, index=True)
+    detail = Column(Text, nullable=True)
+    ip_address = Column(String(100), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+    
+    __table_args__ = (
+        Index('ix_audit_logs_user_created', 'user_id', 'created_at'),
+        Index('ix_audit_logs_action_created', 'action', 'created_at'),
     )

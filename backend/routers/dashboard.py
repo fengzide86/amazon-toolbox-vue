@@ -2,8 +2,9 @@
 数据看板路由模块（优化版）
 使用服务层 + 统一响应格式 + 缓存
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 from database import get_db
 from core.dependencies import get_current_admin
@@ -14,22 +15,24 @@ router = APIRouter()
 
 @router.get("")
 async def get_dashboard(
+    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
     """数据总览 - 返回关键业务指标的汇总数据"""
     service = DashboardService(db)
-    return await service.get_dashboard_stats()
+    return await service.get_dashboard_stats(platform_key=platform_key)
 
 
 @router.get("/charts")
 async def get_dashboard_charts(
+    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
     """获取图表数据 - 包含收入趋势、套餐分布、工具成功率"""
     service = DashboardService(db)
-    return await service.get_dashboard_charts()
+    return await service.get_dashboard_charts(platform_key=platform_key)
 
 
 @router.post("/refresh-cache")

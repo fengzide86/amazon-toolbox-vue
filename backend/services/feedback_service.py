@@ -25,6 +25,7 @@ class FeedbackService:
         self,
         status: Optional[str] = None,
         user_id: Optional[int] = None,
+        platform_key: Optional[str] = None,
         pagination: Optional[PaginationParams] = None
     ) -> Dict[str, Any]:
         """获取工单列表（支持过滤和分页）"""
@@ -37,6 +38,10 @@ class FeedbackService:
         # 用户过滤
         if user_id:
             query = query.where(Feedback.user_id == user_id)
+        
+        # 平台过滤（1.5 新增）
+        if platform_key:
+            query = query.where(Feedback.platform_key == platform_key)
         
         if pagination:
             items, total = await paginate(query, self.db, pagination)
@@ -75,6 +80,10 @@ class FeedbackService:
             screenshots=data.get("screenshots"),
             status="pending",
             priority=data.get("priority", "normal"),
+            platform_key=data.get("platform_key"),
+            capability_key=data.get("capability_key"),
+            tool_id=data.get("tool_id"),
+            run_log_id=data.get("run_log_id"),
         )
         self.db.add(feedback)
         
@@ -172,6 +181,9 @@ class FeedbackService:
             "priority": feedback.priority,
             "admin_reply": feedback.admin_reply,
             "created_at": feedback.created_at.isoformat() if feedback.created_at else None,
+            "platform_key": feedback.platform_key,
+            "capability_key": feedback.capability_key,
+            "tool_id": feedback.tool_id,
         }
         
         if detailed:
@@ -180,5 +192,6 @@ class FeedbackService:
             data["status_history"] = feedback.status_history
             data["replied_at"] = feedback.replied_at.isoformat() if feedback.replied_at else None
             data["updated_at"] = feedback.updated_at.isoformat() if feedback.updated_at else None
+            data["run_log_id"] = feedback.run_log_id
         
         return data

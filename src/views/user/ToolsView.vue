@@ -35,7 +35,7 @@
 
     <!-- 工具列表 -->
     <div v-if="filteredTools.length" class="stats-row" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-      <div v-for="tool in filteredTools" :key="tool.name" class="stat-card tool-card" @click="runTool(tool)">
+      <div v-for="tool in filteredTools" :key="tool.name" class="stat-card tool-card" :data-testid="'tool-card-' + tool.name" @click="runTool(tool)">
         <div class="tool-header">
           <div class="stat-label">{{ tool.name }}</div>
           <span :class="['status-badge', tool.status === 'online' ? 'online' : 'offline']">
@@ -65,10 +65,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getTools, getToolCategories, createLog } from '@/utils/api'
 import { runToolSimulation, showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
+const platformStore = usePlatformStore()
 const tools = ref([])
 const categories = ref([
   { id: 'all', name: '全部工具', sort_order: 0 },
@@ -100,13 +102,21 @@ const filteredTools = computed(() => {
     )
   }
   
+  // 速卖通平台下过滤掉 FBA/AGL
+  if (platformStore.currentPlatform === 'aliexpress') {
+    result = result.filter(t => t.capability_key !== 'fba_agl')
+  }
+  
   return result
 })
 
 // 加载工具数据
 async function loadData() {
   try {
-    tools.value = await getTools()
+    const params = {
+      platform_key: platformStore.currentPlatform
+    }
+    tools.value = await getTools(params)
   } catch (err) {
     showToast('工具加载失败', 'error')
   }
@@ -154,27 +164,99 @@ function getCategoryName(catId) {
   return cat ? cat.name : '未分类'
 }
 
-// 运行工具
+// 检查平台权限
+function checkPlatformPermission() {
+  // 优先从登录时存储的 JSON 数组读取
+  try {
+    const scope = localStorage.getItem('toolbox_platform_scope')
+    if (scope) {
+      const parsed = JSON.parse(scope)
+      if (Array.isArray(parsed)) return platformStore.hasPlatformPermission(parsed.join(','), platformStore.currentPlatform)
+    }
+  } catch (e) {}
+  // 兼容旧格式
+  try {
+    const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
+    if (authData.platform_scope) {
+      const scope = Array.isArray(authData.platform_scope)
+        ? authData.platform_scope.join(',')
+        : authData.platform_scope
+      return platformStore.hasPlatformPermission(scope, platformStore.currentPlatform)
+    }
+  } catch (e) {}
+  return true
+}
+
+// 运行工具（调用 launch-token 接口）
 async function runTool(tool) {
-  if (tool.status !== 'online') {
+  if (tool.status !== 'online' && tool.status !== 'available' && tool.status !== 'beta') {
     showToast(`${tool.name} 正在维护中`, 'warning')
     return
   }
+  
+  // 检查平台权限
+  if (!checkPlatformPermission()) {
+    showToast('当前授权暂未包含该平台，如需使用请升级授权', 'error')
+    return
+  }
+  
+  const platformKey = platformStore.currentPlatform
+  const deviceId = localStorage.getItem('toolbox_device_id') || ''
+  
   showToast(`正在启动 ${tool.name}...`, 'info')
-  runToolSimulation(tool.name)
+  
+  try {
+    // 调用 launch-token 接口
+    const response = await fetch(
+      `${import.meta.env.DEV ? 'http://localhost:8000' : ''}/api/tools/${tool.id}/launch-token?platform_key=${platformKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('toolbox_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform_key: platformKey,
+          device_id: deviceId,
+        }),
+      }
+    )
+    
+    const result = await response.json()
+    
+    if (result.success && result.data && result.data.launch_url) {
+      showToast(`${tool.name} 启动成功！`, 'success')
+      // 尝试打开 launch_url
+      window.location.href = result.data.launch_url
+    } else {
+      // 显示后端错误文案
+      const errorMsg = result.message || '启动失败'
+      showToast(errorMsg, 'error')
+    }
+  } catch (err) {
+    showToast('网络连接失败，请检查后端服务', 'error')
+  }
 
   // 记录日志
   try {
     const userInfo = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
     await createLog({
       user_id: userInfo.user_id || null,
-      device_id: userInfo.device_id || null,
+      device_id: deviceId,
       tool_name: tool.name,
       module: tool.module,
-      status: 'success'
+      status: 'success',
+      platform_key: platformKey,
+      capability_key: tool.capability_key,
+      tool_id: tool.id
     })
   } catch (err) {}
 }
+
+// 监听平台变化
+watch(() => platformStore.currentPlatform, () => {
+  loadData()
+})
 
 onMounted(() => {
   loadData()
