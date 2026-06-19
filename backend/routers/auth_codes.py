@@ -13,7 +13,7 @@ import random
 import string
 
 from database import get_db
-from models import AuthCode, Plan, Device
+from models import AuthCode, Plan, Device, AuthSeat
 from schemas import AuthCodeGenerate, AuthCodeUpdate, AuthCodeResponse
 from core.logging import get_logger
 from core.exceptions import NotFoundException, ConflictException
@@ -23,6 +23,40 @@ from core.audit import log_admin_action
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _parse_platform_scope(scope_str: str) -> List[str]:
+    """将 platform_scope 字符串转为数组，空值兼容为 ['amazon']"""
+    if not scope_str:
+        return ["amazon"]
+    return [p.strip() for p in scope_str.split(",") if p.strip()]
+
+
+async def _calculate_seat_used(db: AsyncSession, auth_code_id: int) -> int:
+    """统计 active 席位数"""
+    result = await db.execute(
+        select(func.count(AuthSeat.id)).where(
+            AuthSeat.auth_code_id == auth_code_id,
+            AuthSeat.status == "active"
+        )
+    )
+    return result.scalar() or 0
+
+
+async def _calculate_device_used(db: AsyncSession, auth_code_id: int) -> int:
+    """统计设备数"""
+    result = await db.execute(
+        select(func.count(Device.id)).where(Device.auth_code_id == auth_code_id)
+    )
+    return result.scalar() or 0
+
+
+async def _get_plan_name(db: AsyncSession, plan_id: int) -> str:
+    """获取套餐名称"""
+    if not plan_id:
+        return "未关联套餐"
+    result = await db.execute(select(Plan.name).where(Plan.id == plan_id))
+    return result.scalar() or "未关联套餐"
 
 
 def generate_random_code(length: int = 6) -> str:
@@ -47,7 +81,86 @@ async def get_auth_codes(
         .offset(offset)
         .limit(page_size)
     )
-    return result.scalars().all()
+    codes = result.scalars().all()
+    
+    # 为每个授权码补充统计字段
+    response_list = []
+    for code in codes:
+        seat_used = await _calculate_seat_used(db, code.id)
+        device_used = await _calculate_device_used(db, code.id)
+        plan_name = await _get_plan_name(db, code.plan_id)
+        
+        # 构建响应字典
+        code_dict = {
+            "id": code.id,
+            "code": code.code,
+            "plan_id": code.plan_id,
+            "user_id": code.user_id,
+            "device_id": code.device_id,
+            "device_name": code.device_name,
+            "max_devices": code.max_devices,
+            "status": code.status,
+            "expires_at": code.expires_at,
+            "created_at": code.created_at,
+            "devices": code.devices,
+            # 1.5 新增字段
+            "platform_scope": _parse_platform_scope(code.platform_scope),
+            "scene_type": code.scene_type,
+            "seat_limit": code.seat_limit,
+            "seat_used": seat_used,
+            "device_used": device_used,
+            "plan_name": plan_name,
+        }
+        response_list.append(AuthCodeResponse(**code_dict))
+    
+    return response_list
+
+
+@router.get("/{code_id}", response_model=AuthCodeResponse)
+async def get_auth_code_detail(
+    code_id: int,
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(get_current_admin)
+):
+    """获取授权码详情 - 仅管理员"""
+    result = await db.execute(
+        select(AuthCode)
+        .options(selectinload(AuthCode.devices))
+        .where(AuthCode.id == code_id)
+    )
+    code = result.scalars().first()
+    
+    if not code:
+        raise NotFoundException("授权码不存在")
+    
+    # 计算统计字段
+    seat_used = await _calculate_seat_used(db, code.id)
+    device_used = await _calculate_device_used(db, code.id)
+    plan_name = await _get_plan_name(db, code.plan_id)
+    
+    # 构建响应
+    code_dict = {
+        "id": code.id,
+        "code": code.code,
+        "plan_id": code.plan_id,
+        "user_id": code.user_id,
+        "device_id": code.device_id,
+        "device_name": code.device_name,
+        "max_devices": code.max_devices,
+        "status": code.status,
+        "expires_at": code.expires_at,
+        "created_at": code.created_at,
+        "devices": code.devices,
+        # 1.5 新增字段
+        "platform_scope": _parse_platform_scope(code.platform_scope),
+        "scene_type": code.scene_type,
+        "seat_limit": code.seat_limit,
+        "seat_used": seat_used,
+        "device_used": device_used,
+        "plan_name": plan_name,
+    }
+    
+    return AuthCodeResponse(**code_dict)
 
 
 @router.post("/batch-generate")
