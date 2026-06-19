@@ -90,17 +90,37 @@ const currentPlatform = computed(() => platformStore.currentPlatform)
 const adminPlatform = computed(() => platformStore.adminPlatform)
 const availablePlatformsForUser = computed(() => {
   // 获取用户授权的平台权限
-  const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
-  const platformScope = authData.platform_scope
+  const platformScope = getPlatformScope()
   return platformStore.getAvailablePlatformsForUser(platformScope)
 })
 
 // 检查用户是否有平台权限
 const hasPermission = (platformKey) => {
   if (props.isAdmin) return true
-  const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
-  const platformScope = authData.platform_scope
+  const platformScope = getPlatformScope()
   return platformStore.hasPlatformPermission(platformScope, platformKey)
+}
+
+// 获取平台权限（支持数组和字符串格式）
+function getPlatformScope() {
+  // 优先从登录时存储的 JSON 数组读取
+  try {
+    const scope = localStorage.getItem('toolbox_platform_scope')
+    if (scope) {
+      const parsed = JSON.parse(scope)
+      if (Array.isArray(parsed)) return parsed.join(',')
+    }
+  } catch (e) {}
+  // 兼容旧格式：从 toolbox_auth 读取
+  try {
+    const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
+    if (authData.platform_scope) {
+      return Array.isArray(authData.platform_scope)
+        ? authData.platform_scope.join(',')
+        : authData.platform_scope
+    }
+  } catch (e) {}
+  return null
 }
 
 // 处理平台切换
