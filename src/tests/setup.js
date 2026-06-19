@@ -1,7 +1,7 @@
 /**
  * Vitest 测试环境配置
+ * 注意：vitest.config.js 已配置 globals: true，无需 import
  */
-import { vi, beforeEach } from 'vitest'
 
 // Mock localStorage
 const localStorageMock = (() => {
