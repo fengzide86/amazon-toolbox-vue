@@ -187,9 +187,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlans, api } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
 const authCodes = ref([])
 const plans = ref([])
@@ -204,6 +205,8 @@ const generatedCodes = ref([])
 const filterStatus = ref('')
 const searchText = ref('')
 const planNameMap = {}
+
+const platformStore = usePlatformStore()
 
 // 设备数弹窗
 const showDeviceModal = ref(false)
@@ -285,7 +288,9 @@ async function saveMaxDevices() {
 
 async function loadData() {
   try {
-    const [codesRes, plansRes] = await Promise.all([getAuthCodes(), getPlans()])
+    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
+    const params = platformKey ? { platform_key: platformKey } : {}
+    const [codesRes, plansRes] = await Promise.all([getAuthCodes(params), getPlans()])
     authCodes.value = codesRes
     plans.value = plansRes
     if (plansRes.length) selectedPlanId.value = plansRes[0].id
@@ -294,6 +299,8 @@ async function loadData() {
     showToast('数据加载失败', 'error')
   }
 }
+
+watch(() => platformStore.adminPlatform, () => { loadData() })
 
 async function handleGenerate() {
   if (!generateCount.value || generateCount.value < 1) {

@@ -57,9 +57,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getProfitSummary, getSettings } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
 const summary = ref({})
 const profitRatios = ref({
@@ -70,6 +71,8 @@ const profitRatios = ref({
   coordination: 10,
   record: 5
 })
+
+const platformStore = usePlatformStore()
 
 const profitItems = computed(() => [
   { key: 'tech', label: '技术', icon: '🔧', amountKey: 'total_tech', color: '#6366F1', bgColor: 'rgba(99,102,241,0.1)', barColor: '#6366F1' },
@@ -82,8 +85,10 @@ const profitItems = computed(() => [
 
 async function loadData() {
   try {
+    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
+    const params = platformKey ? { platform_key: platformKey } : {}
     const [summaryRes, settingsRes] = await Promise.all([
-      getProfitSummary(),
+      getProfitSummary(params),
       getSettings()
     ])
     summary.value = summaryRes
@@ -101,6 +106,8 @@ async function loadData() {
     showToast('数据加载失败', 'error')
   }
 }
+
+watch(() => platformStore.adminPlatform, () => { loadData() })
 
 onMounted(loadData)
 </script>

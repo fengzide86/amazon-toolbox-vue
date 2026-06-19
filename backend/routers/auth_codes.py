@@ -69,18 +69,25 @@ def generate_random_code(length: int = 6) -> str:
 async def get_auth_codes(
     page: int = 1,
     page_size: int = 100,
+    platform_key: str = None,
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
-    """获取授权码列表（支持分页）- 仅管理员"""
+    """获取授权码列表（支持分页和平台过滤）- 仅管理员"""
     offset = (page - 1) * page_size
-    result = await db.execute(
-        select(AuthCode)
-        .options(selectinload(AuthCode.devices))
-        .order_by(AuthCode.created_at.desc())
-        .offset(offset)
-        .limit(page_size)
-    )
+    query = select(AuthCode).options(selectinload(AuthCode.devices))
+    
+    if platform_key:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                AuthCode.platform_scope.contains(platform_key),
+                AuthCode.platform_scope.is_(None)
+            )
+        )
+    
+    query = query.order_by(AuthCode.created_at.desc()).offset(offset).limit(page_size)
+    result = await db.execute(query)
     codes = result.scalars().all()
     
     # 为每个授权码补充统计字段

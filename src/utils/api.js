@@ -255,9 +255,9 @@ export function getPlans() {
     return api.get('/api/plans');
 }
 
-// 获取授权码列表
-export function getAuthCodes() {
-    return api.get('/api/auth-codes');
+// 获取授权码列表（支持平台过滤）
+export function getAuthCodes(params = {}) {
+    return api.get('/api/auth-codes', params);
 }
 
 // 批量生成授权码
@@ -275,9 +275,9 @@ export function deleteAuthCode(id) {
     return api.delete(`/api/auth-codes/${id}`);
 }
 
-// 获取订单列表
-export function getOrders() {
-    return api.get('/api/orders');
+// 获取订单列表（支持平台过滤）
+export function getOrders(params = {}) {
+    return api.get('/api/orders', params);
 }
 
 // 导出订单
@@ -372,14 +372,14 @@ export function getDashboardCharts() {
     return api.get('/api/dashboard/charts');
 }
 
-// 获取分润记录
-export function getProfit() {
-    return api.get('/api/profit');
+// 获取分润记录（支持平台过滤）
+export function getProfit(params = {}) {
+    return api.get('/api/profit', params);
 }
 
-// 获取分润汇总
-export function getProfitSummary() {
-    return api.get('/api/profit/summary');
+// 获取分润汇总（支持平台过滤）
+export function getProfitSummary(params = {}) {
+    return api.get('/api/profit/summary', params);
 }
 
 // 获取系统设置
