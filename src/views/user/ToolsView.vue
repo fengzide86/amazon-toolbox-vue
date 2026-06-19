@@ -166,14 +166,30 @@ function getCategoryName(catId) {
 
 // 检查平台权限
 function checkPlatformPermission() {
-  const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
-  const platformScope = authData.platform_scope
-  return platformStore.hasPlatformPermission(platformScope, platformStore.currentPlatform)
+  // 优先从登录时存储的 JSON 数组读取
+  try {
+    const scope = localStorage.getItem('toolbox_platform_scope')
+    if (scope) {
+      const parsed = JSON.parse(scope)
+      if (Array.isArray(parsed)) return platformStore.hasPlatformPermission(parsed.join(','), platformStore.currentPlatform)
+    }
+  } catch (e) {}
+  // 兼容旧格式
+  try {
+    const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
+    if (authData.platform_scope) {
+      const scope = Array.isArray(authData.platform_scope)
+        ? authData.platform_scope.join(',')
+        : authData.platform_scope
+      return platformStore.hasPlatformPermission(scope, platformStore.currentPlatform)
+    }
+  } catch (e) {}
+  return true
 }
 
-// 运行工具
+// 运行工具（调用 launch-token 接口）
 async function runTool(tool) {
-  if (tool.status !== 'online') {
+  if (tool.status !== 'online' && tool.status !== 'available' && tool.status !== 'beta') {
     showToast(`${tool.name} 正在维护中`, 'warning')
     return
   }
@@ -184,19 +200,53 @@ async function runTool(tool) {
     return
   }
   
+  const platformKey = platformStore.currentPlatform
+  const deviceId = localStorage.getItem('toolbox_device_id') || ''
+  
   showToast(`正在启动 ${tool.name}...`, 'info')
-  runToolSimulation(tool.name)
+  
+  try {
+    // 调用 launch-token 接口
+    const response = await fetch(
+      `${import.meta.env.DEV ? 'http://localhost:8000' : ''}/api/tools/${tool.id}/launch-token?platform_key=${platformKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('toolbox_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform_key: platformKey,
+          device_id: deviceId,
+        }),
+      }
+    )
+    
+    const result = await response.json()
+    
+    if (result.success && result.data && result.data.launch_url) {
+      showToast(`${tool.name} 启动成功！`, 'success')
+      // 尝试打开 launch_url
+      window.location.href = result.data.launch_url
+    } else {
+      // 显示后端错误文案
+      const errorMsg = result.message || '启动失败'
+      showToast(errorMsg, 'error')
+    }
+  } catch (err) {
+    showToast('网络连接失败，请检查后端服务', 'error')
+  }
 
   // 记录日志
   try {
     const userInfo = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
     await createLog({
       user_id: userInfo.user_id || null,
-      device_id: userInfo.device_id || null,
+      device_id: deviceId,
       tool_name: tool.name,
       module: tool.module,
       status: 'success',
-      platform_key: platformStore.currentPlatform,
+      platform_key: platformKey,
       capability_key: tool.capability_key,
       tool_id: tool.id
     })

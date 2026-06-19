@@ -75,6 +75,9 @@ class AuthCodeGenerate(BaseModel):
     count: int = 1
     duration_days: Optional[int] = None
     max_devices: Optional[int] = None
+    platform_scope: Optional[str] = "amazon"
+    scene_type: Optional[str] = "competition"
+    seat_limit: Optional[int] = None
 
 
 class AuthCodeUpdate(BaseModel):
