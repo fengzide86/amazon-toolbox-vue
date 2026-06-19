@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import AppHeader from '@/components/AppHeader.vue'
 
 // Mock vue-router
@@ -22,6 +23,7 @@ vi.mock('@/utils', () => ({
 describe('AppHeader', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
   })
 
   describe('渲染测试', () => {
@@ -33,7 +35,7 @@ describe('AppHeader', () => {
 
     it('应该显示应用标题', () => {
       const wrapper = mount(AppHeader)
-      expect(wrapper.text()).toContain('亚马逊赛训效率工具箱')
+      expect(wrapper.text()).toContain('跨境电商赛训工具箱')
     })
 
     it('应该显示汉堡菜单按钮', () => {
