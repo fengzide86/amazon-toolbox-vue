@@ -41,25 +41,19 @@ class DashboardService:
             feedback_cond = or_(Feedback.platform_key == platform_key, Feedback.platform_key.is_(None))
             feedback_filter.append(feedback_cond)
         
-        # 构建订单/授权码/用户平台过滤条件
-        order_filter = []
+        # 构建授权码平台过滤条件（订单没有 platform_key 字段，跳过订单过滤）
         auth_code_filter = []
         if platform_key:
             from sqlalchemy import or_
-            order_filter.append(or_(Order.platform_key == platform_key, Order.platform_key.is_(None)))
             auth_code_filter.append(or_(AuthCode.platform_scope.contains(platform_key), AuthCode.platform_scope.is_(None)))
         
-        # 总收入
+        # 总收入（订单没有平台字段，不按平台过滤）
         revenue_query = select(func.sum(Order.amount)).where(Order.status.in_(["paid", "refunded"]))
-        for cond in order_filter:
-            revenue_query = revenue_query.where(cond)
         revenue_result = await self.db.execute(revenue_query)
         total_revenue = revenue_result.scalar() or 0
         
-        # 总订单数
+        # 总订单数（订单没有平台字段，不按平台过滤）
         orders_query = select(func.count(Order.id))
-        for cond in order_filter:
-            orders_query = orders_query.where(cond)
         orders_result = await self.db.execute(orders_query)
         total_orders = orders_result.scalar() or 0
         
@@ -128,15 +122,12 @@ class DashboardService:
         
         now = datetime.now()
         
-        # 收入趋势（近7天）- 按平台过滤
+        # 收入趋势（近7天）- 订单没有平台字段，不按平台过滤
         start_date = (now - timedelta(days=6)).date()
         revenue_where = [
             func.date(Order.created_at) >= start_date,
             Order.status.in_(["paid", "refunded"])
         ]
-        if platform_key:
-            from sqlalchemy import or_
-            revenue_where.append(or_(Order.platform_key == platform_key, Order.platform_key.is_(None)))
         revenue_result = await self.db.execute(
             select(
                 func.date(Order.created_at).label('day'),
@@ -153,11 +144,8 @@ class DashboardService:
             amount = revenue_by_day.get(day_str, 0)
             revenue_trend.append({"date": day_name, "amount": amount})
         
-        # 套餐分布 - 按平台过滤
+        # 套餐分布 - 订单没有平台字段，不按平台过滤
         plan_join_cond = (Order.plan_id == Plan.id) & (Order.status == "paid")
-        if platform_key:
-            from sqlalchemy import or_
-            plan_join_cond = plan_join_cond & or_(Order.platform_key == platform_key, Order.platform_key.is_(None))
         plan_dist_result = await self.db.execute(
             select(Plan.name, func.count(Order.id))
             .outerjoin(Order, plan_join_cond)
