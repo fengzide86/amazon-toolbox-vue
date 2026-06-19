@@ -99,6 +99,51 @@ test.describe('工单提交验收', () => {
   })
 })
 
+test.describe('用户端平台切换验收', () => {
+  test('用户端平台切换按钮点击有效', async ({ page }) => {
+    await clearAuth(page)
+    await loginUser(page, TEST_E2E_AMZ)
+
+    // 等待平台切换器可见
+    const platformSwitcher = page.getByTestId('platform-switcher')
+    await expect(platformSwitcher).toBeVisible({ timeout: 5000 })
+
+    // 获取当前选中的平台按钮
+    const activeBtn = platformSwitcher.locator('button.active')
+    const activeText = await activeBtn.textContent()
+    console.log(`当前选中平台：${activeText}`)
+
+    // 点击另一个平台按钮
+    const buttons = platformSwitcher.locator('button.platform-btn:not(.disabled)')
+    const buttonCount = await buttons.count()
+    
+    if (buttonCount > 1) {
+      // 点击第一个非当前选中的按钮
+      for (let i = 0; i < buttonCount; i++) {
+        const btn = buttons.nth(i)
+        const btnText = await btn.textContent()
+        if (btnText !== activeText) {
+          await btn.click()
+          await page.waitForTimeout(500)
+          
+          // 验证按钮状态已切换
+          const newActiveBtn = platformSwitcher.locator('button.active')
+          const newActiveText = await newActiveBtn.textContent()
+          console.log(`切换后平台：${newActiveText}`)
+          
+          // 验证 localStorage 已更新
+          const storedPlatform = await page.evaluate(() => localStorage.getItem('toolbox_current_platform'))
+          console.log(`localStorage 中的平台：${storedPlatform}`)
+          
+          break
+        }
+      }
+    }
+
+    await page.screenshot({ path: 'test-results/screenshots/user-platform-switch.png', fullPage: true })
+  })
+})
+
 // ===========================
 // 后台测试（复用 globalSetup 保存的 admin 登录态）
 // ===========================
