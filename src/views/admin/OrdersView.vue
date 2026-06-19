@@ -102,15 +102,18 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { getOrders, createOrder as apiCreateOrder, updateOrder, refundOrder, getPlans, exportOrders, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
 
 const orders = ref([])
 const plans = ref([])
 const isLoading = ref(false)
 const filterStatus = ref('')
 const planNameMap = {}
+
+const platformStore = usePlatformStore()
 
 const newOrder = ref({ plan_id: null, amount: 0, channel: '', responsible: '', status: 'pending' })
 
@@ -143,7 +146,9 @@ function formatTime(timeStr) {
 
 async function loadData() {
   try {
-    const [ordersRes, plansRes] = await Promise.all([getOrders(), getPlans()])
+    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
+    const params = platformKey ? { platform_key: platformKey } : {}
+    const [ordersRes, plansRes] = await Promise.all([getOrders(params), getPlans()])
     orders.value = ordersRes
     plans.value = plansRes
     if (plansRes.length && !newOrder.value.plan_id) {
@@ -155,6 +160,8 @@ async function loadData() {
     showToast('数据加载失败', 'error')
   }
 }
+
+watch(() => platformStore.adminPlatform, () => { loadData() })
 
 async function createOrder() {
   if (!newOrder.value.plan_id) { showToast('请选择套餐', 'error'); return }
@@ -192,7 +199,6 @@ async function refund(order) {
 }
 
 // 选择套餐时自动填充金额
-import { watch } from 'vue'
 watch(() => newOrder.value.plan_id, (id) => {
   const plan = plans.value.find(p => p.id === id)
   if (plan) newOrder.value.amount = plan.price

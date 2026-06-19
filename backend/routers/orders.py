@@ -47,11 +47,15 @@ async def generate_profit_record(db: AsyncSession, order: Order):
 
 
 @router.get("", response_model=List[OrderResponse])
-async def get_orders(page: int = 1, page_size: int = 50, db: AsyncSession = Depends(get_db)):
-    """获取订单列表（支持分页）"""
+async def get_orders(page: int = 1, page_size: int = 50, platform_key: str = None, db: AsyncSession = Depends(get_db)):
+    """获取订单列表（支持分页和平台过滤）"""
     offset = (page - 1) * page_size
+    query = select(Order)
+    if platform_key:
+        from sqlalchemy import or_
+        query = query.where(or_(Order.platform_key == platform_key, Order.platform_key.is_(None)))
     result = await db.execute(
-        select(Order).order_by(desc(Order.created_at)).offset(offset).limit(page_size)
+        query.order_by(desc(Order.created_at)).offset(offset).limit(page_size)
     )
     return result.scalars().all()
 
