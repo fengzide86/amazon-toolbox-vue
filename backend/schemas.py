@@ -97,6 +97,13 @@ class AuthCodeResponse(BaseModel):
     expires_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     devices: List[DeviceResponse] = []
+    # 1.5 新增字段
+    platform_scope: Optional[List[str]] = None
+    scene_type: Optional[str] = None
+    seat_limit: Optional[int] = None
+    seat_used: Optional[int] = None
+    device_used: Optional[int] = None
+    plan_name: Optional[str] = None
 
     class Config:
         from_attributes = True
