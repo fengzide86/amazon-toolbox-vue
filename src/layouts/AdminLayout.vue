@@ -1,6 +1,6 @@
 <template>
   <div class="app-layout">
-    <AppHeader :is-admin="true" @toggle-sidebar="toggleSidebar" />
+    <AppHeader :is-admin="true" @toggle-sidebar="toggleSidebar" @platform-change="handlePlatformChange" />
     
     <!-- 移动端侧边栏遮罩 -->
     <div
@@ -13,7 +13,7 @@
       <AdminSidebar :class="{ 'mobile-open': showMobileSidebar }" />
       <main class="content">
         <Breadcrumb />
-        <router-view />
+        <router-view :key="platformKey" />
       </main>
     </div>
   </div>
@@ -22,22 +22,29 @@
 <script setup>
 import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { usePlatformStore } from '@/stores/platform'
 import AppHeader from '@/components/AppHeader.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const router = useRouter()
+const platformStore = usePlatformStore()
 const showMobileSidebar = ref(false)
+const platformKey = ref(0)
 
 function toggleSidebar() {
   showMobileSidebar.value = !showMobileSidebar.value
-  // 防止背景滚动
   document.body.style.overflow = showMobileSidebar.value ? 'hidden' : ''
 }
 
 function closeSidebar() {
   showMobileSidebar.value = false
   document.body.style.overflow = ''
+}
+
+function handlePlatformChange() {
+  // 切换平台时强制重新渲染子组件，触发数据重新加载
+  platformKey.value++
 }
 
 // 路由变化时关闭侧边栏
