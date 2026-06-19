@@ -323,9 +323,8 @@ function handleLogin() {
         }
         showSuccess.value = true
         showToast('授权成功！正在跳转...', 'success')
-        setTimeout(() => {
-          router.push('/user/dashboard')
-        }, 1200)
+        // 直接跳转，不等待
+        router.push('/user/dashboard')
       } else {
         errorMessage.value = res.message
         showError.value = true

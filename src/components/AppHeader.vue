@@ -24,7 +24,7 @@
       </div>
       
       <!-- 平台切换器 -->
-      <div class="platform-switcher" v-if="showPlatformSwitcher">
+      <div class="platform-switcher" v-if="showPlatformSwitcher" data-testid="platform-switcher">
         <span class="platform-label">{{ isAdmin ? '管理平台：' : '平台：' }}</span>
         <div class="platform-options">
           <button
