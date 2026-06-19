@@ -35,7 +35,7 @@
 
     <!-- 工具列表 -->
     <div v-if="filteredTools.length" class="stats-row" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-      <div v-for="tool in filteredTools" :key="tool.name" class="stat-card tool-card" @click="runTool(tool)">
+      <div v-for="tool in filteredTools" :key="tool.name" class="stat-card tool-card" :data-testid="'tool-card-' + tool.name" @click="runTool(tool)">
         <div class="tool-header">
           <div class="stat-label">{{ tool.name }}</div>
           <span :class="['status-badge', tool.status === 'online' ? 'online' : 'offline']">

@@ -278,9 +278,10 @@ async def create_launch_token(
             AuthSeat.status == "active"
         )
     )
-    active_seat = seat_result.scalar_one_or_none()
-    if not active_seat:
+    active_seats = seat_result.scalars().all()
+    if not active_seats:
         return error_response("当前授权席位无效，请重新登录或联系管理员", 403)
+    active_seat = active_seats[0]
     
     # 8. 检查设备限制
     from models import Device

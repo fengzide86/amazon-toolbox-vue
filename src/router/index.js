@@ -76,11 +76,8 @@ const routes = [
   // 管理后台路由
   {
     path: '/admin',
-    redirect: '/admin/dashboard'
-  },
-  {
-    path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
+    redirect: '/admin/dashboard',
     children: [
       {
         path: 'dashboard',
