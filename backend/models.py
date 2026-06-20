@@ -162,6 +162,7 @@ class Order(Base):
     responsible = Column(String(100), nullable=True)
     status = Column(String(20), default="pending", index=True)  # pending/paid/refunded
     refund_amount = Column(Numeric(precision=10, scale=2), default=0)
+    platform_key = Column(String(50), nullable=True, index=True)  # 平台标识: amazon/aliexpress
     created_at = Column(DateTime, server_default=func.now(), index=True)
     paid_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -169,6 +170,7 @@ class Order(Base):
     __table_args__ = (
         Index('ix_orders_status_created', 'status', 'created_at'),
         Index('ix_orders_plan_status', 'plan_id', 'status'),
+        Index('ix_orders_platform', 'platform_key'),
     )
 
 
