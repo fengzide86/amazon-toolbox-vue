@@ -56,6 +56,27 @@ test.describe('用户端 AMZ 验收', () => {
     await page.screenshot({ path: 'test-results/screenshots/user-amz-dashboard.png', fullPage: true })
     await expect(page.getByTestId('platform-switcher')).toBeVisible({ timeout: 5000 })
 
+    // 视觉检查：侧边栏图标渲染
+    const sidebar = page.locator('.sidebar-dark')
+    await expect(sidebar).toBeVisible()
+    const svgIcons = await sidebar.locator('svg').count()
+    expect(svgIcons).toBeGreaterThan(5)
+
+    // 视觉检查：布局正确
+    const layout = page.locator('.layout-studio')
+    const computedStyle = await layout.evaluate(el => {
+      const style = window.getComputedStyle(el)
+      return { display: style.display, gridTemplateColumns: style.gridTemplateColumns }
+    })
+    expect(computedStyle.display).toBe('grid')
+    expect(computedStyle.gridTemplateColumns).toMatch(/\d+px 1fr/)
+
+    // 视觉检查：配色正确
+    const appLayoutBg = await page.locator('.app-layout').evaluate(el =>
+      window.getComputedStyle(el).backgroundColor
+    )
+    expect(appLayoutBg).toMatch(/rgb\(245, 246, 249\)/)
+
     await page.goto(`${FRONTEND_URL}/#/user/tools`)
     await page.waitForLoadState('networkidle')
     await expect(page.locator('.tool-card', { hasText: '物流模板标准版' })).toBeVisible({ timeout: 15000 })

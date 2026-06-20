@@ -26,5 +26,6 @@ echo.
 echo 正在启动后端服务 (http://localhost:8000)...
 echo API文档: http://localhost:8000/docs
 echo.
+set DEBUG=true
 %PYTHON% main.py
 pause

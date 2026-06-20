@@ -22,9 +22,7 @@
         <!-- Logo -->
         <div class="brand-logo">
           <div class="logo-mark">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
+            <Zap :size="24" />
           </div>
         </div>
 
@@ -52,9 +50,7 @@
         <!-- 功能标签 -->
         <div class="feature-tags">
           <span class="feature-tag" v-for="tag in featureTags" :key="tag">
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-            </svg>
+            <Check :size="12" />
             {{ tag }}
           </span>
         </div>
@@ -69,9 +65,7 @@
 
         <div class="logo-section">
           <div class="logo-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
+            <Zap :size="28" />
           </div>
           <h2>授权码登录</h2>
           <p>请输入授权码激活您的工具箱</p>
@@ -79,17 +73,13 @@
 
         <!-- 错误消息 -->
         <div class="error-message" :class="{ show: showError }">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+          <CircleAlert :size="18" />
           <span>{{ errorMessage }}</span>
         </div>
 
         <!-- 成功消息 -->
         <div class="success-message" :class="{ show: showSuccess }">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
+          <CircleCheck :size="18" />
           <span>授权成功！正在跳转到首页...</span>
         </div>
 
@@ -104,9 +94,7 @@
             <label for="authCode">授权码</label>
             <div class="input-wrapper">
               <span class="input-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-                </svg>
+                <KeyRound :size="18" />
               </span>
               <input
                 type="text"
@@ -123,23 +111,17 @@
           </div>
 
           <div class="device-info">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
+            <Monitor :size="16" />
             <span>已检测到设备：<strong>{{ deviceName }}</strong></span>
           </div>
 
           <button type="submit" class="btn-login" :disabled="isLoading" :aria-busy="isLoading">
             <span class="btn-content" :class="{ hidden: isLoading }">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
-              </svg>
+              <LogIn :size="20" />
               验证并登录
             </span>
             <span class="btn-loading" :class="{ visible: isLoading }">
-              <svg class="spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
+              <Loader :size="20" class="spinner" />
               验证中...
             </span>
           </button>
@@ -147,22 +129,22 @@
 
         <nav class="footer-links" aria-label="其他操作">
           <a href="#" @click.prevent="showHelp" class="footer-link">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <HelpCircle :size="14" />
             使用帮助
           </a>
           <span class="footer-divider"></span>
           <a href="#" @click.prevent="showContact" class="footer-link">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+            <Phone :size="14" />
             联系客服
           </a>
           <span class="footer-divider"></span>
           <a href="#/user/terms" class="footer-link">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <FileText :size="14" />
             服务条款
           </a>
           <span class="footer-divider"></span>
           <a href="#/admin/login" class="footer-link admin-link">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <Shield :size="14" />
             管理员登录
           </a>
         </nav>
@@ -178,14 +160,10 @@
     <div class="modal-overlay" :class="{ show: showHelpModal }" @click.self="closeModals">
       <div class="modal">
         <button class="modal-close" @click="closeModals" aria-label="关闭">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
+          <X :size="20" />
         </button>
         <h3>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+          <HelpCircle :size="20" />
           如何使用
         </h3>
         <div class="help-steps">
@@ -195,9 +173,7 @@
           </div>
         </div>
         <div class="modal-notice">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+          <AlertTriangle :size="16" />
           每个授权码只能绑定一台设备，如需更换设备请联系客服。
         </div>
         <div class="modal-btns">
@@ -212,8 +188,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Auth, showToast, getDeviceId, getDeviceName } from '@/utils'
-import { verifyAuthCode, getSettings } from '@/utils/api'
+import { verifyAuthCode } from '@/utils/api'
+import { api } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
+import { Zap, Check, CircleAlert, CircleCheck, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle } from '@lucide/vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -273,8 +251,8 @@ function checkOnlineStatus() {
 
 async function loadWechatId() {
   try {
-    const settings = await getSettings()
-    const wxSetting = settings.find(s => s.key === 'wechat_id')
+    const settings = await api.get('/api/settings/public')
+    const wxSetting = settings.find(s => s.key === 'wechat_id' || s.key === 'service_wechat')
     if (wxSetting && wxSetting.value) {
       wechatId.value = wxSetting.value
     }

@@ -40,6 +40,55 @@ class TestGetSettings:
             assert password_settings[0]["value"] == "********"
 
 
+class TestGetPublicSettings:
+    """公开设置接口测试（无需认证）"""
+
+    @pytest.mark.asyncio
+    async def test_get_public_settings_no_auth_required(self, client: AsyncClient):
+        """测试公开设置接口无需认证即可访问"""
+        response = await client.get("/api/settings/public")
+        assert response.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_get_public_settings_returns_public_keys(self, client: AsyncClient, db_session: AsyncSession):
+        """测试公开设置只返回白名单中的 key"""
+        # 插入公开 key 和非公开 key
+        db_session.add(Setting(key="wechat_id", value="wx_123"))
+        db_session.add(Setting(key="service_wechat", value="wx_456"))
+        db_session.add(Setting(key="admin_password", value="secret_hash"))
+        await db_session.commit()
+
+        response = await client.get("/api/settings/public")
+        assert response.status_code == 200
+        data = response.json()
+        keys = [s["key"] for s in data]
+
+        # 公开 key 应返回
+        assert "wechat_id" in keys
+        assert "service_wechat" in keys
+        # 非公开 key 不应返回
+        assert "admin_password" not in keys
+
+    @pytest.mark.asyncio
+    async def test_get_public_settings_includes_wechat_id(self, client: AsyncClient, db_session: AsyncSession):
+        """测试公开设置包含 wechat_id（登录页依赖此字段）"""
+        db_session.add(Setting(key="wechat_id", value="AmazonToolbox_Support"))
+        await db_session.commit()
+
+        response = await client.get("/api/settings/public")
+        data = response.json()
+        wx = next((s for s in data if s["key"] == "wechat_id"), None)
+        assert wx is not None
+        assert wx["value"] == "AmazonToolbox_Support"
+
+    @pytest.mark.asyncio
+    async def test_get_public_settings_empty_db(self, client: AsyncClient):
+        """测试数据库为空时公开接口返回空列表"""
+        response = await client.get("/api/settings/public")
+        assert response.status_code == 200
+        assert response.json() == []
+
+
 class TestUpdateSetting:
     """更新系统设置测试"""
     

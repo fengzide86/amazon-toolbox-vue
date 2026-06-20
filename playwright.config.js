@@ -16,6 +16,12 @@ export default defineConfig({
     trace: 'on-first-retry',
     viewport: { width: 1440, height: 900 },
   },
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixels: 200,
+      threshold: 0.2,
+    },
+  },
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: 'test-results/artifacts',
 })

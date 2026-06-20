@@ -106,7 +106,8 @@ export function runToolSimulation(toolName) {
 // ===== Auth Management =====
 export const Auth = {
     set(code) {
-        localStorage.setItem('toolbox_auth', code);
+        // 写入 JSON 格式，兼容 authService.getAuth() 的 JSON.parse 解析
+        localStorage.setItem('toolbox_auth', JSON.stringify({ auth_code: code }));
         localStorage.setItem('toolbox_login_time', Date.now());
     },
     get() {
@@ -115,6 +116,7 @@ export const Auth = {
     clear() {
         localStorage.removeItem('toolbox_auth');
         localStorage.removeItem('toolbox_login_time');
+        localStorage.removeItem('toolbox_token');
     },
     check() {
         return !!this.get();

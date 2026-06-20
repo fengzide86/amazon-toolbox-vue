@@ -171,6 +171,12 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 全局容器 */
+.app-layout {
+  background: var(--studio-bg, #F5F6F9);
+  min-height: 100vh;
+}
+
 /* Studio Milk & Slate 布局 */
 .layout-studio {
   max-width: var(--content-max-width);

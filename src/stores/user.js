@@ -57,7 +57,12 @@ export const useUserStore = defineStore('user', {
       // 同步到 localStorage
       localStorage.setItem('toolbox_token', data.token)
       localStorage.setItem('toolbox_role', data.role)
-      localStorage.setItem('toolbox_auth', data.auth_code || data.auth)
+      // 写入 JSON 格式，兼容 authService.getAuth() 的 JSON.parse 解析
+      localStorage.setItem('toolbox_auth', JSON.stringify({
+        auth_code: data.auth_code || data.auth,
+        token: data.token,
+        role: data.role
+      }))
       if (data.user) {
         localStorage.setItem('toolbox_user', JSON.stringify(data.user))
       }

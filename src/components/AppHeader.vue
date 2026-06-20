@@ -8,14 +8,10 @@
           @click="$emit('toggle-sidebar')"
           aria-label="打开导航菜单"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
+          <Menu :size="16" />
         </button>
         <div class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
+          <Zap :size="16" />
         </div>
         <div class="header-title">
           <h1>赛训工具箱</h1>
@@ -79,6 +75,7 @@ import { useRouter } from 'vue-router'
 import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
+import { Menu, Zap } from '@lucide/vue'
 
 const props = defineProps({
   isAdmin: {

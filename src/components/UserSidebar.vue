@@ -2,75 +2,57 @@
   <aside class="sidebar-dark" aria-label="用户导航">
     <div class="sidebar-brand">
       <div class="brand-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-        </svg>
+        <Zap :size="18" />
       </div>
       <span class="brand-text">工具箱</span>
     </div>
     <ul class="sidebar-nav">
       <li>
         <router-link to="/user/dashboard" active-class="active" :aria-current="isActive('/user/dashboard') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-          </svg>
+          <LayoutDashboard :size="18" aria-hidden="true" />
           首页总览
         </router-link>
       </li>
       <li>
         <router-link to="/user/tools" active-class="active" :aria-current="isActive('/user/tools') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
+          <Zap :size="18" aria-hidden="true" />
           功能入口
         </router-link>
       </li>
       <li>
         <router-link to="/user/logs" active-class="active" :aria-current="isActive('/user/logs') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
-          </svg>
+          <ClipboardList :size="18" aria-hidden="true" />
           个人日志
         </router-link>
       </li>
       <li>
         <router-link to="/user/faq" active-class="active" :aria-current="isActive('/user/faq') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+          <HelpCircle :size="18" aria-hidden="true" />
           常见问题
         </router-link>
       </li>
       <li>
         <router-link to="/user/plans" active-class="active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
+          <ShieldCheck :size="18" aria-hidden="true" />
           套餐价格
         </router-link>
       </li>
       <li>
         <router-link to="/user/devices" active-class="active" :aria-current="isActive('/user/devices') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
+          <Monitor :size="18" aria-hidden="true" />
           设备管理
         </router-link>
       </li>
       <li>
         <router-link to="/user/ai-chat" active-class="active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-          </svg>
+          <MessageCircle :size="18" aria-hidden="true" />
           AI 客服
         </router-link>
       </li>
     </ul>
     <div class="sidebar-footer">
       <button class="btn-logout" @click="handleLogout" aria-label="退出登录">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-        </svg>
+        <LogOut :size="18" aria-hidden="true" />
         退出登录
       </button>
     </div>
@@ -80,6 +62,7 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
 import { Auth, showToast } from '@/utils'
+import { Zap, LayoutDashboard, ClipboardList, HelpCircle, ShieldCheck, Monitor, MessageCircle, LogOut } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()

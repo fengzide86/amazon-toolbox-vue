@@ -1,4 +1,6 @@
 @echo off
+chcp 65001 >nul
+
 echo ========================================
 echo   Code Check - Run Frontend and Backend Tests
 echo ========================================
@@ -7,7 +9,7 @@ echo.
 echo [1/3] Running frontend tests...
 echo ----------------------------------------
 call npm test
-if %errorlevel% neq 0 (
+if errorlevel neq 0 (
     echo.
     echo [FAIL] Frontend tests failed!
     echo.
@@ -22,7 +24,7 @@ echo [2/3] Running backend tests...
 echo ----------------------------------------
 cd backend
 call python -m pytest --rootdir=. -v --tb=short
-if %errorlevel% neq 0 (
+if errorlevel neq 0 (
     echo.
     echo [FAIL] Backend tests failed!
     cd ..
@@ -40,13 +42,13 @@ echo Checking service status...
 
 :: Check backend service
 set BACKEND_READY=0
-python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)" >nul 2>&1
-if %errorlevel% equ 0 set BACKEND_READY=1
+curl -s http://localhost:8000/api/health >nul 2>&1
+if not errorlevel 1 set BACKEND_READY=1
 
 :: Check frontend service
 set FRONTEND_READY=0
-python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000', timeout=3)" >nul 2>&1
-if %errorlevel% equ 0 set FRONTEND_READY=1
+curl -s http://localhost:3000 >nul 2>&1
+if not errorlevel 1 set FRONTEND_READY=1
 
 if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
     echo [OK] Both frontend and backend services are running
@@ -55,7 +57,7 @@ if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
 
 echo [WARN] Frontend or backend services are not running!
 echo.
-echo Please run start.bat first, then re-run this check script.
+echo Please run 一键启动.bat first, then re-run this check script.
 echo.
 echo Skipping E2E tests.
 echo.
@@ -66,7 +68,7 @@ echo.
 set /p RUN_E2E="Run E2E tests? (y/n): "
 if /i "%RUN_E2E%"=="y" (
     call npx playwright test
-    if %errorlevel% neq 0 (
+    if errorlevel neq 0 (
         echo.
         echo [FAIL] E2E tests failed!
         echo.

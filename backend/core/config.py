@@ -166,7 +166,8 @@ class Settings:
         - errors: 高风险错误，建议修复后再启动
         """
         result = {"warnings": [], "errors": []}
-        is_production = not self.DEBUG
+        # 使用 SQLite 或 DEBUG 模式时，视为开发环境，跳过严格检查
+        is_production = not self.DEBUG and self.DB_TYPE != "sqlite"
         
         # 1. JWT_SECRET_KEY 长度检查
         if not self.JWT_SECRET_KEY or len(self.JWT_SECRET_KEY) < 32:

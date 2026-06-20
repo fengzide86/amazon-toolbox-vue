@@ -15,7 +15,7 @@ from core.security import (
     extract_token_from_header,
     configure_cors
 )
-from core.config import settings
+from core.config import Settings
 
 
 class TestPasswordHashing:
@@ -362,3 +362,51 @@ class TestCORSSonfiguration:
         
         call_kwargs = mock_app.add_middleware.call_args[1]
         assert call_kwargs["max_age"] == 600  # 10分钟
+
+
+class TestCheckSecurity:
+    """安全检查逻辑测试"""
+
+    def test_sqlite_skips_production_checks(self):
+        """测试 SQLite 数据库时自动视为开发环境，跳过生产环境严格检查"""
+        s = Settings()
+        # 强制设为 SQLite + DEBUG=False（模拟一键启动场景）
+        s.DB_TYPE = "sqlite"
+        s.DEBUG = False
+        s.CORS_ORIGINS = ["*"]
+        s.DEFAULT_ADMIN_PASSWORD = "admin123"
+
+        result = s.check_security()
+
+        # SQLite 应视为开发环境，不应有 errors
+        assert len(result["errors"]) == 0, \
+            f"SQLite 开发环境不应触发安全检查错误，但得到了: {result['errors']}"
+
+    def test_mysql_production_triggers_errors(self):
+        """测试 MySQL + DEBUG=False 时触发生产环境安全检查错误"""
+        s = Settings()
+        s.DB_TYPE = "mysql"
+        s.DEBUG = False
+        s.CORS_ORIGINS = ["*"]
+        s.DEFAULT_ADMIN_PASSWORD = "admin123"
+        s.MYSQL_PASSWORD = ""
+
+        result = s.check_security()
+
+        # 生产环境应触发 CORS 和默认密码错误
+        error_texts = " ".join(result["errors"])
+        assert "CORS" in error_texts
+        assert "admin123" in error_texts
+
+    def test_debug_mode_no_errors(self):
+        """测试 DEBUG=True 时不触发生产环境错误"""
+        s = Settings()
+        s.DB_TYPE = "mysql"
+        s.DEBUG = True
+        s.CORS_ORIGINS = ["*"]
+        s.DEFAULT_ADMIN_PASSWORD = "admin123"
+
+        result = s.check_security()
+
+        # DEBUG 模式不应有 errors（只有 warnings）
+        assert len(result["errors"]) == 0
