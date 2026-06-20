@@ -1,10 +1,16 @@
 """重启服务并验证"""
 import paramiko
 import time
+import os
+
+# 服务器配置（优先从环境变量读取，默认值仅供开发使用）
+SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
+SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
 
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect('8.130.113.104', username='root', password='Wei99991221', timeout=10)
+ssh.connect(SERVER_HOST, username=SERVER_USER, password=SERVER_PASSWORD, timeout=10)
 
 # 重启服务
 print('=== 重启服务 ===')

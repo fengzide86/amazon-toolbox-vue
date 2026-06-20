@@ -1,15 +1,15 @@
-import os
 """
 在云服务器上安装 MySQL
 使用 MariaDB 替代（完全兼容 MySQL，阿里云镜像源有）
 """
 import paramiko
 import time
+import os
 
-# 服务器配置
-SERVER_HOST = "8.130.113.104"
-SERVER_USER = "root"
-SERVER_PASSWORD = os.getenv("SERVER_PASSWORD", "")
+# 服务器配置（优先从环境变量读取，默认值仅供开发使用）
+SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
+SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
 
 def connect():
     ssh = paramiko.SSHClient()

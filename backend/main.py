@@ -70,11 +70,12 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-# 创建限流器
+# 创建限流器（优先使用 Redis，无 Redis 时回退到内存）
+limiter_storage = settings.REDIS_URL or "memory://"
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"],
-    storage_uri="memory://",  # 使用内存存储（生产环境可用 Redis）
+    storage_uri=limiter_storage,
 )
 
 
@@ -105,12 +106,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"数据库类型: {settings.DB_TYPE}")
     logger.info(f"Redis: {'已配置' if cache.redis else '未配置（使用内存缓存）'}")
     
-    # 安全检查
+    # 安全检查（生产环境发现 errors 直接阻止启动）
     security_result = settings.check_security()
     if security_result["errors"]:
         logger.error("发现以下安全错误（高风险）：")
         for err in security_result["errors"]:
             logger.error(f"  [ERROR] {err}")
+        if not settings.DEBUG:
+            logger.error("生产环境安全检查未通过，服务启动终止！")
+            logger.error("请修复上述错误后重新启动，或设置 DEBUG=True 跳过检查（仅限开发环境）")
+            raise RuntimeError("生产环境安全检查未通过")
     if security_result["warnings"]:
         logger.warning("发现以下安全警告：")
         for warn in security_result["warnings"]:

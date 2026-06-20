@@ -69,8 +69,8 @@ class Settings:
     # ===== API 频率限制 =====
     RATE_LIMIT_PER_MINUTE: int = 60  # 每分钟最多60次请求
     
-    # 默认管理员密码
-    DEFAULT_ADMIN_PASSWORD: str = "admin123"
+    # 默认管理员密码（通过环境变量覆盖）
+    DEFAULT_ADMIN_PASSWORD: str = ""
     
     # 默认分润比例
     DEFAULT_PROFIT_RATIOS: dict = None
@@ -85,15 +85,11 @@ class Settings:
     AI_CHAT_MAX_HISTORY: int = 5                 # 对话历史轮数
     
     def __init__(self):
+        # 初始化默认管理员密码（优先环境变量）
+        self.DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
+        
         # 初始化 CORS 配置（生产环境禁止使用 *）
         cors_env = os.getenv("CORS_ORIGINS", "")
-        if cors_env == "*":
-            import warnings
-            warnings.warn(
-                "CORS_ORIGINS='*' 在生产环境中极不安全！请设置具体的域名列表。",
-                UserWarning,
-                stacklevel=2,
-            )
         self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()] if cors_env else ["*"]
         
         # ===== 初始化数据库配置 =====
@@ -175,7 +171,7 @@ class Settings:
         
         # 2. CORS 配置检查（仅生产环境）
         if is_production and "*" in self.CORS_ORIGINS:
-            result["warnings"].append("生产环境 CORS_ORIGINS 不应包含 *，请设置具体域名")
+            result["errors"].append("生产环境 CORS_ORIGINS 不应包含 *，请设置具体域名")
         
         # 3. DEBUG 模式检查
         if self.DEBUG:
@@ -183,7 +179,7 @@ class Settings:
         
         # 4. 默认管理员密码检查
         if self.DEFAULT_ADMIN_PASSWORD == "admin123":
-            result["warnings"].append("使用默认管理员密码 'admin123'，请尽快修改")
+            result["errors"].append("使用默认管理员密码 'admin123'，生产环境必须修改 DEFAULT_ADMIN_PASSWORD")
         
         # 5. MySQL 密码检查（仅生产环境）
         if is_production and self.DB_TYPE == "mysql" and not self.MYSQL_PASSWORD:
