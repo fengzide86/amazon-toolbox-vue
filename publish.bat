@@ -24,7 +24,7 @@ if "%NEW_VERSION%"=="" set NEW_VERSION=%CURRENT_VERSION%
 
 echo.
 echo [INFO] Updating version to %NEW_VERSION%...
-python -c "import json; p=json.load(open('package.json')); p['version']='%NEW_VERSION%'; json.dump(p, open('package.json','w'), indent=2); print('Version updated to %NEW_VERSION%')"
+python -c "import json; p=json.load(open('package.json',encoding='utf-8')); p['version']='%NEW_VERSION%'; json.dump(p, open('package.json','w',encoding='utf-8'), indent=2); print('Version updated to %NEW_VERSION%')"
 if errorlevel 1 (
     echo [ERROR] Version update failed!
     pause
