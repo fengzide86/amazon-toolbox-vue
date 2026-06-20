@@ -3,133 +3,134 @@
     <h2 class="page-title">工单管理</h2>
 
     <div class="filter-bar">
-      <select v-model="filterStatus" class="form-input">
-        <option value="">全部状态</option>
-        <option value="pending">待处理</option>
-        <option value="processing">处理中</option>
-        <option value="resolved">已解决</option>
-      </select>
-      <span style="font-size:0.85rem;color:var(--color-muted);">共 {{ filteredFeedbacks.length }} 个工单</span>
+      <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 160px;">
+        <el-option label="全部状态" value="" />
+        <el-option label="待处理" value="pending" />
+        <el-option label="处理中" value="processing" />
+        <el-option label="已解决" value="resolved" />
+      </el-select>
+      <span class="filter-count">共 {{ filteredFeedbacks.length }} 个工单</span>
     </div>
 
-    <section class="table-card">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>标题</th>
-            <th>用户ID</th>
-            <th>状态</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="fb in filteredFeedbacks" :key="fb.id">
-            <td>{{ fb.id }}</td>
-            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ fb.title || '-' }}</td>
-            <td>{{ fb.user_id || '-' }}</td>
-            <td>
-              <span :class="['status-dot', getStatusClass(fb.status)]"></span>
-              {{ getStatusText(fb.status) }}
-            </td>
-            <td>{{ formatTime(fb.created_at) }}</td>
-            <td>
-              <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
-                @click="viewDetail(fb)">
-                查看
-              </button>
-              <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;"
-                @click="openReply(fb)" :disabled="fb.status === 'resolved'">
-                {{ fb.status === 'pending' ? '处理' : '回复' }}
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!filteredFeedbacks.length">
-            <td colspan="6" style="text-align:center;color:var(--color-muted);padding:2rem;">暂无工单数据</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    <el-card class="table-card" shadow="never">
+      <el-table :data="filteredFeedbacks" stripe style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="user_id" label="用户ID" width="100" />
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)" size="small">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="160">
+          <template #default="{ row }">
+            <span class="time-text">{{ formatTime(row.created_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="viewDetail(row)">查看</el-button>
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="openReply(row)" 
+              :disabled="row.status === 'resolved'"
+            >
+              {{ row.status === 'pending' ? '处理' : '回复' }}
+            </el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-state">暂无工单数据</div>
+        </template>
+      </el-table>
+    </el-card>
 
     <!-- 查看详情弹窗 -->
-    <div class="modal-overlay" :class="{ show: showDetailModal }" @click.self="showDetailModal = false">
-      <div class="modal modal-large">
-        <h3>工单详情</h3>
-        <div class="detail-content">
-          <div class="detail-row">
-            <span class="detail-label">标题：</span>
-            <span>{{ currentFeedback?.title || '-' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">用户ID：</span>
-            <span>{{ currentFeedback?.user_id || '-' }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">状态：</span>
-            <span :class="['status-dot', getStatusClass(currentFeedback?.status)]"></span>
+    <el-dialog v-model="showDetailModal" title="工单详情" width="600px">
+      <div class="detail-content">
+        <div class="detail-row">
+          <span class="detail-label">标题：</span>
+          <span>{{ currentFeedback?.title || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">用户ID：</span>
+          <span>{{ currentFeedback?.user_id || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">状态：</span>
+          <el-tag :type="getStatusType(currentFeedback?.status)" size="small">
             {{ getStatusText(currentFeedback?.status) }}
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">创建时间：</span>
-            <span>{{ formatTime(currentFeedback?.created_at) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">内容：</span>
-            <p class="detail-text">{{ currentFeedback?.content || '无内容' }}</p>
-          </div>
-          <div class="detail-row" v-if="currentFeedback?.screenshots">
-            <span class="detail-label">截图：</span>
-            <div class="screenshot-list">
-              <img v-for="(url, index) in parseScreenshots(currentFeedback.screenshots)" :key="index" :src="url" alt="截图" class="screenshot-img" @click="previewImage(url)">
-            </div>
-          </div>
-          <div class="detail-row" v-if="currentFeedback?.admin_reply">
-            <span class="detail-label">管理员回复：</span>
-            <p class="detail-text reply-text">{{ currentFeedback.admin_reply }}</p>
+          </el-tag>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">创建时间：</span>
+          <span class="time-text">{{ formatTime(currentFeedback?.created_at) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">内容：</span>
+          <div class="detail-text">{{ currentFeedback?.content || '无内容' }}</div>
+        </div>
+        <div class="detail-row" v-if="currentFeedback?.screenshots">
+          <span class="detail-label">截图：</span>
+          <div class="screenshot-list">
+            <el-image
+              v-for="(url, index) in parseScreenshots(currentFeedback.screenshots)"
+              :key="index"
+              :src="url"
+              :preview-src-list="parseScreenshots(currentFeedback.screenshots)"
+              :initial-index="index"
+              fit="cover"
+              class="screenshot-img"
+            />
           </div>
         </div>
-        <div class="modal-btns">
-          <button class="btn btn-secondary" @click="showDetailModal = false">关闭</button>
+        <div class="detail-row" v-if="currentFeedback?.admin_reply">
+          <span class="detail-label">管理员回复：</span>
+          <div class="detail-text reply-text">{{ currentFeedback.admin_reply }}</div>
         </div>
       </div>
-    </div>
+      <template #footer>
+        <el-button @click="showDetailModal = false">关闭</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 回复弹窗 -->
-    <div class="modal-overlay" :class="{ show: showReplyModal }" @click.self="showReplyModal = false">
-      <div class="modal">
-        <h3>{{ currentFeedback?.status === 'pending' ? '处理工单' : '回复工单' }}</h3>
-        <p style="color: var(--color-muted); font-size: 0.85rem; margin-bottom: 1rem;">
-          工单：{{ currentFeedback?.title }}
-        </p>
-        <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--color-primary);">状态：</label>
-          <select v-model="replyStatus" class="btn btn-secondary" style="width: 100%; padding: 0.6rem 1rem; text-align: left;">
-            <option value="processing">处理中</option>
-            <option value="resolved">已解决</option>
-          </select>
-        </div>
-        <div style="margin-bottom: 1rem;">
-          <label style="display: block; font-size: 0.85rem; margin-bottom: 0.5rem; color: var(--color-primary);">回复内容：</label>
-          <textarea v-model="replyContent" class="btn btn-secondary" rows="4" 
-            style="width: 100%; padding: 0.6rem 1rem; text-align: left; resize: vertical; min-height: 100px;"
-            placeholder="请输入回复内容..."></textarea>
-        </div>
-        <div class="modal-btns">
-          <button class="btn btn-primary" @click="submitReply" :disabled="isSubmitting">
-            {{ isSubmitting ? '提交中...' : '提交' }}
-          </button>
-          <button class="btn btn-secondary" @click="showReplyModal = false">取消</button>
-        </div>
+    <el-dialog 
+      v-model="showReplyModal" 
+      :title="currentFeedback?.status === 'pending' ? '处理工单' : '回复工单'" 
+      width="500px"
+    >
+      <div class="reply-info">
+        工单：{{ currentFeedback?.title }}
       </div>
-    </div>
+      
+      <el-form label-width="80px">
+        <el-form-item label="状态">
+          <el-select v-model="replyStatus" style="width: 100%;">
+            <el-option label="处理中" value="processing" />
+            <el-option label="已解决" value="resolved" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="回复内容">
+          <el-input
+            v-model="replyContent"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入回复内容..."
+          />
+        </el-form-item>
+      </el-form>
 
-    <!-- 图片预览弹窗 -->
-    <div class="modal-overlay" :class="{ show: showImageModal }" @click.self="showImageModal = false">
-      <div class="modal modal-image">
-        <img :src="previewImageUrl" alt="预览" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
-      </div>
-    </div>
+      <template #footer>
+        <el-button @click="showReplyModal = false">取消</el-button>
+        <el-button type="primary" @click="submitReply" :loading="isSubmitting">
+          {{ isSubmitting ? '提交中...' : '提交' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -144,19 +145,17 @@ const feedbacks = ref([])
 const filterStatus = ref('')
 const showDetailModal = ref(false)
 const showReplyModal = ref(false)
-const showImageModal = ref(false)
 const currentFeedback = ref(null)
 const replyStatus = ref('processing')
 const replyContent = ref('')
 const isSubmitting = ref(false)
-const previewImageUrl = ref('')
 
 const filteredFeedbacks = computed(() => {
   if (!filterStatus.value) return feedbacks.value
   return feedbacks.value.filter(f => f.status === filterStatus.value)
 })
 
-function getStatusClass(status) {
+function getStatusType(status) {
   const map = { pending: 'warning', processing: 'info', resolved: 'success' }
   return map[status] || 'warning'
 }
@@ -215,11 +214,6 @@ function parseScreenshots(screenshotsStr) {
   }
 }
 
-function previewImage(url) {
-  previewImageUrl.value = url
-  showImageModal.value = true
-}
-
 async function loadData() {
   try {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
@@ -235,108 +229,113 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(15,23,42,0.5);
-  backdrop-filter: blur(5px);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: white;
-  border-radius: 20px;
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 25px 50px rgba(0,0,0,0.15);
-}
-.modal-large {
-  max-width: 600px;
-}
-.modal-image {
-  max-width: 90vw;
-  max-height: 90vh;
-  padding: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal h3 {
+.page-title {
   font-family: var(--font-heading);
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  color: var(--color-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--studio-text-main);
+  margin-bottom: 1.5rem;
 }
-.modal-btns {
+
+.filter-bar {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
-.modal-btns button {
-  flex: 1;
-  padding: 0.75rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
+
+.filter-count {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
 }
+
+.table-card {
+  background: var(--studio-surface);
+  border-radius: var(--radius-lg);
+}
+
+.time-text {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--studio-text-muted);
+}
+
 .detail-content {
   max-height: 60vh;
   overflow-y: auto;
 }
+
 .detail-row {
   margin-bottom: 1rem;
 }
+
 .detail-label {
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--studio-text-main);
   margin-right: 0.5rem;
 }
+
 .detail-text {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  background: #f8fafc;
-  border-radius: 8px;
+  background: var(--studio-bg);
+  border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.9rem;
   line-height: 1.6;
 }
+
 .reply-text {
-  background: rgba(99,102,241,0.05);
-  border-left: 3px solid var(--color-accent);
+  background: rgba(79, 70, 229, 0.05);
+  border-left: 3px solid var(--studio-accent);
 }
+
+.reply-info {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--studio-bg);
+  border-radius: var(--radius-sm);
+}
+
 .screenshot-list {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 0.5rem;
 }
+
 .screenshot-img {
-  max-width: 200px;
-  max-height: 150px;
-  border-radius: 8px;
+  width: 120px;
+  height: 90px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  object-fit: cover;
-  border: 1px solid var(--color-border);
-  transition: opacity 0.2s;
 }
-.screenshot-img:hover {
-  opacity: 0.8;
+
+:deep(.el-table) {
+  --el-table-border-color: var(--studio-border);
+  --el-table-header-bg-color: var(--studio-bg);
+  --el-table-row-hover-bg-color: var(--studio-bg-hover);
 }
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 4px;
+
+:deep(.el-dialog) {
+  border-radius: var(--radius-lg);
 }
-.status-dot.warning { background: #F59E0B; }
-.status-dot.info { background: #3B82F6; }
-.status-dot.success { background: #10B981; }
-.status-dot.error { background: #EF4444; }
+
+:deep(.el-dialog__header) {
+  border-bottom: 1px solid var(--studio-border);
+  padding-bottom: 1rem;
+}
+
+:deep(.el-dialog__footer) {
+  border-top: 1px solid var(--studio-border);
+  padding-top: 1rem;
+}
 </style>

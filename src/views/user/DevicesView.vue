@@ -101,7 +101,7 @@ onMounted(loadDevices)
 .page-title {
   font-family: var(--font-heading);
   font-size: 1.5rem;
-  color: var(--color-primary);
+  color: var(--studio-text-main);
   margin-bottom: 1.5rem;
 }
 
@@ -110,16 +110,16 @@ onMounted(loadDevices)
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  background: rgba(99, 102, 241, 0.06);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  background: rgba(79, 70, 229, 0.06);
+  border: 1px solid rgba(79, 70, 229, 0.15);
   border-radius: 12px;
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
-  color: var(--color-muted);
+  color: var(--studio-text-muted);
 }
 
-.device-info-banner svg { color: var(--color-accent); flex-shrink: 0; }
-.device-info-banner strong { color: var(--color-accent); }
+.device-info-banner svg { color: var(--studio-accent); flex-shrink: 0; }
+.device-info-banner strong { color: var(--studio-accent); }
 
 .device-list { display: flex; flex-direction: column; gap: 0.75rem; }
 
@@ -128,7 +128,7 @@ onMounted(loadDevices)
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background: white;
+  background: var(--studio-surface);
   border-radius: 14px;
   border: 1px solid var(--color-border);
   transition: box-shadow 0.2s;
@@ -138,15 +138,15 @@ onMounted(loadDevices)
 .device-icon {
   width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(79, 70, 229, 0.08);
   border-radius: 12px;
-  color: var(--color-accent);
+  color: var(--studio-accent);
   flex-shrink: 0;
 }
 
 .device-info { flex: 1; min-width: 0; }
-.device-name { font-weight: 600; font-size: 0.95rem; color: var(--color-primary); margin-bottom: 0.25rem; }
-.device-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--color-muted); flex-wrap: wrap; }
+.device-name { font-weight: 600; font-size: 0.95rem; color: var(--studio-text-main); margin-bottom: 0.25rem; }
+.device-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--studio-text-muted); flex-wrap: wrap; }
 .device-id { font-family: monospace; }
 
 .unbind-btn {
@@ -154,7 +154,7 @@ onMounted(loadDevices)
   background: transparent;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  color: var(--color-muted);
+  color: var(--studio-text-muted);
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
@@ -169,7 +169,7 @@ onMounted(loadDevices)
 
 .empty-state {
   display: flex; flex-direction: column; align-items: center;
-  padding: 4rem 2rem; color: var(--color-muted);
+  padding: 4rem 2rem; color: var(--studio-text-muted);
 }
 .empty-state p { margin-top: 1rem; }
 </style>

@@ -1,16 +1,41 @@
-/* ===== AmazonToolbox Design System v4 - Desktop Optimized ===== */
+/* ===== AmazonToolbox Design System v5 - Studio Milk & Slate ===== */
 
 /* ===== CSS Variables ===== */
 :root {
-    /* 颜色系统 */
+    /* === Studio Milk & Slate 色彩系统 === */
+    --studio-bg: #F5F6F9;              /* 牛奶复合白：带微弱冷灰调底色 */
+    --studio-surface: #FFFFFF;         /* 纯白：卡片、弹窗背景 */
+    --studio-frame: #0F172A;           /* 深石板蓝：侧边栏、顶栏压阵 */
+    --studio-text-main: #1E293B;       /* 碳晶灰：正文 */
+    --studio-text-muted: #64748B;      /* 燕麦灰：辅助文字 */
+    --studio-accent: #4F46E5;          /* 暮光靛蓝：品牌色、主按钮 */
+    --studio-accent-hover: #4338CA;
+    --studio-accent-light: #818CF8;
+    --studio-success: #10B981;         /* 新茶绿：正常状态 */
+    --studio-warning: #F59E0B;         /* 琥珀金：付费锁卡、VIP */
+    --studio-danger: #EF4444;          /* 红色：危险操作 */
+    --studio-danger-hover: #DC2626;
+    --studio-info: #06B6D4;
+    --studio-purple: #8B5CF6;
+    --studio-gold: #F59E0B;
+
+    /* === 弥散悬浮阴影 === */
+    --studio-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 12px 0 rgba(15, 23, 42, 0.03);
+    --studio-shadow-hover: 0 10px 25px -5px rgba(79, 70, 229, 0.08), 0 8px 16px -6px rgba(79, 70, 229, 0.04);
+
+    /* === 边框和交互状态 === */
+    --studio-border: #E2E8F0;
+    --studio-bg-hover: #F1F5F9;
+
+    /* === 兼容旧变量（过渡期） === */
     --color-primary: #0F172A;
-    --color-accent: #6366F1;
-    --color-accent-hover: #4F46E5;
+    --color-accent: #4F46E5;
+    --color-accent-hover: #4338CA;
     --color-accent-light: #818CF8;
     --color-gold: #F59E0B;
-    --color-background: #F8FAFC;
-    --color-body-bg: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #DBEAFE 100%);
-    --color-foreground: #020617;
+    --color-background: #F5F6F9;
+    --color-body-bg: linear-gradient(135deg, #F5F6F9 0%, #EEF0F5 50%, #E8EBF2 100%);
+    --color-foreground: #1E293B;
     --color-muted: #64748B;
     --color-border: #E2E8F0;
     --color-border-light: #F1F5F9;
@@ -20,43 +45,96 @@
     --color-success: #10B981;
     --color-info: #06B6D4;
     --color-purple: #8B5CF6;
-    
-    /* 间距系统 */
-    --spacing-xs: 0.25rem;   /* 4px */
-    --spacing-sm: 0.5rem;    /* 8px */
-    --spacing-md: 1rem;      /* 16px */
-    --spacing-lg: 1.5rem;    /* 24px */
-    --spacing-xl: 2rem;      /* 32px */
-    --spacing-2xl: 2.5rem;   /* 40px */
-    --spacing-3xl: 3rem;     /* 48px */
-    
-    /* 阴影层级 */
+
+    /* === 间距系统 === */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 2.5rem;
+    --spacing-3xl: 3rem;
+
+    /* === 阴影层级（兼容旧） === */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
     --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
-    
-    /* 圆角 */
+
+    /* === 圆角 === */
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 14px;
     --radius-xl: 18px;
     --radius-2xl: 24px;
-    
-    /* 字体 */
+
+    /* === 字体 === */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    
-    /* 过渡 */
+
+    /* === 过渡 === */
     --transition: 200ms ease;
     --transition-slow: 300ms ease;
-    
-    /* 布局 */
-    --sidebar-width: 240px;
+
+    /* === 布局 === */
+    --sidebar-width: 200px;
     --sidebar-collapsed-width: 72px;
-    --header-height: 72px;
+    --header-height: 48px;
     --content-max-width: 1600px;
+
+    /* === Element Plus 主题覆盖 === */
+    --el-color-primary: #4F46E5;
+    --el-color-primary-light-3: #818CF8;
+    --el-color-primary-light-5: #A5B4FC;
+    --el-color-primary-light-7: #C7D2FE;
+    --el-color-primary-light-8: #E0E7FF;
+    --el-color-primary-light-9: #EEF2FF;
+    --el-color-primary-dark-2: #4338CA;
+    --el-color-success: #10B981;
+    --el-color-warning: #F59E0B;
+    --el-color-danger: #EF4444;
+    --el-color-info: #64748B;
+    --el-border-radius-base: 8px;
+    --el-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --el-font-size-base: 14px;
+    --el-bg-color: #FFFFFF;
+    --el-bg-color-page: #F5F6F9;
+    --el-text-color-primary: #1E293B;
+    --el-text-color-regular: #475569;
+    --el-text-color-secondary: #64748B;
+    --el-text-color-placeholder: #94A3B8;
+    --el-border-color: #E2E8F0;
+    --el-border-color-light: #F1F5F9;
+    --el-fill-color-blank: #FFFFFF;
+}
+
+/* === Element Plus 全局组件质感覆盖 === */
+.el-card {
+    border: none !important;
+    box-shadow: var(--studio-shadow) !important;
+    border-radius: 10px !important;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.el-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--studio-shadow-hover) !important;
+}
+.el-button--primary {
+    --el-button-bg-color: var(--studio-accent);
+    --el-button-border-color: var(--studio-accent);
+    --el-button-hover-bg-color: var(--studio-accent-hover);
+    --el-button-hover-border-color: var(--studio-accent-hover);
+}
+.el-tag {
+    border-radius: 6px;
+}
+.el-table {
+    --el-table-border-color: #E2E8F0;
+    --el-table-header-bg-color: #F8FAFC;
+    --el-table-row-hover-bg-color: #F1F5F9;
+    border-radius: 10px;
+    overflow: hidden;
 }
 
 /* ===== Base Reset ===== */
@@ -1444,4 +1522,143 @@ a:focus-visible {
         opacity: 1;
         animation: none;
     }
+}
+
+/* ===== Element Plus 全局覆盖 ===== */
+
+/* 页面标题 */
+.page-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--studio-text-main);
+    margin-bottom: 1.5rem;
+}
+
+/* 全局 Element Plus 表格 */
+.el-table {
+    --el-table-border-color: #E2E8F0;
+    --el-table-header-bg-color: #F8FAFC;
+    --el-table-row-hover-bg-color: #F1F5F9;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* 全局 Element Plus 卡片 */
+.el-card {
+    border: none !important;
+    box-shadow: var(--studio-shadow) !important;
+    border-radius: 10px !important;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* 全局 Element Plus 按钮 */
+.el-button--primary {
+    --el-button-bg-color: var(--studio-accent);
+    --el-button-border-color: var(--studio-accent);
+    --el-button-hover-bg-color: var(--studio-accent-hover);
+    --el-button-hover-border-color: var(--studio-accent-hover);
+}
+
+.el-button--warning {
+    --el-button-bg-color: var(--studio-warning);
+    --el-button-border-color: var(--studio-warning);
+}
+
+.el-button--danger {
+    --el-button-bg-color: var(--studio-danger);
+    --el-button-border-color: var(--studio-danger);
+}
+
+/* 全局 Element Plus 标签 */
+.el-tag {
+    border-radius: 6px;
+}
+
+/* 全局 Element Plus 对话框 */
+.el-dialog {
+    border-radius: var(--radius-lg);
+}
+
+.el-dialog__header {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 1rem;
+}
+
+.el-dialog__footer {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+}
+
+/* 全局 Element Plus 表单 */
+.el-form-item__label {
+    color: var(--studio-text-main) !important;
+    font-weight: 500;
+}
+
+/* 全局 Element Plus 输入框 */
+.el-input__wrapper {
+    border-radius: 8px !important;
+}
+
+.el-textarea__inner {
+    border-radius: 8px !important;
+}
+
+/* 全局 Element Plus 选择器 */
+.el-select-dropdown__item.is-selected {
+    color: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus 分页 */
+.el-pagination .el-pager li.is-active {
+    background: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus Tabs */
+.el-tabs__item.is-active {
+    color: var(--studio-accent) !important;
+}
+
+.el-tabs__active-bar {
+    background-color: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus 复选框 */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+    background-color: var(--studio-accent) !important;
+    border-color: var(--studio-accent) !important;
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label {
+    color: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus 单选框 */
+.el-radio__input.is-checked .el-radio__inner {
+    background-color: var(--studio-accent) !important;
+    border-color: var(--studio-accent) !important;
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+    color: var(--studio-accent) !important;
+}
+
+/* 微型滚动条 */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--studio-accent);
 }

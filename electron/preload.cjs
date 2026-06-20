@@ -26,5 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   onUpdateDownloaded: (callback) => {
     ipcRenderer.on('update-downloaded', (event, data) => callback(data));
-  }
+  },
+  // 窗口形变控制：学员窄屏 / 管理员宽屏
+  resizeWindow: (mode) => ipcRenderer.send('resize-window-context', mode),
 });

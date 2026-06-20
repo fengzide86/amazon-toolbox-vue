@@ -1,0 +1,68 @@
+@echo off
+chcp 65001 >nul
+echo ========================================
+echo  亚马逊赛训工具箱 - 一键测试
+echo ========================================
+echo.
+
+:: 检查 Node.js 是否安装
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    echo ❌ 未检测到 Node.js，请先安装 Node.js
+    pause
+    exit /b 1
+)
+
+:: 检查 node_modules 是否存在
+if not exist "node_modules\" (
+    echo 📦 检测到未安装依赖，正在安装...
+    call npm install
+    if %errorlevel% neq 0 (
+        echo ❌ 依赖安装失败
+        pause
+        exit /b 1
+    )
+    echo ✅ 依赖安装完成
+    echo.
+)
+
+echo [1/3] 运行前端单元测试...
+echo ----------------------------------------
+call npm test
+if %errorlevel% neq 0 (
+    echo.
+    echo ❌ 前端单元测试失败
+    pause
+    exit /b 1
+)
+echo.
+echo ✅ 前端单元测试通过
+echo.
+
+echo [2/3] 运行构建验证...
+echo ----------------------------------------
+call npm run build:verify
+if %errorlevel% neq 0 (
+    echo.
+    echo ❌ 构建验证失败
+    pause
+    exit /b 1
+)
+echo.
+echo ✅ 构建验证通过
+echo.
+
+echo [3/3] 生成测试覆盖率报告...
+echo ----------------------------------------
+call npm run test:coverage
+echo.
+
+echo ========================================
+echo  ✅ 所有测试通过！
+echo ========================================
+echo.
+echo 测试报告位置:
+echo   - 覆盖率报告: coverage/index.html
+echo   - 构建产物: dist-release/
+echo.
+pause

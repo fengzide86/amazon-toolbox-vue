@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -109,8 +109,6 @@ autoUpdater.on('error', (err) => {
 });
 
 // 监听来自渲染进程的更新指令
-const { ipcMain } = require('electron');
-
 ipcMain.on('start-download-update', () => {
   console.log('[Updater] 开始下载更新...');
   autoUpdater.downloadUpdate().catch(err => {
@@ -123,11 +121,52 @@ ipcMain.on('install-update', () => {
   autoUpdater.quitAndInstall();
 });
 
+// ===== 窗口形变控制 =====
+ipcMain.on('resize-window-context', (event, targetMode) => {
+  if (!mainWindow) return;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: scrWidth, height: scrHeight } = primaryDisplay.workAreaSize;
+
+  if (targetMode === 'trainee-mini') {
+    // 学员窄屏伴侣：420px 宽，贴右，强制置顶
+    mainWindow.setResizable(true);
+    mainWindow.setMinimumSize(380, 600);
+    mainWindow.setBounds({
+      x: scrWidth - 420,
+      y: 0,
+      width: 420,
+      height: scrHeight
+    }, true);
+    mainWindow.setAlwaysOnTop(true, 'screen-saver');
+  } else if (targetMode === 'admin-large') {
+    // 管理员宽屏看板：1200x800 居中，取消置顶
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.setResizable(true);
+    mainWindow.setMinimumSize(900, 600);
+    mainWindow.setBounds({
+      x: Math.floor((scrWidth - 1200) / 2),
+      y: Math.floor((scrHeight - 800) / 2),
+      width: 1200,
+      height: 800
+    }, true);
+  } else if (targetMode === 'reset') {
+    // 重置为默认窗口
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.setMinimumSize(900, 600);
+    mainWindow.setBounds({
+      x: Math.floor((scrWidth - 1280) / 2),
+      y: Math.floor((scrHeight - 800) / 2),
+      width: 1280,
+      height: 800
+    }, true);
+  }
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 900,
+    minWidth: 380,
     minHeight: 600,
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {

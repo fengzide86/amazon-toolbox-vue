@@ -3,63 +3,95 @@
     <h2 class="page-title">用户管理</h2>
 
     <div class="filter-bar">
-      <input v-model="searchText" class="form-input" placeholder="搜索用户/设备..." style="min-width:200px;">
-      <span style="font-size:0.85rem;color:var(--color-muted);">共 {{ filteredUsers.length }} 个用户</span>
+      <el-input 
+        v-model="searchText" 
+        placeholder="搜索用户/设备..." 
+        clearable
+        style="min-width: 240px;"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <span class="filter-count">共 {{ filteredUsers.length }} 个用户</span>
     </div>
 
-    <section class="table-card">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>用户名</th>
-            <th>手机号</th>
-            <th>设备名</th>
-            <th>设备ID</th>
-            <th>席位数</th>
-            <th>额外设备</th>
-            <th>注册时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="user in filteredUsers" :key="user.id">
-            <td>{{ user.id }}</td>
-            <td>
-              <input v-if="editingUser?.id === user.id" v-model="editingUser.name" class="form-input" style="width:100px;">
-              <span v-else>{{ user.name || '-' }}</span>
-            </td>
-            <td>
-              <input v-if="editingUser?.id === user.id" v-model="editingUser.phone" class="form-input" style="width:120px;">
-              <span v-else>{{ user.phone || '-' }}</span>
-            </td>
-            <td style="font-size:0.85rem;">{{ user.device_name || '-' }}</td>
-            <td style="font-family:monospace;font-size:0.8rem;">{{ user.device_id || '-' }}</td>
-            <td>
-              <input v-if="editingUser?.id === user.id" v-model.number="editingUser.total_seats" type="number" class="form-input" style="width:60px;">
-              <span v-else>{{ user.total_seats }}</span>
-            </td>
-            <td>
-              <input v-if="editingUser?.id === user.id" v-model.number="editingUser.extra_devices" type="number" class="form-input" style="width:60px;">
-              <span v-else>{{ user.extra_devices }}</span>
-            </td>
-            <td>{{ formatTime(user.created_at) }}</td>
-            <td>
-              <template v-if="editingUser?.id === user.id">
-                <button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.75rem;margin-right:0.3rem;" @click="saveUser(user)">保存</button>
-                <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;" @click="editingUser = null">取消</button>
-              </template>
-              <template v-else>
-                <button class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.75rem;" @click="startEdit(user)">编辑</button>
-              </template>
-            </td>
-          </tr>
-          <tr v-if="!filteredUsers.length">
-            <td colspan="9" style="text-align:center;color:var(--color-muted);padding:2rem;">暂无用户数据</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+    <el-card class="table-card" shadow="never">
+      <el-table :data="filteredUsers" stripe style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column label="用户名" min-width="140">
+          <template #default="{ row }">
+            <el-input 
+              v-if="editingUser?.id === row.id" 
+              v-model="editingUser.name" 
+              size="small"
+              style="width: 120px;"
+            />
+            <span v-else>{{ row.name || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="手机号" width="140">
+          <template #default="{ row }">
+            <el-input 
+              v-if="editingUser?.id === row.id" 
+              v-model="editingUser.phone" 
+              size="small"
+              style="width: 120px;"
+            />
+            <span v-else>{{ row.phone || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="device_name" label="设备名" min-width="140" show-overflow-tooltip />
+        <el-table-column label="设备ID" min-width="160">
+          <template #default="{ row }">
+            <span class="mono-text">{{ row.device_id || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="席位数" width="100">
+          <template #default="{ row }">
+            <el-input-number 
+              v-if="editingUser?.id === row.id" 
+              v-model="editingUser.total_seats" 
+              size="small"
+              :min="1"
+              style="width: 80px;"
+            />
+            <span v-else>{{ row.total_seats }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="额外设备" width="100">
+          <template #default="{ row }">
+            <el-input-number 
+              v-if="editingUser?.id === row.id" 
+              v-model="editingUser.extra_devices" 
+              size="small"
+              :min="0"
+              style="width: 80px;"
+            />
+            <span v-else>{{ row.extra_devices }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="注册时间" width="160">
+          <template #default="{ row }">
+            <span class="time-text">{{ formatTime(row.created_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <template v-if="editingUser?.id === row.id">
+              <el-button type="primary" size="small" @click="saveUser(row)">保存</el-button>
+              <el-button size="small" @click="editingUser = null">取消</el-button>
+            </template>
+            <template v-else>
+              <el-button size="small" @click="startEdit(row)">编辑</el-button>
+            </template>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-state">暂无用户数据</div>
+        </template>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -67,6 +99,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { getUsers, updateUser } from '@/utils/api'
 import { showToast } from '@/utils'
+import { Search } from '@element-plus/icons-vue'
 
 const users = ref([])
 const searchText = ref('')
@@ -119,3 +152,57 @@ async function loadData() {
 
 onMounted(loadData)
 </script>
+
+<style scoped>
+.page-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--studio-text-main);
+  margin-bottom: 1.5rem;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter-count {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+}
+
+.table-card {
+  background: var(--studio-surface);
+  border-radius: var(--radius-lg);
+}
+
+.mono-text {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 0.8rem;
+  color: var(--studio-text-secondary);
+}
+
+.time-text {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--studio-text-muted);
+}
+
+:deep(.el-table) {
+  --el-table-border-color: var(--studio-border);
+  --el-table-header-bg-color: var(--studio-bg);
+  --el-table-row-hover-bg-color: var(--studio-bg-hover);
+}
+
+:deep(.el-input-number) {
+  width: 100%;
+}
+</style>

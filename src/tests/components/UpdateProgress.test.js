@@ -1,6 +1,6 @@
 /**
  * UpdateProgress 组件测试
- * 测试更新进度显示功能
+ * 测试更新进度显示功能（适配新 UI）
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
@@ -100,7 +100,9 @@ describe('UpdateProgress', () => {
       window.dispatchEvent(event)
       await wrapper.vm.$nextTick()
       
-      expect(wrapper.find('.progress-percent').text()).toBe('75%')
+      // 新 UI 中百分比在 .stat-value 中
+      const statValues = wrapper.findAll('.stat-value')
+      expect(statValues[0].text()).toBe('75%')
     })
 
     it('应该正确显示已传输和总大小', async () => {
@@ -117,9 +119,10 @@ describe('UpdateProgress', () => {
       window.dispatchEvent(event)
       await wrapper.vm.$nextTick()
       
-      const progressDetail = wrapper.find('.progress-detail').text()
-      expect(progressDetail).toContain('15MB')
-      expect(progressDetail).toContain('50MB')
+      // 新 UI 中已下载信息在第二个 .stat-value 中
+      const statValues = wrapper.findAll('.stat-value')
+      expect(statValues[1].text()).toContain('15MB')
+      expect(statValues[1].text()).toContain('50MB')
     })
 
     it('应该正确显示下载速度', async () => {
@@ -136,8 +139,9 @@ describe('UpdateProgress', () => {
       window.dispatchEvent(event)
       await wrapper.vm.$nextTick()
       
-      const progressDetail = wrapper.find('.progress-detail').text()
-      expect(progressDetail).toContain('2.5MB/s')
+      // 新 UI 中速度在第三个 .stat-value 中
+      const statValues = wrapper.findAll('.stat-value')
+      expect(statValues[2].text()).toContain('2.5MB/s')
     })
 
     it('进度条宽度应该与百分比匹配', async () => {
@@ -160,7 +164,7 @@ describe('UpdateProgress', () => {
   })
 
   describe('完成状态测试', () => {
-    it('下载完成后应该显示提示文字', async () => {
+    it('下载完成后应该显示状态提示', async () => {
       const wrapper = mount(UpdateProgress)
       
       const event = new CustomEvent('update-progress', {
@@ -174,8 +178,9 @@ describe('UpdateProgress', () => {
       window.dispatchEvent(event)
       await wrapper.vm.$nextTick()
       
-      expect(wrapper.find('.update-hint').exists()).toBe(true)
-      expect(wrapper.find('.update-hint').text()).toContain('请耐心等待')
+      // 新 UI 使用 .status-hint 替代 .update-hint
+      expect(wrapper.find('.status-hint').exists()).toBe(true)
+      expect(wrapper.find('.status-hint').text()).toContain('下载完成')
     })
 
     it('下载完成后 2 秒应该隐藏进度条', async () => {
@@ -203,7 +208,7 @@ describe('UpdateProgress', () => {
   })
 
   describe('UI 元素测试', () => {
-    it('应该显示下载图标', async () => {
+    it('应该显示应用图标', async () => {
       const wrapper = mount(UpdateProgress)
       
       const event = new CustomEvent('update-progress', {
@@ -212,10 +217,10 @@ describe('UpdateProgress', () => {
       window.dispatchEvent(event)
       await wrapper.vm.$nextTick()
       
-      expect(wrapper.find('.update-header svg').exists()).toBe(true)
+      expect(wrapper.find('.app-icon svg').exists()).toBe(true)
     })
 
-    it('应该显示"正在下载更新"标题', async () => {
+    it('应该显示应用名称', async () => {
       const wrapper = mount(UpdateProgress)
       
       const event = new CustomEvent('update-progress', {
@@ -224,7 +229,47 @@ describe('UpdateProgress', () => {
       window.dispatchEvent(event)
       await wrapper.vm.$nextTick()
       
-      expect(wrapper.find('.update-header h3').text()).toBe('正在下载更新')
+      expect(wrapper.find('.update-header h3').text()).toBe('亚马逊工具箱')
+    })
+
+    it('应该显示版本号信息', async () => {
+      const wrapper = mount(UpdateProgress)
+      
+      const event = new CustomEvent('update-progress', {
+        detail: { percent: 50, speed: '2', transferred: '25', total: '50' }
+      })
+      window.dispatchEvent(event)
+      await wrapper.vm.$nextTick()
+      
+      expect(wrapper.find('.version-badge').exists()).toBe(true)
+      expect(wrapper.find('.old-version').exists()).toBe(true)
+      expect(wrapper.find('.new-version').exists()).toBe(true)
+    })
+
+    it('应该显示更新内容列表', async () => {
+      const wrapper = mount(UpdateProgress)
+      
+      const event = new CustomEvent('update-progress', {
+        detail: { percent: 50, speed: '2', transferred: '25', total: '50' }
+      })
+      window.dispatchEvent(event)
+      await wrapper.vm.$nextTick()
+      
+      expect(wrapper.find('.changelog-section').exists()).toBe(true)
+      expect(wrapper.findAll('.changelog-list li').length).toBeGreaterThan(0)
+    })
+
+    it('应该显示操作按钮', async () => {
+      const wrapper = mount(UpdateProgress)
+      
+      const event = new CustomEvent('update-progress', {
+        detail: { percent: 50, speed: '2', transferred: '25', total: '50' }
+      })
+      window.dispatchEvent(event)
+      await wrapper.vm.$nextTick()
+      
+      expect(wrapper.find('.action-buttons').exists()).toBe(true)
+      expect(wrapper.findAll('.action-buttons button').length).toBeGreaterThan(0)
     })
   })
 })

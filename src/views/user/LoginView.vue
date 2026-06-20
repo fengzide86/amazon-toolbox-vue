@@ -323,6 +323,8 @@ function handleLogin() {
         }
         showSuccess.value = true
         showToast('授权成功！正在跳转...', 'success')
+        // 触发窗口形变为学员窄屏伴侣模式
+        window.electronAPI?.resizeWindow('trainee-mini')
         // 直接跳转，不等待
         router.push('/user/dashboard')
       } else {

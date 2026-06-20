@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { authService } from '@/utils/auth'
 
 const routes = [
   // 用户端路由
@@ -152,17 +153,17 @@ const router = createRouter({
   }
 })
 
-// 路由守卫 - 检查登录状态
+// 路由守卫 - 使用 AuthService 统一管理
 router.beforeEach((to, from, next) => {
   try {
-    const auth = localStorage.getItem('toolbox_auth')
-    const role = localStorage.getItem('toolbox_role') || 'user'
+    const isAuthenticated = authService.isAuthenticated()
+    const isAdmin = authService.isAdmin()
     
     // 登录页不需要验证
     if (to.name === 'UserLogin' || to.name === 'AdminLogin' || to.name === 'UserTerms') {
-      if (auth) {
+      if (isAuthenticated) {
         // 已登录，根据角色跳转
-        next({ name: role === 'admin' ? 'AdminDashboard' : 'UserDashboard' })
+        next({ name: isAdmin ? 'AdminDashboard' : 'UserDashboard' })
       } else {
         next()
       }
@@ -171,11 +172,11 @@ router.beforeEach((to, from, next) => {
     
     // 管理后台需要管理员角色
     if (to.path.startsWith('/admin')) {
-      if (!auth) {
+      if (!isAuthenticated) {
         next({ name: 'AdminLogin' })
         return
       }
-      if (role !== 'admin') {
+      if (!isAdmin) {
         next({ name: 'UserDashboard' })
         return
       }
@@ -184,7 +185,7 @@ router.beforeEach((to, from, next) => {
     }
     
     // 用户端页面需要验证
-    if (!auth) {
+    if (!isAuthenticated) {
       next({ name: 'UserLogin' })
       return
     }
@@ -192,14 +193,8 @@ router.beforeEach((to, from, next) => {
     next()
   } catch (err) {
     console.error('Router guard error:', err)
-    // 发生错误时，尝试清除可能损坏的数据并跳转到登录页
-    try {
-      localStorage.removeItem('toolbox_auth')
-      localStorage.removeItem('toolbox_role')
-      localStorage.removeItem('toolbox_user')
-    } catch (e) {
-      // 忽略清理错误
-    }
+    // 发生错误时，清除认证信息并跳转到登录页
+    authService.clear()
     next({ name: 'UserLogin' })
   }
 })

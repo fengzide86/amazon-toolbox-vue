@@ -9,12 +9,12 @@
       @click="closeSidebar"
     ></div>
     
-    <div class="layout">
+    <div class="layout-studio">
       <UserSidebar 
         :class="{ 'mobile-open': showMobileSidebar }" 
         ref="sidebarRef"
       />
-      <main class="content" data-testid="user-content">
+      <main class="content-studio" data-testid="user-content">
         <Breadcrumb />
         <AnnouncementBanner />
         <router-view />
@@ -171,6 +171,25 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Studio Milk & Slate 布局 */
+.layout-studio {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  gap: var(--spacing-lg);
+  min-height: calc(100vh - var(--header-height));
+}
+
+.content-studio {
+  min-width: 0;
+  background: var(--studio-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: var(--studio-shadow);
+}
+
 /* 移动端侧边栏遮罩 */
 .sidebar-overlay {
   display: none;
@@ -184,6 +203,13 @@ onUnmounted(() => {
 @media (max-width: 1024px) {
   .sidebar-overlay {
     display: block;
+  }
+  .layout-studio {
+    grid-template-columns: 1fr;
+    padding: var(--spacing-sm);
+  }
+  .content-studio {
+    padding: var(--spacing-md);
   }
 }
 

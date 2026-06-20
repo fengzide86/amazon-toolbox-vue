@@ -65,7 +65,7 @@ export const usePlatformStore = defineStore('platform', () => {
   // 检查平台是否可用
   const isPlatformAvailable = (platformKey) => {
     const platform = availablePlatforms.value.find(p => p.key === platformKey)
-    return platform && platform.status === 'available'
+    return Boolean(platform && platform.status === 'available')
   }
 
   // 检查用户是否有平台权限
