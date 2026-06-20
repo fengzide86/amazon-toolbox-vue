@@ -86,36 +86,38 @@
       </article>
     </section>
 
-    <section class="table-card">
+    <section class="table-section">
       <div class="table-header">
         <h3>最近工具运行记录</h3>
-        <router-link to="/user/logs">查看全部 →</router-link>
+        <router-link to="/user/logs" class="view-all-link">查看全部 →</router-link>
       </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>工具名称</th>
-            <th>运行时间</th>
-            <th>状态</th>
-            <th>详情</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="log in recentLogs" :key="log.id">
-            <td>{{ log.tool_name || '未知工具' }}</td>
-            <td>{{ formatTime(log.created_at) }}</td>
-            <td>
-              <span :class="['badge', log.status === 'success' ? 'badge-success' : 'badge-error']">
-                {{ log.status === 'success' ? '成功' : '失败' }}
-              </span>
-            </td>
-            <td>{{ log.detail || '-' }}</td>
-          </tr>
-          <tr v-if="!recentLogs.length">
-            <td colspan="4" class="empty-row">暂无运行记录</td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table :data="recentLogs" size="small" class="studio-table" style="width: 100%">
+        <el-table-column prop="tool_name" label="工具名称" min-width="140">
+          <template #default="{ row }">
+            {{ row.tool_name || '未知工具' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="运行时间" width="140">
+          <template #default="{ row }">
+            {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
+              {{ row.status === 'success' ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="detail" label="详情" min-width="160">
+          <template #default="{ row }">
+            {{ row.detail || '-' }}
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-row">暂无运行记录</div>
+        </template>
+      </el-table>
     </section>
   </div>
 </template>
@@ -545,6 +547,46 @@ onUnmounted(() => {
   justify-content: center;
   height: 100%;
   color: var(--color-muted);
+}
+
+/* 表格区域 */
+.table-section {
+  background: var(--studio-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.table-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.view-all-link {
+  font-size: 0.85rem;
+  color: var(--studio-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.view-all-link:hover {
+  color: var(--studio-accent-hover);
+}
+
+:deep(.studio-table) {
+  --el-table-border-color: #E2E8F0;
+  --el-table-header-bg-color: #F8FAFC;
+  --el-table-row-hover-bg-color: #F1F5F9;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 /* 表格 */

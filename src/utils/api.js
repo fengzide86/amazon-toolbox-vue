@@ -5,6 +5,7 @@
 // 3. 默认值（开发环境用本地，生产环境用云端）
 
 import { getCache, setCache, generateCacheKey } from './cache.js';
+import { authService } from './auth.js';
 
 // 缓存配置
 const CACHE_ENABLED = true;
@@ -58,10 +59,11 @@ function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 获取存储的 JWT Token
+// 获取存储的 JWT Token（使用 AuthService）
 function getAuthToken() {
     try {
-        return localStorage.getItem('toolbox_token');
+        const auth = authService.getAuth();
+        return auth?.token || localStorage.getItem('toolbox_token');
     } catch (e) {
         return null;
     }
@@ -125,13 +127,11 @@ export async function request(url, options = {}) {
                 if (!response.ok) {
                     // 全局处理 401/403 错误（授权码被冻结、被踢出等）
                     if (response.status === 401 || response.status === 403) {
-                        const auth = localStorage.getItem('toolbox_auth');
-                        const role = localStorage.getItem('toolbox_role');
+                        const auth = authService.getAuth();
+                        const role = authService.getRole();
                         // 避免在登录页重复跳转
                         if (auth && role !== 'admin') {
-                            localStorage.removeItem('toolbox_auth');
-                            localStorage.removeItem('toolbox_role');
-                            localStorage.removeItem('toolbox_user');
+                            authService.clear();
                             // 仅在非登录页跳转
                             if (!window.location.hash.includes('/login')) {
                                 window.location.hash = '#/user/login';

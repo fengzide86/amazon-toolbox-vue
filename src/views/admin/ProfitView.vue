@@ -3,22 +3,24 @@
     <h2 class="page-title">分润管理</h2>
 
     <!-- 分润统计卡片 -->
-    <section class="stats-row">
-      <article class="stat-card" v-for="(item, index) in profitItems" :key="item.key">
-        <div class="stat-icon" :style="{ background: item.bgColor }">
-          <span style="font-size: 1.5rem;">{{ item.icon }}</span>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">{{ item.label }} ({{ profitRatios[item.key] }}%)</div>
-          <div class="stat-value" :style="{ color: item.color }">
-            ¥{{ summary[item.amountKey]?.toFixed(2) || '0.00' }}
+    <el-row :gutter="16" style="margin-bottom: 1.5rem;">
+      <el-col :xs="12" :sm="8" :md="4" v-for="(item, index) in profitItems" :key="item.key">
+        <el-card class="stat-card">
+          <div class="stat-icon" :style="{ background: item.bgColor }">
+            <span style="font-size: 1.5rem;">{{ item.icon }}</span>
           </div>
-        </div>
-      </article>
-    </section>
+          <div class="stat-content">
+            <div class="stat-label">{{ item.label }} ({{ profitRatios[item.key] }}%)</div>
+            <div class="stat-value" :style="{ color: item.color }">
+              ¥{{ summary[item.amountKey]?.toFixed(2) || '0.00' }}
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 分润总计 -->
-    <section class="total-card">
+    <el-card class="total-card">
       <div class="total-content">
         <div class="total-label">分润总计</div>
         <div class="total-value">¥{{ summary.grand_total?.toFixed(2) || '0.00' }}</div>
@@ -26,20 +28,19 @@
       <div v-if="!summary.grand_total" class="total-empty">
         暂无分润记录，请先创建订单并确认付款
       </div>
-    </section>
+    </el-card>
 
     <!-- 分润比例可视化 -->
-    <section class="table-card">
-      <div class="table-header">
-        <h3>分润比例配置</h3>
-        <router-link to="/admin/settings" class="settings-link">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-          去设置
-        </router-link>
-      </div>
+    <el-card class="table-card">
+      <template #header>
+        <div class="card-header">
+          <h3>分润比例配置</h3>
+          <router-link to="/admin/settings" class="settings-link">
+            <el-icon><Setting /></el-icon>
+            去设置
+          </router-link>
+        </div>
+      </template>
       <div class="ratio-bars">
         <div v-for="item in profitItems" :key="item.key" class="ratio-bar-row">
           <div class="ratio-bar-label">
@@ -52,7 +53,7 @@
           <div class="ratio-bar-value">{{ profitRatios[item.key] }}%</div>
         </div>
       </div>
-    </section>
+    </el-card>
   </div>
 </template>
 
@@ -61,6 +62,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getProfitSummary, getSettings } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { Setting } from '@element-plus/icons-vue'
 
 const summary = ref({})
 const profitRatios = ref({
@@ -113,10 +115,11 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+.page-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--studio-text-main);
   margin-bottom: 1.5rem;
 }
 
@@ -124,16 +127,7 @@ onMounted(loadData)
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 1.25rem;
-  background: white;
-  border-radius: 16px;
-  border: 1px solid var(--color-border);
-  transition: box-shadow var(--transition), transform var(--transition);
-}
-
-.stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  transform: translateY(-2px);
+  margin-bottom: 1rem;
 }
 
 .stat-icon {
@@ -153,7 +147,7 @@ onMounted(loadData)
 
 .stat-label {
   font-size: 0.8rem;
-  color: var(--color-muted);
+  color: var(--studio-text-muted);
   font-weight: 500;
   margin-bottom: 0.25rem;
 }
@@ -165,12 +159,14 @@ onMounted(loadData)
 }
 
 .total-card {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-light));
-  border-radius: 20px;
-  padding: 2rem;
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
   margin-bottom: 1.5rem;
   text-align: center;
   color: white;
+}
+
+.total-card :deep(.el-card__body) {
+  background: transparent;
 }
 
 .total-content {
@@ -199,26 +195,20 @@ onMounted(loadData)
 }
 
 .table-card {
-  background: white;
-  border-radius: 16px;
-  border: 1px solid var(--color-border);
-  padding: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
-.table-header {
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.25rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--color-border);
 }
 
-.table-header h3 {
+.card-header h3 {
   font-family: var(--font-heading);
   font-size: 1rem;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--studio-text-main);
   margin: 0;
 }
 
@@ -227,16 +217,16 @@ onMounted(loadData)
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--color-accent);
+  color: var(--studio-accent);
   text-decoration: none;
   padding: 0.4rem 0.75rem;
   border-radius: 8px;
-  background: rgba(99,102,241,0.08);
+  background: rgba(79, 70, 229, 0.08);
   transition: background var(--transition);
 }
 
 .settings-link:hover {
-  background: rgba(99,102,241,0.15);
+  background: rgba(79, 70, 229, 0.15);
 }
 
 .ratio-bars {
@@ -257,7 +247,7 @@ onMounted(loadData)
   gap: 0.5rem;
   min-width: 80px;
   font-size: 0.85rem;
-  color: var(--color-foreground);
+  color: var(--studio-text-main);
   font-weight: 500;
 }
 
@@ -268,7 +258,7 @@ onMounted(loadData)
 .ratio-bar-track {
   flex: 1;
   height: 8px;
-  background: #F1F5F9;
+  background: var(--studio-bg);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -284,14 +274,10 @@ onMounted(loadData)
   text-align: right;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-muted);
+  color: var(--studio-text-muted);
 }
 
 @media (max-width: 768px) {
-  .stats-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
   .total-value {
     font-size: 2rem;
   }

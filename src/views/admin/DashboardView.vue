@@ -83,37 +83,37 @@
     <section class="table-card">
       <div class="table-header">
         <h3>最近订单</h3>
-        <router-link to="/admin/orders">查看全部 →</router-link>
+        <router-link to="/admin/orders" class="view-all-link">查看全部 →</router-link>
       </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>订单号</th>
-            <th>套餐</th>
-            <th>金额</th>
-            <th>渠道</th>
-            <th>状态</th>
-            <th>时间</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="order in recentOrders" :key="order.id">
-            <td style="font-family:monospace;font-size:0.85rem">{{ order.order_no }}</td>
-            <td>{{ getPlanName(order.plan_id) }}</td>
-            <td>¥{{ order.amount }}</td>
-            <td>{{ order.channel || '-' }}</td>
-            <td>
-              <span :class="['badge', 'badge-' + order.status]">
-                {{ getStatusText(order.status) }}
-              </span>
-            </td>
-            <td>{{ formatTime(order.created_at) }}</td>
-          </tr>
-          <tr v-if="!recentOrders.length">
-            <td colspan="6" class="empty-row">暂无订单数据</td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table :data="recentOrders" style="width: 100%" class="studio-table" size="small">
+        <el-table-column label="订单号" min-width="140">
+          <template #default="{ row }">
+            <span style="font-family:monospace;font-size:0.85rem">{{ row.order_no }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="套餐" min-width="100">
+          <template #default="{ row }">{{ getPlanName(row.plan_id) }}</template>
+        </el-table-column>
+        <el-table-column label="金额" width="100">
+          <template #default="{ row }">¥{{ row.amount }}</template>
+        </el-table-column>
+        <el-table-column label="渠道" width="100">
+          <template #default="{ row }">{{ row.channel || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'paid' ? 'success' : row.status === 'pending' ? 'warning' : 'danger'" size="small">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="时间" width="120">
+          <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-row">暂无订单数据</div>
+        </template>
+      </el-table>
     </section>
 
     <!-- 最近运行日志 -->
@@ -265,12 +265,12 @@ onMounted(loadData)
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background: white;
+  background: var(--studio-surface);
   border-radius: 16px;
   border: 1px solid var(--color-border);
   transition: box-shadow var(--transition);
 }
-.stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.stat-card:hover { box-shadow: var(--studio-shadow-hover); }
 .stat-icon {
   width: 48px; height: 48px;
   border-radius: 12px;
@@ -279,32 +279,55 @@ onMounted(loadData)
 }
 .stat-icon svg { width: 24px; height: 24px; }
 .stat-content { flex: 1; }
-.stat-label { font-size: 0.8rem; color: var(--color-muted); font-weight: 500; }
+.stat-label { font-size: 0.8rem; color: var(--studio-text-muted); font-weight: 500; }
 .stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
-.stat-sub { font-size: 0.75rem; color: var(--color-muted); margin-top: 0.25rem; }
+.stat-sub { font-size: 0.75rem; color: var(--studio-text-muted); margin-top: 0.25rem; }
 .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
 .chart-card {
-  background: white;
+  background: var(--studio-surface);
   border-radius: 16px;
   border: 1px solid var(--color-border);
   padding: 1.25rem;
+  box-shadow: var(--studio-shadow);
 }
-.chart-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-primary); margin-bottom: 1rem; }
+.chart-header h3 { font-size: 1rem; font-weight: 600; color: var(--studio-text-main); margin-bottom: 1rem; }
 .chart-container { position: relative; height: 250px; }
-.chart-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--color-muted); }
+.chart-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--studio-text-muted); }
+
+.table-card {
+  background: var(--studio-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--studio-shadow);
+}
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.table-header h3 { font-size: 1rem; font-weight: 600; color: var(--studio-text-main); }
+.view-all-link { font-size: 0.85rem; color: var(--studio-accent); text-decoration: none; font-weight: 600; }
+.view-all-link:hover { color: var(--studio-accent-hover); }
+
+:deep(.studio-table) {
+  --el-table-border-color: #E2E8F0;
+  --el-table-header-bg-color: #F8FAFC;
+  --el-table-row-hover-bg-color: #F1F5F9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
 .log-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.log-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: #f8fafc; border-radius: 8px; font-size: 0.85rem; }
-.log-tool { font-weight: 600; color: var(--color-primary); min-width: 120px; }
-.log-module { color: var(--color-muted); }
+.log-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--studio-bg); border-radius: 8px; font-size: 0.85rem; }
+.log-tool { font-weight: 600; color: var(--studio-text-main); min-width: 120px; }
+.log-module { color: var(--studio-text-muted); }
 .log-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
 .log-badge-success { background: rgba(16,185,129,0.1); color: #10B981; }
 .log-badge-fail { background: rgba(239,68,68,0.1); color: #EF4444; }
-.log-time { margin-left: auto; color: var(--color-muted); font-size: 0.8rem; }
-.badge { padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
-.badge-paid { background: rgba(16,185,129,0.1); color: #10B981; }
-.badge-pending { background: rgba(245,158,11,0.1); color: #F59E0B; }
-.badge-refunded { background: rgba(239,68,68,0.1); color: #EF4444; }
-.empty-row { text-align: center; color: var(--color-muted); padding: 1rem; }
-.empty-state { padding: 2rem; text-align: center; color: var(--color-muted); }
+.log-time { margin-left: auto; color: var(--studio-text-muted); font-size: 0.8rem; }
+.empty-row { text-align: center; color: var(--studio-text-muted); padding: 1rem; }
+.empty-state { padding: 2rem; text-align: center; color: var(--studio-text-muted); }
 @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
 </style>

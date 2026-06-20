@@ -2,187 +2,218 @@
   <div>
     <h2 class="page-title">授权码管理</h2>
 
-    <div class="table-card" style="margin-bottom: 1.5rem;">
-      <div class="table-header">
-        <h3>生成新授权码</h3>
-      </div>
+    <el-card class="table-card" style="margin-bottom: 1.5rem;">
+      <template #header>
+        <div class="card-header">
+          <h3>生成新授权码</h3>
+        </div>
+      </template>
       <div class="generate-form">
-        <select v-model="selectedPlanId" class="form-input" style="max-width: 200px;">
-          <option v-for="plan in plans" :key="plan.id" :value="plan.id">{{ plan.name }} - ¥{{ plan.price }}</option>
-        </select>
-        <select v-model="selectedPlatformScope" class="form-input" style="max-width: 160px;">
-          <option value="amazon">亚马逊</option>
-          <option value="aliexpress">速卖通</option>
-          <option value="amazon,aliexpress">双平台</option>
-        </select>
-        <select v-model="selectedSceneType" class="form-input" style="max-width: 120px;">
-          <option value="competition">比赛</option>
-          <option value="course">课程</option>
-        </select>
-        <input type="number" v-model.number="generateCount" class="form-input" placeholder="数量" style="width: 100px;" min="1" max="100">
+        <el-select v-model="selectedPlanId" placeholder="选择套餐" style="max-width: 200px;">
+          <el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" />
+        </el-select>
+        <el-select v-model="selectedPlatformScope" placeholder="平台权限" style="max-width: 160px;">
+          <el-option label="亚马逊" value="amazon" />
+          <el-option label="速卖通" value="aliexpress" />
+          <el-option label="双平台" value="amazon,aliexpress" />
+        </el-select>
+        <el-select v-model="selectedSceneType" placeholder="场景类型" style="max-width: 120px;">
+          <el-option label="比赛" value="competition" />
+          <el-option label="课程" value="course" />
+        </el-select>
+        <el-input-number v-model="generateCount" :min="1" :max="100" placeholder="数量" style="width: 120px;" />
         <div class="device-input-group">
           <label>席位数</label>
-          <input type="number" v-model.number="seatLimit" class="form-input" style="width:60px;" min="1" max="10">
+          <el-input-number v-model="seatLimit" :min="1" :max="10" style="width: 100px;" />
         </div>
         <div class="device-input-group">
           <label>设备数</label>
-          <input type="number" v-model.number="maxDevices" class="form-input" style="width:60px;" min="1" max="10">
+          <el-input-number v-model="maxDevices" :min="1" :max="10" style="width: 100px;" />
         </div>
-        <button class="btn btn-primary" @click="handleGenerate" :disabled="isLoading">
+        <el-button type="primary" @click="handleGenerate" :loading="isLoading">
           {{ isLoading ? '生成中...' : '生成授权码' }}
-        </button>
-        <button v-if="generatedCodes.length" class="btn btn-secondary" @click="copyCodes">
+        </el-button>
+        <el-button v-if="generatedCodes.length" @click="copyCodes">
           📋 一键复制
-        </button>
+        </el-button>
         <span v-if="generatedCodes.length" class="generated-count">
           已生成 {{ generatedCodes.length }} 个
         </span>
       </div>
       <div v-if="generatedCodes.length" class="generated-codes">
-        <div v-for="code in generatedCodes" :key="code" class="code-tag">{{ code }}</div>
+        <el-tag v-for="code in generatedCodes" :key="code" type="primary" effect="dark" class="code-tag">
+          {{ code }}
+        </el-tag>
       </div>
-    </div>
+    </el-card>
 
-    <section class="table-card">
-      <div class="table-header">
-        <h3>授权码列表</h3>
-        <div class="filter-bar">
-          <input v-model="searchText" class="form-input" placeholder="搜索授权码/设备..." style="width:180px;">
-          <select v-model="filterStatus" class="form-input">
-            <option value="">全部状态</option>
-            <option value="unused">未使用</option>
-            <option value="active">已激活</option>
-            <option value="frozen">已冻结</option>
-            <option value="expired">已过期</option>
-          </select>
-        </div>
-      </div>
-      <span class="text-muted" style="padding: 0 1rem;">共 {{ filteredCodes.length }} 个</span>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>授权码</th>
-            <th>套餐</th>
-            <th>平台权限</th>
-            <th>状态</th>
-            <th>席位</th>
-            <th>设备数</th>
-            <th>过期时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="code in filteredCodes" :key="code.id">
-            <td style="font-family:monospace;font-size:0.85rem">
-              <a href="#" @click.prevent="openDetail(code)" style="color:var(--color-primary);text-decoration:none;">{{ code.code }}</a>
-            </td>
-            <td>{{ code.plan_name || getPlanName(code.plan_id) }}</td>
-            <td>
-              <span v-for="p in (code.platform_scope || ['amazon'])" :key="p" class="platform-tag" :class="'platform-' + p">
-                {{ p === 'amazon' ? '亚马逊' : '速卖通' }}
-              </span>
-            </td>
-            <td><span :class="['status-dot', getStatusClass(code.status)]"></span>{{ getStatusText(code.status) }}</td>
-            <td>
-              <span class="seat-badge" v-if="code.seat_limit">
-                {{ code.seat_used || 0 }}/{{ code.seat_limit }}
-              </span>
-              <span v-else style="color:var(--color-muted);">-</span>
-            </td>
-            <td>
-              <span class="device-badge" :class="getDeviceClass(code)" @click="editMaxDevices(code)" title="点击修改">
-                {{ code.device_used || getDeviceCount(code) }}/{{ code.max_devices || 1 }}
-              </span>
-            </td>
-            <td style="font-size:0.8rem;">{{ formatDate(code.expires_at) }}</td>
-            <td>
-              <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
-                @click="openDetail(code)">
-                详情
-              </button>
-              <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
-                @click="toggleFreeze(code)" :disabled="code.status === 'expired'">
-                {{ code.status === 'frozen' ? '解冻' : '冻结' }}
-              </button>
-              <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;"
-                @click="openExtend(code)" :disabled="code.status === 'deleted'">
-                延期
-              </button>
-              <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; color: var(--color-destructive);"
-                @click="deleteCode(code.id)" :disabled="code.status === 'deleted'">
-                删除
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!filteredCodes.length">
-            <td colspan="8" style="text-align:center;color:var(--color-muted);padding:2rem;">暂无数据</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <!-- 修改最大设备数弹窗 -->
-    <div class="modal-overlay" :class="{ show: showDeviceModal }" @click.self="showDeviceModal = false">
-      <div class="modal">
-        <h3>修改最大设备数</h3>
-        <p>授权码：{{ editingCode?.code }}</p>
-        <div class="modal-form-row">
-          <label>最大设备数：</label>
-          <input v-model.number="newMaxDevices" type="number" min="1" max="20" class="form-input modal-input">
-        </div>
-        <div class="modal-btns">
-          <button class="btn btn-primary" @click="saveMaxDevices">确认</button>
-          <button class="btn btn-secondary" @click="showDeviceModal = false">取消</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 延期弹窗 -->
-    <div class="modal-overlay" :class="{ show: showExtendModal }" @click.self="showExtendModal = false">
-      <div class="modal">
-        <h3>授权码延期</h3>
-        <p>授权码：{{ extendingCode?.code }}</p>
-        <p class="modal-subtitle">
-          当前过期时间：{{ formatDate(extendingCode?.expires_at) }}
-        </p>
-        <div class="modal-form-row">
-          <label>延期天数：</label>
-          <input v-model.number="extendDays" type="number" min="1" max="365" class="form-input modal-input">
-        </div>
-        <div class="modal-btns">
-          <button class="btn btn-primary" @click="confirmExtend">确认延期</button>
-          <button class="btn btn-secondary" @click="showExtendModal = false">取消</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 授权码详情弹窗 -->
-    <div class="modal-overlay" :class="{ show: showDetailModal }" @click.self="showDetailModal = false">
-      <div class="modal" style="max-width:520px;">
-        <h3>授权码详情</h3>
-        <div v-if="detailData" class="detail-grid">
-          <div class="detail-row"><span class="detail-label">授权码</span><span class="detail-value" style="font-family:monospace;">{{ detailData.code }}</span></div>
-          <div class="detail-row"><span class="detail-label">套餐</span><span class="detail-value">{{ detailData.plan_name || getPlanName(detailData.plan_id) }}</span></div>
-          <div class="detail-row"><span class="detail-label">状态</span><span class="detail-value"><span :class="['status-dot', getStatusClass(detailData.status)]"></span>{{ getStatusText(detailData.status) }}</span></div>
-          <div class="detail-row"><span class="detail-label">平台权限</span><span class="detail-value"><span v-for="p in (detailData.platform_scope || ['amazon'])" :key="p" class="platform-tag" :class="'platform-' + p">{{ p === 'amazon' ? '亚马逊' : '速卖通' }}</span></span></div>
-          <div class="detail-row"><span class="detail-label">场景类型</span><span class="detail-value">{{ detailData.scene_type || '-' }}</span></div>
-          <div class="detail-row"><span class="detail-label">席位</span><span class="detail-value"><strong>{{ detailData.seat_used || 0 }}</strong> / {{ detailData.seat_limit || '-' }}</span></div>
-          <div class="detail-row"><span class="detail-label">设备数</span><span class="detail-value"><strong>{{ detailData.device_used || 0 }}</strong> / {{ detailData.max_devices || '-' }}</span></div>
-          <div class="detail-row"><span class="detail-label">过期时间</span><span class="detail-value">{{ formatDate(detailData.expires_at) }}</span></div>
-          <div class="detail-row"><span class="detail-label">创建时间</span><span class="detail-value">{{ formatDate(detailData.created_at) }}</span></div>
-          <div v-if="detailData.devices && detailData.devices.length" class="detail-section">
-            <div class="detail-label" style="margin-bottom:0.5rem;">绑定设备</div>
-            <div v-for="dev in detailData.devices" :key="dev.id" class="device-item">
-              {{ dev.device_name || dev.device_id }} <span style="color:var(--color-muted);font-size:0.75rem;">{{ formatDate(dev.created_at) }}</span>
-            </div>
+    <el-card class="table-card">
+      <template #header>
+        <div class="card-header">
+          <h3>授权码列表</h3>
+          <div class="filter-bar">
+            <el-input v-model="searchText" placeholder="搜索授权码/设备..." style="width: 200px;" clearable />
+            <el-select v-model="filterStatus" placeholder="全部状态" clearable>
+              <el-option label="未使用" value="unused" />
+              <el-option label="已激活" value="active" />
+              <el-option label="已冻结" value="frozen" />
+              <el-option label="已过期" value="expired" />
+            </el-select>
           </div>
         </div>
-        <div v-else style="text-align:center;padding:2rem;color:var(--color-muted);">加载中...</div>
-        <div class="modal-btns" style="margin-top:1.5rem;">
-          <button class="btn btn-secondary" @click="showDetailModal = false">关闭</button>
+      </template>
+      <div class="table-info">共 {{ filteredCodes.length }} 个</div>
+      <el-table :data="filteredCodes" style="width: 100%" v-loading="isLoading">
+        <el-table-column label="授权码" min-width="180">
+          <template #default="{ row }">
+            <a href="#" @click.prevent="openDetail(row)" class="code-link">{{ row.code }}</a>
+          </template>
+        </el-table-column>
+        <el-table-column label="套餐" min-width="120">
+          <template #default="{ row }">
+            {{ row.plan_name || getPlanName(row.plan_id) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="平台权限" min-width="140">
+          <template #default="{ row }">
+            <el-tag v-for="p in (row.platform_scope || ['amazon'])" :key="p" 
+                    :type="p === 'amazon' ? 'warning' : 'danger'" size="small" class="platform-tag">
+              {{ p === 'amazon' ? '亚马逊' : '速卖通' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusType(row.status)" size="small">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="席位" width="80">
+          <template #default="{ row }">
+            <span v-if="row.seat_limit" class="seat-badge">
+              {{ row.seat_used || 0 }}/{{ row.seat_limit }}
+            </span>
+            <span v-else class="text-muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="设备数" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getDeviceType(row)" size="small" class="device-badge" 
+                    @click="editMaxDevices(row)" style="cursor: pointer;">
+              {{ row.device_used || getDeviceCount(row) }}/{{ row.max_devices || 1 }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="过期时间" width="120">
+          <template #default="{ row }">
+            <span class="text-small">{{ formatDate(row.expires_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="280" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="openDetail(row)">详情</el-button>
+            <el-button size="small" @click="toggleFreeze(row)" :disabled="row.status === 'expired'">
+              {{ row.status === 'frozen' ? '解冻' : '冻结' }}
+            </el-button>
+            <el-button size="small" @click="openExtend(row)" :disabled="row.status === 'deleted'">延期</el-button>
+            <el-button size="small" type="danger" @click="deleteCode(row.id)" :disabled="row.status === 'deleted'">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-state">暂无数据</div>
+        </template>
+      </el-table>
+    </el-card>
+
+    <!-- 修改最大设备数弹窗 -->
+    <el-dialog v-model="showDeviceModal" title="修改最大设备数" width="400px">
+      <p class="dialog-info">授权码：{{ editingCode?.code }}</p>
+      <div class="dialog-form-row">
+        <label>最大设备数：</label>
+        <el-input-number v-model="newMaxDevices" :min="1" :max="20" />
+      </div>
+      <template #footer>
+        <el-button @click="showDeviceModal = false">取消</el-button>
+        <el-button type="primary" @click="saveMaxDevices">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 延期弹窗 -->
+    <el-dialog v-model="showExtendModal" title="授权码延期" width="400px">
+      <p class="dialog-info">授权码：{{ extendingCode?.code }}</p>
+      <p class="dialog-subtitle">当前过期时间：{{ formatDate(extendingCode?.expires_at) }}</p>
+      <div class="dialog-form-row">
+        <label>延期天数：</label>
+        <el-input-number v-model="extendDays" :min="1" :max="365" />
+      </div>
+      <template #footer>
+        <el-button @click="showExtendModal = false">取消</el-button>
+        <el-button type="primary" @click="confirmExtend">确认延期</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 授权码详情弹窗 -->
+    <el-dialog v-model="showDetailModal" title="授权码详情" width="520px">
+      <div v-if="detailData" class="detail-grid">
+        <div class="detail-row">
+          <span class="detail-label">授权码</span>
+          <span class="detail-value" style="font-family: monospace;">{{ detailData.code }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">套餐</span>
+          <span class="detail-value">{{ detailData.plan_name || getPlanName(detailData.plan_id) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">状态</span>
+          <span class="detail-value">
+            <el-tag :type="getStatusType(detailData.status)" size="small">
+              {{ getStatusText(detailData.status) }}
+            </el-tag>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">平台权限</span>
+          <span class="detail-value">
+            <el-tag v-for="p in (detailData.platform_scope || ['amazon'])" :key="p" 
+                    :type="p === 'amazon' ? 'warning' : 'danger'" size="small" class="platform-tag">
+              {{ p === 'amazon' ? '亚马逊' : '速卖通' }}
+            </el-tag>
+          </span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">场景类型</span>
+          <span class="detail-value">{{ detailData.scene_type || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">席位</span>
+          <span class="detail-value"><strong>{{ detailData.seat_used || 0 }}</strong> / {{ detailData.seat_limit || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">设备数</span>
+          <span class="detail-value"><strong>{{ detailData.device_used || 0 }}</strong> / {{ detailData.max_devices || '-' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">过期时间</span>
+          <span class="detail-value">{{ formatDate(detailData.expires_at) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">创建时间</span>
+          <span class="detail-value">{{ formatDate(detailData.created_at) }}</span>
+        </div>
+        <div v-if="detailData.devices && detailData.devices.length" class="detail-section">
+          <div class="detail-label" style="margin-bottom: 0.5rem;">绑定设备</div>
+          <div v-for="dev in detailData.devices" :key="dev.id" class="device-item">
+            {{ dev.device_name || dev.device_id }} 
+            <span class="text-muted text-small">{{ formatDate(dev.created_at) }}</span>
+          </div>
         </div>
       </div>
-    </div>
+      <div v-else class="empty-state">加载中...</div>
+      <template #footer>
+        <el-button @click="showDetailModal = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -241,9 +272,9 @@ function getPlanName(planId) {
   return planNameMap[planId] || '未关联套餐'
 }
 
-function getStatusClass(status) {
-  const map = { unused: 'warning', active: 'success', frozen: 'error', expired: 'error' }
-  return map[status] || 'warning'
+function getStatusType(status) {
+  const map = { unused: 'warning', active: 'success', frozen: 'info', expired: 'danger' }
+  return map[status] || 'info'
 }
 
 function getStatusText(status) {
@@ -260,12 +291,12 @@ function getDeviceCount(code) {
   return code.devices?.length || (code.device_name ? 1 : 0)
 }
 
-function getDeviceClass(code) {
+function getDeviceType(code) {
   const count = getDeviceCount(code)
   const max = code.max_devices || 1
-  if (count >= max) return 'device-full'
-  if (count > 0) return 'device-partial'
-  return 'device-empty'
+  if (count >= max) return 'danger'
+  if (count > 0) return 'success'
+  return 'info'
 }
 
 function editMaxDevices(code) {
@@ -275,7 +306,10 @@ function editMaxDevices(code) {
 }
 
 async function saveMaxDevices() {
-  if (newMaxDevices.value < 1) { showToast('设备数不能小于1', 'error'); return }
+  if (newMaxDevices.value < 1) {
+    showToast('设备数不能小于1', 'error')
+    return
+  }
   try {
     await updateAuthCode(editingCode.value.id, { max_devices: newMaxDevices.value })
     showToast('设备数已更新', 'success')
@@ -406,12 +440,40 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.page-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--studio-text-main);
+  margin-bottom: 1.5rem;
+}
+
+.table-card {
+  background: var(--studio-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--studio-shadow);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--studio-text-main);
+  margin: 0;
+}
+
 .generate-form {
   display: flex;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
-  padding: 1rem;
+  padding: 1rem 0;
 }
 
 .device-input-group {
@@ -422,44 +484,164 @@ onMounted(loadData)
 
 .device-input-group label {
   font-size: 0.85rem;
-  color: var(--color-muted);
+  color: var(--studio-text-muted);
   white-space: nowrap;
 }
 
 .generated-count {
   font-size: 0.85rem;
-  color: var(--color-accent);
+  color: var(--studio-accent);
+  font-weight: 600;
 }
 
-.filter-bar { padding: 0.75rem 1rem; border-bottom: 1px solid var(--color-border); }
-.generated-codes { margin-top: 1rem; padding: 1rem; background: #f0f9ff; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.code-tag { padding: 0.4rem 0.8rem; background: var(--color-accent); color: white; border-radius: 6px; font-family: monospace; font-size: 0.85rem; }
-.device-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
-.device-empty { background: rgba(100,116,139,0.1); color: var(--color-muted); }
-.device-partial { background: rgba(16,185,129,0.1); color: #10B981; }
-.device-full { background: rgba(239,68,68,0.1); color: #EF4444; }
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5); backdrop-filter: blur(5px); z-index: 1000; align-items: center; justify-content: center; }
-.modal-overlay.show { display: flex; }
-.modal { background: white; border-radius: 20px; padding: 2rem; max-width: 400px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.15); }
-.modal h3 { font-family: var(--font-heading); font-size: 1.1rem; margin-bottom: 0.5rem; color: var(--color-primary); }
-.modal p { color: var(--color-muted); font-size: 0.85rem; font-family: monospace; }
-.modal-btns { display: flex; gap: 0.75rem; margin-top: 1rem; }
-.modal-btns button { flex: 1; padding: 0.75rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+.filter-bar {
+  display: flex;
+  gap: 0.75rem;
+}
 
-/* 平台标签 */
-.platform-tag { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; margin-right: 0.25rem; }
-.platform-amazon { background: rgba(255,153,0,0.1); color: #FF9900; }
-.platform-aliexpress { background: rgba(255,70,0,0.1); color: #FF4600; }
+.table-info {
+  padding: 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+}
 
-/* 席位徽章 */
-.seat-badge { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: rgba(16,185,129,0.1); color: #10B981; }
+.code-link {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--studio-text-main);
+  text-decoration: none;
+  font-weight: 500;
+}
 
-/* 详情弹窗 */
-.detail-grid { display: flex; flex-direction: column; gap: 0.75rem; }
-.detail-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border); }
-.detail-row:last-child { border-bottom: none; }
-.detail-label { width: 100px; font-size: 0.85rem; color: var(--color-muted); flex-shrink: 0; }
-.detail-value { flex: 1; font-size: 0.9rem; color: var(--color-text); }
-.detail-section { margin-top: 1rem; }
-.device-item { padding: 0.5rem; background: var(--color-bg); border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.85rem; }
+.code-link:hover {
+  color: var(--studio-accent);
+}
+
+.platform-tag {
+  margin-right: 0.25rem;
+}
+
+.seat-badge {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+.device-badge {
+  cursor: pointer;
+}
+
+.text-muted {
+  color: var(--studio-text-muted);
+}
+
+.text-small {
+  font-size: 0.8rem;
+}
+
+.generated-codes {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--studio-bg);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.code-tag {
+  font-family: monospace;
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--studio-text-muted);
+}
+
+.dialog-info {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-bottom: 1rem;
+}
+
+.dialog-subtitle {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-bottom: 1rem;
+}
+
+.dialog-form-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.dialog-form-row label {
+  font-size: 0.9rem;
+  color: var(--studio-text-main);
+  white-space: nowrap;
+}
+
+.detail-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  width: 100px;
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  flex-shrink: 0;
+}
+
+.detail-value {
+  flex: 1;
+  font-size: 0.9rem;
+  color: var(--studio-text-main);
+}
+
+.detail-section {
+  margin-top: 1rem;
+}
+
+.device-item {
+  padding: 0.5rem;
+  background: var(--studio-bg);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+}
+
+:deep(.el-table) {
+  --el-table-border-color: var(--color-border);
+  --el-table-header-bg-color: var(--studio-bg);
+  --el-table-row-hover-bg-color: var(--studio-bg);
+}
+
+:deep(.el-card__header) {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+:deep(.el-card__body) {
+  padding: 1.25rem;
+}
 </style>

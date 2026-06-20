@@ -7,68 +7,63 @@
     <section class="table-card">
       <div class="table-header">
         <h3>运行日志</h3>
-        <button class="btn btn-secondary" @click="exportLogsData" :disabled="!logs.length">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <el-button data-testid="export-logs-btn" @click="exportLogsData" :disabled="!logs.length">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
           </svg>
           导出 CSV
-        </button>
+        </el-button>
       </div>
       
       <div class="filters">
         <div class="filter-group">
           <label>开始日期</label>
-          <input type="date" v-model="filters.startDate" @change="loadLogs">
+          <el-date-picker v-model="filters.startDate" type="date" placeholder="选择日期" size="small" @change="loadLogs" data-testid="filter-start-date" />
         </div>
         <div class="filter-group">
           <label>结束日期</label>
-          <input type="date" v-model="filters.endDate" @change="loadLogs">
+          <el-date-picker v-model="filters.endDate" type="date" placeholder="选择日期" size="small" @change="loadLogs" />
         </div>
         <div class="filter-group">
           <label>工具名称</label>
-          <select v-model="filters.toolName" @change="loadLogs">
-            <option value="">全部工具</option>
-            <option v-for="tool in toolOptions" :key="tool" :value="tool">{{ tool }}</option>
-          </select>
+          <el-select v-model="filters.toolName" placeholder="全部工具" size="small" clearable @change="loadLogs">
+            <el-option v-for="tool in toolOptions" :key="tool" :label="tool" :value="tool" />
+          </el-select>
         </div>
         <div class="filter-group">
           <label>状态</label>
-          <select v-model="filters.status" @change="loadLogs">
-            <option value="">全部状态</option>
-            <option value="success">成功</option>
-            <option value="failed">失败</option>
-          </select>
+          <el-select v-model="filters.status" placeholder="全部状态" size="small" clearable @change="loadLogs">
+            <el-option label="成功" value="success" />
+            <el-option label="失败" value="failed" />
+          </el-select>
         </div>
-        <button class="btn btn-secondary" @click="resetFilters">重置</button>
+        <el-button size="small" @click="resetFilters">重置</el-button>
       </div>
 
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th scope="col">时间</th>
-            <th scope="col">工具</th>
-            <th scope="col">模块</th>
-            <th scope="col">状态</th>
-            <th scope="col">详情</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="log in logs" :key="log.id">
-            <td>{{ formatTime(log.created_at) }}</td>
-            <td>{{ log.tool_name || '-' }}</td>
-            <td>{{ log.module || '-' }}</td>
-            <td>
-              <span :class="['status-badge', log.status === 'success' ? 'success' : 'error']">
-                {{ log.status === 'success' ? '成功' : '失败' }}
-              </span>
-            </td>
-            <td>{{ log.detail || log.error_code || '-' }}</td>
-          </tr>
-          <tr v-if="!logs.length">
-            <td colspan="5" class="empty-row">暂无运行日志</td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table :data="logs" style="width: 100%" class="studio-table" size="small">
+        <el-table-column label="时间" min-width="120">
+          <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column label="工具" min-width="100">
+          <template #default="{ row }">{{ row.tool_name || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="模块" min-width="100">
+          <template #default="{ row }">{{ row.module || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'success' ? 'success' : 'danger'" size="small">
+              {{ row.status === 'success' ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="详情" min-width="160">
+          <template #default="{ row }">{{ row.detail || row.error_code || '-' }}</template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-row">暂无运行日志</div>
+        </template>
+      </el-table>
     </section>
 
     <section class="table-card" style="margin-top: 1.5rem;">
@@ -77,12 +72,12 @@
       </div>
       <div class="feedback-form">
         <div class="form-row">
-          <input v-model="feedbackTitle" class="form-input" placeholder="问题标题 *">
-          <button class="btn btn-primary" @click="submitFeedback" :disabled="!feedbackTitle.trim() || submitting">
+          <el-input v-model="feedbackTitle" placeholder="问题标题 *" style="flex: 1; min-width: 200px;" />
+          <el-button type="primary" @click="submitFeedback" :disabled="!feedbackTitle.trim() || submitting" :loading="submitting">
             {{ submitting ? '提交中...' : '提交反馈' }}
-          </button>
+          </el-button>
         </div>
-        <textarea v-model="feedbackContent" class="form-textarea" placeholder="问题描述（选填）" rows="3"></textarea>
+        <el-input v-model="feedbackContent" type="textarea" placeholder="问题描述（选填）" :rows="3" style="margin-bottom: 1rem;" />
         
         <div class="screenshot-section">
           <label class="screenshot-label">
@@ -123,7 +118,9 @@
         <div v-for="fb in myFeedbacks" :key="fb.id" class="feedback-item">
           <div class="feedback-header">
             <strong>{{ fb.title }}</strong>
-            <span :class="['status-badge', fb.status]">{{ getStatusText(fb.status) }}</span>
+            <el-tag :type="fb.status === 'resolved' ? 'success' : fb.status === 'processing' ? '' : 'warning'" size="small">
+              {{ getStatusText(fb.status) }}
+            </el-tag>
           </div>
           <div class="feedback-content">{{ fb.content || '无描述' }}</div>
           <div v-if="fb.screenshots" class="feedback-screenshots">
@@ -326,55 +323,261 @@ onMounted(() => {
 
 <style scoped>
 .page-header { margin-bottom: 1.5rem; }
-.page-title { font-family: var(--font-heading); font-size: 1.5rem; color: var(--color-primary); margin: 0; }
+.page-title { font-family: var(--font-heading); font-size: 1.5rem; color: var(--studio-text-main); margin: 0; }
 
-.filters { display: flex; gap: 1rem; padding: 1rem 1.5rem; background: #f8fafc; border-radius: 12px; margin-bottom: 1rem; flex-wrap: wrap; align-items: flex-end; }
-.filter-group { display: flex; flex-direction: column; gap: 0.25rem; }
-.filter-group label { font-size: 0.75rem; color: var(--color-muted); font-weight: 500; }
-.filter-group input, .filter-group select { padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.85rem; background: white; min-width: 120px; }
+.table-card {
+  background: var(--studio-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
 
-.status-badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-.status-badge.success { background: rgba(16, 185, 129, 0.1); color: #10B981; }
-.status-badge.error { background: rgba(239, 68, 68, 0.1); color: #EF4444; }
-.status-badge.pending { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
-.status-badge.processing { background: rgba(99, 102, 241, 0.1); color: #6366F1; }
-.status-badge.resolved { background: rgba(16, 185, 129, 0.1); color: #10B981; }
-.empty-row { text-align: center; color: var(--color-muted); padding: 2rem; }
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
 
-.feedback-form { padding: 1.5rem; border-bottom: 1px solid var(--color-border); }
-.form-row { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
-.form-input { flex: 1; min-width: 200px; padding: 0.6rem 1rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.9rem; }
-.form-textarea { width: 100%; padding: 0.6rem 1rem; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.9rem; resize: vertical; margin-bottom: 1rem; }
+.table-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--studio-text-main);
+}
 
-.screenshot-section { margin-top: 1rem; }
-.screenshot-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--color-muted); margin-bottom: 0.5rem; }
-.upload-area { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 2rem; border: 2px dashed var(--color-border); border-radius: 12px; cursor: pointer; transition: all 0.2s; color: var(--color-muted); }
-.upload-area:hover { border-color: var(--color-accent); background: rgba(99, 102, 241, 0.02); }
-.preview-list { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.preview-item { position: relative; width: 80px; height: 80px; border-radius: 8px; overflow: hidden; border: 1px solid var(--color-border); }
-.preview-item img { width: 100%; height: 100%; object-fit: cover; }
-.preview-item.add-more { display: flex; align-items: center; justify-content: center; cursor: pointer; background: #f8fafc; color: var(--color-muted); }
-.preview-item.add-more:hover { background: rgba(99, 102, 241, 0.05); color: var(--color-accent); }
-.remove-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); border: none; border-radius: 50%; color: white; cursor: pointer; }
+.filters {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--studio-bg);
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
 
-.feedback-list { padding: 1.5rem; }
-.feedback-list h4 { margin-bottom: 1rem; color: var(--color-primary); }
-.feedback-item { padding: 1rem; background: #f8fafc; border-radius: 12px; margin-bottom: 0.75rem; }
-.feedback-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-.feedback-content { font-size: 0.85rem; color: var(--color-muted); margin-bottom: 0.75rem; }
-.feedback-screenshots { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
-.feedback-screenshots img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 1px solid var(--color-border); }
-.feedback-screenshots img:hover { opacity: 0.8; }
-.admin-reply { padding: 0.75rem; background: rgba(99, 102, 241, 0.05); border-radius: 8px; font-size: 0.85rem; }
-.admin-reply strong { color: var(--color-accent); }
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
 
-.image-preview-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 2rem; }
-.image-preview-overlay img { max-width: 90%; max-height: 90%; border-radius: 8px; }
-.close-preview { position: absolute; top: 1rem; right: 1rem; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.1); border: none; border-radius: 50%; color: white; cursor: pointer; }
-.close-preview:hover { background: rgba(255, 255, 255, 0.2); }
+.filter-group label {
+  font-size: 0.75rem;
+  color: var(--studio-text-muted);
+  font-weight: 500;
+}
+
+:deep(.studio-table) {
+  --el-table-border-color: #E2E8F0;
+  --el-table-header-bg-color: #F8FAFC;
+  --el-table-row-hover-bg-color: #F1F5F9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.empty-row {
+  text-align: center;
+  color: var(--studio-text-muted);
+  padding: 2rem;
+}
+
+.feedback-form {
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.screenshot-section {
+  margin-top: 1rem;
+}
+
+.screenshot-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.upload-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  border: 2px dashed var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--studio-text-muted);
+}
+
+.upload-area:hover {
+  border-color: var(--studio-accent);
+  background: rgba(79, 70, 229, 0.02);
+}
+
+.preview-list {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.preview-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-item.add-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--studio-bg);
+  color: var(--studio-text-muted);
+}
+
+.preview-item.add-more:hover {
+  background: rgba(79, 70, 229, 0.05);
+  color: var(--studio-accent);
+}
+
+.remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+}
+
+.feedback-list {
+  padding: 1.5rem 0;
+}
+
+.feedback-list h4 {
+  margin-bottom: 1rem;
+  color: var(--studio-text-main);
+}
+
+.feedback-item {
+  padding: 1rem;
+  background: var(--studio-bg);
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+}
+
+.feedback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.feedback-content {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.feedback-screenshots {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.feedback-screenshots img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+}
+
+.feedback-screenshots img:hover {
+  opacity: 0.8;
+}
+
+.admin-reply {
+  padding: 0.75rem;
+  background: rgba(79, 70, 229, 0.05);
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.admin-reply strong {
+  color: var(--studio-accent);
+}
+
+.image-preview-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+.image-preview-overlay img {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 8px;
+}
+
+.close-preview {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+}
+
+.close-preview:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
 
 @media (max-width: 640px) {
-  .filters { flex-direction: column; align-items: stretch; }
-  .filter-group input, .filter-group select { width: 100%; }
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

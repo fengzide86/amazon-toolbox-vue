@@ -2,198 +2,267 @@
   <div>
     <h2 class="page-title">系统设置</h2>
 
-    <section class="table-card" style="margin-bottom: 1.5rem;">
-      <div class="table-header">
-        <h3>基本设置</h3>
-      </div>
-      <div style="padding: 1rem 0;">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
-          <div>
-            <div style="font-weight: 600; color: var(--color-primary);">管理员密码</div>
-            <div style="font-size: 0.85rem; color: var(--color-muted); margin-top: 0.25rem;">用于管理后台登录</div>
-          </div>
-          <div style="display:flex;gap:0.5rem;">
-            <input type="password" v-model="adminPassword" class="form-input" placeholder="新密码" style="width: 200px;">
-            <button class="btn btn-primary" style="padding: 0.5rem 1rem;" @click="savePassword">更新密码</button>
-          </div>
+    <el-card class="settings-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>基本设置</span>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
-          <div>
-            <div style="font-weight: 600; color: var(--color-primary);">客服微信</div>
-            <div style="font-size: 0.85rem; color: var(--color-muted); margin-top: 0.25rem;">显示在登录页和帮助页面</div>
-          </div>
-          <div style="display:flex;gap:0.5rem;">
-            <input type="text" v-model="wechatId" class="form-input" placeholder="客服微信号" style="width: 250px;">
-            <button class="btn btn-primary" style="padding: 0.5rem 1rem;" @click="saveWechat">保存</button>
-          </div>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--color-border);">
-          <div>
-            <div style="font-weight: 600; color: var(--color-primary);">分润比例</div>
-            <div style="font-size: 0.85rem; color: var(--color-muted); margin-top: 0.25rem;">{{ profitRatiosText }}</div>
-          </div>
-          <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" @click="openProfitEdit">编辑</button>
-        </div>
-      </div>
-    </section>
+      </template>
 
-    <section class="table-card" style="margin-bottom: 1.5rem;">
-      <div class="table-header">
-        <h3>套餐管理</h3>
-        <button class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem;" @click="showAddPlan = true">+ 新增套餐</button>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th scope="col">套餐名称</th>
-            <th scope="col">价格</th>
-            <th scope="col">有效期</th>
-            <th scope="col">功能</th>
-            <th scope="col">状态</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="plan in plans" :key="plan.id">
-            <td>
-              <input v-if="editingPlan?.id === plan.id" v-model="editingPlan.name" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;">
-              <span v-else>{{ plan.name }}</span>
-            </td>
-            <td>
-              <input v-if="editingPlan?.id === plan.id" v-model.number="editingPlan.price" type="number" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:80px;">
-              <span v-else>¥{{ plan.price }}</span>
-            </td>
-            <td>
-              <input v-if="editingPlan?.id === plan.id" v-model.number="editingPlan.duration_days" type="number" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:70px;">
-              <span v-else>{{ plan.duration_days }} 天</span>
-            </td>
-            <td>
-              <input v-if="editingPlan?.id === plan.id" v-model="editingPlan.features" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:150px;">
-              <span v-else style="font-size:0.85rem;">{{ plan.features }}</span>
-            </td>
-            <td><span :class="['status-dot', plan.status === 'active' ? 'success' : 'error']"></span>{{ plan.status === 'active' ? '启用' : '禁用' }}</td>
-            <td>
-              <template v-if="editingPlan?.id === plan.id">
-                <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;" @click="savePlan(plan)">保存</button>
-                <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" @click="editingPlan = null">取消</button>
-              </template>
-              <template v-else>
-                <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;" @click="startEdit(plan)">编辑</button>
-                <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; color: var(--color-destructive);" @click="togglePlanStatus(plan)">
-                  {{ plan.status === 'active' ? '禁用' : '启用' }}
-                </button>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+      <el-form label-position="top">
+        <el-form-item>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-title">管理员密码</div>
+              <div class="setting-desc">用于管理后台登录</div>
+            </div>
+            <div class="setting-control">
+              <el-input 
+                v-model="adminPassword" 
+                type="password" 
+                placeholder="新密码" 
+                style="width: 200px;"
+                show-password
+              />
+              <el-button type="primary" @click="savePassword">更新密码</el-button>
+            </div>
+          </div>
+        </el-form-item>
 
-    <section class="table-card" style="margin-bottom: 1.5rem;">
-      <div class="table-header">
-        <h3>工具配置</h3>
-        <button class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem;" @click="addTool">+ 添加工具</button>
-      </div>
-      <table class="data-table" v-if="tools.length">
-        <thead>
-          <tr>
-            <th scope="col">工具名称</th>
-            <th scope="col">模块</th>
-            <th scope="col">开放套餐</th>
-            <th scope="col">状态</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(tool, index) in tools" :key="index">
-            <td>
-              <input v-if="editingToolIndex === index" v-model="tool.name" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;">
-              <span v-else>{{ tool.name }}</span>
-            </td>
-            <td>
-              <input v-if="editingToolIndex === index" v-model="tool.module" class="btn btn-secondary" style="padding:0.3rem 0.6rem;font-size:0.85rem;width:100px;">
-              <span v-else style="font-size:0.85rem;">{{ tool.module }}</span>
-            </td>
-            <td style="font-size:0.8rem;">{{ tool.available_plans?.join(', ') || '全部' }}</td>
-            <td><span :class="['status-dot', tool.status === 'online' ? 'success' : 'error']"></span>{{ tool.status === 'online' ? '在线' : '维护' }}</td>
-            <td>
-              <template v-if="editingToolIndex === index">
-                <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;" @click="saveTool(index)">保存</button>
-                <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem;" @click="editingToolIndex = -1">取消</button>
-              </template>
-              <template v-else>
-                <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; margin-right: 0.3rem;" @click="editingToolIndex = index">编辑</button>
-                <button class="btn btn-secondary" style="padding: 0.3rem 0.6rem; font-size: 0.75rem; color: var(--color-destructive);" @click="removeTool(index)">删除</button>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else style="padding:2rem;text-align:center;color:var(--color-muted);">暂无工具配置</div>
-    </section>
+        <el-form-item>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-title">客服微信</div>
+              <div class="setting-desc">显示在登录页和帮助页面</div>
+            </div>
+            <div class="setting-control">
+              <el-input 
+                v-model="wechatId" 
+                placeholder="客服微信号" 
+                style="width: 250px;"
+              />
+              <el-button type="primary" @click="saveWechat">保存</el-button>
+            </div>
+          </div>
+        </el-form-item>
+
+        <el-form-item>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-title">分润比例</div>
+              <div class="setting-desc">{{ profitRatiosText }}</div>
+            </div>
+            <div class="setting-control">
+              <el-button @click="openProfitEdit">编辑</el-button>
+            </div>
+          </div>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card class="settings-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>套餐管理</span>
+          <el-button type="primary" size="small" @click="showAddPlan = true">+ 新增套餐</el-button>
+        </div>
+      </template>
+
+      <el-table :data="plans" style="width: 100%">
+        <el-table-column label="套餐名称" min-width="140">
+          <template #default="{ row }">
+            <el-input 
+              v-if="editingPlan?.id === row.id" 
+              v-model="editingPlan.name" 
+              size="small"
+            />
+            <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="价格" width="120">
+          <template #default="{ row }">
+            <el-input-number 
+              v-if="editingPlan?.id === row.id" 
+              v-model="editingPlan.price" 
+              size="small"
+              :min="0"
+              style="width: 100px;"
+            />
+            <span v-else>¥{{ row.price }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="有效期" width="120">
+          <template #default="{ row }">
+            <el-input-number 
+              v-if="editingPlan?.id === row.id" 
+              v-model="editingPlan.duration_days" 
+              size="small"
+              :min="1"
+              style="width: 100px;"
+            />
+            <span v-else>{{ row.duration_days }} 天</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="功能" min-width="180">
+          <template #default="{ row }">
+            <el-input 
+              v-if="editingPlan?.id === row.id" 
+              v-model="editingPlan.features" 
+              size="small"
+            />
+            <span v-else style="font-size: 0.85rem;">{{ row.features }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'active' ? 'success' : 'danger'" size="small">
+              {{ row.status === 'active' ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <template v-if="editingPlan?.id === row.id">
+              <el-button type="primary" size="small" @click="savePlan(row)">保存</el-button>
+              <el-button size="small" @click="editingPlan = null">取消</el-button>
+            </template>
+            <template v-else>
+              <el-button size="small" @click="startEdit(row)">编辑</el-button>
+              <el-button 
+                size="small" 
+                :type="row.status === 'active' ? 'danger' : 'success'"
+                @click="togglePlanStatus(row)"
+              >
+                {{ row.status === 'active' ? '禁用' : '启用' }}
+              </el-button>
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card class="settings-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>工具配置</span>
+          <el-button type="primary" size="small" @click="addTool">+ 添加工具</el-button>
+        </div>
+      </template>
+
+      <el-table v-if="tools.length" :data="tools" style="width: 100%">
+        <el-table-column label="工具名称" min-width="140">
+          <template #default="{ row, $index }">
+            <el-input 
+              v-if="editingToolIndex === $index" 
+              v-model="row.name" 
+              size="small"
+            />
+            <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="模块" width="140">
+          <template #default="{ row, $index }">
+            <el-input 
+              v-if="editingToolIndex === $index" 
+              v-model="row.module" 
+              size="small"
+              style="width: 120px;"
+            />
+            <span v-else style="font-size: 0.85rem;">{{ row.module }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="开放套餐" min-width="160">
+          <template #default="{ row }">
+            <span style="font-size: 0.8rem;">{{ row.available_plans?.join(', ') || '全部' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'online' ? 'success' : 'danger'" size="small">
+              {{ row.status === 'online' ? '在线' : '维护' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row, $index }">
+            <template v-if="editingToolIndex === $index">
+              <el-button type="primary" size="small" @click="saveTool($index)">保存</el-button>
+              <el-button size="small" @click="editingToolIndex = -1">取消</el-button>
+            </template>
+            <template v-else>
+              <el-button size="small" @click="editingToolIndex = $index">编辑</el-button>
+              <el-button size="small" type="danger" @click="removeTool($index)">删除</el-button>
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty v-else description="暂无工具配置" />
+    </el-card>
 
     <!-- 新增套餐弹窗 -->
-    <div class="modal-overlay" :class="{ show: showAddPlan }" @click.self="showAddPlan = false">
-      <div class="modal">
-        <h3>新增套餐</h3>
-        <div style="display:flex;flex-direction:column;gap:0.75rem;">
-          <input v-model="newPlan.name" placeholder="套餐名称" class="btn btn-secondary" style="padding:0.6rem 1rem;text-align:left;">
-          <input v-model.number="newPlan.price" type="number" placeholder="价格" class="btn btn-secondary" style="padding:0.6rem 1rem;text-align:left;">
-          <input v-model.number="newPlan.duration_days" type="number" placeholder="有效期天数" class="btn btn-secondary" style="padding:0.6rem 1rem;text-align:left;">
-          <input v-model="newPlan.features" placeholder="功能描述" class="btn btn-secondary" style="padding:0.6rem 1rem;text-align:left;">
-        </div>
-        <div class="modal-btns" style="margin-top:1rem;">
-          <button class="btn btn-primary" @click="addPlan">确认添加</button>
-          <button class="btn btn-secondary" @click="showAddPlan = false">取消</button>
-        </div>
-      </div>
-    </div>
+    <el-dialog v-model="showAddPlan" title="新增套餐" width="500px">
+      <el-form label-width="80px">
+        <el-form-item label="套餐名称">
+          <el-input v-model="newPlan.name" placeholder="请输入套餐名称" />
+        </el-form-item>
+        <el-form-item label="价格">
+          <el-input-number v-model="newPlan.price" :min="0" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="有效期">
+          <el-input-number v-model="newPlan.duration_days" :min="1" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="功能描述">
+          <el-input v-model="newPlan.features" type="textarea" :rows="3" placeholder="请输入功能描述" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddPlan = false">取消</el-button>
+        <el-button type="primary" @click="addPlan">确认添加</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 分润比例编辑弹窗 -->
-    <div class="modal-overlay" :class="{ show: showProfitModal }" @click.self="showProfitModal = false">
-      <div class="modal">
-        <h3>编辑分润比例</h3>
-        <p style="font-size: 0.85rem; color: var(--color-muted); margin-bottom: 1rem;">
-          当前总和: {{ profitTotal }}% {{ profitTotal !== 100 ? '(应为100%)' : '✓' }}
-        </p>
-        <div style="display:flex;flex-direction:column;gap:0.75rem;">
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="min-width:60px;font-size:0.85rem;">技术:</label>
-            <input v-model.number="profitRatios.tech" type="number" min="0" max="100" class="btn btn-secondary" style="flex:1;padding:0.5rem;text-align:left;">
-            <span style="font-size:0.85rem;">%</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="min-width:60px;font-size:0.85rem;">市场:</label>
-            <input v-model.number="profitRatios.market" type="number" min="0" max="100" class="btn btn-secondary" style="flex:1;padding:0.5rem;text-align:left;">
-            <span style="font-size:0.85rem;">%</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="min-width:60px;font-size:0.85rem;">产品:</label>
-            <input v-model.number="profitRatios.product" type="number" min="0" max="100" class="btn btn-secondary" style="flex:1;padding:0.5rem;text-align:left;">
-            <span style="font-size:0.85rem;">%</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="min-width:60px;font-size:0.85rem;">客服:</label>
-            <input v-model.number="profitRatios.service" type="number" min="0" max="100" class="btn btn-secondary" style="flex:1;padding:0.5rem;text-align:left;">
-            <span style="font-size:0.85rem;">%</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="min-width:60px;font-size:0.85rem;">统筹:</label>
-            <input v-model.number="profitRatios.coordination" type="number" min="0" max="100" class="btn btn-secondary" style="flex:1;padding:0.5rem;text-align:left;">
-            <span style="font-size:0.85rem;">%</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <label style="min-width:60px;font-size:0.85rem;">记录:</label>
-            <input v-model.number="profitRatios.record" type="number" min="0" max="100" class="btn btn-secondary" style="flex:1;padding:0.5rem;text-align:left;">
-            <span style="font-size:0.85rem;">%</span>
-          </div>
-        </div>
-        <div class="modal-btns" style="margin-top:1rem;">
-          <button class="btn btn-primary" @click="saveProfitRatios" :disabled="profitTotal !== 100">保存</button>
-          <button class="btn btn-secondary" @click="showProfitModal = false">取消</button>
-        </div>
+    <el-dialog v-model="showProfitModal" title="编辑分润比例" width="500px">
+      <div class="profit-info">
+        当前总和: {{ profitTotal }}% {{ profitTotal !== 100 ? '(应为100%)' : '✓' }}
       </div>
-    </div>
+      
+      <el-form label-width="60px">
+        <el-form-item label="技术">
+          <el-input-number v-model="profitRatios.tech" :min="0" :max="100" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="市场">
+          <el-input-number v-model="profitRatios.market" :min="0" :max="100" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="产品">
+          <el-input-number v-model="profitRatios.product" :min="0" :max="100" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="客服">
+          <el-input-number v-model="profitRatios.service" :min="0" :max="100" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="统筹">
+          <el-input-number v-model="profitRatios.coordination" :min="0" :max="100" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="记录">
+          <el-input-number v-model="profitRatios.record" :min="0" :max="100" style="width: 100%;" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="showProfitModal = false">取消</el-button>
+        <el-button type="primary" @click="saveProfitRatios" :disabled="profitTotal !== 100">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -262,19 +331,34 @@ async function loadData() {
 }
 
 async function savePassword() {
-  if (!adminPassword.value.trim()) { showToast('请输入密码', 'error'); return }
+  if (!adminPassword.value.trim()) {
+    showToast('请输入密码', 'error')
+    return
+  }
   try {
-    await updateSetting({ key: 'admin_password', value: adminPassword.value.trim(), description: '管理员密码' })
+    await updateSetting({ 
+      key: 'admin_password', 
+      value: adminPassword.value.trim(), 
+      description: '管理员密码' 
+    })
     showToast('密码已更新', 'success')
     adminPassword.value = ''
-  } catch (err) { showToast('更新失败', 'error') }
+  } catch (err) {
+    showToast('更新失败', 'error')
+  }
 }
 
 async function saveWechat() {
   try {
-    await updateSetting({ key: 'wechat_id', value: wechatId.value, description: '客服微信号' })
+    await updateSetting({ 
+      key: 'wechat_id', 
+      value: wechatId.value, 
+      description: '客服微信号' 
+    })
     showToast('已保存', 'success')
-  } catch (err) { showToast('保存失败', 'error') }
+  } catch (err) {
+    showToast('保存失败', 'error')
+  }
 }
 
 function startEdit(plan) {
@@ -289,7 +373,9 @@ async function savePlan(plan) {
     showToast('套餐已更新', 'success')
     editingPlan.value = null
     await loadData()
-  } catch (err) { showToast('更新失败', 'error') }
+  } catch (err) {
+    showToast('更新失败', 'error')
+  }
 }
 
 async function togglePlanStatus(plan) {
@@ -299,11 +385,16 @@ async function togglePlanStatus(plan) {
     await api.put(`/api/plans/${plan.id}`, { status: newStatus })
     showToast(newStatus === 'active' ? '已启用' : '已禁用', 'success')
     await loadData()
-  } catch (err) { showToast('操作失败', 'error') }
+  } catch (err) {
+    showToast('操作失败', 'error')
+  }
 }
 
 async function addPlan() {
-  if (!newPlan.value.name) { showToast('请输入套餐名称', 'error'); return }
+  if (!newPlan.value.name) {
+    showToast('请输入套餐名称', 'error')
+    return
+  }
   try {
     const { api } = await import('@/utils/api')
     await api.post('/api/plans', newPlan.value)
@@ -311,17 +402,27 @@ async function addPlan() {
     showAddPlan.value = false
     newPlan.value = { name: '', price: 0, duration_days: 7, features: '' }
     await loadData()
-  } catch (err) { showToast('添加失败', 'error') }
+  } catch (err) {
+    showToast('添加失败', 'error')
+  }
 }
 
 function addTool() {
-  tools.value.push({ name: '新工具', module: '未分类', available_plans: [], status: 'online' })
+  tools.value.push({ 
+    name: '新工具', 
+    module: '未分类', 
+    available_plans: [], 
+    status: 'online' 
+  })
   editingToolIndex.value = tools.value.length - 1
 }
 
 function saveTool(index) {
   updateTools(tools.value)
-    .then(() => { showToast('工具配置已保存', 'success'); editingToolIndex.value = -1 })
+    .then(() => {
+      showToast('工具配置已保存', 'success')
+      editingToolIndex.value = -1
+    })
     .catch(() => showToast('保存失败', 'error'))
 }
 
@@ -359,16 +460,107 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.modal-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.5);
-  backdrop-filter: blur(5px); z-index: 1000; align-items: center; justify-content: center;
+.page-title {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--studio-text-main);
+  margin-bottom: 1.5rem;
 }
-.modal-overlay.show { display: flex; }
-.modal {
-  background: white; border-radius: 20px; padding: 2rem; max-width: 400px; width: 90%;
-  box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+
+.settings-card {
+  margin-bottom: 1.5rem;
+  background: var(--studio-surface);
+  border-radius: var(--radius-lg);
 }
-.modal h3 { font-family: var(--font-heading); font-size: 1.1rem; margin-bottom: 1rem; color: var(--color-primary); }
-.modal-btns { display: flex; gap: 0.75rem; }
-.modal-btns button { flex: 1; padding: 0.75rem; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+
+.settings-card :deep(.el-card__header) {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header span {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--studio-text-main);
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-info {
+  flex: 1;
+}
+
+.setting-title {
+  font-weight: 600;
+  color: var(--studio-text-main);
+  margin-bottom: 0.25rem;
+}
+
+.setting-desc {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-top: 0.25rem;
+}
+
+.setting-control {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.profit-info {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--studio-bg);
+  border-radius: var(--radius-sm);
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 0;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+:deep(.el-form-item:last-child) {
+  border-bottom: none;
+}
+
+:deep(.el-table) {
+  --el-table-border-color: var(--color-border);
+  --el-table-header-bg-color: var(--studio-bg);
+  --el-table-row-hover-bg-color: var(--studio-bg-hover);
+}
+
+:deep(.el-dialog) {
+  border-radius: var(--radius-lg);
+}
+
+:deep(.el-dialog__header) {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1rem;
+}
+
+:deep(.el-dialog__footer) {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+}
 </style>

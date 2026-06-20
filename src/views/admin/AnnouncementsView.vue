@@ -3,124 +3,139 @@
     <h2 class="page-title">公告管理</h2>
 
     <!-- 发布公告表单 -->
-    <div class="table-card" style="margin-bottom: 1.5rem;">
-      <div class="table-header">
-        <h3>发布公告</h3>
-      </div>
-      <div class="form-row">
-        <input v-model="newAnn.title" class="form-input" placeholder="公告标题" style="flex: 2; min-width: 200px;">
-        <select v-model="newAnn.type" class="form-input" style="width: 120px;">
-          <option value="system">系统通知</option>
-          <option value="update">版本更新</option>
-          <option value="activity">活动公告</option>
-          <option value="maintenance">维护通知</option>
-        </select>
-        <input v-model="newAnn.expiresAt" type="datetime-local" class="form-input" style="width: 200px;">
-        <button class="btn btn-primary" @click="createAnn" :disabled="isLoading">
-          {{ isLoading ? '发布中...' : '发布公告' }}
-        </button>
-      </div>
-      <div class="form-row" style="padding-top: 0;">
-        <textarea v-model="newAnn.content" class="form-input" placeholder="公告内容" rows="3" style="width: 100%;"></textarea>
-      </div>
-    </div>
+    <el-card class="form-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>发布公告</span>
+        </div>
+      </template>
+      <el-form label-width="80px">
+        <el-form-item label="标题">
+          <el-input v-model="newAnn.title" placeholder="公告标题" style="flex: 2; min-width: 200px;" />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="newAnn.type" style="width: 120px;">
+            <el-option label="系统通知" value="system" />
+            <el-option label="版本更新" value="update" />
+            <el-option label="活动公告" value="activity" />
+            <el-option label="维护通知" value="maintenance" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="过期时间">
+          <el-date-picker
+            v-model="newAnn.expiresAt"
+            type="datetime"
+            placeholder="选择过期时间"
+            style="width: 200px;"
+          />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input
+            v-model="newAnn.content"
+            type="textarea"
+            :rows="3"
+            placeholder="公告内容"
+            style="width: 100%;"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="createAnn" :loading="isLoading">
+            {{ isLoading ? '发布中...' : '发布公告' }}
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
 
     <!-- 公告列表 -->
-    <section class="table-card">
-      <div class="table-header">
-        <h3>全部公告</h3>
-        <div class="filter-bar">
-          <select v-model="filterStatus" class="form-input">
-            <option value="">全部状态</option>
-            <option value="draft">草稿</option>
-            <option value="published">已发布</option>
-            <option value="expired">已过期</option>
-          </select>
+    <el-card class="table-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <span>全部公告</span>
+          <div class="filter-bar">
+            <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 120px;">
+              <el-option label="全部状态" value="" />
+              <el-option label="草稿" value="draft" />
+              <el-option label="已发布" value="published" />
+              <el-option label="已过期" value="expired" />
+            </el-select>
+          </div>
         </div>
-      </div>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>标题</th>
-            <th>类型</th>
-            <th>状态</th>
-            <th>优先级</th>
-            <th>过期时间</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="ann in filteredAnnouncements" :key="ann.id">
-            <td>{{ ann.title }}</td>
-            <td>
-              <span :class="['badge', getTypeClass(ann.type)]">{{ getTypeText(ann.type) }}</span>
-            </td>
-            <td>
-              <span :class="['badge', getStatusClass(ann.status)]">{{ getStatusText(ann.status) }}</span>
-            </td>
-            <td>{{ ann.priority }}</td>
-            <td>{{ ann.expires_at ? formatDate(ann.expires_at) : '永久' }}</td>
-            <td>{{ formatDate(ann.created_at) }}</td>
-            <td>
-              <button class="btn btn-secondary btn-table" @click="togglePublish(ann)" :disabled="ann.status === 'expired'">
-                {{ ann.status === 'published' ? '下架' : '发布' }}
-              </button>
-              <button class="btn btn-secondary btn-table" @click="editAnn(ann)">编辑</button>
-              <button class="btn btn-secondary btn-table" style="color: var(--color-destructive);" @click="deleteAnn(ann.id)">删除</button>
-            </td>
-          </tr>
-          <tr v-if="!filteredAnnouncements.length">
-            <td colspan="7" class="empty-row">暂无公告</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+      </template>
+      <el-table :data="filteredAnnouncements" stripe style="width: 100%">
+        <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
+        <el-table-column label="类型" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getTypeTagType(row.type)" size="small">
+              {{ getTypeText(row.type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusTagType(row.status)" size="small">
+              {{ getStatusText(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="priority" label="优先级" width="80" />
+        <el-table-column label="过期时间" width="160">
+          <template #default="{ row }">
+            <span class="time-text">{{ row.expires_at ? formatDate(row.expires_at) : '永久' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="160">
+          <template #default="{ row }">
+            <span class="time-text">{{ formatDate(row.created_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="togglePublish(row)" :disabled="row.status === 'expired'">
+              {{ row.status === 'published' ? '下架' : '发布' }}
+            </el-button>
+            <el-button size="small" @click="editAnn(row)">编辑</el-button>
+            <el-button size="small" type="danger" @click="deleteAnn(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="empty-state">暂无公告</div>
+        </template>
+      </el-table>
+    </el-card>
 
     <!-- 编辑弹窗 -->
-    <div class="ann-modal-overlay" :class="{ show: showEditModal }" @click.self="showEditModal = false">
-      <div class="ann-modal">
-        <div class="ann-modal-header">
-          <h3>编辑公告</h3>
-          <button class="ann-modal-close" @click="showEditModal = false" aria-label="关闭">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        <div class="ann-modal-body">
-          <div class="ann-form-group">
-            <label>标题</label>
-            <input v-model="editingAnn.title" class="form-input" placeholder="请输入标题">
-          </div>
-          <div class="ann-form-row">
-            <div class="ann-form-group" style="flex: 1;">
-              <label>类型</label>
-          <select v-model="editingAnn.type" class="form-input">
-            <option value="system">系统通知</option>
-            <option value="update">版本更新</option>
-            <option value="activity">活动公告</option>
-            <option value="maintenance">维护通知</option>
-          </select>
-            </div>
-            <div class="ann-form-group" style="flex: 1;">
-              <label>优先级</label>
-              <input v-model.number="editingAnn.priority" type="number" class="form-input" placeholder="0">
-            </div>
-          </div>
-          <div class="ann-form-group">
-            <label>内容</label>
-            <textarea v-model="editingAnn.content" class="form-input" rows="4" placeholder="请输入公告内容"></textarea>
-          </div>
-        </div>
-        <div class="ann-modal-footer">
-          <button class="btn btn-primary" @click="saveEdit" :disabled="isSaving">
-            {{ isSaving ? '保存中...' : '保存' }}
-          </button>
-          <button class="btn btn-secondary" @click="showEditModal = false">取消</button>
-        </div>
-      </div>
-    </div>
+    <el-dialog v-model="showEditModal" title="编辑公告" width="500px" :close-on-click-modal="false">
+      <el-form label-width="80px">
+        <el-form-item label="标题">
+          <el-input v-model="editingAnn.title" placeholder="请输入标题" />
+        </el-form-item>
+        <el-form-item label="类型">
+          <el-select v-model="editingAnn.type" style="width: 100%;">
+            <el-option label="系统通知" value="system" />
+            <el-option label="版本更新" value="update" />
+            <el-option label="活动公告" value="activity" />
+            <el-option label="维护通知" value="maintenance" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="优先级">
+          <el-input-number v-model="editingAnn.priority" :min="0" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="内容">
+          <el-input
+            v-model="editingAnn.content"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入公告内容"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditModal = false">取消</el-button>
+        <el-button type="primary" @click="saveEdit" :loading="isSaving">
+          {{ isSaving ? '保存中...' : '保存' }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -144,9 +159,9 @@ const filteredAnnouncements = computed(() => {
   return announcements.value.filter(a => a.status === filterStatus.value)
 })
 
-function getTypeClass(type) {
-  const map = { system: 'badge-warning', update: 'badge-success', activity: 'badge-warning', maintenance: 'badge-error' }
-  return map[type] || 'badge-warning'
+function getTypeTagType(type) {
+  const map = { system: 'warning', update: 'success', activity: 'warning', maintenance: 'danger' }
+  return map[type] || 'warning'
 }
 
 function getTypeText(type) {
@@ -154,9 +169,9 @@ function getTypeText(type) {
   return map[type] || type
 }
 
-function getStatusClass(status) {
-  const map = { draft: 'badge-warning', published: 'badge-success', expired: 'badge-error' }
-  return map[status] || 'badge-warning'
+function getStatusTagType(status) {
+  const map = { draft: 'warning', published: 'success', expired: 'danger' }
+  return map[status] || 'warning'
 }
 
 function getStatusText(status) {
@@ -260,104 +275,67 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-/* 编辑弹窗样式 */
-.ann-modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(8px);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-
-.ann-modal-overlay.show {
-  display: flex;
-}
-
-.ann-modal {
-  background: white;
-  border-radius: 20px;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  animation: annModalIn 0.3s ease;
-}
-
-@keyframes annModalIn {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.ann-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.ann-modal-header h3 {
+.page-title {
   font-family: var(--font-heading);
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  color: var(--color-primary);
-  margin: 0;
+  color: var(--studio-text-main);
+  margin-bottom: 1.5rem;
 }
 
-.ann-modal-close {
-  width: 32px;
-  height: 32px;
+.form-card,
+.table-card {
+  background: var(--studio-surface);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1.5rem;
+}
+
+.card-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  color: var(--color-muted);
-  cursor: pointer;
-  transition: all 0.2s ease;
 }
 
-.ann-modal-close:hover {
-  background: var(--color-border-light);
-  color: var(--color-primary);
-}
-
-.ann-modal-body {
-  padding: 1.5rem;
-}
-
-.ann-form-group {
-  margin-bottom: 1rem;
-}
-
-.ann-form-group label {
-  display: block;
-  font-size: 0.85rem;
+.card-header span {
+  font-size: 1rem;
   font-weight: 600;
-  color: var(--color-primary);
-  margin-bottom: 0.4rem;
+  color: var(--studio-text-main);
 }
 
-.ann-form-row {
+.filter-bar {
   display: flex;
-  gap: 1rem;
-}
-
-.ann-modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
   gap: 0.75rem;
-  padding: 1rem 1.5rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-border-light);
+  align-items: center;
 }
 
-.ann-modal-footer .btn {
-  min-width: 80px;
+.time-text {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+}
+
+.empty-state {
+  padding: 2rem;
+  text-align: center;
+  color: var(--studio-text-muted);
+}
+
+:deep(.el-table) {
+  --el-table-border-color: var(--studio-border);
+  --el-table-header-bg-color: var(--studio-bg);
+  --el-table-row-hover-bg-color: var(--studio-bg-hover);
+}
+
+:deep(.el-dialog) {
+  border-radius: var(--radius-lg);
+}
+
+:deep(.el-dialog__header) {
+  border-bottom: 1px solid var(--studio-border);
+  padding-bottom: 1rem;
+}
+
+:deep(.el-dialog__footer) {
+  border-top: 1px solid var(--studio-border);
+  padding-top: 1rem;
 }
 </style>
