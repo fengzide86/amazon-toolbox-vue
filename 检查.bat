@@ -54,53 +54,13 @@ if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
     goto :RUN_E2E_PROMPT
 )
 
-echo [警告] 服务未运行，正在自动启动...
-
-:: 直接启动后端服务
-echo [启动] 正在启动后端服务...
-start "后端服务" cmd /k "cd /d %~dp0backend && python main.py"
-
-:: 循环等待后端服务就绪（最多60秒）
-echo 等待后端服务启动...
-set WAIT_COUNT=0
-:WAIT_BACKEND_LOOP
-timeout /t 3 /nobreak >nul
-set /a WAIT_COUNT+=1
-python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)" >nul 2>&1
-if %errorlevel% neq 0 (
-    if %WAIT_COUNT% LSS 20 (
-        echo   等待中... (%WAIT_COUNT%/20)
-        goto :WAIT_BACKEND_LOOP
-    ) else (
-        echo [失败] 后端服务启动超时，请手动运行 一键启动.bat
-        pause
-        exit /b 1
-    )
-)
-echo [成功] 后端服务已就绪
-
-:: 直接启动前端服务
-echo [启动] 正在启动前端服务...
-start "前端服务" cmd /k "cd /d %~dp0 && npm run dev"
-
-:: 循环等待前端服务就绪（最多60秒）
-echo 等待前端服务启动...
-set WAIT_COUNT=0
-:WAIT_FRONTEND_LOOP
-timeout /t 3 /nobreak >nul
-set /a WAIT_COUNT+=1
-python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000', timeout=3)" >nul 2>&1
-if %errorlevel% neq 0 (
-    if %WAIT_COUNT% LSS 20 (
-        echo   等待中... (%WAIT_COUNT%/20)
-        goto :WAIT_FRONTEND_LOOP
-    ) else (
-        echo [失败] 前端服务启动超时，请手动运行 一键启动.bat
-        pause
-        exit /b 1
-    )
-)
-echo [成功] 前端服务已就绪
+echo [警告] 前后端服务未运行！
+echo.
+echo 请先运行 一键启动.bat 启动服务，然后再重新运行本检查脚本。
+echo.
+echo 跳过 E2E 测试。
+echo.
+goto :SKIP_E2E
 
 :RUN_E2E_PROMPT
 echo.
@@ -122,6 +82,7 @@ if /i "%RUN_E2E%"=="y" (
     echo.
 )
 
+:SKIP_E2E
 echo ========================================
 echo   所有测试通过！
 echo ========================================
