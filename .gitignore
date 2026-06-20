@@ -1,4 +1,4 @@
-# ===== 依赖目录 =====
+wokanda# ===== 依赖目录 =====
 node_modules/
 __pycache__/
 *.pyc
@@ -57,6 +57,13 @@ htmlcov/
 *.egg
 build/
 MANIFEST
+
+# ===== 测试产物 =====
+test-results/
+playwright-report/
+
+# ===== AI 工具配置 =====
+.clinerules/
 
 # ===== 其他 =====
 Thumbs.db
