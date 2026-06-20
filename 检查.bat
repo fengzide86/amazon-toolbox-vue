@@ -35,6 +35,29 @@ echo.
 echo [通过] 后端测试通过！
 echo.
 
+echo [3/3] 运行 E2E 测试（需要前后端服务运行）...
+echo ----------------------------------------
+echo 提示：E2E 测试需要前后端服务正在运行
+echo 请先运行 一键启动.bat 启动服务
+echo.
+set /p RUN_E2E="是否运行 E2E 测试？(y/n): "
+if /i "%RUN_E2E%"=="y" (
+    call npx playwright test
+    if %errorlevel% neq 0 (
+        echo.
+        echo [失败] E2E 测试未通过！
+        echo.
+        pause
+        exit /b 1
+    )
+    echo.
+    echo [通过] E2E 测试通过！
+    echo.
+) else (
+    echo [跳过] E2E 测试已跳过
+    echo.
+)
+
 echo ========================================
 echo   所有测试通过！
 echo ========================================
