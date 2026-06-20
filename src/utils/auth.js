@@ -6,6 +6,7 @@ const AUTH_KEY = 'toolbox_auth'
 const ROLE_KEY = 'toolbox_role'
 const USER_KEY = 'toolbox_user'
 const PLATFORM_KEY = 'toolbox_current_platform'
+const TOKEN_KEY = 'toolbox_token'
 
 class AuthService {
   constructor() {
@@ -14,11 +15,19 @@ class AuthService {
 
   /**
    * 获取认证信息
+   * 兼容旧版纯字符串格式（如 'admin' 或授权码）
    */
   getAuth() {
     try {
       const auth = localStorage.getItem(AUTH_KEY)
-      return auth ? JSON.parse(auth) : null
+      if (!auth) return null
+      // 尝试 JSON 解析
+      try {
+        return JSON.parse(auth)
+      } catch {
+        // 兼容旧版纯字符串格式，包装为对象
+        return { auth_code: auth }
+      }
     } catch (err) {
       console.error('解析认证信息失败:', err)
       return null
@@ -76,8 +85,14 @@ class AuthService {
 
   /**
    * 检查是否已登录
+   * 优先检查 toolbox_token（最可靠的认证标识）
+   * 然后检查 toolbox_auth 的过期时间
    */
   isAuthenticated() {
+    // 优先检查 token（管理员和用户登录都会设置 toolbox_token）
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (token) return true
+
     const auth = this.getAuth()
     if (!auth) return false
     
@@ -128,6 +143,7 @@ class AuthService {
     localStorage.removeItem(ROLE_KEY)
     localStorage.removeItem(USER_KEY)
     localStorage.removeItem(PLATFORM_KEY)
+    localStorage.removeItem(TOKEN_KEY)
   }
 
   /**

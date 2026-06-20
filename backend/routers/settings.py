@@ -33,6 +33,7 @@ async def get_public_settings(db: AsyncSession = Depends(get_db)):
         "system_name",
         "logo_url",
         "service_wechat",
+        "wechat_id",
         "terms_of_service",
         "default_announcement",
         "enable_ai_chat",

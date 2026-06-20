@@ -3,18 +3,14 @@
     <h2 class="page-title">设备管理</h2>
 
     <div class="device-info-banner">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
+      <AlertTriangle :size="20" />
       <span>每个授权码可绑定 <strong>{{ maxDevices }}</strong> 台设备，当前已绑定 <strong>{{ devices.length }}</strong> 台</span>
     </div>
 
     <div v-if="devices.length" class="device-list">
       <div v-for="device in devices" :key="device.id" class="device-card">
         <div class="device-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
+          <Monitor :size="28" :stroke-width="1.5" />
         </div>
         <div class="device-info">
           <div class="device-name">{{ device.device_name || '未知设备' }}</div>
@@ -35,9 +31,7 @@
     </div>
 
     <div v-else class="empty-state">
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-      </svg>
+      <Monitor :size="48" :stroke-width="1.5" />
       <p>暂无绑定设备</p>
     </div>
   </div>
@@ -47,6 +41,7 @@
 import { ref, onMounted } from 'vue'
 import { getMyDevices, userUnbindDevice } from '@/utils/api'
 import { showToast } from '@/utils'
+import { AlertTriangle, Monitor } from '@lucide/vue'
 
 const devices = ref([])
 const maxDevices = ref(1)

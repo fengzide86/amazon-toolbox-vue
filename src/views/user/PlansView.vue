@@ -34,9 +34,7 @@
         </div>
         <ul class="plan-features">
           <li v-for="(feature, i) in getFeatures(plan.features)" :key="i">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-            </svg>
+            <Check :size="14" />
             {{ feature }}
           </li>
         </ul>
@@ -59,6 +57,7 @@
 import { ref, onMounted } from 'vue'
 import { getPlans } from '@/utils/api'
 import { showToast } from '@/utils'
+import { Check } from '@lucide/vue'
 
 const plans = ref([])
 

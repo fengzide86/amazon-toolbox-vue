@@ -1,4 +1,6 @@
 @echo off
+chcp 65001 >nul
+
 echo ============================================
 echo   Amazon Toolbox - One Click Start
 echo ============================================
@@ -20,13 +22,21 @@ echo [OK] Python installed
 :: ===== Check backend dependencies =====
 echo.
 echo [CHECK] Checking backend dependencies...
+if not exist "backend\" (
+    echo [ERROR] Backend directory not found!
+    pause
+    exit /b 1
+)
 cd backend
-python -c "import fastapi" >nul 2>&1
+echo [INFO] Checking fastapi module...
+pip show fastapi >nul 2>&1
 if errorlevel 1 (
-    echo [INSTALL] Installing backend dependencies (first run)...
+    echo [INSTALL] Installing backend dependencies first run...
+    echo [INFO] This may take a few minutes...
     pip install -r requirements.txt
     if errorlevel 1 (
         echo [ERROR] Dependency installation failed!
+        cd ..
         pause
         exit /b 1
     )
@@ -52,7 +62,8 @@ echo [OK] Node.js installed
 echo.
 echo [CHECK] Checking frontend dependencies...
 if not exist "node_modules\" (
-    echo [INSTALL] Installing frontend dependencies (first run)...
+    echo [INSTALL] Installing frontend dependencies first run...
+    echo [INFO] This may take a few minutes...
     call npm install
     if errorlevel 1 (
         echo [ERROR] Frontend dependency installation failed!
@@ -67,15 +78,16 @@ if not exist "node_modules\" (
 :: ===== Start backend =====
 echo.
 echo [START] Starting backend service...
-start "Backend" cmd /k "cd /d %~dp0backend && python main.py"
+start "Backend" cmd /k "cd /d %~dp0backend && set DEBUG=true && python main.py"
 
 :: ===== Wait for backend =====
 echo [WAIT] Waiting for backend service to start...
-set /a retry=0
+set retry=0
 :wait_backend
 timeout /t 2 /nobreak >nul
 set /a retry+=1
-python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" >nul 2>&1
+echo [INFO] Checking backend status... attempt %retry%/15
+curl -s http://localhost:8000/api/health >nul 2>&1
 if errorlevel 1 (
     if %retry% LSS 15 (
         goto wait_backend

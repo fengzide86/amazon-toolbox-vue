@@ -8,9 +8,7 @@
       <div class="table-header">
         <h3>运行日志</h3>
         <el-button data-testid="export-logs-btn" @click="exportLogsData" :disabled="!logs.length">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-          </svg>
+          <Download :size="16" style="margin-right: 4px;" />
           导出 CSV
         </el-button>
       </div>
@@ -81,32 +79,24 @@
         
         <div class="screenshot-section">
           <label class="screenshot-label">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
+            <ImageIcon :size="16" />
             添加截图（可选）
           </label>
           <div class="screenshot-upload">
             <input type="file" ref="fileInput" multiple accept="image/*" @change="handleFileSelect" style="display:none;">
             <div v-if="screenshots.length === 0" class="upload-area" @click="triggerFileInput">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-              </svg>
+              <Plus :size="32" :stroke-width="1.5" />
               <span>点击上传截图</span>
             </div>
             <div v-else class="preview-list">
               <div v-for="(img, index) in screenshots" :key="index" class="preview-item">
                 <img :src="img.preview" alt="截图预览">
                 <button class="remove-btn" @click="removeScreenshot(index)">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
+                  <X :size="14" />
                 </button>
               </div>
               <div class="preview-item add-more" @click="triggerFileInput">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                </svg>
+                <Plus :size="24" />
               </div>
             </div>
           </div>
@@ -137,9 +127,7 @@
     <div v-if="previewUrl" class="image-preview-overlay" @click="previewUrl = null">
       <img :src="previewUrl" @click.stop>
       <button class="close-preview" @click="previewUrl = null">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
+        <X :size="24" />
       </button>
     </div>
   </div>
@@ -150,6 +138,7 @@ import { ref, onMounted, watch } from 'vue'
 import { getLogs, getLogTools, exportLogs, createFeedback, getMyFeedbacks, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { Download, Image as ImageIcon, Plus, X } from '@lucide/vue'
 
 const platformStore = usePlatformStore()
 const logs = ref([])

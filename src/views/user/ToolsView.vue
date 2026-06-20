@@ -3,21 +3,17 @@
     <div class="page-header">
       <h2 class="page-title">功能入口</h2>
       <!-- 搜索框 -->
-      <div class="search-box">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-        </svg>
+        <div class="search-box">
+          <Search :size="18" />
         <input 
           type="text" 
           v-model="searchText" 
           placeholder="搜索工具..." 
           @input="handleSearch"
         />
-        <button v-if="searchText" class="clear-btn" @click="clearSearch">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
+          <button v-if="searchText" class="clear-btn" @click="clearSearch">
+            <X :size="16" />
+          </button>
       </div>
     </div>
 
@@ -51,10 +47,8 @@
     </div>
     
     <!-- 空状态 -->
-    <div v-else class="empty-state">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-      </svg>
+      <div v-else class="empty-state">
+        <Search :size="48" :stroke-width="1.5" />
       <p v-if="searchText">未找到匹配 "{{ searchText }}" 的工具</p>
       <p v-else>暂无可用工具</p>
       <button v-if="searchText || selectedCategory !== 'all'" class="reset-btn" @click="resetFilters">
@@ -69,6 +63,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getTools, getToolCategories, createLog } from '@/utils/api'
 import { runToolSimulation, showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { Search, X } from '@lucide/vue'
 
 const platformStore = usePlatformStore()
 const tools = ref([])

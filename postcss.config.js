@@ -21,6 +21,7 @@ export default {
           /^slide-/,
           /^zoom-/,
           /^collapse-/,
+          /^page-/,
           // 保留自定义工具类
           /^text-/,
           /^bg-/,

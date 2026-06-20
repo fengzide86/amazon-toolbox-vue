@@ -3,18 +3,14 @@
     <!-- 续费提醒 -->
     <div v-if="renewalReminder.show" :class="['renewal-reminder', renewalReminder.type]">
       <div class="reminder-content">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
+        <Clock :size="18" />
         <div class="reminder-text">
           <strong>{{ renewalReminder.title }}</strong>
           <span>{{ renewalReminder.message }}</span>
         </div>
       </div>
       <button class="reminder-close" @click="renewalReminder.show = false">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
+        <X :size="18" />
       </button>
     </div>
 
@@ -26,7 +22,7 @@
       <article class="bento-card bento-card-large status-card">
         <div class="card-header-row">
           <div class="card-icon" style="background: linear-gradient(135deg, #10B981, #34D399);">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+            <ShieldCheck :size="18" />
           </div>
           <span class="status-badge-active">已激活</span>
         </div>
@@ -40,7 +36,7 @@
       <!-- 已使用工具 -->
       <article class="bento-card">
         <div class="card-icon" style="background: linear-gradient(135deg, #6366F1, #818CF8);">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <Zap :size="18" />
         </div>
         <div class="card-body">
           <div class="card-label">已使用工具</div>
@@ -52,7 +48,7 @@
       <!-- 成功率 -->
       <article class="bento-card">
         <div class="card-icon" style="background: linear-gradient(135deg, #06B6D4, #22D3EE);">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <BarChart3 :size="18" />
         </div>
         <div class="card-body">
           <div class="card-label">成功率</div>
@@ -127,6 +123,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getLogs } from '@/utils/api'
 import { showToast } from '@/utils'
 import { Bar as BarChart, Doughnut as DoughnutChart } from 'vue-chartjs'
+import { Clock, X, ShieldCheck, Zap, BarChart3 } from '@lucide/vue'
 import '@/utils/chart' // 按需注册 Chart.js
 
 const countdownText = ref('计算中...')

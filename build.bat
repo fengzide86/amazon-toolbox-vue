@@ -1,4 +1,7 @@
 @echo off
+chcp 65001 >nul
+setlocal enabledelayedexpansion
+
 echo ============================================
 echo   Amazon Toolbox - Build
 echo ============================================
@@ -75,7 +78,8 @@ echo.
 for /f "tokens=2 delims=:, " %%a in ('findstr /c:"\"version\"" package.json') do set PKG_VERSION=%%~a
 echo ============================================
 echo   Build complete!
-echo   Installer: release\Amazon Toolbox Setup %PKG_VERSION%.exe
+echo   Installer: release\Amazon Toolbox Setup !PKG_VERSION!.exe
 echo ============================================
 echo.
 pause
+endlocal
