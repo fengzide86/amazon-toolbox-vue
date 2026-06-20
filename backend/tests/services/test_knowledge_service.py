@@ -156,7 +156,7 @@ class TestKnowledgeService:
                     title="测试统计",
                     content="内容"
                 )
-        
-        stats = await knowledge_service.get_stats(db_session)
-        assert stats["total"] >= 1
-        assert stats["active"] >= 1
+                
+                stats = await knowledge_service.get_stats(db_session)
+                assert stats["total"] >= 1
+                assert stats["active"] >= 1
