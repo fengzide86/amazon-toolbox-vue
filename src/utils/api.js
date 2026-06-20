@@ -190,7 +190,11 @@ export function clearApiCache(url) {
 // 快捷方法
 export const api = {
     get: (url, params = {}, options = {}) => {
-        const queryString = new URLSearchParams(params).toString();
+        // 过滤掉 undefined 值，避免 URLSearchParams 将其序列化为字符串 "undefined"
+        const filteredParams = Object.fromEntries(
+            Object.entries(params).filter(([_, v]) => v !== undefined && v !== null)
+        );
+        const queryString = new URLSearchParams(filteredParams).toString();
         const fullUrl = queryString ? `${url}?${queryString}` : url;
         
         // 检查是否使用缓存
