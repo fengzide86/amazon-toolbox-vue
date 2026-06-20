@@ -72,10 +72,26 @@
     /* === 字体 === */
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    
+    /* === 字阶系统 (Typography Scale) === */
+    --font-title: 13px;        /* 主标题：工具名 */
+    --font-subtitle: 11px;     /* 副标题：功能描述 */
+    --font-stat: 24px;         /* 统计大数 */
+    --font-stat-lg: 28px;      /* 大号统计数字 */
+    --font-body: 14px;         /* 正文 */
+    --font-small: 12px;        /* 小号文字 */
+    --font-xs: 10px;           /* 超小号文字 */
+    
+    /* === 字重 === */
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
 
     /* === 过渡 === */
     --transition: 200ms ease;
     --transition-slow: 300ms ease;
+    --transition-physics: 400ms cubic-bezier(0.16, 1, 0.3, 1);  /* 物理阻尼曲线 */
 
     /* === 布局 === */
     --sidebar-width: 200px;
@@ -1661,4 +1677,92 @@ a:focus-visible {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--studio-accent);
+}
+
+/* ===== Typography: 数字等宽 (Tabular Nums) ===== */
+.tabular-nums,
+.stat-value,
+.stat-number,
+.card-value,
+.metric-value,
+.countdown-value {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* ===== Typography: 字阶应用 ===== */
+.tool-name,
+.card-title {
+    font-size: var(--font-title);
+    font-weight: var(--font-weight-semibold);
+    color: var(--studio-text-main);
+}
+
+.tool-desc,
+.card-subtitle {
+    font-size: var(--font-subtitle);
+    font-weight: var(--font-weight-normal);
+    color: var(--studio-text-muted);
+}
+
+/* ===== Icons: 统一规范 ===== */
+/* 默认图标颜色：温和灰 */
+.icon-muted svg,
+.sidebar-nav a svg,
+.nav-item svg,
+.menu-icon svg {
+    color: rgba(100, 116, 139, 0.4);
+    transition: color var(--transition);
+}
+
+/* 悬浮时亮起：暮光靛蓝 */
+.sidebar-nav a:hover svg,
+.nav-item:hover svg,
+.menu-icon:hover svg,
+.icon-muted:hover svg {
+    color: var(--studio-accent);
+}
+
+/* 激活状态：品牌色 */
+.sidebar-nav a.active svg,
+.nav-item.active svg {
+    color: var(--studio-accent);
+}
+
+/* 功能图标：保持原色（如状态指示器） */
+.icon-success svg { color: var(--studio-success); }
+.icon-warning svg { color: var(--studio-warning); }
+.icon-danger svg { color: var(--studio-danger); }
+.icon-info svg { color: var(--studio-info); }
+
+/* ===== Micro-interactions: 物理反馈 ===== */
+/* 卡片悬浮：物理阻尼上浮 */
+.bento-card,
+.tool-card,
+.stat-card,
+.chart-card {
+    transition: all var(--transition-physics);
+}
+
+.bento-card:hover,
+.tool-card:hover,
+.stat-card:hover,
+.chart-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--studio-shadow-hover);
+}
+
+/* 按钮点击：物理触发感 */
+.btn:active:not(:disabled),
+.el-button:active:not(:disabled),
+button:active:not(:disabled) {
+    transform: scale(0.96);
+    transition: transform 0.1s ease;
+}
+
+/* 输入框聚焦：柔和反馈 */
+.form-input:focus,
+.el-input__wrapper:focus-within {
+    transform: scale(1.01);
+    transition: all var(--transition);
 }
