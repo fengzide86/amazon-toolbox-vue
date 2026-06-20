@@ -85,6 +85,9 @@ class Settings:
     AI_CHAT_MAX_HISTORY: int = 5                 # 对话历史轮数
     
     def __init__(self):
+        # 初始化 DEBUG 模式（优先环境变量）
+        self.DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+        
         # 初始化默认管理员密码（优先环境变量）
         self.DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
         
@@ -177,8 +180,8 @@ class Settings:
         if self.DEBUG:
             result["warnings"].append("DEBUG 模式已启用，生产环境应设置 DEBUG=False")
         
-        # 4. 默认管理员密码检查
-        if self.DEFAULT_ADMIN_PASSWORD == "admin123":
+        # 4. 默认管理员密码检查（仅生产环境）
+        if is_production and self.DEFAULT_ADMIN_PASSWORD == "admin123":
             result["errors"].append("使用默认管理员密码 'admin123'，生产环境必须修改 DEFAULT_ADMIN_PASSWORD")
         
         # 5. MySQL 密码检查（仅生产环境）
