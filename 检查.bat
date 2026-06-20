@@ -1,89 +1,88 @@
 @echo off
-chcp 65001 >nul
 echo ========================================
-echo   代码检查 - 运行前后端测试
+echo   Code Check - Run Frontend and Backend Tests
 echo ========================================
 echo.
 
-echo [1/3] 运行前端测试...
+echo [1/3] Running frontend tests...
 echo ----------------------------------------
 call npm test
 if %errorlevel% neq 0 (
     echo.
-    echo [失败] 前端测试未通过！
+    echo [FAIL] Frontend tests failed!
     echo.
     pause
     exit /b 1
 )
 echo.
-echo [通过] 前端测试通过！
+echo [PASS] Frontend tests passed!
 echo.
 
-echo [2/3] 运行后端测试...
+echo [2/3] Running backend tests...
 echo ----------------------------------------
 cd backend
 call python -m pytest --rootdir=. -v --tb=short
 if %errorlevel% neq 0 (
     echo.
-    echo [失败] 后端测试未通过！
+    echo [FAIL] Backend tests failed!
     cd ..
     pause
     exit /b 1
 )
 cd ..
 echo.
-echo [通过] 后端测试通过！
+echo [PASS] Backend tests passed!
 echo.
 
-echo [3/3] 运行 E2E 测试（需要前后端服务运行）...
+echo [3/3] Running E2E tests (requires frontend and backend services running)...
 echo ----------------------------------------
-echo 检测服务状态...
+echo Checking service status...
 
-:: 检测后端服务
+:: Check backend service
 set BACKEND_READY=0
 python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)" >nul 2>&1
 if %errorlevel% equ 0 set BACKEND_READY=1
 
-:: 检测前端服务
+:: Check frontend service
 set FRONTEND_READY=0
 python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000', timeout=3)" >nul 2>&1
 if %errorlevel% equ 0 set FRONTEND_READY=1
 
 if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
-    echo [成功] 前后端服务均已运行
+    echo [OK] Both frontend and backend services are running
     goto :RUN_E2E_PROMPT
 )
 
-echo [警告] 前后端服务未运行！
+echo [WARN] Frontend or backend services are not running!
 echo.
-echo 请先运行 一键启动.bat 启动服务，然后再重新运行本检查脚本。
+echo Please run start.bat first, then re-run this check script.
 echo.
-echo 跳过 E2E 测试。
+echo Skipping E2E tests.
 echo.
 goto :SKIP_E2E
 
 :RUN_E2E_PROMPT
 echo.
-set /p RUN_E2E="是否运行 E2E 测试？(y/n): "
+set /p RUN_E2E="Run E2E tests? (y/n): "
 if /i "%RUN_E2E%"=="y" (
     call npx playwright test
     if %errorlevel% neq 0 (
         echo.
-        echo [失败] E2E 测试未通过！
+        echo [FAIL] E2E tests failed!
         echo.
         pause
         exit /b 1
     )
     echo.
-    echo [通过] E2E 测试通过！
+    echo [PASS] E2E tests passed!
     echo.
 ) else (
-    echo [跳过] E2E 测试已跳过
+    echo [SKIP] E2E tests skipped
     echo.
 )
 
 :SKIP_E2E
 echo ========================================
-echo   所有测试通过！
+echo   All tests passed!
 echo ========================================
 pause
