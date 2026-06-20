@@ -49,41 +49,53 @@ set FRONTEND_READY=0
 python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000', timeout=3)" >nul 2>&1
 if %errorlevel% equ 0 set FRONTEND_READY=1
 
-if %BACKEND_READY% equ 0 (
-    echo [警告] 后端服务未运行，正在自动启动...
-    start "" "%~dp0一键启动.bat"
-    echo 等待服务启动...
-    timeout /t 15 /nobreak >nul
-    
-    :: 再次检测后端服务
-    python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)" >nul 2>&1
-    if %errorlevel% equ 0 (
-        echo [成功] 后端服务已启动
+if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
+    echo [成功] 前后端服务均已运行
+    goto :RUN_E2E_PROMPT
+)
+
+echo [警告] 服务未运行，正在自动启动...
+start "" "%~dp0一键启动.bat"
+
+:: 循环等待后端服务就绪（最多60秒）
+echo 等待后端服务启动...
+set WAIT_COUNT=0
+:WAIT_BACKEND_LOOP
+timeout /t 3 /nobreak >nul
+set /a WAIT_COUNT+=1
+python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)" >nul 2>&1
+if %errorlevel% neq 0 (
+    if %WAIT_COUNT% LSS 20 (
+        echo   等待中... (%WAIT_COUNT%/20)
+        goto :WAIT_BACKEND_LOOP
     ) else (
-        echo [失败] 后端服务启动失败，请手动运行 一键启动.bat
+        echo [失败] 后端服务启动超时，请手动运行 一键启动.bat
         pause
         exit /b 1
     )
-) else (
-    echo [成功] 后端服务已运行
 )
+echo [成功] 后端服务已就绪
 
-if %FRONTEND_READY% equ 0 (
-    echo [警告] 前端服务未运行，正在自动启动...
-    :: 等待后端就绪后再启动前端
-    timeout /t 5 /nobreak >nul
-    python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000', timeout=3)" >nul 2>&1
-    if %errorlevel% equ 0 (
-        echo [成功] 前端服务已启动
+:: 循环等待前端服务就绪（最多60秒）
+echo 等待前端服务启动...
+set WAIT_COUNT=0
+:WAIT_FRONTEND_LOOP
+timeout /t 3 /nobreak >nul
+set /a WAIT_COUNT+=1
+python -c "import urllib.request; urllib.request.urlopen('http://localhost:3000', timeout=3)" >nul 2>&1
+if %errorlevel% neq 0 (
+    if %WAIT_COUNT% LSS 20 (
+        echo   等待中... (%WAIT_COUNT%/20)
+        goto :WAIT_FRONTEND_LOOP
     ) else (
-        echo [失败] 前端服务启动失败，请手动运行 一键启动.bat
+        echo [失败] 前端服务启动超时，请手动运行 一键启动.bat
         pause
         exit /b 1
     )
-) else (
-    echo [成功] 前端服务已运行
 )
+echo [成功] 前端服务已就绪
 
+:RUN_E2E_PROMPT
 echo.
 set /p RUN_E2E="是否运行 E2E 测试？(y/n): "
 if /i "%RUN_E2E%"=="y" (
