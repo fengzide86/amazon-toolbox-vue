@@ -24,15 +24,12 @@ if "%NEW_VERSION%"=="" set NEW_VERSION=%CURRENT_VERSION%
 
 echo.
 echo [INFO] Updating version to %NEW_VERSION%...
-echo var p=require('./package.json');p.version='%NEW_VERSION%';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n'); > _update_version.cjs
-node _update_version.cjs
+python -c "import json; p=json.load(open('package.json')); p['version']='%NEW_VERSION%'; json.dump(p, open('package.json','w'), indent=2); print('Version updated to %NEW_VERSION%')"
 if errorlevel 1 (
     echo [ERROR] Version update failed!
-    del _update_version.cjs
     pause
     exit /b 1
 )
-del _update_version.cjs
 echo Version updated.
 echo.
 
