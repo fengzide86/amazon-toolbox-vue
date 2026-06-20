@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 echo ============================================
 echo   Amazon Toolbox - Build
 echo ============================================
@@ -51,7 +50,7 @@ echo.
 
 echo [4/4] Generating installer...
 echo.
-:: 设置 Electron 国内镜像源（加速下载）
+:: Set Electron mirror for faster download
 set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
 set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
 set CSC_IDENTITY_AUTO_DISCOVERY=false
@@ -72,7 +71,7 @@ if errorlevel 1 (
 )
 echo.
 
-:: 从 package.json 读取版本号
+:: Read version from package.json
 for /f "tokens=2 delims=:, " %%a in ('findstr /c:"\"version\"" package.json') do set PKG_VERSION=%%~a
 echo ============================================
 echo   Build complete!

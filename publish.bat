@@ -1,4 +1,5 @@
 @echo off
+setlocal
 title Amazon Toolbox - One Click Publish
 echo ============================================
 echo   Amazon Toolbox - One Click Publish
@@ -23,22 +24,19 @@ set /p NEW_VERSION="Enter new version (press Enter to use %CURRENT_VERSION%): "
 if "%NEW_VERSION%"=="" set NEW_VERSION=%CURRENT_VERSION%
 
 echo.
-echo [INFO] Updating version to %NEW_VERSION%...
-python _update_version.py %NEW_VERSION%
-if errorlevel 1 (
-    echo [ERROR] Version update failed!
-    pause
-    exit /b 1
-)
-echo Version updated.
+echo [INFO] Target version: %NEW_VERSION%
 echo.
 
-echo [1/3] Building...
+echo [1/4] Building (version not changed yet)...
 echo.
+pushd "%~dp0"
 call build.bat
-if errorlevel 1 (
+set BUILD_RESULT=%errorlevel%
+popd
+if %BUILD_RESULT% neq 0 (
     echo.
-    echo [ERROR] Build failed!
+    echo [ERROR] Build failed! (exit code: %BUILD_RESULT%)
+    echo [INFO] package.json version NOT changed, you can retry with same version.
     echo.
     pause
     exit /b 1
@@ -46,7 +44,17 @@ if errorlevel 1 (
 echo Build complete!
 echo.
 
-echo [2/3] Uploading files to server...
+echo [2/4] Updating version to %NEW_VERSION%...
+python _update_version.py %NEW_VERSION%
+if errorlevel 1 (
+    echo [ERROR] Version update failed!
+    pause
+    exit /b 1
+)
+echo Version updated to %NEW_VERSION%.
+echo.
+
+echo [3/4] Uploading files to server...
 echo.
 
 set RELEASE_DIR=release
@@ -99,11 +107,12 @@ for %%f in ("%RELEASE_DIR%\*.blockmap") do (
 )
 
 echo.
-echo [3/3] Done!
+echo [4/4] Done!
 echo.
 echo ============================================
 echo   Publish Success! Version: %NEW_VERSION%
 echo   Server: %SERVER_URL%
 echo ============================================
 echo.
+endlocal
 pause
