@@ -55,7 +55,10 @@ if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
 )
 
 echo [警告] 服务未运行，正在自动启动...
-powershell -Command "Start-Process '%~dp0一键启动.bat' -WorkingDirectory '%~dp0'"
+
+:: 直接启动后端服务
+echo [启动] 正在启动后端服务...
+start "后端服务" cmd /k "cd /d %~dp0backend && python main.py"
 
 :: 循环等待后端服务就绪（最多60秒）
 echo 等待后端服务启动...
@@ -75,6 +78,10 @@ if %errorlevel% neq 0 (
     )
 )
 echo [成功] 后端服务已就绪
+
+:: 直接启动前端服务
+echo [启动] 正在启动前端服务...
+start "前端服务" cmd /k "cd /d %~dp0 && npm run dev"
 
 :: 循环等待前端服务就绪（最多60秒）
 echo 等待前端服务启动...
