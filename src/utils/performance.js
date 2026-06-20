@@ -3,7 +3,7 @@
  * 使用 web-vitals 收集关键性能指标
  */
 
-import { onCLS, onFID, onLCP, onFCP, onTTFB } from 'web-vitals'
+import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals'
 
 /**
  * 初始化性能监控
@@ -15,10 +15,10 @@ export function initPerformanceMonitoring() {
     sendToAnalytics('CLS', metric.value)
   })
 
-  // First Input Delay (FID) - 首次输入延迟
-  onFID((metric) => {
-    console.log('[Performance] FID:', metric.value, 'ms')
-    sendToAnalytics('FID', metric.value)
+  // Interaction to Next Paint (INP) - 交互到下次绘制（替代 FID）
+  onINP((metric) => {
+    console.log('[Performance] INP:', metric.value, 'ms')
+    sendToAnalytics('INP', metric.value)
   })
 
   // Largest Contentful Paint (LCP) - 最大内容绘制
@@ -76,7 +76,7 @@ function sendToAnalytics(name, value) {
 export function getPerformanceRating(metric, value) {
   const thresholds = {
     CLS: { good: 0.1, poor: 0.25 },
-    FID: { good: 100, poor: 300 },
+    INP: { good: 200, poor: 500 },
     LCP: { good: 2500, poor: 4000 },
     FCP: { good: 1800, poor: 3000 },
     TTFB: { good: 800, poor: 1800 },
