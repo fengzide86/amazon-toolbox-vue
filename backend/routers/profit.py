@@ -11,6 +11,7 @@ from database import get_db
 from models import ProfitRecord, Order
 from schemas import ProfitRecordResponse
 from core.logging import get_logger
+from core.dependencies import get_current_admin
 
 logger = get_logger(__name__)
 
@@ -18,7 +19,13 @@ router = APIRouter()
 
 
 @router.get("", response_model=List[ProfitRecordResponse])
-async def get_profit_records(page: int = 1, page_size: int = 50, platform_key: str = None, db: AsyncSession = Depends(get_db)):
+async def get_profit_records(
+    page: int = 1, 
+    page_size: int = 50, 
+    platform_key: str = None, 
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin)
+):
     """获取分润记录列表（支持分页和平台过滤）"""
     offset = (page - 1) * page_size
     query = select(ProfitRecord).join(Order, ProfitRecord.order_id == Order.id)
@@ -32,7 +39,11 @@ async def get_profit_records(page: int = 1, page_size: int = 50, platform_key: s
 
 
 @router.get("/summary")
-async def get_profit_summary(platform_key: str = None, db: AsyncSession = Depends(get_db)):
+async def get_profit_summary(
+    platform_key: str = None, 
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_admin)
+):
     """获取分润汇总数据（支持平台过滤）
     
     使用 SQL 聚合函数计算，避免全表加载到内存
