@@ -5,11 +5,11 @@ const { autoUpdater } = require('electron-updater');
 let mainWindow;
 
 // ===== 自动更新功能 =====
-// 更新服务器地址（指向你的云端服务器）
-const UPDATE_SERVER_URL = 'http://8.130.113.104:8000/updates/';
+// 更新服务器地址（优先从环境变量读取，默认值仅供开发使用）
+const UPDATE_SERVER_URL = process.env.ELECTRON_UPDATE_URL || 'http://8.130.113.104:8000/updates/';
 
-// 云端服务器地址（生产环境固定使用云端）
-const CLOUD_API_BASE = 'http://8.130.113.104:8000';
+// 云端服务器地址（优先从环境变量读取，默认值仅供开发使用）
+const CLOUD_API_BASE = process.env.ELECTRON_API_BASE || 'http://8.130.113.104:8000';
 
 // 配置自动更新
 autoUpdater.autoDownload = false; // 不自动下载，先通知用户

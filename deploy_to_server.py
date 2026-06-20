@@ -6,11 +6,11 @@ import paramiko
 import os
 import sys
 
-# 服务器配置
-SERVER_HOST = "8.130.113.104"
-SERVER_USER = "root"
-SERVER_PASSWORD = "Wei99991221"
-REMOTE_DIR = "/opt/amazon-toolbox/backend"
+# 服务器配置（优先从环境变量读取，默认值仅供开发使用）
+SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
+SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
+REMOTE_DIR = os.environ.get("DEPLOY_REMOTE_DIR", "/opt/amazon-toolbox/backend")
 
 # 本地 backend 目录
 LOCAL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend")

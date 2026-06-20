@@ -2,10 +2,13 @@
 设置 999 套餐的 SVIP 前缀 - 通过 SSH 直接操作数据库
 """
 import paramiko
+import os
 
-SERVER_HOST = "8.130.113.104"
-SERVER_USER = "root"
-SERVER_PASSWORD = "Wei99991221"
+# 服务器配置（优先从环境变量读取，默认值仅供开发使用）
+SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
+SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
+MYSQL_PASSWORD = os.environ.get("DEPLOY_MYSQL_PASSWORD", "Wei99991221")
 
 def run_cmd(ssh, cmd):
     stdin, stdout, stderr = ssh.exec_command(cmd)
@@ -22,12 +25,12 @@ def main():
 
     # 1. 查看所有套餐
     print("\n=== 当前套餐列表 ===")
-    out, err = run_cmd(ssh, 'mysql -u root -pWei99991221 amazon_toolbox -e "SELECT id, name, price, code_prefix FROM plans WHERE status != \\"deleted\\";"')
+    out, err = run_cmd(ssh, f'mysql -u root -p{MYSQL_PASSWORD} amazon_toolbox -e "SELECT id, name, price, code_prefix FROM plans WHERE status != \\"deleted\\";"')
     print(out)
 
     # 2. 找到 999 套餐并更新
     print("=== 设置 999 套餐 code_prefix = SVIP ===")
-    out, err = run_cmd(ssh, 'mysql -u root -pWei99991221 amazon_toolbox -e "UPDATE plans SET code_prefix = \\"SVIP\\" WHERE price = 999 OR name LIKE \\"%999%\\";"')
+    out, err = run_cmd(ssh, f'mysql -u root -p{MYSQL_PASSWORD} amazon_toolbox -e "UPDATE plans SET code_prefix = \\"SVIP\\" WHERE price = 999 OR name LIKE \\"%999%\\";"')
     if err and "ERROR" in err:
         print(f"  更新失败: {err}")
     else:
@@ -35,7 +38,7 @@ def main():
 
     # 3. 验证
     print("\n=== 验证结果 ===")
-    out, err = run_cmd(ssh, 'mysql -u root -pWei99991221 amazon_toolbox -e "SELECT id, name, price, code_prefix FROM plans WHERE status != \\"deleted\\";"')
+    out, err = run_cmd(ssh, f'mysql -u root -p{MYSQL_PASSWORD} amazon_toolbox -e "SELECT id, name, price, code_prefix FROM plans WHERE status != \\"deleted\\";"')
     print(out)
 
     ssh.close()

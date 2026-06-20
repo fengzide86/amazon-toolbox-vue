@@ -88,10 +88,10 @@ async def get_current_user(
     role = payload.get("role", "user")
     auth_code_id = payload.get("auth_code_id")
     
-    # 管理员特殊处理：user_id=0 表示管理员
-    if role == "admin" and user_id == 0:
+    # 管理员特殊处理：基于 role 判断，不再依赖 user_id==0
+    if role == "admin":
         return {
-            "user_id": 0,
+            "user_id": user_id,
             "role": "admin",
             "auth_code_id": None,
         }

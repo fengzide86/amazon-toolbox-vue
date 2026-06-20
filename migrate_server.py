@@ -4,10 +4,13 @@
 """
 import paramiko
 import time
+import os
 
-SERVER_HOST = "8.130.113.104"
-SERVER_USER = "root"
-SERVER_PASSWORD = "Wei99991221"
+# 服务器配置（优先从环境变量读取，默认值仅供开发使用）
+SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
+SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
+SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
+MYSQL_PASSWORD = os.environ.get("DEPLOY_MYSQL_PASSWORD", "Wei99991221")
 
 def run_cmd(ssh, cmd):
     stdin, stdout, stderr = ssh.exec_command(cmd)
@@ -29,7 +32,7 @@ def main():
     # 1. 执行数据库迁移 - 添加 code_prefix 字段
     print("\n=== 数据库迁移: 添加 plans.code_prefix 字段 ===")
     sql = "ALTER TABLE plans ADD COLUMN code_prefix VARCHAR(20) NULL;"
-    out, err = run_cmd(ssh, f'mysql -u root -pWei99991221 amazon_toolbox -e "{sql}"')
+    out, err = run_cmd(ssh, f'mysql -u root -p{MYSQL_PASSWORD} amazon_toolbox -e "{sql}"')
     if "Duplicate" in err:
         print("  字段已存在，跳过")
     elif err and "ERROR" in err:
