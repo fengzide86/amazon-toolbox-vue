@@ -5,9 +5,9 @@ echo   代码检查 - 运行前后端测试
 echo ========================================
 echo.
 
-echo [1/2] 运行前端测试...
+echo [1/3] 运行前端测试...
 echo ----------------------------------------
-call npm run test:run
+call npm test
 if %errorlevel% neq 0 (
     echo.
     echo [失败] 前端测试未通过！
