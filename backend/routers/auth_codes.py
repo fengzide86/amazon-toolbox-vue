@@ -78,13 +78,7 @@ async def get_auth_codes(
     query = select(AuthCode).options(selectinload(AuthCode.devices))
     
     if platform_key:
-        from sqlalchemy import or_
-        query = query.where(
-            or_(
-                AuthCode.platform_scope.contains(platform_key),
-                AuthCode.platform_scope.is_(None)
-            )
-        )
+        query = query.where(AuthCode.platform_scope.contains(platform_key))
     
     query = query.order_by(AuthCode.created_at.desc()).offset(offset).limit(page_size)
     result = await db.execute(query)
