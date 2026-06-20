@@ -24,7 +24,15 @@ if "%NEW_VERSION%"=="" set NEW_VERSION=%CURRENT_VERSION%
 
 echo.
 echo [INFO] Updating version to %NEW_VERSION%...
-node -e "var p=require('./package.json');p.version='%NEW_VERSION%';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+echo var p=require('./package.json');p.version='%NEW_VERSION%';require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\n'); > _update_version.js
+node _update_version.js
+if errorlevel 1 (
+    echo [ERROR] Version update failed!
+    del _update_version.js
+    pause
+    exit /b 1
+)
+del _update_version.js
 echo Version updated.
 echo.
 
