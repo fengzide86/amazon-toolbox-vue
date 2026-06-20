@@ -22,7 +22,7 @@ echo.
 echo [2/3] 运行后端测试...
 echo ----------------------------------------
 cd backend
-call python -m pytest -v --tb=short
+call python -m pytest --rootdir=. -v --tb=short
 if %errorlevel% neq 0 (
     echo.
     echo [失败] 后端测试未通过！
