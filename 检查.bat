@@ -19,10 +19,10 @@ echo.
 echo [通过] 前端测试通过！
 echo.
 
-echo [2/2] 运行后端测试...
+echo [2/3] 运行后端测试...
 echo ----------------------------------------
 cd backend
-call pytest -v --tb=short
+call python -m pytest -v --tb=short
 if %errorlevel% neq 0 (
     echo.
     echo [失败] 后端测试未通过！

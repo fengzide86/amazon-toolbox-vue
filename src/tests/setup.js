@@ -31,8 +31,13 @@ Object.defineProperty(globalThis, 'localStorage', {
 // Mock window.confirm
 globalThis.confirm = vi.fn()
 
-// Mock fetch
-globalThis.fetch = vi.fn()
+// Mock fetch - 返回带 .json() 方法的对象，避免 platform.js 等调用时报错
+globalThis.fetch = vi.fn().mockResolvedValue({
+  json: vi.fn().mockResolvedValue([]),
+  ok: true,
+  status: 200,
+  text: vi.fn().mockResolvedValue('')
+})
 
 // Reset mocks before each test
 beforeEach(() => {
