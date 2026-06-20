@@ -1,6 +1,12 @@
 """
 pytest 测试配置和公共 fixtures
 """
+import sys
+import os
+
+# 确保 backend 目录在 Python 路径中
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import pytest
 import asyncio
 from typing import AsyncGenerator
@@ -9,7 +15,6 @@ from httpx import AsyncClient, ASGITransport
 from unittest.mock import patch
 
 # 设置测试环境变量
-import os
 os.environ["APP_ENV"] = "test"
 
 # 在导入 app 之前，将 Limiter.limit 装饰器替换为无操作装饰器
