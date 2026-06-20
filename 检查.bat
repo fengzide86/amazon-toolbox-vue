@@ -55,7 +55,7 @@ if %BACKEND_READY% equ 1 if %FRONTEND_READY% equ 1 (
 )
 
 echo [警告] 服务未运行，正在自动启动...
-start "" "%~dp0一键启动.bat"
+powershell -Command "Start-Process '%~dp0一键启动.bat' -WorkingDirectory '%~dp0'"
 
 :: 循环等待后端服务就绪（最多60秒）
 echo 等待后端服务启动...
