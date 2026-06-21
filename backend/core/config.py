@@ -93,7 +93,11 @@ class Settings:
         
         # 初始化 CORS 配置（生产环境禁止使用 *）
         cors_env = os.getenv("CORS_ORIGINS", "")
-        self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()] if cors_env else ["*"]
+        if cors_env:
+            self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+        else:
+            # 开发环境默认允许 localhost，生产环境必须配置 CORS_ORIGINS
+            self.CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173"]
         
         # ===== 初始化数据库配置 =====
         # 优先使用环境变量，否则根据环境自动选择
