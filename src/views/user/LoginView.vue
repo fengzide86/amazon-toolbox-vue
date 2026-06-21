@@ -199,6 +199,43 @@
         </div>
       </div>
     </div>
+
+    <!-- 联系客服弹窗 -->
+    <div 
+      class="modal-overlay" 
+      :class="{ show: showContactModal }" 
+      @click.self="closeModals"
+      @keydown.esc="closeModals"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="contact-modal-title"
+    >
+      <div class="modal" ref="contactModalRef">
+        <button class="modal-close" @click="closeModals" aria-label="关闭">
+          <X :size="20" />
+        </button>
+        <h3 id="contact-modal-title">
+          <Phone :size="20" />
+          联系客服
+        </h3>
+        <div class="contact-info">
+          <p class="contact-desc">如有任何问题，请联系客服：</p>
+          <div class="wechat-id-box">
+            <span class="wechat-label">微信号：</span>
+            <span class="wechat-id">{{ wechatId }}</span>
+            <button class="copy-btn" @click="copyWechatId" :title="copySuccess ? '已复制' : '复制微信号'">
+              <Check v-if="copySuccess" :size="16" />
+              <Copy v-else :size="16" />
+              {{ copySuccess ? '已复制' : '复制' }}
+            </button>
+          </div>
+          <p v-if="copySuccess" class="copy-success">✓ 已复制到剪贴板</p>
+        </div>
+        <div class="modal-btns">
+          <button class="btn-confirm" @click="closeModals">关闭</button>
+        </div>
+      </div>
+    </div>
   </main>
 </template>
 
@@ -209,7 +246,7 @@ import { Auth, showToast, getDeviceId, getDeviceName } from '@/utils'
 import { verifyAuthCode } from '@/utils/api'
 import { api } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
-import { Zap, Check, CircleAlert, CircleCheck, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle } from '@lucide/vue'
+import { Zap, Check, CircleAlert, CircleCheck, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -219,6 +256,8 @@ const isLoading = ref(false)
 const showError = ref(false)
 const showSuccess = ref(false)
 const showHelpModal = ref(false)
+const showContactModal = ref(false)
+const copySuccess = ref(false)
 const errorMessage = ref('')
 const inputFocused = ref(false)
 const isOnline = ref(true)
@@ -350,11 +389,41 @@ function showHelp() {
 }
 
 function showContact() {
-  showToast(`客服微信：${wechatId.value}`, 'info')
+  showContactModal.value = true
+  copySuccess.value = false
+}
+
+async function copyWechatId() {
+  try {
+    await navigator.clipboard.writeText(wechatId.value)
+    copySuccess.value = true
+    setTimeout(() => {
+      copySuccess.value = false
+    }, 2000)
+  } catch (err) {
+    // 降级方案：创建临时输入框复制
+    const textArea = document.createElement('textarea')
+    textArea.value = wechatId.value
+    textArea.style.position = 'fixed'
+    textArea.style.opacity = '0'
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      copySuccess.value = true
+      setTimeout(() => {
+        copySuccess.value = false
+      }, 2000)
+    } catch (e) {
+      showToast('复制失败，请手动复制', 'error')
+    }
+    document.body.removeChild(textArea)
+  }
 }
 
 function closeModals() {
   showHelpModal.value = false
+  showContactModal.value = false
 }
 
 onMounted(() => {
@@ -1310,6 +1379,78 @@ onUnmounted(() => {
 .btn-confirm:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+/* 联系客服弹窗 */
+.contact-info {
+  margin-bottom: 1.5rem;
+}
+
+.contact-desc {
+  font-size: 0.9rem;
+  color: var(--studio-text-main);
+  margin-bottom: 1rem;
+}
+
+.wechat-id-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--studio-bg-hover);
+  border-radius: 10px;
+  border: 1px solid var(--studio-border);
+}
+
+.wechat-label {
+  font-size: 0.85rem;
+  color: var(--studio-text-muted);
+}
+
+.wechat-id {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--studio-accent);
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--studio-accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background: var(--studio-accent-hover);
+  transform: translateY(-1px);
+}
+
+.copy-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.copy-success {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--studio-success);
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ===== 响应式 ===== */
