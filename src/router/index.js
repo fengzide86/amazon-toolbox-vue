@@ -34,43 +34,43 @@ const routes = [
         path: 'dashboard',
         name: 'UserDashboard',
         component: () => import('@/views/user/DashboardView.vue'),
-        meta: { title: '首页总览' }
+        meta: { title: '首页总览', skeleton: 'dashboard' }
       },
       {
         path: 'tools',
         name: 'UserTools',
         component: () => import('@/views/user/ToolsView.vue'),
-        meta: { title: '功能入口' }
+        meta: { title: '功能入口', skeleton: 'grid' }
       },
       {
         path: 'logs',
         name: 'UserLogs',
         component: () => import('@/views/user/LogsView.vue'),
-        meta: { title: '个人日志与问题反馈' }
+        meta: { title: '个人日志与问题反馈', skeleton: 'table' }
       },
       {
         path: 'faq',
         name: 'UserFaq',
         component: () => import('@/views/user/FaqView.vue'),
-        meta: { title: '常见问题' }
+        meta: { title: '常见问题', skeleton: 'default' }
       },
       {
         path: 'plans',
         name: 'UserPlans',
         component: () => import('@/views/user/PlansView.vue'),
-        meta: { title: '套餐价格' }
+        meta: { title: '套餐价格', skeleton: 'grid' }
       },
       {
         path: 'devices',
         name: 'UserDevices',
         component: () => import('@/views/user/DevicesView.vue'),
-        meta: { title: '设备管理' }
+        meta: { title: '设备管理', skeleton: 'table' }
       },
       {
         path: 'ai-chat',
         name: 'UserAIChat',
         component: () => import('@/views/user/AIChatView.vue'),
-        meta: { title: 'AI 客服' }
+        meta: { title: 'AI 客服', skeleton: 'default' }
       }
     ]
   },
@@ -84,61 +84,61 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/DashboardView.vue'),
-        meta: { title: '数据总览看板' }
+        meta: { title: '数据总览看板', skeleton: 'dashboard' }
       },
       {
         path: 'authcodes',
         name: 'AdminAuthCodes',
         component: () => import('@/views/admin/AuthCodesView.vue'),
-        meta: { title: '授权码管理' }
+        meta: { title: '授权码管理', skeleton: 'table' }
       },
       {
         path: 'orders',
         name: 'AdminOrders',
         component: () => import('@/views/admin/OrdersView.vue'),
-        meta: { title: '订单与套餐权限' }
+        meta: { title: '订单与套餐权限', skeleton: 'table' }
       },
       {
         path: 'profit',
         name: 'AdminProfit',
         component: () => import('@/views/admin/ProfitView.vue'),
-        meta: { title: '分润管理' }
+        meta: { title: '分润管理', skeleton: 'table' }
       },
       {
         path: 'settings',
         name: 'AdminSettings',
         component: () => import('@/views/admin/SettingsView.vue'),
-        meta: { title: '系统设置' }
+        meta: { title: '系统设置', skeleton: 'default' }
       },
       {
         path: 'users',
         name: 'AdminUsers',
         component: () => import('@/views/admin/UsersView.vue'),
-        meta: { title: '用户管理' }
+        meta: { title: '用户管理', skeleton: 'table' }
       },
       {
         path: 'feedback',
         name: 'AdminFeedback',
         component: () => import('@/views/admin/FeedbackView.vue'),
-        meta: { title: '工单管理' }
+        meta: { title: '工单管理', skeleton: 'table' }
       },
       {
         path: 'knowledge',
         name: 'AdminKnowledge',
         component: () => import('@/views/admin/KnowledgeView.vue'),
-        meta: { title: '知识库管理' }
+        meta: { title: '知识库管理', skeleton: 'table' }
       },
       {
         path: 'ai-chat',
         name: 'AdminAIChat',
         component: () => import('@/views/admin/AIChatView.vue'),
-        meta: { title: 'AI 客服管理' }
+        meta: { title: 'AI 客服管理', skeleton: 'default' }
       },
       {
         path: 'announcements',
         name: 'AdminAnnouncements',
         component: () => import('@/views/admin/AnnouncementsView.vue'),
-        meta: { title: '公告管理' }
+        meta: { title: '公告管理', skeleton: 'table' }
       }
     ]
   }

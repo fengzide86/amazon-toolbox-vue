@@ -279,15 +279,14 @@ describe('LoginView', () => {
   })
 
   describe('联系客服测试', () => {
-    it('点击联系客服应该显示微信信息', async () => {
+    it('点击联系客服应该打开弹窗', async () => {
       const wrapper = mountWithPinia(LoginView)
       const contactLink = wrapper.findAll('.footer-link')[1]
       await contactLink.trigger('click')
-
-      expect(mockShowToast).toHaveBeenCalledWith(
-        expect.stringContaining('客服微信'),
-        'info'
-      )
+      
+      // 检查弹窗是否显示
+      const modal = wrapper.find('.modal')
+      expect(modal.exists()).toBe(true)
     })
   })
 

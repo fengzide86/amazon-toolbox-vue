@@ -17,7 +17,16 @@
       <main class="content-studio" data-testid="user-content">
         <Breadcrumb />
         <AnnouncementBanner />
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <Suspense>
+            <template #default>
+              <component :is="Component" />
+            </template>
+            <template #fallback>
+              <LoadingSkeleton :type="route.meta?.skeleton || 'default'" />
+            </template>
+          </Suspense>
+        </router-view>
       </main>
     </div>
     <!-- 踢人提示弹窗 -->
@@ -54,6 +63,7 @@ import { checkAuthStatus } from '@/utils/api'
 import AppHeader from '@/components/AppHeader.vue'
 import UserSidebar from '@/components/UserSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const router = useRouter()
 const route = useRoute()
