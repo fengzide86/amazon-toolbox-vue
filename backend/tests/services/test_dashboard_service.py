@@ -2,7 +2,7 @@
 仪表盘服务测试
 """
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from backend.services.dashboard_service import DashboardService
 from backend.models import User, Order, Plan
 from backend.database import SessionLocal
@@ -57,7 +57,7 @@ class TestDashboardService:
                 plan_id=plan.id,
                 amount=99.99,
                 status="paid",
-                paid_at=datetime.utcnow() - timedelta(days=i)
+                paid_at=datetime.now(timezone.utc) - timedelta(days=i)
             )
             dashboard_service.db.add(order)
             orders.append(order)

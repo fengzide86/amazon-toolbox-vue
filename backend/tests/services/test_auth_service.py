@@ -2,7 +2,7 @@
 认证服务测试
 """
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from backend.services.auth_service import AuthService
 from backend.core.security import create_access_token, verify_token, get_password_hash, verify_password
 from backend.models import User
@@ -32,7 +32,7 @@ class TestAuthService:
 
     def test_verify_token_expired(self):
         """测试验证过期令牌"""
-        data = {"sub": "user1", "exp": datetime.utcnow() - timedelta(hours=1)}
+        data = {"sub": "user1", "exp": datetime.now(timezone.utc) - timedelta(hours=1)}
         token = create_access_token(data, expires_delta=timedelta(hours=-1))
         
         payload = verify_token(token)

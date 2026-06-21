@@ -2,7 +2,7 @@
 套餐服务测试
 """
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from backend.services.plan_service import PlanService
 from backend.models import Plan
 from backend.database import SessionLocal
@@ -117,7 +117,7 @@ class TestPlanService:
             duration_days=30
         )
         
-        start_date = datetime.utcnow()
+        start_date = datetime.now(timezone.utc)
         expire_date = plan_service.calculate_expire_date(plan.id, start_date)
         
         expected_expire = start_date + timedelta(days=30)

@@ -2,7 +2,7 @@
 用户服务测试
 """
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from backend.services.user_service import UserService
 from backend.models import User
 from backend.database import SessionLocal
@@ -137,7 +137,7 @@ class TestUserService:
         
         updated_user = user_service.update_last_login(user.id)
         assert updated_user.last_login is not None
-        assert updated_user.last_login <= datetime.utcnow()
+        assert updated_user.last_login <= datetime.now(timezone.utc)
 
     def test_update_user_subscription(self, user_service):
         """测试更新用户订阅信息"""
@@ -147,7 +147,7 @@ class TestUserService:
             password="password123"
         )
         
-        expire_date = datetime.utcnow() + timedelta(days=30)
+        expire_date = datetime.now(timezone.utc) + timedelta(days=30)
         updated_user = user_service.update_subscription(
             user.id,
             plan_id=1,

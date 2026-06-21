@@ -111,7 +111,7 @@
                 id="authCode"
                 v-model="authCode"
                 placeholder="请输入您的授权码"
-                autocomplete="off"
+                autocomplete="one-time-code"
                 required
                 @focus="inputFocused = true"
                 @blur="inputFocused = false"
@@ -167,12 +167,20 @@
     </div>
 
     <!-- 帮助弹窗 -->
-    <div class="modal-overlay" :class="{ show: showHelpModal }" @click.self="closeModals">
-      <div class="modal">
+    <div 
+      class="modal-overlay" 
+      :class="{ show: showHelpModal }" 
+      @click.self="closeModals"
+      @keydown.esc="closeModals"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="help-modal-title"
+    >
+      <div class="modal" ref="helpModalRef">
         <button class="modal-close" @click="closeModals" aria-label="关闭">
           <X :size="20" />
         </button>
-        <h3>
+        <h3 id="help-modal-title">
           <HelpCircle :size="20" />
           如何使用
         </h3>
@@ -317,8 +325,10 @@ function handleLogin() {
         } catch (e) {
           console.warn('resizeWindow failed:', e)
         }
-        // 直接跳转，不等待
-        router.push('/user/dashboard')
+        // 延迟跳转，让用户看到成功提示
+        setTimeout(() => {
+          router.push('/user/dashboard')
+        }, 800)
       } else {
         errorMessage.value = res.message
         showError.value = true

@@ -114,16 +114,29 @@ class Settings:
         # ===== 初始化 JWT 配置 =====
         # 生产环境必须设置强密码！
         jwt_key = os.getenv("JWT_SECRET_KEY", "")
-        if not jwt_key or jwt_key == "dev-secret-key-change-in-production":
-            import secrets
-            import warnings
-            warnings.warn(
-                "JWT_SECRET_KEY 未设置或使用默认值！已自动生成随机密钥。"
-                "请在 .env 文件中设置 JWT_SECRET_KEY 以确保重启后 Token 不失效。",
-                UserWarning,
-                stacklevel=2,
-            )
-            jwt_key = secrets.token_urlsafe(48)
+        
+        # 判断是否为生产环境（使用 MySQL 且非 DEBUG 模式）
+        is_production = not self.DEBUG and self.DB_TYPE == "mysql"
+        
+        if not jwt_key:
+            if is_production:
+                # 生产环境：强制要求配置 JWT_SECRET_KEY
+                raise ValueError(
+                    "生产环境必须配置 JWT_SECRET_KEY！\n"
+                    "请在 .env 文件中设置：JWT_SECRET_KEY=你的强密钥（至少32位）\n"
+                    "可以使用命令生成：python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+                )
+            else:
+                # 开发环境：使用固定的开发密钥（确保重启后 Token 不失效）
+                import warnings
+                warnings.warn(
+                    "JWT_SECRET_KEY 未设置，使用开发环境固定密钥。\n"
+                    "生产环境请在 .env 文件中配置 JWT_SECRET_KEY。",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                jwt_key = "dev-only-fixed-key-for-restart-stability-do-not-use-in-production"
+        
         self.JWT_SECRET_KEY = jwt_key
         
         # ===== 初始化 Redis 配置 =====
