@@ -71,18 +71,17 @@ test.describe('视觉回归测试 - 用户端', () => {
     const layout = page.locator('.layout-studio')
     await expect(layout).toBeVisible()
 
-    // 检查 grid 布局
+    // 检查 flex 布局（全高骨架设计）
     const computedStyle = await layout.evaluate(el => {
       const style = window.getComputedStyle(el)
       return {
         display: style.display,
-        gridTemplateColumns: style.gridTemplateColumns,
-        gap: style.gap
+        flexDirection: style.flexDirection
       }
     })
 
-    expect(computedStyle.display).toBe('grid')
-    expect(computedStyle.gridTemplateColumns).toMatch(/\d+px 1fr/)
+    expect(computedStyle.display).toBe('flex')
+    expect(computedStyle.flexDirection).toBe('row')
   })
 
   test('用户端页面配色正确', async ({ page }) => {
@@ -143,7 +142,7 @@ test.describe('视觉回归测试 - 后台', () => {
     const appLayout = page.locator('.app-layout')
     await expect(appLayout).toBeVisible()
 
-    // 检查 grid 布局
+    // 检查 flex 布局（全高骨架设计）
     const layout = page.locator('.layout')
     await expect(layout).toBeVisible()
 
@@ -151,12 +150,12 @@ test.describe('视觉回归测试 - 后台', () => {
       const style = window.getComputedStyle(el)
       return {
         display: style.display,
-        gridTemplateColumns: style.gridTemplateColumns,
+        flexDirection: style.flexDirection
       }
     })
 
-    expect(computedStyle.display).toBe('grid')
-    expect(computedStyle.gridTemplateColumns).toMatch(/\d+px 1fr/)
+    expect(computedStyle.display).toBe('flex')
+    expect(computedStyle.flexDirection).toBe('row')
   })
 
   test('后台侧边栏图标正确渲染', async ({ page }) => {

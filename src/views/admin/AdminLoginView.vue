@@ -2,7 +2,7 @@
   <main class="login-container">
     <div class="login-card">
       <div class="logo-section">
-        <div class="logo-icon" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+        <div class="logo-icon" style="background: linear-gradient(135deg, #0EA5E9, #0284C7);">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
           </svg>
@@ -54,7 +54,7 @@
           </div>
         </div>
 
-        <button type="submit" class="btn-login" :disabled="isLoading" :aria-busy="isLoading" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">
+        <button type="submit" class="btn-login" :disabled="isLoading" :aria-busy="isLoading" style="background: linear-gradient(135deg, #0EA5E9, #0284C7);">
           <svg v-if="isLoading" class="btn-spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
           </svg>
@@ -113,7 +113,11 @@ function handleLogin() {
         showSuccess.value = true
         showToast('登录成功！', 'success')
         // 触发窗口形变为管理员宽屏模式
-        window.electronAPI?.resizeWindow('admin-large')
+        try {
+          window.electronAPI?.resizeWindow('admin-large')
+        } catch (e) {
+          console.warn('resizeWindow failed:', e)
+        }
         setTimeout(() => {
           router.push('/admin/dashboard')
         }, 1000)
@@ -170,7 +174,7 @@ function goToUserLogin() {
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-  box-shadow: 0 10px 25px rgba(99,102,241,0.3);
+  box-shadow: 0 10px 25px rgba(14,165,233,0.3);
 }
 
 .logo-section .logo-icon svg {
@@ -222,14 +226,14 @@ function goToUserLogin() {
 }
 
 .input-wrapper input:focus {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99,102,241,0.1);
+  border-color: var(--studio-accent);
+  box-shadow: 0 0 0 4px rgba(14,165,233,0.1);
   background: white;
 }
 
 .input-wrapper input:focus-visible {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 4px rgba(99,102,241,0.2);
+  border-color: var(--studio-accent);
+  box-shadow: 0 0 0 4px rgba(14,165,233,0.2);
 }
 
 .input-icon {
@@ -265,11 +269,11 @@ function goToUserLogin() {
 }
 
 .toggle-password:hover {
-  color: #6366f1;
+  color: var(--studio-accent);
 }
 
 .toggle-password:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid var(--studio-accent);
   outline-offset: 2px;
 }
 
@@ -298,7 +302,7 @@ function goToUserLogin() {
 
 .btn-login:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px rgba(99,102,241,0.3);
+  box-shadow: 0 15px 30px rgba(14,165,233,0.3);
 }
 
 .btn-login:active:not(:disabled) {
@@ -306,7 +310,7 @@ function goToUserLogin() {
 }
 
 .btn-login:focus-visible {
-  outline: 3px solid rgba(99,102,241,0.4);
+  outline: 3px solid rgba(14,165,233,0.4);
   outline-offset: 2px;
 }
 
@@ -355,12 +359,12 @@ function goToUserLogin() {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: rgba(99,102,241,0.08);
-  border: 1px solid rgba(99,102,241,0.2);
+  background: rgba(14,165,233,0.08);
+  border: 1px solid rgba(14,165,233,0.2);
   border-radius: 10px;
   margin-bottom: 1.5rem;
   font-size: 0.85rem;
-  color: #6366f1;
+  color: var(--studio-accent);
 }
 
 .success-message.show {
@@ -384,11 +388,11 @@ function goToUserLogin() {
 }
 
 .footer-links a:hover {
-  color: #6366f1;
+  color: var(--studio-accent);
 }
 
 .footer-links a:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid var(--studio-accent);
   outline-offset: 2px;
 }
 

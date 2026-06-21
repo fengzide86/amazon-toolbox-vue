@@ -160,7 +160,7 @@ onMounted(loadData)
 .code-prefix-info {
   margin: var(--spacing-sm) 0;
   padding: 0.5rem;
-  background: rgba(79, 70, 229, 0.06);
+  background: rgba(14, 165, 233, 0.06);
   border-radius: var(--radius-sm);
   font-size: 0.8rem;
   color: var(--studio-text-muted);

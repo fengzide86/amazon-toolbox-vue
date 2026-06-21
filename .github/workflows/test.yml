@@ -133,6 +133,13 @@ jobs:
           BACKEND_URL: "http://localhost:8000"
           E2E_ADMIN_PASSWORD: "admin123"
       
+      - name: Run visual regression tests
+        run: npx playwright test tests/e2e/visual-regression.spec.js
+        env:
+          FRONTEND_URL: "http://localhost:3000"
+          BACKEND_URL: "http://localhost:8000"
+          E2E_ADMIN_PASSWORD: "admin123"
+      
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()

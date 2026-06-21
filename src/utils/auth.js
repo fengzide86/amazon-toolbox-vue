@@ -85,18 +85,13 @@ class AuthService {
 
   /**
    * 检查是否已登录
-   * 优先检查 toolbox_token（最可靠的认证标识）
-   * 然后检查 toolbox_auth 的过期时间
+   * 检查 toolbox_token 和 toolbox_auth 的过期时间
    */
   isAuthenticated() {
-    // 优先检查 token（管理员和用户登录都会设置 toolbox_token）
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (token) return true
-
     const auth = this.getAuth()
     if (!auth) return false
-    
-    // 检查 token 是否过期
+
+    // 检查 auth 过期时间（无论有无 token 都要检查）
     if (auth.expires_at) {
       const expiresAt = new Date(auth.expires_at).getTime()
       if (Date.now() >= expiresAt) {
@@ -104,8 +99,13 @@ class AuthService {
         return false
       }
     }
-    
-    return true
+
+    // 检查 token 是否存在
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (token) return true
+
+    // 兼容旧版：有 auth 数据但无 token 的情况
+    return !!auth.auth_code
   }
 
   /**
@@ -169,6 +169,19 @@ class AuthService {
   }
 
   /**
+   * 获取 API 基础地址（与 api.js 保持一致，避免循环依赖）
+   */
+  _getApiBase() {
+    try {
+      const electronApiBase = localStorage.getItem('toolbox_api_base')
+      if (electronApiBase) return electronApiBase
+    } catch (e) {}
+    const viteApiBase = import.meta.env?.VITE_API_BASE
+    if (viteApiBase) return viteApiBase
+    return import.meta.env?.DEV ? 'http://localhost:8000' : 'http://8.130.113.104:8000'
+  }
+
+  /**
    * 刷新 token
    */
   async refreshToken() {
@@ -176,7 +189,8 @@ class AuthService {
     if (!auth || !auth.refresh_token) return
     
     try {
-      const response = await fetch('/api/auth/refresh', {
+      const apiBase = this._getApiBase()
+      const response = await fetch(`${apiBase}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

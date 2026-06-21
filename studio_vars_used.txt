@@ -1,0 +1,14 @@
+--studio-accent
+--studio-accent-hover
+--studio-bg
+--studio-bg-hover
+--studio-border
+--studio-danger
+--studio-shadow
+--studio-shadow-hover
+--studio-success
+--studio-surface
+--studio-text-main
+--studio-text-muted
+--studio-text-secondary
+--studio-warning

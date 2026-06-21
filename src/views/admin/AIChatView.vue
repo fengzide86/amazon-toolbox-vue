@@ -4,172 +4,143 @@
       <h2 class="page-title">AI 客服管理</h2>
     </div>
 
-    <el-tabs v-model="activeTab" class="studio-tabs">
-      <el-tab-pane label="基础配置" name="config">
-        <div class="tab-content">
+    <!-- Master-Detail 双栏布局 -->
+    <div class="master-detail-container">
+      <!-- 左侧面板：配置 + 数据看板 + 对话记录 -->
+      <div class="panel-left">
+        <!-- 策略配置 -->
+        <div class="panel-section">
+          <h3 class="section-title">⚙️ 策略配置</h3>
+          
           <div class="config-section">
-            <h3>欢迎语</h3>
+            <label>欢迎语</label>
             <el-input
               v-model="config.welcome_message"
               type="textarea"
-              :rows="3"
-              placeholder="用户进入 AI 客服时显示的欢迎语"
+              :rows="2"
+              placeholder="用户进入时显示的欢迎语"
             />
           </div>
 
           <div class="config-section">
-            <h3>推荐问题</h3>
-            <p class="hint">用户进入时显示的推荐问题（最多 5 个）</p>
+            <label>推荐问题</label>
             <div v-for="(q, i) in suggestedQuestions" :key="i" class="suggested-item">
-              <el-input v-model="suggestedQuestions[i]" :placeholder="`推荐问题 ${i + 1}`" />
+              <el-input v-model="suggestedQuestions[i]" size="small" :placeholder="`推荐问题 ${i + 1}`" />
               <el-button
                 v-if="suggestedQuestions.length > 1"
                 type="danger"
                 size="small"
+                circle
                 @click="suggestedQuestions.splice(i, 1)"
               >
-                删除
+                ×
               </el-button>
             </div>
-            <el-button v-if="suggestedQuestions.length < 5" @click="suggestedQuestions.push('')">
+            <el-button v-if="suggestedQuestions.length < 5" size="small" @click="suggestedQuestions.push('')">
               + 添加
             </el-button>
           </div>
 
           <div class="config-section">
-            <h3>转人工规则</h3>
+            <label>转人工规则</label>
             <el-checkbox v-model="transferRules.refund_direct_transfer" class="checkbox-item">
-              退款相关问题直接转人工
+              退款问题直接转人工
             </el-checkbox>
             <el-checkbox v-model="transferRules.complaint_direct_transfer" class="checkbox-item">
-              投诉/情绪问题直接转人工
+              投诉/情绪直接转人工
             </el-checkbox>
             <el-checkbox v-model="transferRules.auto_transfer_after_retries" class="checkbox-item">
-              AI 连续 3 次未解决自动转人工
-            </el-checkbox>
-            <el-checkbox v-model="transferRules.account_direct_transfer" class="checkbox-item">
-              账号/授权问题直接转人工
+              3次未解决自动转人工
             </el-checkbox>
           </div>
 
-          <el-button type="primary" @click="saveConfig" :loading="saving">
+          <el-button type="primary" size="small" @click="saveConfig" :loading="saving" style="width: 100%;">
             {{ saving ? '保存中...' : '保存配置' }}
           </el-button>
         </div>
-      </el-tab-pane>
 
-      <el-tab-pane label="对话记录" name="sessions">
-        <div class="tab-content">
-          <div class="filter-bar">
-            <el-select v-model="sessionFilter" placeholder="全部状态" clearable @change="loadSessions" style="width: 160px;">
-              <el-option label="全部状态" value="" />
-              <el-option label="进行中" value="active" />
-              <el-option label="已解决" value="resolved" />
-              <el-option label="已转人工" value="transferred" />
-            </el-select>
+        <!-- 数据看板 -->
+        <div class="panel-section">
+          <h3 class="section-title">📊 数据看板</h3>
+          <div class="stats-grid-mini">
+            <div class="stat-mini">
+              <div class="stat-value-mini">{{ stats.total_sessions || 0 }}</div>
+              <div class="stat-label-mini">总对话</div>
+            </div>
+            <div class="stat-mini">
+              <div class="stat-value-mini">{{ stats.today_sessions || 0 }}</div>
+              <div class="stat-label-mini">今日</div>
+            </div>
+            <div class="stat-mini">
+              <div class="stat-value-mini">{{ stats.resolve_rate || 0 }}%</div>
+              <div class="stat-label-mini">解决率</div>
+            </div>
+            <div class="stat-mini">
+              <div class="stat-value-mini">{{ stats.transfer_rate || 0 }}%</div>
+              <div class="stat-label-mini">转人工</div>
+            </div>
           </div>
+        </div>
 
-          <div class="sessions-list">
-            <el-card
-              v-for="session in sessions"
+        <!-- 最近对话 -->
+        <div class="panel-section">
+          <h3 class="section-title">📋 最近对话</h3>
+          <div class="sessions-list-mini">
+            <div
+              v-for="session in sessions.slice(0, 5)"
               :key="session.session_id"
-              class="session-card"
-              shadow="hover"
+              class="session-item-mini"
+              :class="{ active: currentSession?.session_id === session.session_id }"
               @click="viewSession(session)"
             >
-              <div class="session-header">
-                <span class="session-id">{{ session.session_id }}</span>
+              <div class="session-id-mini">{{ session.session_id?.slice(-8) }}</div>
+              <div class="session-status-mini">
                 <el-tag :type="getStatusTagType(session.status)" size="small">
                   {{ getStatusText(session.status) }}
                 </el-tag>
               </div>
-              <div class="session-info">
-                <span>用户: {{ session.user_name || '匿名' }}</span>
-                <span>消息: {{ session.message_count }}</span>
-                <span>{{ formatTime(session.created_at) }}</span>
+            </div>
+            <div v-if="!sessions.length" class="empty-mini">暂无对话</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧面板：实时聊天沙盒 -->
+      <div class="panel-right">
+        <div class="panel-section chat-sandbox">
+          <h3 class="section-title">💬 实时聊天沙盒</h3>
+          
+          <!-- 聊天消息区 -->
+          <div class="chat-messages-sandbox">
+            <div v-for="(msg, idx) in sandboxMessages" :key="idx" :class="['message-sandbox', msg.role]">
+              <div class="message-avatar-sandbox">
+                {{ msg.role === 'user' ? '👤' : '🤖' }}
               </div>
-              <div class="session-meta">
-                <el-tag v-if="session.ai_resolved" type="success" size="small">AI 已解决</el-tag>
-                <el-tag v-if="session.transferred_to_human" type="warning" size="small">已转人工</el-tag>
-                <el-tag v-if="session.satisfaction" type="info" size="small">评分: {{ session.satisfaction }}★</el-tag>
+              <div class="message-content-sandbox">
+                <div class="message-text-sandbox">{{ msg.content }}</div>
+                <div class="message-time-sandbox">{{ formatTime(msg.time) }}</div>
               </div>
-            </el-card>
-            <el-empty v-if="!sessions.length" description="暂无对话记录" />
+            </div>
+            <div v-if="!sandboxMessages.length" class="empty-sandbox">
+              发送消息测试 AI 客服效果
+            </div>
           </div>
 
-          <div v-if="totalSessions > pageSize" class="pagination">
-            <el-pagination
-              v-model:current-page="currentPage"
-              :page-size="pageSize"
-              :total="totalSessions"
-              layout="prev, pager, next"
-              @current-change="loadSessions"
+          <!-- 输入区 -->
+          <div class="chat-input-sandbox">
+            <el-input
+              v-model="testMessage"
+              placeholder="输入测试消息..."
+              @keyup.enter="sendTest"
+              :disabled="sendingTest"
             />
-          </div>
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane label="数据看板" name="stats">
-        <div class="tab-content">
-          <el-row :gutter="16" class="stats-grid">
-            <el-col :span="6">
-              <el-card class="stat-card" shadow="never">
-                <div class="stat-value">{{ stats.total_sessions || 0 }}</div>
-                <div class="stat-label">总对话数</div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card" shadow="never">
-                <div class="stat-value">{{ stats.today_sessions || 0 }}</div>
-                <div class="stat-label">今日对话</div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card" shadow="never">
-                <div class="stat-value">{{ stats.resolve_rate || 0 }}%</div>
-                <div class="stat-label">AI 解决率</div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card" shadow="never">
-                <div class="stat-value">{{ stats.transfer_rate || 0 }}%</div>
-                <div class="stat-label">转人工率</div>
-              </el-card>
-            </el-col>
-          </el-row>
-          <el-row :gutter="16" style="margin-top: 1rem;">
-            <el-col :span="6">
-              <el-card class="stat-card" shadow="never">
-                <div class="stat-value">{{ stats.avg_satisfaction || '-' }}</div>
-                <div class="stat-label">平均满意度</div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 会话详情弹窗 -->
-    <el-dialog v-model="showDetail" title="对话详情" width="800px" :close-on-click-modal="true">
-      <div class="session-detail-header">
-        <span>会话 ID: {{ currentSession?.session_id }}</span>
-        <span>用户: {{ currentSession?.user_name || '匿名' }}</span>
-        <el-tag :type="getStatusTagType(currentSession?.status)" size="small">
-          {{ getStatusText(currentSession?.status) }}
-        </el-tag>
-      </div>
-      <div class="chat-messages">
-        <div v-for="msg in currentSession?.messages || []" :key="msg.id" :class="['message', msg.role]">
-          <div class="message-avatar">
-            {{ msg.role === 'user' ? '👤' : msg.role === 'ai' ? '🤖' : '⚙️' }}
-          </div>
-          <div class="message-content">
-            <div class="message-text">{{ msg.content }}</div>
-            <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+            <el-button type="primary" @click="sendTest" :loading="sendingTest">
+              发送
+            </el-button>
           </div>
         </div>
       </div>
-    </el-dialog>
+    </div>
   </div>
 </template>
 
@@ -177,8 +148,6 @@
 import { ref, onMounted } from 'vue'
 import { getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats } from '@/utils/api'
 import { showToast } from '@/utils'
-
-const activeTab = ref('config')
 
 // 配置
 const config = ref({
@@ -206,6 +175,11 @@ const currentSession = ref(null)
 
 // 统计
 const stats = ref({})
+
+// 沙盒测试
+const testMessage = ref('')
+const sandboxMessages = ref([])
+const sendingTest = ref(false)
 
 function getStatusTagType(status) {
   const map = { active: '', resolved: 'success', transferred: 'warning' }
@@ -295,6 +269,30 @@ async function loadStats() {
   }
 }
 
+// 沙盒测试发送
+async function sendTest() {
+  if (!testMessage.value.trim()) return
+  
+  const userMsg = {
+    role: 'user',
+    content: testMessage.value.trim(),
+    time: new Date().toISOString()
+  }
+  sandboxMessages.value.push(userMsg)
+  testMessage.value = ''
+  sendingTest.value = true
+  
+  // 模拟 AI 回复（实际应调用后端 API）
+  setTimeout(() => {
+    sandboxMessages.value.push({
+      role: 'ai',
+      content: '收到您的消息："' + userMsg.content + '"。这是沙盒测试回复。',
+      time: new Date().toISOString()
+    })
+    sendingTest.value = false
+  }, 800)
+}
+
 onMounted(() => {
   loadConfig()
   loadSessions()
@@ -305,6 +303,7 @@ onMounted(() => {
 <style scoped>
 .ai-chat-admin {
   padding: 0;
+  max-width: 100% !important;
 }
 
 .page-header {
@@ -319,32 +318,57 @@ onMounted(() => {
   margin: 0;
 }
 
-.studio-tabs {
+/* ===== Master-Detail 双栏布局 ===== */
+.master-detail-container {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  height: calc(100vh - 120px);
+}
+
+.panel-left {
+  flex: 0 0 35%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.panel-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-section {
   background: var(--studio-surface);
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.03);
 }
 
-.tab-content {
-  padding: 1rem 0;
-}
-
-/* 配置 */
-.config-section {
-  margin-bottom: 1.5rem;
-}
-
-.config-section h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1rem;
+.section-title {
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--studio-text-main);
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--studio-border);
 }
 
-.config-section .hint {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.85rem;
+/* ===== 左侧面板：配置区 ===== */
+.config-section {
+  margin-bottom: 1rem;
+}
+
+.config-section label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--studio-text-muted);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .suggested-item {
@@ -359,152 +383,179 @@ onMounted(() => {
   margin-bottom: 0.5rem;
 }
 
-/* 对话记录 */
-.filter-bar {
-  margin-bottom: 1rem;
-}
-
-.sessions-list {
+/* ===== 左侧面板：数据看板 ===== */
+.stats-grid-mini {
   display: grid;
-  gap: 0.75rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
-.session-card {
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.session-card:hover {
-  border-color: var(--studio-accent);
-}
-
-.session-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
-}
-
-.session-id {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-}
-
-.session-info {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-  margin-bottom: 0.5rem;
-}
-
-.session-meta {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.pagination {
-  display: flex;
-  justify-content: center;
-  margin-top: 1.5rem;
-}
-
-/* 统计 */
-.stats-grid {
-  margin-bottom: 1rem;
-}
-
-.stat-card {
+.stat-mini {
   background: var(--studio-bg);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+  padding: 12px;
   text-align: center;
 }
 
-.stat-value {
-  font-size: 2rem;
+.stat-value-mini {
+  font-size: 1.5rem;
   font-weight: 700;
+  color: var(--studio-text-main);
+  line-height: 1.2;
+}
+
+.stat-label-mini {
+  font-size: 0.75rem;
+  color: var(--studio-text-muted);
+  margin-top: 4px;
+}
+
+/* ===== 左侧面板：最近对话 ===== */
+.sessions-list-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-item-mini {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--studio-bg);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.session-item-mini:hover {
+  background: var(--studio-bg-hover);
+  transform: translateX(2px);
+}
+
+.session-item-mini.active {
+  background: rgba(14, 165, 233, 0.08);
+  border-left: 3px solid var(--studio-accent);
+}
+
+.session-id-mini {
+  font-family: monospace;
+  font-size: 0.8rem;
   color: var(--studio-text-main);
 }
 
-.stat-label {
-  font-size: 0.85rem;
+.empty-mini {
+  text-align: center;
   color: var(--studio-text-muted);
-  margin-top: 0.25rem;
-}
-
-/* 弹窗 */
-.session-detail-header {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--studio-border);
   font-size: 0.85rem;
-  align-items: center;
+  padding: 1rem;
 }
 
-.chat-messages {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
-.message {
+/* ===== 右侧面板：聊天沙盒 ===== */
+.chat-sandbox {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  height: 100%;
 }
 
-.message.user {
+.chat-messages-sandbox {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background: var(--studio-bg);
+  border-radius: var(--radius-md);
+  margin-bottom: 1rem;
+  min-height: 300px;
+}
+
+.message-sandbox {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  animation: messageSlideIn 0.3s ease;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-sandbox.user {
   flex-direction: row-reverse;
 }
 
-.message-avatar {
+.message-avatar-sandbox {
   font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
-.message-content {
+.message-content-sandbox {
   max-width: 70%;
-  padding: 0.75rem 1rem;
+  padding: 12px 16px;
   border-radius: 12px;
-  background: var(--studio-bg);
+  background: var(--studio-surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
-.message.user .message-content {
+.message-sandbox.user .message-content-sandbox {
   background: var(--studio-accent);
   color: white;
 }
 
-.message-text {
-  white-space: pre-wrap;
+.message-text-sandbox {
+  font-size: 0.9rem;
+  line-height: 1.5;
   word-break: break-word;
 }
 
-.message-time {
+.message-time-sandbox {
   font-size: 0.7rem;
   color: var(--studio-text-muted);
-  margin-top: 0.25rem;
+  margin-top: 6px;
   text-align: right;
 }
 
-.message.user .message-time {
+.message-sandbox.user .message-time-sandbox {
   color: rgba(255, 255, 255, 0.7);
 }
 
-:deep(.el-tabs__header) {
-  margin-bottom: 0;
+.empty-sandbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--studio-text-muted);
+  font-size: 0.9rem;
 }
 
-:deep(.el-tabs__nav-wrap::after) {
-  display: none;
+.chat-input-sandbox {
+  display: flex;
+  gap: 12px;
 }
 
-:deep(.el-dialog) {
-  border-radius: var(--radius-lg);
+.chat-input-sandbox :deep(.el-input) {
+  flex: 1;
 }
 
-:deep(.el-dialog__header) {
-  border-bottom: 1px solid var(--studio-border);
-  padding-bottom: 1rem;
+/* ===== 响应式 ===== */
+@media (max-width: 1024px) {
+  .master-detail-container {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .panel-left {
+    flex: none;
+  }
+  
+  .panel-right {
+    min-height: 500px;
+  }
 }
 </style>

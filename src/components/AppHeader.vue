@@ -10,12 +10,14 @@
         >
           <Menu :size="16" />
         </button>
-        <div class="logo-icon">
-          <Zap :size="16" />
-        </div>
-        <div class="header-title">
-          <h1>赛训工具箱</h1>
-        </div>
+        <router-link :to="isAdmin ? '/admin/dashboard' : '/user/dashboard'" class="logo-link">
+          <div class="logo-icon">
+            <Zap :size="16" />
+          </div>
+          <div class="header-title">
+            <h1>赛训工具箱</h1>
+          </div>
+        </router-link>
       </div>
 
       <!-- 平台切换器 -->
@@ -52,12 +54,14 @@
           </div>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="devices" :icon="Monitor">
-                设备换绑
-              </el-dropdown-item>
-              <el-dropdown-item command="plans" :icon="PriceTag">
-                续费中心
-              </el-dropdown-item>
+              <template v-if="!isAdmin">
+                <el-dropdown-item command="devices" :icon="Monitor">
+                  设备换绑
+                </el-dropdown-item>
+                <el-dropdown-item command="plans" :icon="PriceTag">
+                  续费中心
+                </el-dropdown-item>
+              </template>
               <el-dropdown-item divided command="logout" :icon="SwitchButton" class="logout-item">
                 退出系统
               </el-dropdown-item>
@@ -96,12 +100,15 @@ const adminPlatform = computed(() => platformStore.adminPlatform)
 
 const currentPlatformModel = computed({
   get: () => props.isAdmin ? adminPlatform.value : currentPlatform.value,
-  set: () => {} // handled by handlePlatformSelect
+  set: (val) => handlePlatformSelect(val)
 })
 
 const availablePlatformsForUser = computed(() => {
   if (props.isAdmin) {
-    return platformStore.availablePlatforms.filter(p => p.status === 'available')
+    // 管理员：头部插入"全部平台"选项
+    const allOption = { key: 'all', short_name: '全部平台', name: '全部平台', status: 'available' }
+    const platforms = platformStore.availablePlatforms.filter(p => p.status === 'available')
+    return [allOption, ...platforms]
   }
   const platformScope = getPlatformScope()
   return platformStore.getAvailablePlatformsForUser(platformScope)
@@ -177,8 +184,11 @@ const isSvip = computed(() => {
 function handleLogout() {
   Auth.clear()
   localStorage.removeItem('toolbox_role')
+  localStorage.removeItem('toolbox_user')
   localStorage.removeItem('toolbox_current_platform')
   localStorage.removeItem('toolbox_admin_platform')
+  localStorage.removeItem('toolbox_platform_scope')
+  localStorage.removeItem('toolbox_device_id')
   router.push('/user/login')
 }
 
@@ -191,7 +201,8 @@ onMounted(() => {
 .studio-header {
   height: var(--header-height);
   background: var(--studio-surface);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: none;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.06);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -239,6 +250,20 @@ onMounted(() => {
 .hamburger-btn:hover {
   background: var(--color-border-light);
   color: var(--color-primary);
+}
+
+/* Logo link */
+.logo-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+
+.logo-link:hover {
+  opacity: 0.8;
 }
 
 /* Logo */
@@ -311,8 +336,8 @@ onMounted(() => {
 /* 管理员标记 */
 .admin-badge {
   font-size: 10px;
-  background: rgba(79, 70, 229, 0.1);
-  border: 1px solid rgba(79, 70, 229, 0.2);
+  background: rgba(14, 165, 233, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.2);
   color: var(--studio-accent);
   padding: 2px 6px;
   border-radius: 4px;

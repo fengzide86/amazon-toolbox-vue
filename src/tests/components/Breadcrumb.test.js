@@ -103,7 +103,7 @@ describe('Breadcrumb', () => {
   })
 
   describe('首页链接测试', () => {
-    it('首页链接应该指向根路径', () => {
+    it('首页链接应该指向用户首页', () => {
       const wrapper = mount(Breadcrumb, {
         global: {
           stubs: {
@@ -112,7 +112,7 @@ describe('Breadcrumb', () => {
         }
       })
       const homeLink = wrapper.findComponent(RouterLinkStub)
-      expect(homeLink.props('to')).toBe('/')
+      expect(homeLink.props('to')).toBe('/user/dashboard')
     })
 
     it('首页链接应该包含首页图标', () => {

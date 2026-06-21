@@ -72,7 +72,7 @@
 | 打包后白屏 | vite base 必须是 `'./'`，路由用 Hash 模式 |
 | 用户端报 403 | 调用了管理员接口 |
 | 数据库缺字段 | database.py 有自动迁移，但服务器需手动 ALTER TABLE |
-| bat 脚本闪退 | 必须是 GBK/ASCII 编码，不能 UTF-8 |
+| bat 脚本闪退 | 必须是 GBK/ASCII 编码。AI 编辑 bat 时只能用英文，禁止中文 |
 | 输入框无法点击 | 不要用 `titleBarStyle: 'hiddenInset'`，用 `frame: true` |
 | 打包后后端崩溃 | exe 必须通过 extraFiles 放到 asar 外面 |
 | electron-updater 崩溃 | 必须放 dependencies，不能放 devDependencies |
@@ -94,3 +94,8 @@
    - 修改后的效果
 3. **获得明确同意** — 用户明确说"可以改"或"同意"后才能修改
 4. **修改后需确认** — 修改完成后，告知用户修改了什么，用户有异议立即回退
+5. **bat 文件编辑规则** — AI 修改 `.bat` 文件时必须遵守：
+   - **只能用英文/ASCII 字符**：所有 echo、注释、提示信息必须用英文，禁止使用中文
+   - **禁止 UTF-8 BOM**：write_to_file 保存后不能带 BOM 头
+   - **修改后提醒用户**：告知用户 bat 文件已修改，如遇闪退需检查编码
+   - 涉及的 bat 文件：`一键启动.bat`、`一键发布.bat`、`build.bat`、`检查.bat`、`测试.bat`、`保存.bat`、`backend/start.bat`

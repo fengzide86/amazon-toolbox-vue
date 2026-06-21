@@ -1,6 +1,6 @@
 <template>
   <nav class="breadcrumb" aria-label="面包屑导航">
-    <router-link to="/" class="breadcrumb-item">
+    <router-link :to="homePath" class="breadcrumb-item">
       <Home :size="14" />
       首页
     </router-link>
@@ -15,6 +15,10 @@ import { useRoute } from 'vue-router'
 import { Home } from '@lucide/vue'
 
 const route = useRoute()
+
+const homePath = computed(() => {
+  return route.path?.startsWith('/admin') ? '/admin/dashboard' : '/user/dashboard'
+})
 
 const currentTitle = computed(() => {
   return route.meta?.title || '未知页面'
@@ -45,7 +49,7 @@ const currentTitle = computed(() => {
 
 .breadcrumb-item:hover {
   color: var(--color-accent);
-  background: rgba(99, 102, 241, 0.06);
+  background: rgba(14, 165, 233, 0.06);
 }
 
 .breadcrumb-item.active {

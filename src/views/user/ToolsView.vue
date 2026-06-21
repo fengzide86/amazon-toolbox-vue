@@ -308,7 +308,7 @@ onMounted(() => {
 .search-box input:focus {
   outline: none;
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
 .clear-btn {
@@ -360,7 +360,7 @@ onMounted(() => {
 }
 
 .tab-btn:hover {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(14, 165, 233, 0.05);
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
@@ -409,12 +409,12 @@ onMounted(() => {
 
 .status-badge.online {
   background: rgba(16, 185, 129, 0.1);
-  color: #10B981;
+  color: var(--studio-success);
 }
 
 .status-badge.offline {
   background: rgba(239, 68, 68, 0.1);
-  color: #EF4444;
+  color: var(--studio-danger);
 }
 
 .tool-desc {
@@ -436,7 +436,7 @@ onMounted(() => {
 .tool-category {
   font-size: 0.75rem;
   color: var(--color-accent);
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(14, 165, 233, 0.08);
   padding: 0.2rem 0.6rem;
   border-radius: 4px;
 }

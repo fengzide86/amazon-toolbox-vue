@@ -12,8 +12,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     headless: true,
-    screenshot: 'on',
-    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    trace: 'retain-on-failure',
     viewport: { width: 1440, height: 900 },
   },
   expect: {

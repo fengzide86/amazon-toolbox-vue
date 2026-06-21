@@ -604,9 +604,9 @@ onMounted(() => {
   border-radius: 4px;
 }
 
-.history-status.active { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
-.history-status.resolved { background: rgba(16, 185, 129, 0.1); color: #10b981; }
-.history-status.transferred { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.history-status.active { background: rgba(14, 165, 233, 0.1); color: var(--studio-accent); }
+.history-status.resolved { background: rgba(16, 185, 129, 0.1); color: var(--studio-success); }
+.history-status.transferred { background: rgba(255, 153, 0, 0.1); color: var(--studio-warning); }
 
 .history-time {
   font-size: 0.8rem;
@@ -626,12 +626,12 @@ onMounted(() => {
 }
 
 .btn-success {
-  background: #10b981;
+  background: var(--studio-success);
   color: white;
 }
 
 .btn-warning {
-  background: #f59e0b;
+  background: var(--studio-warning);
   color: white;
 }
 </style>

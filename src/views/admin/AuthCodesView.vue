@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <h2 class="page-title">授权码管理</h2>
 
@@ -218,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlans, api } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
@@ -235,7 +235,7 @@ const isLoading = ref(false)
 const generatedCodes = ref([])
 const filterStatus = ref('')
 const searchText = ref('')
-const planNameMap = {}
+const planNameMap = reactive({})
 
 const platformStore = usePlatformStore()
 
@@ -428,8 +428,8 @@ function copyCodes() {
 
 async function openDetail(code) {
   try {
-    const res = await api.get(`/auth-codes/${code.id}`)
-    detailData.value = res.data
+    const res = await api.get(`/api/auth-codes/${code.id}`)
+    detailData.value = res
     showDetailModal.value = true
   } catch (err) {
     showToast('获取详情失败', 'error')
@@ -527,7 +527,7 @@ onMounted(loadData)
   font-size: 0.75rem;
   font-weight: 600;
   background: rgba(16, 185, 129, 0.1);
-  color: #10B981;
+  color: var(--studio-success);
 }
 
 .device-badge {
