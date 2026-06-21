@@ -1,8 +1,23 @@
 const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
+const { spawn } = require('child_process');
 
 let mainWindow;
+let backendProcess = null;
+
+// ===== 单实例锁 =====
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 
 // ===== 自动更新功能 =====
 // 更新服务器地址（优先从环境变量读取，默认值仅供开发使用）
@@ -103,9 +118,14 @@ autoUpdater.on('update-downloaded', (info) => {
   }
 });
 
-// 更新错误
+// 更新错误 - 通知用户
 autoUpdater.on('error', (err) => {
   console.error('[Updater] 更新错误:', err.message);
+  if (mainWindow) {
+    mainWindow.webContents.send('update-error', {
+      message: '更新检查失败: ' + err.message
+    });
+  }
 });
 
 // 监听来自渲染进程的更新指令
@@ -118,7 +138,27 @@ ipcMain.on('start-download-update', () => {
 
 ipcMain.on('install-update', () => {
   console.log('[Updater] 安装更新，即将重启...');
+  cleanupBackend();
   autoUpdater.quitAndInstall();
+});
+
+// 暂停/继续下载
+ipcMain.on('pause-download', () => {
+  console.log('[Updater] 暂停下载');
+  autoUpdater.autoDownload = false;
+});
+
+ipcMain.on('resume-download', () => {
+  console.log('[Updater] 继续下载');
+  autoUpdater.autoDownload = true;
+  autoUpdater.downloadUpdate().catch(err => {
+    console.error('[Updater] 继续下载失败:', err.message);
+  });
+});
+
+ipcMain.on('cancel-download', () => {
+  console.log('[Updater] 取消下载');
+  // electron-updater 不支持直接取消，重新设置 feed URL 来重置
 });
 
 // ===== 窗口形变控制 =====
@@ -162,6 +202,47 @@ ipcMain.on('resize-window-context', (event, targetMode) => {
   }
 });
 
+// ===== 后端进程管理 =====
+function startBackend() {
+  const backendExe = path.join(__dirname, 'toolbox-backend.exe');
+  try {
+    backendProcess = spawn(backendExe, [], {
+      detached: false,
+      stdio: 'ignore',
+      windowsHide: true
+    });
+    console.log('[Backend] 后端进程已启动, PID:', backendProcess.pid);
+    backendProcess.on('error', (err) => {
+      console.error('[Backend] 后端启动失败:', err.message);
+    });
+    backendProcess.on('exit', (code) => {
+      console.log('[Backend] 后端进程退出, code:', code);
+      backendProcess = null;
+    });
+  } catch (err) {
+    console.error('[Backend] 启动后端失败:', err.message);
+  }
+}
+
+function cleanupBackend() {
+  if (backendProcess) {
+    console.log('[Backend] 正在关闭后端进程...');
+    try {
+      backendProcess.kill('SIGTERM');
+      // 给后端 3 秒时间优雅关闭
+      setTimeout(() => {
+        if (backendProcess) {
+          backendProcess.kill('SIGKILL');
+          backendProcess = null;
+        }
+      }, 3000);
+    } catch (err) {
+      console.error('[Backend] 关闭后端失败:', err.message);
+      backendProcess = null;
+    }
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -175,10 +256,16 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
     },
     frame: true,
-    show: true,
+    show: false, // 先隐藏，等页面加载完再显示
+    backgroundColor: '#0F172A', // 深色背景减少闪烁
   });
 
   mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+
+  // 页面加载完成后显示窗口（消除白屏闪烁）
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
 
   // 设置云端服务器地址到 localStorage
   mainWindow.webContents.on('did-finish-load', () => {
@@ -201,12 +288,20 @@ app.commandLine.appendSwitch('no-proxy-server');
 app.whenReady().then(() => {
   console.log('[INFO] App ready');
 
+  // 启动后端进程
+  startBackend();
+
   // 创建窗口，直接连接云端服务器
   createWindow();
 });
 
 app.on('window-all-closed', () => {
+  cleanupBackend();
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  cleanupBackend();
 });
