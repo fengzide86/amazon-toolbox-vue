@@ -13,7 +13,16 @@
       <AdminSidebar :class="{ 'mobile-open': showMobileSidebar }" />
       <main class="content">
         <Breadcrumb />
-        <router-view :key="platformKey" />
+        <router-view :key="platformKey" v-slot="{ Component }">
+          <Suspense>
+            <template #default>
+              <component :is="Component" />
+            </template>
+            <template #fallback>
+              <LoadingSkeleton :type="route.meta?.skeleton || 'default'" />
+            </template>
+          </Suspense>
+        </router-view>
       </main>
     </div>
   </div>
@@ -21,13 +30,15 @@
 
 <script setup>
 import { ref, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { usePlatformStore } from '@/stores/platform'
 import AppHeader from '@/components/AppHeader.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const router = useRouter()
+const route = useRoute()
 const platformStore = usePlatformStore()
 const showMobileSidebar = ref(false)
 const platformKey = ref(0)

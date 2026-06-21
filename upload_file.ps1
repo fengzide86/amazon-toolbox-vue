@@ -1,41 +1,62 @@
-param([string]$FilePath, [string]$ServerUrl, [string]$Token)
+# upload_file.ps1 - 文件上传脚本（修复中文路径问题）
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$FilePath,
+    
+    [Parameter(Mandatory=$true)]
+    [string]$ServerUrl,
+    
+    [string]$Token
+)
 
-$fileName = [System.IO.Path]::GetFileName($FilePath)
-$boundary = [System.Guid]::NewGuid().ToString()
-$LF = "`r`n"
-
-# Use WebClient for binary-safe upload
-$wc = New-Object System.Net.WebClient
-$wc.Headers.Add("Content-Type", "multipart/form-data; boundary=$boundary")
-
-# Add Authorization header if Token is provided
-if ($Token) {
-    $wc.Headers.Add("Authorization", "Bearer $Token")
+# 解析为绝对路径（支持中文文件名）
+$resolvedPath = Resolve-Path -LiteralPath $FilePath
+if (-not $resolvedPath) {
+    Write-Host "Error: File not found: $FilePath"
+    exit 1
 }
 
-# Build body as bytes
-$encoding = [System.Text.Encoding]::GetEncoding(28591)
-$headerStr = "--$boundary$LF"
-$headerStr += "Content-Disposition: form-data; name=`"file`"; filename=`"$fileName`"$LF"
-$headerStr += "Content-Type: application/octet-stream$LF$LF"
-$footerStr = "$LF--$boundary--$LF"
+$fileName = [System.IO.Path]::GetFileName($resolvedPath.Path)
+$fileSize = (Get-Item -LiteralPath $resolvedPath.Path).Length
 
-$headerBytes = $encoding.GetBytes($headerStr)
-$footerBytes = $encoding.GetBytes($footerStr)
-$fileBytes = [System.IO.File]::ReadAllBytes($FilePath)
-
-$totalLen = $headerBytes.Length + $fileBytes.Length + $footerBytes.Length
-$bodyBytes = New-Object byte[] $totalLen
-[System.Buffer]::BlockCopy($headerBytes, 0, $bodyBytes, 0, $headerBytes.Length)
-[System.Buffer]::BlockCopy($fileBytes, 0, $bodyBytes, $headerBytes.Length, $fileBytes.Length)
-[System.Buffer]::BlockCopy($footerBytes, 0, $bodyBytes, $headerBytes.Length + $fileBytes.Length, $footerBytes.Length)
+Write-Host "Uploading: $fileName ($([math]::Round($fileSize / 1MB, 2)) MB)..."
 
 try {
-    $response = $wc.UploadData("$ServerUrl/api/updates/upload", "POST", $bodyBytes)
-    $responseText = $encoding.GetString($response)
-    Write-Host $responseText
-    exit 0
+    # 使用 .NET HttpClient 上传（支持中文路径）
+    Add-Type -AssemblyName System.Net.Http
+    
+    $client = New-Object System.Net.Http.HttpClient
+    $client.Timeout = [TimeSpan]::FromMinutes(10)
+    
+    if ($Token) {
+        $client.DefaultRequestHeaders.Authorization = [System.Net.Http.Headers.AuthenticationHeaderValue]::new("Bearer", $Token)
+    }
+    
+    # 构建 multipart form data
+    $content = New-Object System.Net.Http.MultipartFormDataContent
+    $fileBytes = [System.IO.File]::ReadAllBytes($resolvedPath.Path)
+    $fileContent = New-Object System.Net.Http.ByteArrayContent(,$fileBytes)
+    $fileContent.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::new("application/octet-stream")
+    $content.Add($fileContent, "file", $fileName)
+    
+    # 上传
+    $uploadUrl = "$ServerUrl/api/updates/upload"
+    $response = $client.PostAsync($uploadUrl, $content).Result
+    
+    $responseContent = $response.Content.ReadAsStringAsync().Result
+    
+    if ($response.IsSuccessStatusCode) {
+        Write-Host "Upload success: $responseContent"
+        exit 0
+    } else {
+        Write-Host "Upload failed: HTTP $($response.StatusCode) - $responseContent"
+        exit 1
+    }
 } catch {
-    Write-Host ("Upload failed: " + $_.Exception.Message)
+    Write-Host "Upload failed: $($_.Exception.Message)"
     exit 1
+} finally {
+    if ($client) {
+        $client.Dispose()
+    }
 }
