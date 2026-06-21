@@ -2,7 +2,7 @@
 Token 黑名单模块
 用于使 JWT Token 失效（如用户登出、修改密码等场景）
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Set, Dict, Optional
 from core.config import settings
 from core.logging import get_logger
@@ -53,7 +53,7 @@ class TokenBlacklist:
         if self._redis:
             try:
                 # 计算剩余时间
-                ttl = int((expires_at - datetime.utcnow()).total_seconds())
+                ttl = int((expires_at - datetime.now(timezone.utc)).total_seconds())
                 if ttl <= 0:
                     return False  # Token 已过期，无需加入黑名单
                 
@@ -139,7 +139,7 @@ class TokenBlacklist:
     
     def _cleanup_expired(self):
         """清理过期的黑名单条目（仅内存模式）"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_tokens = [
             token for token, expires_at in self._memory_blacklist.items()
             if expires_at < now
@@ -186,7 +186,7 @@ class LogoutManager:
         Returns:
             是否成功记录
         """
-        logout_time = datetime.utcnow()
+        logout_time = datetime.now(timezone.utc)
         
         if self._redis:
             try:
