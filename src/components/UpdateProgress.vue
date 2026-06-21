@@ -164,27 +164,28 @@ function handleProgress(event) {
 function pauseDownload() {
   isPaused.value = true
   statusMessage.value = '⏸️ 下载已暂停'
-  // 发送 IPC 事件给 Electron
-  window.dispatchEvent(new CustomEvent('update-pause'))
+  // 调用 Electron API 暂停下载
+  window.electronAPI?.pauseDownload()
 }
 
 function resumeDownload() {
   isPaused.value = false
   statusMessage.value = '▶️ 继续下载...'
-  window.dispatchEvent(new CustomEvent('update-resume'))
+  // 调用 Electron API 继续下载
+  window.electronAPI?.resumeDownload()
 }
 
 function minimizeToBackground() {
   showProgress.value = false
   statusMessage.value = '📥 正在后台下载...'
-  window.dispatchEvent(new CustomEvent('update-minimize'))
 }
 
 function cancelDownload() {
   if (confirm('确定要取消更新吗？')) {
     showProgress.value = false
     statusMessage.value = ''
-    window.dispatchEvent(new CustomEvent('update-cancel'))
+    // 调用 Electron API 取消下载
+    window.electronAPI?.cancelDownload()
   }
 }
 

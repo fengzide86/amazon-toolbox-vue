@@ -21,6 +21,9 @@ ipcRenderer.on('update-error', (event, data) => {
 contextBridge.exposeInMainWorld('electronAPI', {
   startDownloadUpdate: () => ipcRenderer.send('start-download-update'),
   installUpdate: () => ipcRenderer.send('install-update'),
+  pauseDownload: () => ipcRenderer.send('pause-download'),
+  resumeDownload: () => ipcRenderer.send('resume-download'),
+  cancelDownload: () => ipcRenderer.send('cancel-download'),
   onUpdateProgress: (callback) => {
     ipcRenderer.on('update-download-progress', (event, data) => callback(data));
   },
