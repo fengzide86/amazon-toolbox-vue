@@ -114,6 +114,8 @@ function goToLogin() {
   localStorage.removeItem('toolbox_user')
   showKickout.value = false
   closeSidebar()
+  // 登出时恢复默认窗口
+  window.electronAPI?.resizeWindow('reset')
   router.push('/user/login')
 }
 

@@ -44,17 +44,25 @@ class AuthService:
         5. 席位检查（1.5 新增）
         6. 多设备支持：检查设备绑定情况
         7. 返回 JWT Token
+        
+        优化: 缓存中间查询结果，避免重复查询（原约8次查询优化为5次）
         """
         code = code.strip()
         
-        # 1. 查询授权码
+        # 1. 查询授权码（同时 JOIN 获取 Plan 信息，避免后续重复查询）
         result = await self.db.execute(
-            select(AuthCode).where(AuthCode.code == code)
+            select(AuthCode, Plan.name, Plan.duration_days)
+            .outerjoin(Plan, AuthCode.plan_id == Plan.id)
+            .where(AuthCode.code == code)
         )
-        code_obj = result.scalars().first()
+        row = result.first()
         
-        if not code_obj:
+        if not row:
             return error_response("授权码无效", ErrorCodes.AUTH_CODE_INVALID)
+        
+        code_obj = row[0]
+        plan_name = row[1] or "未知"
+        plan_duration = row[2] or 30  # 默认30天
         
         # 2. 检查状态
         if code_obj.status == "frozen":
@@ -83,17 +91,8 @@ class AuthService:
             code_obj.device_id = device_id
             code_obj.device_name = device_name
             
-            # 获取套餐天数
-            days = 30
-            if code_obj.plan_id:
-                plan_result = await self.db.execute(
-                    select(Plan).where(Plan.id == code_obj.plan_id)
-                )
-                plan = plan_result.scalars().first()
-                if plan:
-                    days = plan.duration_days
-            
-            code_obj.expires_at = datetime.now() + timedelta(days=days)
+            # 使用已 JOIN 获取的 plan_duration，无需再次查询 Plan
+            code_obj.expires_at = datetime.now() + timedelta(days=plan_duration)
             
             # 创建用户记录
             user = User(
@@ -120,6 +119,7 @@ class AuthService:
         )
         seat_obj = existing_seat.scalars().first()
         
+        # 缓存席位计数，后续响应直接复用
         if not seat_obj:
             # 检查席位数是否已满
             active_seats_count = await self.db.execute(
@@ -165,7 +165,17 @@ class AuthService:
                     ErrorCodes.DEVICE_LIMIT_EXCEEDED
                 )
             
-            logger.info(f"授权码 {code} 创建新席位 #{active_seats + 1}")
+            active_seats = recheck_seats
+            logger.info(f"授权码 {code} 创建新席位 #{seat_obj.seat_no}")
+        else:
+            # 已有席位，获取当前席位数
+            active_seats_count = await self.db.execute(
+                select(func.count(AuthSeat.id)).where(
+                    AuthSeat.auth_code_id == code_obj.id,
+                    AuthSeat.status == "active"
+                )
+            )
+            active_seats = active_seats_count.scalar() or 0
         
         # 6. 多设备支持
         existing_device = await self.db.execute(
@@ -176,6 +186,7 @@ class AuthService:
         )
         device_obj = existing_device.scalars().first()
         
+        # 缓存设备计数，后续响应直接复用
         if not device_obj:
             # 检查设备上限
             device_count_result = await self.db.execute(
@@ -197,7 +208,14 @@ class AuthService:
             )
             self.db.add(device_obj)
             await self.db.flush()
+            device_count += 1  # 新增了一个设备
             logger.info(f"授权码 {code} 绑定新设备: {device_name}")
+        else:
+            # 已有设备，获取当前设备数
+            device_count_result = await self.db.execute(
+                select(func.count(Device.id)).where(Device.auth_code_id == code_obj.id)
+            )
+            device_count = device_count_result.scalar() or 0
         
         # 7. 提交事务
         try:
@@ -207,29 +225,7 @@ class AuthService:
             logger.error(f"验证过程出错: {e}")
             return error_response("验证过程出错，请重试", ErrorCodes.DATABASE_ERROR)
         
-        # 8. 获取套餐名称
-        plan_name = "未知"
-        if code_obj.plan_id:
-            plan_result = await self.db.execute(
-                select(Plan.name).where(Plan.id == code_obj.plan_id)
-            )
-            plan_name = plan_result.scalar() or "未知"
-        
-        # 9. 获取席位和设备统计
-        active_seats_count = await self.db.execute(
-            select(func.count(AuthSeat.id)).where(
-                AuthSeat.auth_code_id == code_obj.id,
-                AuthSeat.status == "active"
-            )
-        )
-        active_seats = active_seats_count.scalar() or 0
-        
-        device_count_result = await self.db.execute(
-            select(func.count(Device.id)).where(Device.auth_code_id == code_obj.id)
-        )
-        device_count = device_count_result.scalar() or 0
-        
-        # 10. 生成 JWT Token
+        # 8. 生成 JWT Token（plan_name 和统计数据已在上方缓存，无需重复查询）
         token = create_access_token(data={
             "user_id": code_obj.user_id,
             "role": "user",

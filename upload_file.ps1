@@ -1,21 +1,17 @@
-param([string]$FilePath, [string]$ServerUrl)
+param([string]$FilePath, [string]$ServerUrl, [string]$Token)
 
 $fileName = [System.IO.Path]::GetFileName($FilePath)
 $boundary = [System.Guid]::NewGuid().ToString()
 $LF = "`r`n"
 
-$bodyLines = @(
-    "--$boundary",
-    "Content-Disposition: form-data; name=`"file`"; filename=`"$fileName`"",
-    "Content-Type: application/octet-stream",
-    "",
-    (Get-Content $FilePath -Raw -Encoding Byte),
-    "--$boundary--"
-)
-
 # Use WebClient for binary-safe upload
 $wc = New-Object System.Net.WebClient
 $wc.Headers.Add("Content-Type", "multipart/form-data; boundary=$boundary")
+
+# Add Authorization header if Token is provided
+if ($Token) {
+    $wc.Headers.Add("Authorization", "Bearer $Token")
+}
 
 # Build body as bytes
 $encoding = [System.Text.Encoding]::GetEncoding(28591)

@@ -1,0 +1,109 @@
+/* === Element Plus 全局组件质感覆盖 === */
+.el-card {
+    border: none !important;
+    box-shadow: var(--studio-shadow) !important;
+    border-radius: 10px !important;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.el-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--studio-shadow-hover) !important;
+}
+.el-button--primary {
+    --el-button-bg-color: var(--studio-accent);
+    --el-button-border-color: var(--studio-accent);
+    --el-button-hover-bg-color: var(--studio-accent-hover);
+    --el-button-hover-border-color: var(--studio-accent-hover);
+}
+.el-button--warning {
+    --el-button-bg-color: var(--studio-warning);
+    --el-button-border-color: var(--studio-warning);
+}
+.el-button--danger {
+    --el-button-bg-color: var(--studio-danger);
+    --el-button-border-color: var(--studio-danger);
+}
+.el-tag {
+    border-radius: 6px;
+}
+.el-table {
+    --el-table-border-color: #E2E8F0;
+    --el-table-header-bg-color: #F8FAFC;
+    --el-table-row-hover-bg-color: #F1F5F9;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+/* 全局 Element Plus 对话框 */
+.el-dialog {
+    border-radius: var(--radius-lg);
+}
+
+.el-dialog__header {
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 1rem;
+}
+
+.el-dialog__footer {
+    border-top: 1px solid var(--color-border);
+    padding-top: 1rem;
+}
+
+/* 全局 Element Plus 表单 */
+.el-form-item__label {
+    color: var(--studio-text-main) !important;
+    font-weight: 500;
+}
+
+/* 全局 Element Plus 输入框 */
+.el-input__wrapper {
+    border-radius: 8px !important;
+}
+
+.el-textarea__inner {
+    border-radius: 8px !important;
+}
+
+/* 全局 Element Plus 选择器 */
+.el-select-dropdown__item.is-selected {
+    color: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus 分页 */
+.el-pagination .el-pager li.is-active {
+    background: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus Tabs */
+.el-tabs__item.is-active {
+    color: var(--studio-accent) !important;
+}
+
+.el-tabs__active-bar {
+    background-color: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus 复选框 */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+    background-color: var(--studio-accent) !important;
+    border-color: var(--studio-accent) !important;
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label {
+    color: var(--studio-accent) !important;
+}
+
+/* 全局 Element Plus 单选框 */
+.el-radio__input.is-checked .el-radio__inner {
+    background-color: var(--studio-accent) !important;
+    border-color: var(--studio-accent) !important;
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+    color: var(--studio-accent) !important;
+}
+
+/* Element Plus 图标保护 */
+.el-icon {
+    flex-shrink: 0 !important;
+}

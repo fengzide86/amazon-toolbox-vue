@@ -27,21 +27,18 @@ async def get_devices(
     _admin: dict = Depends(get_current_admin)
 ):
     """获取设备列表（管理员）"""
-    query = select(Device).order_by(Device.created_at.desc())
+    # 使用 selectinload 预加载关联的授权码信息，避免 N+1 查询
+    query = select(Device).options(selectinload(Device.auth_code)).order_by(Device.created_at.desc())
     if auth_code_id:
         query = query.where(Device.auth_code_id == auth_code_id)
     
     result = await db.execute(query)
     devices = result.scalars().all()
     
-    # 获取关联的授权码信息
+    # 直接从预加载的关联对象获取授权码信息
     device_list = []
     for device in devices:
-        auth_result = await db.execute(
-            select(AuthCode).where(AuthCode.id == device.auth_code_id)
-        )
-        auth_code = auth_result.scalars().first()
-        
+        auth_code = device.auth_code
         device_list.append({
             "id": device.id,
             "auth_code_id": device.auth_code_id,

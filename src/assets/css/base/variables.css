@@ -1,0 +1,133 @@
+/* ===== CSS Variables ===== */
+:root {
+    /* === Studio Milk & Slate 色彩系统 === */
+    --studio-bg: #F5F6F9;              /* 牛奶复合白：带微弱冷灰调底色 */
+    --studio-surface: #FFFFFF;         /* 纯白：卡片、弹窗背景 */
+    --studio-frame: #0F172A;           /* 深石板蓝：侧边栏、顶栏压阵 */
+    --studio-text-main: #1E293B;       /* 碳晶灰：正文 */
+    --studio-text-muted: #64748B;      /* 燕麦灰：辅助文字 */
+    --studio-accent: #0EA5E9;          /* 冰川蓝：品牌色、主按钮 */
+    --studio-accent-hover: #0284C7;
+    --studio-accent-light: #7DD3FC;
+    --studio-accent-bg: #E0F2FE;       /* 极淡冰川蓝背景 */
+    --studio-success: #10B981;         /* 新茶绿：正常状态 */
+    --studio-warning: #FF9900;         /* 亚马逊橙：付费锁卡、VIP */
+    --studio-danger: #EF4444;          /* 红色：危险操作 */
+    --studio-danger-hover: #DC2626;
+    --studio-info: #06B6D4;
+    --studio-purple: #8B5CF6;
+    --studio-gold: #FF9900;
+    --studio-amazon: #FF9900;          /* 亚马逊橙：登录页品牌装饰专用 */
+    --studio-amazon-light: #FBBF24;
+
+    /* === 弥散悬浮阴影 === */
+    --studio-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 12px 0 rgba(15, 23, 42, 0.03);
+    --studio-shadow-hover: 0 10px 25px -5px rgba(14, 165, 233, 0.08), 0 8px 16px -6px rgba(14, 165, 233, 0.04);
+
+    /* === 边框和交互状态 === */
+    --studio-border: #E2E8F0;
+    --studio-bg-hover: #F1F5F9;
+    --studio-text-secondary: #64748B;  /* 辅助文字颜色 */
+
+    /* === 兼容旧变量（过渡期） === */
+    --color-primary: #0F172A;
+    --color-accent: var(--studio-accent);
+    --color-accent-hover: var(--studio-accent-hover);
+    --color-accent-light: var(--studio-accent-light);
+    --color-gold: var(--studio-warning);
+    --color-background: #F5F6F9;
+    --color-body-bg: linear-gradient(135deg, #F5F6F9 0%, #EEF0F5 50%, #E8EBF2 100%);
+    --color-foreground: #1E293B;
+    --color-muted: #64748B;
+    --color-border: #E2E8F0;
+    --color-border-light: #F1F5F9;
+    --color-destructive: #EF4444;
+    --color-destructive-hover: #DC2626;
+    --color-warning: var(--studio-warning);
+    --color-success: #10B981;
+    --color-info: #06B6D4;
+    --color-purple: #8B5CF6;
+    
+    /* === 补充缺失的变量 === */
+    --color-bg-card: #FFFFFF;
+    --color-bg-secondary: #F5F6F9;
+    --color-text-secondary: #64748B;
+
+    /* === 间距系统 === */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 2.5rem;
+    --spacing-3xl: 3rem;
+
+    /* === 阴影层级（兼容旧） === */
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+    --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
+
+    /* === 圆角 === */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-2xl: 24px;
+
+    /* === 字体 === */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    
+    /* === 字阶系统 (Typography Scale) === */
+    --font-title: 13px;        /* 主标题：工具名 */
+    --font-subtitle: 11px;     /* 副标题：功能描述 */
+    --font-stat: 24px;         /* 统计大数 */
+    --font-stat-lg: 28px;      /* 大号统计数字 */
+    --font-body: 14px;         /* 正文 */
+    --font-small: 12px;        /* 小号文字 */
+    --font-xs: 10px;           /* 超小号文字 */
+    
+    /* === 字重 === */
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    /* === 过渡 === */
+    --transition: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-physics: 400ms cubic-bezier(0.16, 1, 0.3, 1);  /* 物理阻尼曲线 */
+
+    /* === 布局 === */
+    --sidebar-width: 200px;
+    --sidebar-collapsed-width: 72px;
+    --header-height: 48px;
+    --content-max-width: 1600px;
+
+    /* === Element Plus 主题覆盖 === */
+    --el-color-primary: #0EA5E9;
+    --el-color-primary-light-3: #7DD3FC;
+    --el-color-primary-light-5: #38BDF8;
+    --el-color-primary-light-7: #BAE6FD;
+    --el-color-primary-light-8: #E0F2FE;
+    --el-color-primary-light-9: #F0F9FF;
+    --el-color-primary-dark-2: #0284C7;
+    --el-color-success: #10B981;
+    --el-color-warning: #F59E0B;
+    --el-color-danger: #EF4444;
+    --el-color-info: #64748B;
+    --el-border-radius-base: 8px;
+    --el-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --el-font-size-base: 14px;
+    --el-bg-color: #FFFFFF;
+    --el-bg-color-page: #F5F6F9;
+    --el-text-color-primary: #1E293B;
+    --el-text-color-regular: #475569;
+    --el-text-color-secondary: #64748B;
+    --el-text-color-placeholder: #94A3B8;
+    --el-border-color: #E2E8F0;
+    --el-border-color-light: #F1F5F9;
+    --el-fill-color-blank: #FFFFFF;
+}

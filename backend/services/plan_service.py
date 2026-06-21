@@ -264,4 +264,4 @@ class PlanService:
     async def _invalidate_cache(self):
         """清除套餐相关缓存"""
         await cache.delete(CacheKeys.PLANS_LIST)
-        await cache.delete_pattern("plan:*")
+        await cache.delete_pattern("plans:detail:*")

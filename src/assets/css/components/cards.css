@@ -1,0 +1,277 @@
+/* ===== Stat Cards ===== */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-accent);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.stat-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    font-weight: 500;
+    margin-bottom: var(--spacing-xs);
+}
+
+.stat-value {
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    line-height: 1.2;
+    margin-bottom: 2px;
+}
+
+.stat-sub {
+    font-size: 0.75rem;
+    color: var(--color-muted);
+}
+
+.stat-change {
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stat-change.up {
+    color: var(--color-success);
+}
+
+.stat-change.down {
+    color: var(--color-destructive);
+}
+
+/* ===== Chart Cards ===== */
+.charts-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.chart-card {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.chart-header h3 {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.chart-header .period {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    padding: 0.3rem 0.75rem;
+    background: var(--color-border-light);
+    border-radius: var(--radius-sm);
+}
+
+.chart-container {
+    flex: 1;
+    min-height: 240px;
+}
+
+.chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+    height: 150px;
+}
+
+.chart-bar {
+    flex: 1;
+    background: linear-gradient(180deg, var(--color-accent-light), var(--color-accent));
+    border-radius: 6px 6px 0 0;
+    position: relative;
+    transition: all var(--transition);
+    min-width: 20px;
+    opacity: 0.8;
+}
+
+.chart-bar:hover {
+    opacity: 1;
+    transform: scaleY(1.05);
+}
+
+.chart-bar .label {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--color-muted);
+    white-space: nowrap;
+}
+
+.chart-bar .value {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: var(--color-accent);
+    font-weight: 600;
+}
+
+/* ===== Card (通用卡片) ===== */
+.card {
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.card-header h3 {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.card-body {
+    padding: var(--spacing-lg);
+}
+
+.card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+/* ===== Tool Card Stagger Animation ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tool-card {
+    opacity: 0;
+    animation: fadeInUp 400ms ease forwards;
+}
+
+.tool-card:nth-child(1) { animation-delay: 0ms; }
+.tool-card:nth-child(2) { animation-delay: 50ms; }
+.tool-card:nth-child(3) { animation-delay: 100ms; }
+.tool-card:nth-child(4) { animation-delay: 150ms; }
+.tool-card:nth-child(5) { animation-delay: 200ms; }
+.tool-card:nth-child(6) { animation-delay: 250ms; }
+.tool-card:nth-child(7) { animation-delay: 300ms; }
+.tool-card:nth-child(8) { animation-delay: 350ms; }
+.tool-card:nth-child(9) { animation-delay: 400ms; }
+.tool-card:nth-child(10) { animation-delay: 450ms; }
+.tool-card:nth-child(11) { animation-delay: 500ms; }
+.tool-card:nth-child(12) { animation-delay: 550ms; }
+
+/* ===== Cards Responsive ===== */
+@media (max-width: 1024px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .stats-row {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 375px) {
+    .stats-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 卡片悬浮：物理阻尼上浮 */
+.bento-card,
+.tool-card,
+.stat-card,
+.chart-card {
+    transition: all var(--transition-physics);
+}
+
+.bento-card:hover,
+.tool-card:hover,
+.stat-card:hover,
+.chart-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--studio-shadow-hover);
+}
+
+/* Reduced motion 时禁用动画 */
+@media (prefers-reduced-motion: reduce) {
+    .tool-card {
+        opacity: 1;
+        animation: none;
+    }
+}

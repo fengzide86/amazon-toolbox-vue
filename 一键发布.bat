@@ -37,13 +37,16 @@ echo.
 
 echo [1/4] Building (version not changed yet)...
 echo.
-pushd "%~dp0"
 call build.bat
-set BUILD_RESULT=!errorlevel!
-popd
-if !BUILD_RESULT! neq 0 (
-    echo.
-    echo [ERROR] Build failed! (exit code: !BUILD_RESULT!)
+echo.
+
+REM Check if build succeeded by looking for exe file in release directory
+set BUILD_OK=0
+dir /b "release\*.exe" 2>nul | findstr /v /i "elevate.exe" >nul 2>&1
+if not errorlevel 1 set BUILD_OK=1
+
+if "!BUILD_OK!"=="0" (
+    echo [ERROR] Build failed! No installer found in release directory.
     echo [INFO] package.json version NOT changed, you can retry with same version.
     echo.
     pause
@@ -77,9 +80,32 @@ if not exist "!RELEASE_DIR!" (
 
 set SCRIPT_DIR=%~dp0
 
+REM Get admin token for upload authentication
+echo [AUTH] Logging in to get admin token...
+set ADMIN_PASSWORD=
+set /p ADMIN_PASSWORD="Enter admin password (default: admin123): "
+if "!ADMIN_PASSWORD!"=="" set ADMIN_PASSWORD=admin123
+
+for /f "delims=" %%t in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "$r = Invoke-RestMethod -Uri '!SERVER_URL!/api/auth/admin-login' -Method POST -ContentType 'application/json' -Body ('{\"password\":\"' + '!ADMIN_PASSWORD!' + '\"}'); if ($r.success) { Write-Host $r.data.token } else { Write-Host 'AUTH_FAILED' }"') do set ADMIN_TOKEN=%%t
+
+if "!ADMIN_TOKEN!"=="" (
+    echo [ERROR] Failed to get admin token!
+    echo.
+    pause
+    exit /b 1
+)
+if "!ADMIN_TOKEN!"=="AUTH_FAILED" (
+    echo [ERROR] Admin login failed! Wrong password?
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Admin token obtained.
+echo.
+
 if exist "!RELEASE_DIR!\latest.yml" (
     echo Uploading latest.yml...
-    powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "!RELEASE_DIR!\latest.yml" -ServerUrl "!SERVER_URL!"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "!RELEASE_DIR!\latest.yml" -ServerUrl "!SERVER_URL!" -Token "!ADMIN_TOKEN!"
     if errorlevel 1 (
         echo [ERROR] latest.yml upload failed!
         echo.
@@ -95,7 +121,7 @@ for %%f in ("!RELEASE_DIR!\*.exe") do (
     if not "%%~nxf"=="elevate.exe" (
         set EXE_FOUND=1
         echo Uploading %%~nxf...
-        powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "%%f" -ServerUrl "!SERVER_URL!"
+        powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "%%f" -ServerUrl "!SERVER_URL!" -Token "!ADMIN_TOKEN!"
         if errorlevel 1 (
             echo [ERROR] %%~nxf upload failed!
             echo.
@@ -111,7 +137,7 @@ if "!EXE_FOUND!"=="0" (
 
 for %%f in ("!RELEASE_DIR!\*.blockmap") do (
     echo Uploading %%~nxf...
-    powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "%%f" -ServerUrl "!SERVER_URL!"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "%%f" -ServerUrl "!SERVER_URL!" -Token "!ADMIN_TOKEN!"
 )
 
 echo.

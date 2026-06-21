@@ -1,0 +1,128 @@
+/* ===== Form Inputs ===== */
+.form-group {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    background: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-family: var(--font-family);
+    color: var(--color-foreground);
+    transition: all var(--transition);
+    outline: none;
+}
+
+.form-input:hover {
+    border-color: #CBD5E1;
+}
+
+.form-input:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.form-input::placeholder {
+    color: #94A3B8;
+}
+
+.form-input:disabled {
+    background: var(--color-border-light);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* 带图标的输入框 */
+.input-with-icon {
+    position: relative;
+}
+
+.input-with-icon .form-input {
+    padding-left: 2.75rem;
+}
+
+.input-with-icon .input-icon {
+    position: absolute;
+    left: 0.875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-muted);
+    pointer-events: none;
+}
+
+.input-with-icon .input-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* 表单帮助文本 */
+.form-help {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-top: var(--spacing-xs);
+}
+
+/* 表单错误文本 */
+.form-error {
+    font-size: 0.8rem;
+    color: var(--color-destructive);
+    margin-top: var(--spacing-xs);
+}
+
+/* ===== Form Row (表单行) ===== */
+.form-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    padding: var(--spacing-md);
+}
+
+.form-row .form-input {
+    width: auto;
+    min-width: 160px;
+}
+
+/* ===== Modal Form Row ===== */
+.modal-form-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.modal-form-row label {
+  font-size: 0.9rem;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.modal-input {
+  width: 100px;
+  padding: 0.5rem 0.8rem;
+  text-align: left;
+}
+
+.modal-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+}
+
+/* 输入框聚焦：柔和反馈 */
+.form-input:focus,
+.el-input__wrapper:focus-within {
+    transform: scale(1.01);
+    transition: all var(--transition);
+}
