@@ -129,12 +129,11 @@ export async function request(url, options = {}) {
                     if (response.status === 401 || response.status === 403) {
                         const auth = authService.getAuth();
                         const role = authService.getRole();
-                        // 避免在登录页重复跳转
-                        if (auth && role !== 'admin') {
+                        if (auth) {
                             authService.clear();
-                            // 仅在非登录页跳转
+                            // 避免在登录页重复跳转
                             if (!window.location.hash.includes('/login')) {
-                                window.location.hash = '#/user/login';
+                                window.location.hash = role === 'admin' ? '#/admin/login' : '#/user/login';
                             }
                         }
                     }

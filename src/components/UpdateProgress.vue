@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="update-overlay" v-if="showProgress">
     <div class="update-card">
       <!-- 头部：应用信息 -->
@@ -221,7 +221,7 @@ onUnmounted(() => {
 }
 
 .update-card {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: linear-gradient(135deg, #ffffff 0%, var(--studio-bg) 100%);
   border-radius: 24px;
   padding: 2rem;
   max-width: 480px;
@@ -254,12 +254,12 @@ onUnmounted(() => {
 .app-icon {
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, var(--studio-accent) 0%, #8b5cf6 100%);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.3);
 }
 
 .app-icon svg {
@@ -275,7 +275,7 @@ onUnmounted(() => {
 .version-info h3 {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--studio-text-main);
   margin: 0 0 0.25rem 0;
 }
 
@@ -287,20 +287,20 @@ onUnmounted(() => {
 }
 
 .old-version {
-  color: #64748b;
+  color: var(--studio-text-muted);
   text-decoration: line-through;
 }
 
 .arrow {
   width: 16px;
   height: 16px;
-  color: #6366f1;
+  color: var(--studio-accent);
 }
 
 .new-version {
-  color: #6366f1;
+  color: var(--studio-accent);
   font-weight: 600;
-  background: rgba(99, 102, 241, 0.1);
+  background: rgba(14, 165, 233, 0.1);
   padding: 0.125rem 0.5rem;
   border-radius: 4px;
 }
@@ -313,7 +313,7 @@ onUnmounted(() => {
 .progress-bar-container {
   width: 100%;
   height: 16px;
-  background: #e2e8f0;
+  background: var(--studio-border);
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 1rem;
@@ -322,7 +322,7 @@ onUnmounted(() => {
 
 .progress-bar {
   height: 100%;
-  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+  background: linear-gradient(90deg, var(--studio-accent) 0%, #8b5cf6 50%, #a78bfa 100%);
   border-radius: 8px;
   transition: width 0.3s ease;
   position: relative;
@@ -355,14 +355,14 @@ onUnmounted(() => {
 .stat-item {
   text-align: center;
   padding: 0.5rem;
-  background: #f8fafc;
+  background: var(--studio-bg);
   border-radius: 8px;
 }
 
 .stat-label {
   display: block;
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--studio-text-muted);
   margin-bottom: 0.25rem;
 }
 
@@ -370,21 +370,21 @@ onUnmounted(() => {
   display: block;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--studio-text-main);
 }
 
 /* 更新内容样式 */
 .changelog-section {
   margin-bottom: 1.5rem;
   padding: 1rem;
-  background: #f8fafc;
+  background: var(--studio-bg);
   border-radius: 12px;
 }
 
 .changelog-section h4 {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--studio-text-main);
   margin: 0 0 0.5rem 0;
 }
 
@@ -396,7 +396,7 @@ onUnmounted(() => {
 
 .changelog-list li {
   font-size: 0.875rem;
-  color: #475569;
+  color: var(--el-text-color-regular);
   padding: 0.25rem 0;
   padding-left: 1.25rem;
   position: relative;
@@ -406,7 +406,7 @@ onUnmounted(() => {
   content: '•';
   position: absolute;
   left: 0;
-  color: #6366f1;
+  color: var(--studio-accent);
   font-weight: bold;
 }
 
@@ -439,22 +439,22 @@ onUnmounted(() => {
 }
 
 .btn-secondary {
-  background: #f1f5f9;
-  color: #475569;
+  background: var(--studio-bg-hover);
+  color: var(--el-text-color-regular);
 }
 
 .btn-secondary:hover {
-  background: #e2e8f0;
+  background: var(--studio-border);
   transform: translateY(-1px);
 }
 
 .btn-danger {
-  background: #fee2e2;
-  color: #dc2626;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--studio-danger-hover);
 }
 
 .btn-danger:hover {
-  background: #fecaca;
+  background: rgba(239, 68, 68, 0.15);
   transform: translateY(-1px);
 }
 
@@ -462,11 +462,11 @@ onUnmounted(() => {
 .status-hint {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: 8px;
   font-size: 0.875rem;
-  color: #166534;
+  color: var(--studio-success);
   text-align: center;
   animation: fadeIn 0.3s ease;
 }

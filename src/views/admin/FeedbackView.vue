@@ -292,7 +292,7 @@ onMounted(loadData)
 }
 
 .reply-text {
-  background: rgba(79, 70, 229, 0.05);
+  background: rgba(14, 165, 233, 0.05);
   border-left: 3px solid var(--studio-accent);
 }
 

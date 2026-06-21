@@ -62,14 +62,14 @@ test.describe('用户端 AMZ 验收', () => {
     const svgIcons = await sidebar.locator('svg').count()
     expect(svgIcons).toBeGreaterThan(5)
 
-    // 视觉检查：布局正确
+    // 视觉检查：布局正确（flex 布局）
     const layout = page.locator('.layout-studio')
     const computedStyle = await layout.evaluate(el => {
       const style = window.getComputedStyle(el)
-      return { display: style.display, gridTemplateColumns: style.gridTemplateColumns }
+      return { display: style.display, flexDirection: style.flexDirection }
     })
-    expect(computedStyle.display).toBe('grid')
-    expect(computedStyle.gridTemplateColumns).toMatch(/\d+px 1fr/)
+    expect(computedStyle.display).toBe('flex')
+    expect(computedStyle.flexDirection).toBe('row')
 
     // 视觉检查：配色正确
     const appLayoutBg = await page.locator('.app-layout').evaluate(el =>

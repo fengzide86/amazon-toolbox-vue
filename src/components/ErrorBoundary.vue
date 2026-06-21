@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <slot v-if="!error"></slot>
     <div v-else class="error-boundary">
@@ -122,7 +122,7 @@ function sendErrorToAnalytics(err, instance, info) {
   width: 80px;
   height: 80px;
   margin: 0 auto 1.5rem;
-  color: #ef4444;
+  color: var(--studio-danger);
 }
 
 .error-icon svg {
@@ -133,13 +133,13 @@ function sendErrorToAnalytics(err, instance, info) {
 .error-title {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--studio-text-main);
   margin-bottom: 1rem;
 }
 
 .error-message {
   font-size: 1rem;
-  color: #6b7280;
+  color: var(--studio-text-muted);
   margin-bottom: 2rem;
   line-height: 1.6;
 }
@@ -153,7 +153,7 @@ function sendErrorToAnalytics(err, instance, info) {
 
 .btn-primary {
   padding: 0.75rem 1.5rem;
-  background: #4f46e5;
+  background: var(--studio-accent);
   color: white;
   border: none;
   border-radius: 8px;
@@ -163,16 +163,16 @@ function sendErrorToAnalytics(err, instance, info) {
 }
 
 .btn-primary:hover {
-  background: #4338ca;
+  background: var(--studio-accent-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
 }
 
 .btn-secondary {
   padding: 0.75rem 1.5rem;
   background: white;
-  color: #4f46e5;
-  border: 2px solid #4f46e5;
+  color: var(--studio-accent);
+  border: 2px solid var(--studio-accent);
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
@@ -180,7 +180,7 @@ function sendErrorToAnalytics(err, instance, info) {
 }
 
 .btn-secondary:hover {
-  background: #f3f4f6;
+  background: var(--studio-bg-hover);
   transform: translateY(-2px);
 }
 
@@ -192,16 +192,16 @@ function sendErrorToAnalytics(err, instance, info) {
 .error-details summary {
   cursor: pointer;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--studio-text-muted);
   margin-bottom: 1rem;
 }
 
 .error-details pre {
-  background: #f3f4f6;
+  background: var(--studio-bg-hover);
   padding: 1rem;
   border-radius: 8px;
   overflow-x: auto;
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--studio-text-main);
 }
 </style>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <h2 class="page-title">设备管理</h2>
 
@@ -105,8 +105,8 @@ onMounted(loadDevices)
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  background: rgba(79, 70, 229, 0.06);
-  border: 1px solid rgba(79, 70, 229, 0.15);
+  background: rgba(14, 165, 233, 0.06);
+  border: 1px solid rgba(14, 165, 233, 0.15);
   border-radius: 12px;
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
@@ -133,7 +133,7 @@ onMounted(loadDevices)
 .device-icon {
   width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(79, 70, 229, 0.08);
+  background: rgba(14, 165, 233, 0.08);
   border-radius: 12px;
   color: var(--studio-accent);
   flex-shrink: 0;
@@ -158,7 +158,7 @@ onMounted(loadDevices)
 .unbind-btn:hover:not(:disabled) {
   background: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.3);
-  color: #EF4444;
+  color: var(--studio-danger);
 }
 .unbind-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

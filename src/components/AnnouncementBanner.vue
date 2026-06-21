@@ -173,19 +173,19 @@ onMounted(async () => {
 }
 
 .announcement-modal.system .modal-accent {
-  background: linear-gradient(90deg, #6366F1, #818CF8);
+  background: linear-gradient(90deg, var(--studio-accent), var(--studio-accent-light));
 }
 
 .announcement-modal.update .modal-accent {
-  background: linear-gradient(90deg, #3B82F6, #60A5FA);
+  background: linear-gradient(90deg, var(--studio-accent), var(--studio-accent-light));
 }
 
 .announcement-modal.activity .modal-accent {
-  background: linear-gradient(90deg, #F59E0B, #FBBF24);
+  background: linear-gradient(90deg, var(--studio-warning), var(--studio-amazon-light));
 }
 
 .announcement-modal.maintenance .modal-accent {
-  background: linear-gradient(90deg, #EF4444, #F87171);
+  background: linear-gradient(90deg, var(--studio-danger), #F87171);
 }
 
 /* 关闭按钮 */
@@ -201,7 +201,7 @@ onMounted(async () => {
   background: rgba(0, 0, 0, 0.05);
   border: none;
   border-radius: 8px;
-  color: #64748B;
+  color: var(--studio-text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 10;
@@ -209,7 +209,7 @@ onMounted(async () => {
 
 .modal-close-btn:hover {
   background: rgba(0, 0, 0, 0.1);
-  color: #0F172A;
+  color: var(--studio-text-main);
 }
 
 /* 内容区域 */
@@ -242,22 +242,22 @@ onMounted(async () => {
 }
 
 .type-icon.system {
-  background: linear-gradient(135deg, #6366F1, #818CF8);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 .type-icon.update {
-  background: linear-gradient(135deg, #3B82F6, #60A5FA);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 .type-icon.activity {
-  background: linear-gradient(135deg, #F59E0B, #FBBF24);
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, var(--studio-warning), var(--studio-amazon-light));
+  box-shadow: 0 4px 12px rgba(255, 153, 0, 0.3);
 }
 
 .type-icon.maintenance {
-  background: linear-gradient(135deg, #EF4444, #F87171);
+  background: linear-gradient(135deg, var(--studio-danger), #F87171);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
@@ -276,30 +276,30 @@ onMounted(async () => {
 }
 
 .type-label.system {
-  background: rgba(99, 102, 241, 0.1);
-  color: #6366F1;
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--studio-accent);
 }
 
 .type-label.update {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3B82F6;
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--studio-accent);
 }
 
 .type-label.activity {
-  background: rgba(245, 158, 11, 0.1);
-  color: #F59E0B;
+  background: rgba(255, 153, 0, 0.1);
+  color: var(--studio-warning);
 }
 
 .type-label.maintenance {
   background: rgba(239, 68, 68, 0.1);
-  color: #EF4444;
+  color: var(--studio-danger);
 }
 
 .modal-title {
   font-family: var(--font-heading);
   font-size: 1.25rem;
   font-weight: 700;
-  color: #0F172A;
+  color: var(--studio-text-main);
   margin: 0;
   line-height: 1.3;
 }
@@ -312,7 +312,7 @@ onMounted(async () => {
 .modal-content p {
   font-size: 0.95rem;
   line-height: 1.7;
-  color: #475569;
+  color: var(--el-text-color-regular);
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -324,12 +324,12 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding-top: 1rem;
-  border-top: 1px solid #E2E8F0;
+  border-top: 1px solid var(--studio-border);
 }
 
 .publish-time {
   font-size: 0.8rem;
-  color: #94A3B8;
+  color: var(--studio-text-muted);
 }
 
 .modal-actions {
@@ -342,7 +342,7 @@ onMounted(async () => {
   align-items: center;
   gap: 0.4rem;
   padding: 0.6rem 1.2rem;
-  background: linear-gradient(135deg, #6366F1, #4F46E5);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-hover));
   color: white;
   border: none;
   border-radius: 10px;
@@ -354,13 +354,13 @@ onMounted(async () => {
 
 .btn-next:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 .btn-close {
   padding: 0.6rem 1.2rem;
-  background: #F1F5F9;
-  color: #475569;
+  background: var(--studio-bg-hover);
+  color: var(--el-text-color-regular);
   border: none;
   border-radius: 10px;
   font-size: 0.875rem;
@@ -370,8 +370,8 @@ onMounted(async () => {
 }
 
 .btn-close:hover {
-  background: #E2E8F0;
-  color: #0F172A;
+  background: var(--studio-border);
+  color: var(--studio-text-main);
 }
 
 /* 动画 */

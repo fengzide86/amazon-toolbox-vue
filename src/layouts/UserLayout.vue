@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="app-layout" data-testid="user-layout">
     <AppHeader :is-admin="false" @toggle-sidebar="toggleSidebar" />
     
@@ -175,25 +175,22 @@ onUnmounted(() => {
 .app-layout {
   background: var(--studio-bg, #F5F6F9);
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Studio Milk & Slate 布局 */
+/* 全高骨架布局 - 侧边栏贴边 */
 .layout-studio {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: var(--spacing-md) var(--spacing-lg);
-  display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
-  gap: var(--spacing-lg);
+  flex: 1;
+  display: flex;
   min-height: calc(100vh - var(--header-height));
 }
 
 .content-studio {
+  flex: 1;
   min-width: 0;
-  background: var(--studio-surface);
-  border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
-  box-shadow: var(--studio-shadow);
+  overflow-y: auto;
 }
 
 /* 移动端侧边栏遮罩 */
@@ -211,8 +208,7 @@ onUnmounted(() => {
     display: block;
   }
   .layout-studio {
-    grid-template-columns: 1fr;
-    padding: var(--spacing-sm);
+    flex-direction: column;
   }
   .content-studio {
     padding: var(--spacing-md);
@@ -254,7 +250,7 @@ onUnmounted(() => {
 .kickout-icon svg {
   width: 32px;
   height: 32px;
-  color: #EF4444;
+  color: var(--studio-danger);
 }
 .kickout-card h3 {
   font-family: var(--font-heading);

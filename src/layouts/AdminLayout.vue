@@ -61,25 +61,28 @@ onUnmounted(() => {
 .app-layout {
   min-height: 100vh;
   background: var(--studio-bg, #F1F5F9);
+  display: flex;
+  flex-direction: column;
 }
 
-/* 主布局 - 与 UserLayout 保持一致的 grid 布局 */
+/* 主布局 - 侧边栏全高，内容区独立 */
 .layout {
-  max-width: var(--content-max-width, 1400px);
-  margin: 0 auto;
-  padding: var(--spacing-md, 1rem) var(--spacing-lg, 1.5rem);
-  display: grid;
-  grid-template-columns: var(--sidebar-width, 220px) 1fr;
-  gap: var(--spacing-lg, 1.5rem);
+  flex: 1;
+  display: flex;
   min-height: calc(100vh - var(--header-height, 56px));
 }
 
 .content {
+  flex: 1;
   min-width: 0;
-  background: var(--studio-surface, white);
-  border-radius: var(--radius-lg, 16px);
   padding: var(--spacing-lg, 1.5rem);
-  box-shadow: var(--studio-shadow, 0 1px 3px rgba(0,0,0,0.06));
+  overflow-y: auto;
+}
+
+.content > :deep(*) {
+  max-width: var(--content-max-width, 1400px);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* 移动端侧边栏遮罩 */
@@ -97,8 +100,7 @@ onUnmounted(() => {
     display: block;
   }
   .layout {
-    grid-template-columns: 1fr;
-    padding: var(--spacing-sm, 0.75rem);
+    flex-direction: column;
   }
   .content {
     padding: var(--spacing-md, 1rem);

@@ -3,9 +3,9 @@
     <h2 class="page-title">分润管理</h2>
 
     <!-- 分润统计卡片 -->
-    <el-row :gutter="16" style="margin-bottom: 1.5rem;">
-      <el-col :xs="12" :sm="8" :md="4" v-for="(item, index) in profitItems" :key="item.key">
-        <el-card class="stat-card">
+    <el-row :gutter="16" style="margin-bottom: 1.5rem; align-items: stretch;">
+      <el-col :xs="12" :sm="8" :md="4" v-for="(item, index) in profitItems" :key="item.key" style="display: flex;">
+        <el-card class="stat-card" style="width: 100%; min-height: 120px;">
           <div class="stat-icon" :style="{ background: item.bgColor }">
             <span style="font-size: 1.5rem;">{{ item.icon }}</span>
           </div>

@@ -35,24 +35,24 @@
 
       <!-- 已使用工具 -->
       <article class="bento-card">
-        <div class="card-icon" style="background: linear-gradient(135deg, #6366F1, #818CF8);">
-          <Zap :size="18" />
-        </div>
-        <div class="card-body">
-          <div class="card-label">已使用工具</div>
-          <div class="card-value" style="color: #6366F1;">{{ toolCount }}</div>
+          <div class="card-icon" style="background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));">
+            <Zap :size="18" />
+          </div>
+          <div class="card-body">
+            <div class="card-label">已使用工具</div>
+            <div class="card-value" style="color: var(--studio-accent);">{{ toolCount }}</div>
           <div class="card-sub">今日 {{ todayRuns }} 次</div>
         </div>
       </article>
 
       <!-- 成功率 -->
       <article class="bento-card">
-        <div class="card-icon" style="background: linear-gradient(135deg, #06B6D4, #22D3EE);">
-          <BarChart3 :size="18" />
-        </div>
-        <div class="card-body">
-          <div class="card-label">成功率</div>
-          <div class="card-value" style="color: #06B6D4;">{{ successRate }}%</div>
+          <div class="card-icon" style="background: linear-gradient(135deg, var(--studio-info), #22D3EE);">
+            <BarChart3 :size="18" />
+          </div>
+          <div class="card-body">
+            <div class="card-label">成功率</div>
+            <div class="card-value" style="color: var(--studio-info);">{{ successRate }}%</div>
           <div class="card-sub">成功 {{ successCount }} 次</div>
         </div>
       </article>
@@ -154,7 +154,7 @@ const barChartData = computed(() => ({
   datasets: [{
     label: '使用次数',
     data: weekDays.value.map(d => d.count),
-    backgroundColor: 'rgba(99,102,241,0.7)',
+    backgroundColor: 'rgba(14,165,233,0.7)',
     borderRadius: 6,
   }]
 }))
@@ -170,7 +170,7 @@ const barChartOptions = {
 }
 
 const doughnutChartData = computed(() => {
-  const colors = ['#10B981', '#F59E0B', '#EF4444', '#6366F1', '#06B6D4', '#8B5CF6']
+  const colors = ['#10B981', '#FF9900', '#EF4444', '#0EA5E9', '#06B6D4', '#8B5CF6']
   return {
     labels: toolStats.value.map(t => t.name),
     datasets: [{

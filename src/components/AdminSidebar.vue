@@ -1,113 +1,74 @@
 <template>
-  <aside class="sidebar-dark" aria-label="管理员导航">
-    <div class="sidebar-brand">
-      <div class="brand-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-        </svg>
-      </div>
-      <span class="brand-text">管理后台</span>
+  <aside class="studio-admin-sidebar" aria-label="管理员导航">
+    <!-- 品牌区 -->
+    <div class="sidebar-brand-zone">
+      <div class="brand-badge">AMZ</div>
+      <span class="brand-text">控制中心</span>
     </div>
-    <ul class="sidebar-nav">
-      <li>
-        <router-link to="/admin/dashboard" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-          </svg>
-          数据总览
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/authcodes" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-          </svg>
-          授权码管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/orders" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          订单与套餐
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/profit" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-          分润管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/users" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-          </svg>
-          用户管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/feedback" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
-          </svg>
-          工单管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/knowledge" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-          </svg>
-          知识库管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/ai-chat" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-          </svg>
-          AI 客服管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/announcements" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-          </svg>
-          公告管理
-        </router-link>
-      </li>
-      <li>
-        <router-link to="/admin/settings" active-class="active">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
-          系统设置
-        </router-link>
-      </li>
-    </ul>
-    <div class="sidebar-footer">
-      <button class="btn-logout" @click="handleLogout" aria-label="退出登录">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-        </svg>
-        退出登录
+
+    <!-- 导航菜单 -->
+    <nav class="sidebar-menu-nav">
+      <router-link to="/admin/dashboard" class="menu-nav-item" active-class="is-active">
+        <LayoutDashboard :size="14" class="menu-icon" />
+        <span class="menu-label">数据总览</span>
+      </router-link>
+      <router-link to="/admin/authcodes" class="menu-nav-item" active-class="is-active">
+        <Key :size="14" class="menu-icon" />
+        <span class="menu-label">授权码管理</span>
+      </router-link>
+      <router-link to="/admin/orders" class="menu-nav-item" active-class="is-active">
+        <Receipt :size="14" class="menu-icon" />
+        <span class="menu-label">订单与套餐</span>
+      </router-link>
+      <router-link to="/admin/profit" class="menu-nav-item" active-class="is-active">
+        <Percent :size="14" class="menu-icon" />
+        <span class="menu-label">分润管理</span>
+      </router-link>
+      <router-link to="/admin/users" class="menu-nav-item" active-class="is-active">
+        <Users :size="14" class="menu-icon" />
+        <span class="menu-label">用户管理</span>
+      </router-link>
+      <router-link to="/admin/feedback" class="menu-nav-item" active-class="is-active">
+        <Wrench :size="14" class="menu-icon" />
+        <span class="menu-label">工单管理</span>
+      </router-link>
+      <router-link to="/admin/knowledge" class="menu-nav-item" active-class="is-active">
+        <BookOpen :size="14" class="menu-icon" />
+        <span class="menu-label">知识库管理</span>
+      </router-link>
+      <router-link to="/admin/ai-chat" class="menu-nav-item" active-class="is-active">
+        <MessageSquare :size="14" class="menu-icon" />
+        <span class="menu-label">AI 客服管理</span>
+      </router-link>
+      <router-link to="/admin/announcements" class="menu-nav-item" active-class="is-active">
+        <Megaphone :size="14" class="menu-icon" />
+        <span class="menu-label">公告管理</span>
+      </router-link>
+      <router-link to="/admin/settings" class="menu-nav-item" active-class="is-active">
+        <Settings :size="14" class="menu-icon" />
+        <span class="menu-label">系统设置</span>
+      </router-link>
+    </nav>
+
+    <!-- 底部退出 -->
+    <div class="sidebar-footer-zone">
+      <button class="menu-nav-item logout-item" @click="handleLogout" aria-label="退出登录">
+        <LogOut :size="14" class="menu-icon" />
+        <span class="menu-label">退出登录</span>
       </button>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { useRouter, useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { Auth, showToast } from '@/utils'
+import {
+  LayoutDashboard, Key, Receipt, Percent, Users, Wrench,
+  BookOpen, MessageSquare, Megaphone, Settings, LogOut
+} from '@lucide/vue'
 
 const router = useRouter()
-const route = useRoute()
 
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return
@@ -120,157 +81,155 @@ function handleLogout() {
 </script>
 
 <style scoped>
-.sidebar-dark {
-  position: sticky;
-  top: calc(var(--header-height) + var(--spacing-lg));
-  height: fit-content;
-  max-height: calc(100vh - var(--header-height) - var(--spacing-3xl));
+/* 全高骨架侧边栏 */
+.studio-admin-sidebar {
+  width: var(--sidebar-width, 200px);
+  height: 100vh;
+  background-color: var(--studio-frame, #0F172A);
   display: flex;
   flex-direction: column;
-  background: #0F172A;
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-sm);
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.2);
-  overflow: hidden;
-}
-
-/* 品牌区域 */
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 0.75rem 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.brand-icon {
-  width: 28px;
-  height: 28px;
-  background: linear-gradient(135deg, #4F46E5, #818CF8);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-sizing: border-box;
+  user-select: none;
   flex-shrink: 0;
 }
 
-.brand-icon svg {
-  width: 16px;
-  height: 16px;
-  color: white;
+/* 品牌区 */
+.sidebar-brand-zone {
+  height: var(--header-height, 48px);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
 }
 
-.brand-text {
-  font-size: 0.8rem;
+.brand-badge {
+  background: var(--studio-accent, #4F46E5);
+  color: white;
+  font-size: 10px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
+  padding: 2px 5px;
+  border-radius: 4px;
   letter-spacing: 0.05em;
 }
 
+  .brand-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--studio-text-on-dark-muted, #94A3B8);
+    letter-spacing: 0.5px;
+  }
+
 /* 导航菜单 */
-.sidebar-nav {
-  list-style: none;
-  flex: 1;
+.sidebar-menu-nav {
+  flex-grow: 1;
+  padding: 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   overflow-y: auto;
 }
 
-.sidebar-nav li {
-  margin-bottom: 2px;
-}
-
-.sidebar-nav a {
-  position: relative;
+/* 菜单项 */
+.menu-nav-item {
+  height: 34px;
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: var(--radius-md);
-  color: rgba(255, 255, 255, 0.5);
-  text-decoration: none;
-  font-size: 0.82rem;
-  font-weight: 500;
-  transition: all var(--transition);
-  font-family: var(--font-heading);
+  padding: 0 12px;
+  gap: 10px;
+  border-radius: 6px;
   cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.sidebar-nav a:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
+  .menu-icon {
+    width: 14px;
+    height: 14px;
+    color: var(--studio-icon-on-dark, #94A3B8);
+    stroke-width: 1.75px;
+    transition: color 0.2s;
+    flex-shrink: 0;
+  }
+
+  .menu-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--studio-text-on-dark-muted, #94A3B8);
+    transition: color 0.2s;
+    white-space: nowrap;
+  }
+
+/* Hover */
+.menu-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
-.sidebar-nav a.active {
-  background: rgba(79, 70, 229, 0.25);
-  color: white;
-  font-weight: 600;
-}
+  .menu-nav-item:hover .menu-icon,
+  .menu-nav-item:hover .menu-label {
+    color: var(--studio-text-on-dark, #F8FAFC);
+  }
 
-/* 左侧指示条 */
-.sidebar-nav a.active::before {
+/* Active - 3px 左侧高亮蓝条 */
+  .menu-nav-item.is-active {
+    background-color: rgba(14, 165, 233, 0.15);
+  }
+
+  .menu-nav-item.is-active .menu-icon,
+  .menu-nav-item.is-active .menu-label {
+    color: var(--studio-text-on-dark, #FFFFFF);
+    font-weight: 600;
+  }
+
+.menu-nav-item.is-active::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 8px;
+  bottom: 8px;
   width: 3px;
-  height: 55%;
-  background: var(--studio-accent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background-color: var(--studio-accent, #4F46E5);
+  border-radius: 0 2px 2px 0;
 }
 
-.sidebar-nav a svg {
-  width: 18px;
-  height: 18px;
+/* 底部退出区 */
+.sidebar-footer-zone {
+  padding: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
 }
 
-/* 底部退出按钮 */
-.sidebar-footer {
-  margin-top: auto;
-  padding: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+.logout-item:hover {
+  background-color: rgba(239, 68, 68, 0.1) !important;
 }
 
-.btn-logout {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.btn-logout:hover {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #F87171;
-}
-
-.btn-logout svg {
-  width: 14px;
-  height: 14px;
+.logout-item:hover .menu-icon,
+.logout-item:hover .menu-label {
+  color: var(--studio-danger, #EF4444) !important;
 }
 
 /* 移动端适配 */
 @media (max-width: 1024px) {
-  .sidebar-dark {
+  .studio-admin-sidebar {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
     width: 220px;
     z-index: 999;
-    border-radius: 0;
-    max-height: 100vh;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .studio-admin-sidebar.mobile-open {
+    transform: translateX(0);
   }
 }
 </style>

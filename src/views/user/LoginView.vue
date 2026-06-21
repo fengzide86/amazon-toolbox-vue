@@ -55,6 +55,16 @@
           </span>
         </div>
       </div>
+      
+      <!-- 扫描线效果 -->
+      <div class="scan-line"></div>
+      
+      <!-- 版本号 -->
+      <div class="version-badge">
+        <span class="version-text">v1.5.0</span>
+        <span class="version-divider">·</span>
+        <span class="version-edition">Glacier Cyan</span>
+      </div>
     </div>
 
     <!-- 右侧登录区 -->
@@ -302,7 +312,11 @@ function handleLogin() {
         showSuccess.value = true
         showToast('授权成功！正在跳转...', 'success')
         // 触发窗口形变为学员窄屏伴侣模式
-        window.electronAPI?.resizeWindow('trainee-mini')
+        try {
+          window.electronAPI?.resizeWindow('trainee-mini')
+        } catch (e) {
+          console.warn('resizeWindow failed:', e)
+        }
         // 直接跳转，不等待
         router.push('/user/dashboard')
       } else {
@@ -373,8 +387,8 @@ onUnmounted(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(99, 102, 241, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(14, 165, 233, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14, 165, 233, 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
   z-index: 1;
 }
@@ -394,11 +408,11 @@ onUnmounted(() => {
 .shape-circle-1 {
   width: 320px;
   height: 320px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, transparent 70%);
   border-radius: 50%;
   top: -80px;
   right: -60px;
-  animation: float 8s ease-in-out infinite;
+  animation: float 8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
 .shape-circle-2 {
@@ -414,17 +428,17 @@ onUnmounted(() => {
 .shape-circle-3 {
   width: 150px;
   height: 150px;
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.1) 0%, transparent 70%);
   border-radius: 50%;
   top: 50%;
   right: 15%;
-  animation: float 10s ease-in-out infinite;
+  animation: float 10s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
 .shape-ring-1 {
   width: 180px;
   height: 180px;
-  border: 1px solid rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(14, 165, 233, 0.1);
   border-radius: 50%;
   top: 20%;
   left: 10%;
@@ -444,11 +458,11 @@ onUnmounted(() => {
 .shape-dot-1 {
   width: 6px;
   height: 6px;
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(14, 165, 233, 0.3);
   border-radius: 50%;
   top: 30%;
   left: 25%;
-  animation: pulse 3s ease-in-out infinite;
+  animation: pulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
 .shape-dot-2 {
@@ -464,21 +478,21 @@ onUnmounted(() => {
 .shape-dot-3 {
   width: 5px;
   height: 5px;
-  background: rgba(129, 140, 248, 0.3);
+  background: rgba(14, 165, 233, 0.3);
   border-radius: 50%;
   bottom: 35%;
   left: 40%;
-  animation: pulse 3.5s ease-in-out infinite 0.5s;
+  animation: pulse 3.5s cubic-bezier(0.16, 1, 0.3, 1) infinite 0.5s;
 }
 
 .shape-line-1 {
   width: 60px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.2), transparent);
   top: 45%;
   left: 5%;
   transform: rotate(-30deg);
-  animation: float 7s ease-in-out infinite;
+  animation: float 7s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
 .shape-line-2 {
@@ -505,12 +519,79 @@ onUnmounted(() => {
   50% { opacity: 1; transform: scale(1.5); }
 }
 
+/* 扫描线效果 */
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(14, 165, 233, 0.6), 
+    transparent
+  );
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.4);
+  animation: scanDown 4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  z-index: 3;
+  pointer-events: none;
+}
+
+@keyframes scanDown {
+  0% { 
+    top: -2px; 
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% { 
+    top: 100%; 
+    opacity: 0;
+  }
+}
+
+/* 版本号徽章 */
+.version-badge {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 20px;
+  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+  font-size: 0.75rem;
+  z-index: 2;
+  backdrop-filter: blur(8px);
+}
+
+.version-text {
+  color: rgba(14, 165, 233, 0.9);
+  font-weight: 600;
+}
+
+.version-divider {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.version-edition {
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.05em;
+}
+
 /* 品牌内容 */
 .brand-content {
   position: relative;
   z-index: 2;
   max-width: 460px;
-  animation: fadeInUp 0.8s ease forwards;
+  animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fadeInUp {
@@ -526,12 +607,12 @@ onUnmounted(() => {
 .logo-mark {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #6366F1, #818CF8);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
   border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
 }
 
 .logo-mark svg {
@@ -569,14 +650,14 @@ onUnmounted(() => {
 .divider-line {
   width: 40px;
   height: 2px;
-  background: linear-gradient(90deg, #6366F1, #FF9900);
+  background: linear-gradient(90deg, var(--studio-accent), var(--studio-amazon));
   border-radius: 1px;
 }
 
 .divider-dot {
   width: 6px;
   height: 6px;
-  background: #FF9900;
+  background: var(--studio-amazon);
   border-radius: 50%;
 }
 
@@ -621,7 +702,7 @@ onUnmounted(() => {
   font-family: var(--font-heading);
   font-size: 1.25rem;
   font-weight: 600;
-  color: #FF9900;
+  color: var(--studio-amazon);
 }
 
 @keyframes countUp {
@@ -632,7 +713,7 @@ onUnmounted(() => {
 .stat-line {
   width: 32px;
   height: 2px;
-  background: linear-gradient(90deg, #6366F1, transparent);
+  background: linear-gradient(90deg, var(--studio-accent), transparent);
   border-radius: 1px;
 }
 
@@ -663,13 +744,13 @@ onUnmounted(() => {
 }
 
 .feature-tag:hover {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
   color: white;
 }
 
 .feature-tag svg {
-  color: #FF9900;
+  color: var(--studio-amazon);
 }
 
 /* ===== 右侧登录区 ===== */
@@ -680,7 +761,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: #F8FAFC;
+  background: var(--studio-bg);
   position: relative;
 }
 
@@ -690,7 +771,7 @@ onUnmounted(() => {
   padding: 2.5rem;
   background: white;
   border-radius: 20px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--studio-border);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 10px 30px -5px rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
@@ -709,7 +790,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #6366F1, #818CF8, #FF9900);
+  background: linear-gradient(90deg, var(--studio-accent), var(--studio-accent-light), var(--studio-amazon));
 }
 
 /* Logo 区域 */
@@ -721,13 +802,13 @@ onUnmounted(() => {
 .logo-icon {
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, #6366F1, #818CF8);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
   border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1rem;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25);
 }
 
 .logo-icon svg {
@@ -740,13 +821,13 @@ onUnmounted(() => {
   font-family: var(--font-heading);
   font-size: 1.25rem;
   font-weight: 700;
-  color: #0F172A;
+  color: var(--studio-text-main);
   margin-bottom: 0.4rem;
 }
 
 .logo-section p {
   font-size: 0.85rem;
-  color: #64748B;
+  color: var(--studio-text-muted);
 }
 
 /* 错误/成功消息 */
@@ -771,14 +852,14 @@ onUnmounted(() => {
 .error-message.show {
   display: flex;
   background: rgba(239, 68, 68, 0.08);
-  color: #EF4444;
+  color: var(--studio-danger);
   border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
 .success-message.show {
   display: flex;
   background: rgba(16, 185, 129, 0.08);
-  color: #10B981;
+  color: var(--studio-success);
   border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
@@ -803,12 +884,12 @@ onUnmounted(() => {
 
 .connection-status.online {
   background: rgba(16, 185, 129, 0.06);
-  color: #10B981;
+  color: var(--studio-success);
 }
 
 .connection-status.offline {
   background: rgba(245, 158, 11, 0.06);
-  color: #F59E0B;
+  color: var(--studio-warning);
 }
 
 .status-dot {
@@ -819,7 +900,7 @@ onUnmounted(() => {
 }
 
 .connection-status.online .status-dot {
-  background: #10B981;
+  background: var(--studio-success);
 }
 
 .connection-status.online .status-dot::after {
@@ -827,13 +908,13 @@ onUnmounted(() => {
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  background: #10B981;
+  background: var(--studio-success);
   opacity: 0.3;
   animation: ping 2s ease-in-out infinite;
 }
 
 .connection-status.offline .status-dot {
-  background: #F59E0B;
+  background: var(--studio-warning);
   animation: blink 1.5s ease-in-out infinite;
 }
 
@@ -856,7 +937,7 @@ onUnmounted(() => {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #0F172A;
+  color: var(--studio-text-main);
   margin-bottom: 0.5rem;
 }
 
@@ -869,13 +950,13 @@ onUnmounted(() => {
   left: 0.875rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94A3B8;
+  color: var(--studio-text-muted);
   pointer-events: none;
   transition: color 0.3s ease;
 }
 
 .input-wrapper:focus-within .input-icon {
-  color: #6366F1;
+  color: var(--studio-accent);
 }
 
 .input-icon svg {
@@ -886,24 +967,24 @@ onUnmounted(() => {
 .input-wrapper input {
   width: 100%;
   padding: 0.8rem 1rem 0.8rem 2.75rem;
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
+  background: var(--studio-bg);
+  border: 1.5px solid var(--studio-border);
   border-radius: 12px;
   font-size: 0.9rem;
   font-family: var(--font-family);
-  color: #0F172A;
+  color: var(--studio-text-main);
   transition: all 0.3s ease;
   outline: none;
 }
 
 .input-wrapper input::placeholder {
-  color: #94A3B8;
+  color: var(--studio-text-muted);
 }
 
 .input-wrapper input:focus {
   background: white;
-  border-color: #6366F1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  border-color: var(--studio-accent);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
 /* 设备信息 */
@@ -912,23 +993,23 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: #F1F5F9;
+  background: var(--studio-bg-hover);
   border-radius: 10px;
   font-size: 0.8rem;
-  color: #64748B;
+  color: var(--studio-text-muted);
   margin-bottom: 1.5rem;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--studio-border);
 }
 
 .device-info svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: #94A3B8;
+  color: var(--studio-text-muted);
 }
 
 .device-info strong {
-  color: #0F172A;
+  color: var(--studio-text-main);
   font-weight: 600;
 }
 
@@ -936,7 +1017,7 @@ onUnmounted(() => {
 .btn-login {
   width: 100%;
   padding: 0.9rem;
-  background: linear-gradient(135deg, #6366F1, #4F46E5);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-hover));
   color: white;
   border: none;
   border-radius: 12px;
@@ -968,12 +1049,12 @@ onUnmounted(() => {
 
 .btn-login:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.35);
 }
 
 .btn-login:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25);
 }
 
 .btn-login:disabled {
@@ -1032,7 +1113,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.3rem;
   font-size: 0.8rem;
-  color: #64748B;
+  color: var(--studio-text-muted);
   text-decoration: none;
   transition: all 0.2s ease;
   padding: 0.25rem 0.4rem;
@@ -1040,8 +1121,8 @@ onUnmounted(() => {
 }
 
 .footer-link:hover {
-  color: #6366F1;
-  background: rgba(99, 102, 241, 0.05);
+  color: var(--studio-accent);
+  background: rgba(14, 165, 233, 0.05);
 }
 
 .footer-link svg {
@@ -1052,17 +1133,17 @@ onUnmounted(() => {
 .footer-divider {
   width: 1px;
   height: 12px;
-  background: #E2E8F0;
+  background: var(--studio-border);
 }
 
 .admin-link {
-  color: #6366F1;
+  color: var(--studio-accent);
   font-weight: 500;
 }
 
 .admin-link:hover {
-  color: #4F46E5;
-  background: rgba(99, 102, 241, 0.08);
+  color: var(--studio-accent-hover);
+  background: rgba(14, 165, 233, 0.08);
 }
 
 /* 底部版权 */
@@ -1073,7 +1154,7 @@ onUnmounted(() => {
 
 .login-footer p {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: var(--studio-text-muted);
 }
 
 /* ===== 弹窗 ===== */
@@ -1120,14 +1201,14 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   border-radius: 8px;
-  color: #94A3B8;
+  color: var(--studio-text-muted);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .modal-close:hover {
-  background: #F1F5F9;
-  color: #0F172A;
+  background: var(--studio-bg-hover);
+  color: var(--studio-text-main);
 }
 
 .modal h3 {
@@ -1136,14 +1217,14 @@ onUnmounted(() => {
   gap: 0.5rem;
   font-family: var(--font-heading);
   font-size: 1.1rem;
-  color: #0F172A;
+  color: var(--studio-text-main);
   margin-bottom: 1.25rem;
 }
 
 .modal h3 svg {
   width: 20px;
   height: 20px;
-  color: #6366F1;
+  color: var(--studio-accent);
 }
 
 /* 帮助步骤 */
@@ -1163,7 +1244,7 @@ onUnmounted(() => {
 .step-number {
   width: 24px;
   height: 24px;
-  background: linear-gradient(135deg, #6366F1, #818CF8);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
   color: white;
   border-radius: 50%;
   display: flex;
@@ -1176,7 +1257,7 @@ onUnmounted(() => {
 
 .step-text {
   font-size: 0.875rem;
-  color: #475569;
+  color: var(--el-text-color-regular);
   line-height: 1.5;
   padding-top: 2px;
 }
@@ -1206,7 +1287,7 @@ onUnmounted(() => {
 
 .btn-confirm {
   padding: 0.625rem 1.5rem;
-  background: linear-gradient(135deg, #6366F1, #4F46E5);
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-hover));
   color: white;
   border: none;
   border-radius: 10px;
@@ -1218,7 +1299,7 @@ onUnmounted(() => {
 
 .btn-confirm:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 /* ===== 响应式 ===== */

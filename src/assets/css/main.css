@@ -8,31 +8,35 @@
     --studio-frame: #0F172A;           /* 深石板蓝：侧边栏、顶栏压阵 */
     --studio-text-main: #1E293B;       /* 碳晶灰：正文 */
     --studio-text-muted: #64748B;      /* 燕麦灰：辅助文字 */
-    --studio-accent: #4F46E5;          /* 暮光靛蓝：品牌色、主按钮 */
-    --studio-accent-hover: #4338CA;
-    --studio-accent-light: #818CF8;
+    --studio-accent: #0EA5E9;          /* 冰川蓝：品牌色、主按钮 */
+    --studio-accent-hover: #0284C7;
+    --studio-accent-light: #7DD3FC;
+    --studio-accent-bg: #E0F2FE;       /* 极淡冰川蓝背景 */
     --studio-success: #10B981;         /* 新茶绿：正常状态 */
-    --studio-warning: #F59E0B;         /* 琥珀金：付费锁卡、VIP */
+    --studio-warning: #FF9900;         /* 亚马逊橙：付费锁卡、VIP */
     --studio-danger: #EF4444;          /* 红色：危险操作 */
     --studio-danger-hover: #DC2626;
     --studio-info: #06B6D4;
     --studio-purple: #8B5CF6;
-    --studio-gold: #F59E0B;
+    --studio-gold: #FF9900;
+    --studio-amazon: #FF9900;          /* 亚马逊橙：登录页品牌装饰专用 */
+    --studio-amazon-light: #FBBF24;
 
     /* === 弥散悬浮阴影 === */
     --studio-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 12px 0 rgba(15, 23, 42, 0.03);
-    --studio-shadow-hover: 0 10px 25px -5px rgba(79, 70, 229, 0.08), 0 8px 16px -6px rgba(79, 70, 229, 0.04);
+    --studio-shadow-hover: 0 10px 25px -5px rgba(14, 165, 233, 0.08), 0 8px 16px -6px rgba(14, 165, 233, 0.04);
 
     /* === 边框和交互状态 === */
     --studio-border: #E2E8F0;
     --studio-bg-hover: #F1F5F9;
+    --studio-text-secondary: #64748B;  /* 辅助文字颜色 */
 
     /* === 兼容旧变量（过渡期） === */
     --color-primary: #0F172A;
-    --color-accent: #4F46E5;
-    --color-accent-hover: #4338CA;
-    --color-accent-light: #818CF8;
-    --color-gold: #F59E0B;
+    --color-accent: var(--studio-accent);
+    --color-accent-hover: var(--studio-accent-hover);
+    --color-accent-light: var(--studio-accent-light);
+    --color-gold: var(--studio-warning);
     --color-background: #F5F6F9;
     --color-body-bg: linear-gradient(135deg, #F5F6F9 0%, #EEF0F5 50%, #E8EBF2 100%);
     --color-foreground: #1E293B;
@@ -41,10 +45,15 @@
     --color-border-light: #F1F5F9;
     --color-destructive: #EF4444;
     --color-destructive-hover: #DC2626;
-    --color-warning: #F59E0B;
+    --color-warning: var(--studio-warning);
     --color-success: #10B981;
     --color-info: #06B6D4;
     --color-purple: #8B5CF6;
+    
+    /* === 补充缺失的变量 === */
+    --color-bg-card: #FFFFFF;
+    --color-bg-secondary: #F5F6F9;
+    --color-text-secondary: #64748B;
 
     /* === 间距系统 === */
     --spacing-xs: 0.25rem;
@@ -89,8 +98,8 @@
     --font-weight-bold: 700;
 
     /* === 过渡 === */
-    --transition: 200ms ease;
-    --transition-slow: 300ms ease;
+    --transition: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
     --transition-physics: 400ms cubic-bezier(0.16, 1, 0.3, 1);  /* 物理阻尼曲线 */
 
     /* === 布局 === */
@@ -100,13 +109,13 @@
     --content-max-width: 1600px;
 
     /* === Element Plus 主题覆盖 === */
-    --el-color-primary: #4F46E5;
-    --el-color-primary-light-3: #818CF8;
-    --el-color-primary-light-5: #A5B4FC;
-    --el-color-primary-light-7: #C7D2FE;
-    --el-color-primary-light-8: #E0E7FF;
-    --el-color-primary-light-9: #EEF2FF;
-    --el-color-primary-dark-2: #4338CA;
+    --el-color-primary: #0EA5E9;
+    --el-color-primary-light-3: #7DD3FC;
+    --el-color-primary-light-5: #38BDF8;
+    --el-color-primary-light-7: #BAE6FD;
+    --el-color-primary-light-8: #E0F2FE;
+    --el-color-primary-light-9: #F0F9FF;
+    --el-color-primary-dark-2: #0284C7;
     --el-color-success: #10B981;
     --el-color-warning: #F59E0B;
     --el-color-danger: #EF4444;
@@ -1765,4 +1774,25 @@ button:active:not(:disabled) {
 .el-input__wrapper:focus-within {
     transform: scale(1.01);
     transition: all var(--transition);
+}
+
+/* ===== 全局 Flex 防挤压保护 ===== */
+/* Chart.js 图例圆点防挤压 */
+.legend-circle-marker,
+.studio-lucide-icon {
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 50%;
+    flex-shrink: 0 !important;
+    object-fit: contain;
+}
+
+/* Lucide 图标全局保护 */
+svg.lucide {
+    flex-shrink: 0 !important;
+}
+
+/* Element Plus 图标保护 */
+.el-icon {
+    flex-shrink: 0 !important;
 }

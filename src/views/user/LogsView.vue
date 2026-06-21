@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <div class="page-header">
       <h2 class="page-title">个人日志与问题反馈</h2>
@@ -358,9 +358,9 @@ onMounted(() => {
 }
 
 :deep(.studio-table) {
-  --el-table-border-color: #E2E8F0;
-  --el-table-header-bg-color: #F8FAFC;
-  --el-table-row-hover-bg-color: #F1F5F9;
+  --el-table-border-color: var(--studio-border);
+  --el-table-header-bg-color: var(--studio-bg);
+  --el-table-row-hover-bg-color: var(--studio-bg-hover);
   border-radius: 10px;
   overflow: hidden;
 }

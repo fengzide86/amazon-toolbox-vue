@@ -7,12 +7,12 @@
     <!-- 统计卡片 -->
     <section class="stats-row">
       <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(99,102,241,0.1);">
+        <div class="stat-icon" style="background: rgba(14,165,233,0.1);">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <div class="stat-content">
           <div class="stat-label">总收入</div>
-          <div class="stat-value" style="color: #6366F1;">¥{{ dashboardData.total_revenue?.toFixed(2) || '0.00' }}</div>
+          <div class="stat-value" style="color: var(--studio-accent);">¥{{ dashboardData.total_revenue?.toFixed(2) || '0.00' }}</div>
           <div class="stat-sub">{{ dashboardData.total_orders || 0 }} 笔订单</div>
         </div>
       </article>
@@ -22,7 +22,7 @@
         </div>
         <div class="stat-content">
           <div class="stat-label">活跃授权码</div>
-          <div class="stat-value" style="color: #10B981;">{{ dashboardData.active_codes || 0 }}</div>
+          <div class="stat-value" style="color: var(--studio-success);">{{ dashboardData.active_codes || 0 }}</div>
           <div class="stat-sub">总用户 {{ dashboardData.total_users || 0 }}</div>
         </div>
       </article>
@@ -32,7 +32,7 @@
         </div>
         <div class="stat-content">
           <div class="stat-label">待处理工单</div>
-          <div class="stat-value" style="color: #F59E0B;">{{ dashboardData.pending_tickets || 0 }}</div>
+          <div class="stat-value" style="color: var(--studio-warning);">{{ dashboardData.pending_tickets || 0 }}</div>
           <div class="stat-sub">需要及时处理</div>
         </div>
       </article>
@@ -42,7 +42,7 @@
         </div>
         <div class="stat-content">
           <div class="stat-label">今日运行次数</div>
-          <div class="stat-value" style="color: #06B6D4;">{{ dashboardData.today_runs || 0 }}</div>
+          <div class="stat-value" style="color: var(--studio-info);">{{ dashboardData.today_runs || 0 }}</div>
           <div class="stat-sub">今日工具使用</div>
         </div>
       </article>
@@ -159,8 +159,8 @@ const lineChartData = computed(() => {
     datasets: [{
       label: '收入 (¥)',
       data: chartsData.value.revenue_trend.map(d => d.amount),
-      borderColor: '#6366F1',
-      backgroundColor: 'rgba(99,102,241,0.1)',
+      borderColor: '#0EA5E9',
+      backgroundColor: 'rgba(14,165,233,0.1)',
       fill: true,
       tension: 0.4,
       pointRadius: 4,
@@ -181,7 +181,7 @@ const lineChartOptions = {
 
 const doughnutChartData = computed(() => {
   if (!chartsData.value) return { labels: [], datasets: [] }
-  const colors = ['#6366F1', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#06B6D4']
+  const colors = ['#0EA5E9', '#FF9900', '#10B981', '#EF4444', '#8B5CF6', '#06B6D4']
   return {
     labels: chartsData.value.plan_distribution.map(d => d.name),
     datasets: [{

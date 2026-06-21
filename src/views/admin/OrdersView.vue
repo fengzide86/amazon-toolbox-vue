@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getOrders, createOrder as apiCreateOrder, updateOrder, refundOrder, getPlans, exportOrders, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
@@ -133,7 +133,7 @@ const orders = ref([])
 const plans = ref([])
 const isLoading = ref(false)
 const filterStatus = ref('')
-const planNameMap = {}
+const planNameMap = reactive({})
 
 const platformStore = usePlatformStore()
 
