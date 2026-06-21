@@ -81,7 +81,7 @@ function handleLogout() {
 </script>
 
 <style scoped>
-/* 全高骨架侧边栏 */
+/* 全高骨架侧边栏 - 桌面端固定悬浮 */
 .studio-admin-sidebar {
   width: var(--sidebar-width, 200px);
   height: 100vh;
@@ -91,6 +91,11 @@ function handleLogout() {
   box-sizing: border-box;
   user-select: none;
   flex-shrink: 0;
+  /* 桌面端固定悬浮在左侧 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 99;
 }
 
 /* 品牌区 */

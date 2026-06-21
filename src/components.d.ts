@@ -41,6 +41,7 @@ declare module 'vue' {
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
     ElTag: typeof import('element-plus/es')['ElTag']
     ErrorBoundary: typeof import('./components/ErrorBoundary.vue')['default']
+    LoadingSkeleton: typeof import('./components/LoadingSkeleton.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ThemeToggle: typeof import('./components/ThemeToggle.vue')['default']

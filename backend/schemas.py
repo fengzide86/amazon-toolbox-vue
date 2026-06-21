@@ -135,8 +135,10 @@ class OrderResponse(BaseModel):
     responsible: Optional[str] = None
     status: str
     refund_amount: float
+    platform_key: Optional[str] = None
     created_at: Optional[datetime] = None
     paid_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

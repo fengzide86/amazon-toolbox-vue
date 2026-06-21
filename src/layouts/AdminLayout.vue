@@ -76,6 +76,11 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+/* Header 左侧留空，为固定侧边栏让位 */
+.app-layout :deep(.studio-header) {
+  margin-left: var(--sidebar-width, 200px);
+}
+
 /* 主布局 - 侧边栏全高，内容区独立 */
 .layout {
   flex: 1;
@@ -83,11 +88,23 @@ onUnmounted(() => {
   min-height: calc(100vh - var(--header-height, 56px));
 }
 
+/* 主内容区左侧留空，为固定侧边栏让位 */
 .content {
   flex: 1;
   min-width: 0;
   padding: var(--spacing-lg, 1.5rem);
   overflow-y: auto;
+  margin-left: var(--sidebar-width, 200px);
+}
+
+/* 移动端：取消 margin-left，侧边栏变为抽屉式 */
+@media (max-width: 1024px) {
+  .app-layout :deep(.studio-header) {
+    margin-left: 0;
+  }
+  .content {
+    margin-left: 0;
+  }
 }
 
 .content > :deep(*) {
