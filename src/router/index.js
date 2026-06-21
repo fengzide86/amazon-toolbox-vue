@@ -199,4 +199,19 @@ router.beforeEach((to, from, next) => {
   }
 })
 
+// 路由切换后自动调整窗口大小
+router.afterEach((to) => {
+  // 根据目标页面自动切换窗口模式
+  if (to.path.startsWith('/admin')) {
+    // 管理后台：宽屏看板模式
+    window.electronAPI?.resizeWindow('admin-large')
+  } else if (to.path.startsWith('/user') && to.name !== 'UserLogin' && to.name !== 'UserTerms') {
+    // 用户端功能页面：窄屏伴侣模式
+    window.electronAPI?.resizeWindow('trainee-mini')
+  } else if (to.name === 'UserLogin' || to.name === 'AdminLogin') {
+    // 登录页：默认窗口
+    window.electronAPI?.resizeWindow('reset')
+  }
+})
+
 export default router

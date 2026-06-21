@@ -15,7 +15,7 @@ echo.
 echo [1/3] Running frontend tests...
 echo ----------------------------------------
 call npm test
-if errorlevel neq 0 (
+if %errorlevel% neq 0 (
     echo.
     echo [FAIL] Frontend tests failed!
     echo.
@@ -30,7 +30,7 @@ echo [2/3] Running backend tests...
 echo ----------------------------------------
 cd backend
 call python -m pytest --rootdir=. -v --tb=short
-if errorlevel neq 0 (
+if %errorlevel% neq 0 (
     echo.
     echo [FAIL] Backend tests failed!
     cd ..
@@ -74,7 +74,7 @@ echo.
 set /p RUN_E2E="Run E2E tests? (y/n): "
 if /i "%RUN_E2E%"=="y" (
     call npx playwright test
-    if errorlevel neq 0 (
+    if %errorlevel% neq 0 (
         echo.
         echo [FAIL] E2E tests failed!
         echo.

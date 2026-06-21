@@ -1,0 +1,60 @@
+/* ===== Typography: 数字等宽 (Tabular Nums) ===== */
+.tabular-nums,
+.stat-value,
+.stat-number,
+.card-value,
+.metric-value,
+.countdown-value {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+/* ===== Typography: 字阶应用 ===== */
+.tool-name,
+.card-title {
+    font-size: var(--font-title);
+    font-weight: var(--font-weight-semibold);
+    color: var(--studio-text-main);
+}
+
+.tool-desc,
+.card-subtitle {
+    font-size: var(--font-subtitle);
+    font-weight: var(--font-weight-normal);
+    color: var(--studio-text-muted);
+}
+
+/* ===== Icons: 统一规范 ===== */
+/* 默认图标颜色：温和灰 */
+.icon-muted svg,
+.sidebar-nav a svg,
+.nav-item svg,
+.menu-icon svg {
+    color: rgba(100, 116, 139, 0.4);
+    transition: color var(--transition);
+}
+
+/* 悬浮时亮起：暮光靛蓝 */
+.sidebar-nav a:hover svg,
+.nav-item:hover svg,
+.menu-icon:hover svg,
+.icon-muted:hover svg {
+    color: var(--studio-accent);
+}
+
+/* 激活状态：品牌色 */
+.sidebar-nav a.active svg,
+.nav-item.active svg {
+    color: var(--studio-accent);
+}
+
+/* 功能图标：保持原色（如状态指示器） */
+.icon-success svg { color: var(--studio-success); }
+.icon-warning svg { color: var(--studio-warning); }
+.icon-danger svg { color: var(--studio-danger); }
+.icon-info svg { color: var(--studio-info); }
+
+/* Lucide 图标全局保护 */
+svg.lucide {
+    flex-shrink: 0 !important;
+}

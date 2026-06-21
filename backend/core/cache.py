@@ -147,28 +147,45 @@ class CacheManager:
 
 # ===== 缓存键常量 =====
 class CacheKeys:
-    """缓存键定义"""
+    """缓存键定义
+    
+    统一命名规范: {module}:{entity}:{identifier}
+    """
     # 套餐相关
-    PLANS_LIST = "plans:list"
-    PLAN_DETAIL = "plan:{plan_id}"
+    PLANS_LIST = "plans:list:all"
+    PLAN_DETAIL = "plans:detail:{plan_id}"
     
     # 设置相关
-    SETTINGS_ALL = "settings:all"
-    SETTING_KEY = "setting:{key}"
+    SETTINGS_ALL = "settings:global:all"
+    SETTING_KEY = "settings:item:{key}"
     
     # 用户相关
-    USER_INFO = "user:{user_id}"
-    USER_AUTH_CODE = "user:{user_id}:auth_code"
+    USER_INFO = "users:detail:{user_id}"
+    USER_AUTH_CODE = "users:auth:{user_id}"
+    USERS_LIST = "users:list:{platform}"
     
     # 授权码相关
-    AUTH_CODE_INFO = "auth_code:{code}"
+    AUTH_CODE_INFO = "auth_codes:detail:{code}"
+    AUTH_CODES_LIST = "auth_codes:list:{platform}"
     
     # Dashboard 相关
-    DASHBOARD_STATS = "dashboard:stats"
-    DASHBOARD_CHARTS = "dashboard:charts"
+    DASHBOARD_STATS = "dashboard:stats:{platform}"
+    DASHBOARD_CHARTS = "dashboard:charts:{platform}"
     
     # 工具相关
-    TOOLS_LIST = "tools:list"
+    TOOLS_LIST = "tools:config:all"
+    TOOLS_CATEGORIES = "tools:categories:all"
+    
+    # 分润相关
+    PROFIT_LIST = "profit:list:{platform}"
+    PROFIT_SUMMARY = "profit:summary:{platform}"
+    
+    # 公告相关
+    ANNOUNCEMENTS_ACTIVE = "announcements:active:all"
+    
+    # 知识库相关
+    KNOWLEDGE_LIST = "knowledge:list:{category}"
+    KNOWLEDGE_CATEGORIES = "knowledge:categories:all"
     
     @classmethod
     def plan_detail(cls, plan_id: int) -> str:
@@ -185,6 +202,30 @@ class CacheKeys:
     @classmethod
     def auth_code_info(cls, code: str) -> str:
         return cls.AUTH_CODE_INFO.format(code=code)
+    
+    @classmethod
+    def dashboard_stats(cls, platform: str = "all") -> str:
+        return cls.DASHBOARD_STATS.format(platform=platform or "all")
+    
+    @classmethod
+    def dashboard_charts(cls, platform: str = "all") -> str:
+        return cls.DASHBOARD_CHARTS.format(platform=platform or "all")
+    
+    @classmethod
+    def users_list(cls, platform: str = "all") -> str:
+        return cls.USERS_LIST.format(platform=platform or "all")
+    
+    @classmethod
+    def auth_codes_list(cls, platform: str = "all") -> str:
+        return cls.AUTH_CODES_LIST.format(platform=platform or "all")
+    
+    @classmethod
+    def profit_list(cls, platform: str = "all") -> str:
+        return cls.PROFIT_LIST.format(platform=platform or "all")
+    
+    @classmethod
+    def profit_summary(cls, platform: str = "all") -> str:
+        return cls.PROFIT_SUMMARY.format(platform=platform or "all")
 
 
 # ===== 缓存装饰器 =====

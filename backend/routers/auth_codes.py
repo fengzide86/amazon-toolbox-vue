@@ -73,25 +73,47 @@ async def get_auth_codes(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
-    """获取授权码列表（支持分页和平台过滤）- 仅管理员"""
+    """获取授权码列表（支持分页和平台过滤）- 仅管理员
+    
+    优化: 使用子查询一次性获取统计数据，避免 N+1 查询问题
+    """
     offset = (page - 1) * page_size
-    query = select(AuthCode).options(selectinload(AuthCode.devices))
+    
+    # 构建子查询：统计每个授权码的 active 席位数
+    seat_subquery = select(
+        AuthSeat.auth_code_id,
+        func.count(AuthSeat.id).label('seat_used')
+    ).where(AuthSeat.status == "active").group_by(AuthSeat.auth_code_id).subquery()
+    
+    # 构建子查询：统计每个授权码的设备数
+    device_subquery = select(
+        Device.auth_code_id,
+        func.count(Device.id).label('device_used')
+    ).group_by(Device.auth_code_id).subquery()
+    
+    # 主查询：关联子查询获取统计数据
+    query = select(
+        AuthCode,
+        func.coalesce(seat_subquery.c.seat_used, 0).label('seat_used'),
+        func.coalesce(device_subquery.c.device_used, 0).label('device_used'),
+        Plan.name.label('plan_name')
+    ).options(selectinload(AuthCode.devices))
+    
+    # 关联子查询和 Plan 表
+    query = query.outerjoin(seat_subquery, AuthCode.id == seat_subquery.c.auth_code_id)
+    query = query.outerjoin(device_subquery, AuthCode.id == device_subquery.c.auth_code_id)
+    query = query.outerjoin(Plan, AuthCode.plan_id == Plan.id)
     
     if platform_key:
         query = query.where(AuthCode.platform_scope.contains(platform_key))
     
     query = query.order_by(AuthCode.created_at.desc()).offset(offset).limit(page_size)
     result = await db.execute(query)
-    codes = result.scalars().all()
+    rows = result.all()
     
-    # 为每个授权码补充统计字段
+    # 构建响应列表
     response_list = []
-    for code in codes:
-        seat_used = await _calculate_seat_used(db, code.id)
-        device_used = await _calculate_device_used(db, code.id)
-        plan_name = await _get_plan_name(db, code.plan_id)
-        
-        # 构建响应字典
+    for code, seat_used, device_used, plan_name in rows:
         code_dict = {
             "id": code.id,
             "code": code.code,
@@ -108,9 +130,9 @@ async def get_auth_codes(
             "platform_scope": _parse_platform_scope(code.platform_scope),
             "scene_type": code.scene_type,
             "seat_limit": code.seat_limit,
-            "seat_used": seat_used,
-            "device_used": device_used,
-            "plan_name": plan_name,
+            "seat_used": seat_used or 0,
+            "device_used": device_used or 0,
+            "plan_name": plan_name or "未关联套餐",
         }
         response_list.append(AuthCodeResponse(**code_dict))
     

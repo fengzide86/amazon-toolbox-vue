@@ -702,7 +702,7 @@ onUnmounted(() => {
   font-family: var(--font-heading);
   font-size: 1.25rem;
   font-weight: 600;
-  color: var(--studio-amazon);
+  color: #FF9900; /* 直接使用颜色值，确保显示正常 */
 }
 
 @keyframes countUp {

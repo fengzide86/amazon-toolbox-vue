@@ -1,0 +1,46 @@
+/* ===== Status Dot ===== */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.5rem;
+}
+
+.status-dot.success {
+    background: var(--color-success);
+}
+
+.status-dot.warning {
+    background: var(--color-gold);
+}
+
+.status-dot.error {
+    background: var(--color-destructive);
+}
+
+/* ===== Status Badge (with text for accessibility) ===== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+}
+
+.badge-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #DC2626;
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #D97706;
+}

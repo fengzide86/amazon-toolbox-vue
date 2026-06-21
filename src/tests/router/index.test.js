@@ -19,7 +19,9 @@ describe('Router Configuration', () => {
           { path: 'tools', name: 'UserTools', meta: { title: '功能入口' } },
           { path: 'logs', name: 'UserLogs', meta: { title: '个人日志与问题反馈' } },
           { path: 'faq', name: 'UserFaq', meta: { title: '常见问题' } },
-          { path: 'plans', name: 'UserPlans', meta: { title: '套餐价格' } }
+          { path: 'plans', name: 'UserPlans', meta: { title: '套餐价格' } },
+          { path: 'devices', name: 'UserDevices', meta: { title: '设备管理' } },
+          { path: 'ai-chat', name: 'UserAIChat', meta: { title: 'AI 客服' } }
         ]
       },
       {
@@ -31,7 +33,10 @@ describe('Router Configuration', () => {
           { path: 'profit', name: 'AdminProfit', meta: { title: '分润管理' } },
           { path: 'settings', name: 'AdminSettings', meta: { title: '系统设置' } },
           { path: 'users', name: 'AdminUsers', meta: { title: '用户管理' } },
-          { path: 'feedback', name: 'AdminFeedback', meta: { title: '工单管理' } }
+          { path: 'feedback', name: 'AdminFeedback', meta: { title: '工单管理' } },
+          { path: 'knowledge', name: 'AdminKnowledge', meta: { title: '知识库管理' } },
+          { path: 'ai-chat', name: 'AdminAIChat', meta: { title: 'AI 客服管理' } },
+          { path: 'announcements', name: 'AdminAnnouncements', meta: { title: '公告管理' } }
         ]
       }
     ]
@@ -78,6 +83,8 @@ describe('Router Configuration', () => {
       expect(childPaths).toContain('logs')
       expect(childPaths).toContain('faq')
       expect(childPaths).toContain('plans')
+      expect(childPaths).toContain('devices')
+      expect(childPaths).toContain('ai-chat')
     })
 
     it('管理后台应该包含所有必要的子路由', async () => {
@@ -92,6 +99,9 @@ describe('Router Configuration', () => {
       expect(childPaths).toContain('settings')
       expect(childPaths).toContain('users')
       expect(childPaths).toContain('feedback')
+      expect(childPaths).toContain('knowledge')
+      expect(childPaths).toContain('ai-chat')
+      expect(childPaths).toContain('announcements')
     })
   })
 

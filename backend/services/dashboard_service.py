@@ -26,7 +26,7 @@ class DashboardService:
     async def get_dashboard_stats(self, platform_key: str = None) -> Dict[str, Any]:
         """获取数据总览（带缓存）"""
         # 尝试缓存（按平台区分）
-        cache_key = f"{CacheKeys.DASHBOARD_STATS}:{platform_key or 'all'}"
+        cache_key = CacheKeys.dashboard_stats(platform_key)
         cached = await cache.get(cache_key)
         if cached:
             return cached
@@ -121,7 +121,7 @@ class DashboardService:
     async def get_dashboard_charts(self, platform_key: str = None) -> Dict[str, Any]:
         """获取图表数据（带缓存）"""
         # 尝试缓存（按平台区分）
-        cache_key = f"{CacheKeys.DASHBOARD_CHARTS}:{platform_key or 'all'}"
+        cache_key = CacheKeys.dashboard_charts(platform_key)
         cached = await cache.get(cache_key)
         if cached:
             return cached
@@ -200,5 +200,5 @@ class DashboardService:
     
     async def invalidate_cache(self):
         """清除看板缓存"""
-        await cache.delete(CacheKeys.DASHBOARD_STATS)
-        await cache.delete(CacheKeys.DASHBOARD_CHARTS)
+        await cache.delete_pattern("dashboard:stats:*")
+        await cache.delete_pattern("dashboard:charts:*")

@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.5.0",
+  "version": "1.5.5",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -52,7 +52,7 @@
   },
   "build": {
     "appId": "com.amazon.toolbox",
-    "productName": "亚马逊赛训效率工具箱",
+    "productName": "\u4e9a\u9a6c\u900a\u8d5b\u8bad\u6548\u7387\u5de5\u5177\u7bb1",
     "directories": {
       "output": "release"
     },
@@ -71,7 +71,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "亚马逊工具箱"
+      "shortcutName": "\u4e9a\u9a6c\u900a\u5de5\u5177\u7bb1"
     },
     "publish": {
       "provider": "generic",
