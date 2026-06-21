@@ -191,6 +191,11 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+/* Header 左侧留空，为固定侧边栏让位 */
+.app-layout :deep(.studio-header) {
+  margin-left: var(--sidebar-width, 200px);
+}
+
 /* 全高骨架布局 - 侧边栏贴边 */
 .layout-studio {
   flex: 1;
@@ -198,11 +203,23 @@ onUnmounted(() => {
   min-height: calc(100vh - var(--header-height));
 }
 
+/* 主内容区左侧留空，为固定侧边栏让位 */
 .content-studio {
   flex: 1;
   min-width: 0;
   padding: var(--spacing-lg);
   overflow-y: auto;
+  margin-left: var(--sidebar-width, 200px);
+}
+
+/* 移动端：取消 margin-left，侧边栏变为抽屉式 */
+@media (max-width: 1024px) {
+  .app-layout :deep(.studio-header) {
+    margin-left: 0;
+  }
+  .content-studio {
+    margin-left: 0;
+  }
 }
 
 /* 移动端侧边栏遮罩 */

@@ -58,13 +58,6 @@
       
       <!-- 扫描线效果 -->
       <div class="scan-line"></div>
-      
-      <!-- 版本号 -->
-      <div class="version-badge">
-        <span class="version-text">v1.5.0</span>
-        <span class="version-divider">·</span>
-        <span class="version-edition">Glacier Cyan</span>
-      </div>
     </div>
 
     <!-- 右侧登录区 -->
@@ -630,39 +623,6 @@ onUnmounted(() => {
     top: 100%; 
     opacity: 0;
   }
-}
-
-/* 版本号徽章 */
-.version-badge {
-  position: absolute;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 1rem;
-  background: rgba(14, 165, 233, 0.08);
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  border-radius: 20px;
-  font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  font-size: 0.75rem;
-  z-index: 2;
-  backdrop-filter: blur(8px);
-}
-
-.version-text {
-  color: rgba(14, 165, 233, 0.9);
-  font-weight: 600;
-}
-
-.version-divider {
-  color: rgba(255, 255, 255, 0.3);
-}
-
-.version-edition {
-  color: rgba(255, 255, 255, 0.5);
-  letter-spacing: 0.05em;
 }
 
 /* 品牌内容 */
