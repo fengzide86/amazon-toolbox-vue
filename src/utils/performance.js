@@ -4,6 +4,7 @@
  */
 
 import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals'
+import { API_BASE } from './api/index.js'
 
 /**
  * 初始化性能监控
@@ -49,7 +50,7 @@ function sendToAnalytics(name, value) {
   // 可以在这里集成 Sentry、Google Analytics 等
   // 示例：发送到后端 API
   if (import.meta.env.PROD) {
-    fetch('/api/analytics/performance', {
+    fetch(`${API_BASE}/api/analytics/performance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
