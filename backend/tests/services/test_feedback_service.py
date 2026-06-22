@@ -3,9 +3,9 @@
 """
 import pytest
 from datetime import datetime
-from backend.services.feedback_service import FeedbackService
-from backend.models import Feedback, User
-from backend.database import SessionLocal
+from services.feedback_service import FeedbackService
+from models import Feedback, User
+from database import async_session_maker as SessionLocal
 
 
 class TestFeedbackService:

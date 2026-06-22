@@ -3,9 +3,9 @@
 """
 import pytest
 from datetime import datetime, timedelta, timezone
-from backend.services.user_service import UserService
-from backend.models import User
-from backend.database import SessionLocal
+from services.user_service import UserService
+from models import User
+from database import async_session_maker as SessionLocal
 
 
 class TestUserService:

@@ -4,10 +4,10 @@
 包含连接池优化、健康检查、慢查询日志等功能
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 from sqlalchemy import text, event
 from core.config import settings
 from core.logging import get_logger
+from models.base import Base
 import time
 
 logger = get_logger(__name__)
@@ -55,9 +55,6 @@ async_session_maker = async_sessionmaker(
     autoflush=False,  # 手动控制 flush
 )
 
-Base = declarative_base()
-
-
 # ===== 慢查询阈值（秒）=====
 SLOW_QUERY_THRESHOLD = 1.0  # 1秒
 
@@ -86,6 +83,8 @@ async def get_db():
 
 async def init_db():
     """初始化数据库（创建所有表）"""
+    # 确保所有模型已导入注册到 Base.metadata
+    import models  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("数据库表初始化完成")

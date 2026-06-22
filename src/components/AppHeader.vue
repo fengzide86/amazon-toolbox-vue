@@ -11,9 +11,6 @@
           <Menu :size="16" />
         </button>
         <router-link :to="isAdmin ? '/admin/dashboard' : '/user/dashboard'" class="logo-link">
-          <div class="logo-icon">
-            <Zap :size="16" />
-          </div>
           <div class="header-title">
             <h1>赛训工具箱</h1>
           </div>
@@ -22,11 +19,13 @@
 
       <!-- 平台切换器 -->
       <div class="platform-switcher" v-if="showPlatformSwitcher" data-testid="platform-switcher">
+        <span class="switcher-divider">/</span>
         <el-select
           v-model="currentPlatformModel"
           size="small"
           class="platform-select"
           @change="handlePlatformSelect"
+          :teleported="true"
         >
           <el-option
             v-for="platform in availablePlatformsForUser"
@@ -43,17 +42,20 @@
         <span v-if="!isAdmin && isSvip" class="badge-svip">SVIP</span>
 
         <!-- 管理员标记 -->
-        <span v-if="isAdmin" class="admin-badge">Owner</span>
+        <span v-if="isAdmin" class="admin-badge">系统管理员</span>
 
         <!-- 头像下拉菜单 -->
         <el-dropdown trigger="click" placement="bottom-end" @command="handleCommand">
           <div class="avatar-wrapper" :title="isAdmin ? '管理员' : '用户'">
             <div class="avatar-circle">
-              {{ isAdmin ? 'A' : 'U' }}
+              <User :size="14" />
             </div>
           </div>
           <template #dropdown>
             <el-dropdown-menu>
+              <div class="user-info-header">
+                <span class="user-role-text">{{ isAdmin ? '系统管理员 (Owner)' : '赛训学员' }}</span>
+              </div>
               <template v-if="!isAdmin">
                 <el-dropdown-item command="devices" :icon="Monitor">
                   设备换绑
@@ -79,7 +81,7 @@ import { useRouter } from 'vue-router'
 import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
-import { Menu, Zap } from '@lucide/vue'
+import { Menu, User } from '@lucide/vue'
 
 const props = defineProps({
   isAdmin: {
@@ -266,24 +268,6 @@ onMounted(() => {
   opacity: 0.8;
 }
 
-/* Logo */
-.logo-icon {
-  width: 28px;
-  height: 28px;
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.logo-icon svg {
-  width: 16px;
-  height: 16px;
-  color: white;
-}
-
 .header-title h1 {
   font-family: var(--font-heading);
   font-size: 0.9rem;
@@ -298,20 +282,33 @@ onMounted(() => {
   align-items: center;
 }
 
+/* 分隔符 */
+.switcher-divider {
+  color: var(--studio-border);
+  font-weight: 300;
+  margin-right: 4px;
+  user-select: none;
+}
+
 .platform-select {
   width: 140px;
 }
 
 :deep(.platform-select .el-input__wrapper) {
   box-shadow: none !important;
-  background: var(--color-border-light);
-  border-radius: 8px;
-  padding: 0 8px;
+  background: transparent !important;
+  border-radius: 6px;
+  padding: 0 4px;
+  transition: background var(--transition);
+}
+
+:deep(.platform-select .el-input__wrapper:hover) {
+  background: var(--studio-bg-hover) !important;
 }
 
 :deep(.platform-select .el-input__inner) {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--studio-text-main);
 }
 
@@ -364,8 +361,17 @@ onMounted(() => {
 }
 
 .avatar-circle:hover {
-  background: var(--color-border);
-  color: var(--studio-text-main);
+  background: var(--studio-accent-bg);
+  color: var(--studio-accent);
+}
+
+/* 下拉菜单用户信息 */
+.user-info-header {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--studio-text-muted);
+  border-bottom: 1px solid var(--studio-border);
+  margin-bottom: 4px;
 }
 
 /* 下拉菜单退出项 */

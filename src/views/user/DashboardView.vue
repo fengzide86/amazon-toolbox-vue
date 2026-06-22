@@ -162,9 +162,20 @@ const barChartData = computed(() => ({
 const barChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  interaction: { mode: 'index', intersect: false },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: 'rgba(15, 23, 42, 0.9)',
+      titleFont: { size: 11, weight: '600' },
+      bodyFont: { size: 11 },
+      padding: 8,
+      cornerRadius: 6,
+      displayColors: false
+    }
+  },
   scales: {
-    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+    y: { beginAtZero: true, grace: '10%', grid: { color: 'rgba(0,0,0,0.05)' } },
     x: { grid: { display: false } }
   }
 }
@@ -184,7 +195,17 @@ const doughnutChartData = computed(() => {
 const doughnutChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } } }
+  plugins: {
+    legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true, font: { size: 11 } } },
+    tooltip: {
+      backgroundColor: 'rgba(15, 23, 42, 0.9)',
+      titleFont: { size: 11, weight: '600' },
+      bodyFont: { size: 11 },
+      padding: 8,
+      cornerRadius: 6,
+      displayColors: false
+    }
+  }
 }
 
 function formatTime(timeStr) {

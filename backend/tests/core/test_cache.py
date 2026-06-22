@@ -3,7 +3,7 @@
 """
 import pytest
 from datetime import timedelta
-from backend.core.cache import CacheManager
+from core.cache import CacheManager
 
 
 class TestCacheManager:

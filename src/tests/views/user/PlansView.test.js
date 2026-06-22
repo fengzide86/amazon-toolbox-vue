@@ -12,6 +12,11 @@ vi.mock('@/utils/api', () => ({
   getPlans: vi.fn().mockResolvedValue([])
 }))
 
+// Mock settings API
+vi.mock('@/utils/api/settings', () => ({
+  getPublicSettings: vi.fn().mockResolvedValue([])
+}))
+
 // Mock utils
 vi.mock('@/utils', () => ({
   showToast: vi.fn()
@@ -154,9 +159,12 @@ describe('PlansView', () => {
         global: { stubs: globalStubs }
       })
       
+      await flushPromises()
+      
       wrapper.vm.contactService()
       
-      expect(showToast).toHaveBeenCalledWith('客服微信：AmazonToolbox_Support', 'info')
+      // 当没有配置客服微信时，显示"暂未配置"
+      expect(showToast).toHaveBeenCalledWith('客服微信：暂未配置', 'info')
     })
   })
 

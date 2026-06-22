@@ -1,15 +1,14 @@
 /* ===== Page Transition ===== */
 .page-enter-active {
-    transition: opacity var(--transition-slow), transform var(--transition-slow);
+    transition: opacity 150ms ease;
 }
 
 .page-leave-active {
-    transition: opacity var(--transition);
+    transition: opacity 100ms ease;
 }
 
 .page-enter-from {
-    opacity: 0;
-    transform: translateY(12px);
+  opacity: 0;
 }
 
 .page-leave-to {
