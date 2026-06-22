@@ -144,26 +144,3 @@
         min-width: 600px;
     }
 }
-
-/* ===== Phase 6B: 表格行 hover 品牌色指示条（Linear 风格） ===== */
-.data-table tbody tr td:first-child {
-    position: relative;
-}
-
-.data-table tbody tr td:first-child::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 3px;
-    height: 60%;
-    background: var(--studio-accent);
-    border-radius: 0 2px 2px 0;
-    opacity: 0;
-    transition: opacity var(--transition);
-}
-
-.data-table tbody tr:hover td:first-child::before {
-    opacity: 1;
-}

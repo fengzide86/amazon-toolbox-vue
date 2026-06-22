@@ -7,8 +7,8 @@
     <!-- 统计卡片 -->
     <section class="stats-row">
       <article class="stat-card">
-        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(14, 165, 233, 0.05));">
-          <CircleDollarSign :size="24" />
+        <div class="stat-icon" style="background: rgba(14,165,233,0.1);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <div class="stat-content">
           <div class="stat-label">总收入</div>
@@ -17,8 +17,8 @@
         </div>
       </article>
       <article class="stat-card">
-        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.05));">
-          <ShieldCheck :size="24" />
+        <div class="stat-icon" style="background: rgba(16,185,129,0.1);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         </div>
         <div class="stat-content">
           <div class="stat-label">活跃授权码</div>
@@ -27,8 +27,8 @@
         </div>
       </article>
       <article class="stat-card">
-        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));">
-          <ClipboardList :size="24" />
+        <div class="stat-icon" style="background: rgba(245,158,11,0.1);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         </div>
         <div class="stat-content">
           <div class="stat-label">待处理工单</div>
@@ -37,8 +37,8 @@
         </div>
       </article>
       <article class="stat-card">
-        <div class="stat-icon" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(6, 182, 212, 0.05));">
-          <Zap :size="24" />
+        <div class="stat-icon" style="background: rgba(6,182,212,0.1);">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
         <div class="stat-content">
           <div class="stat-label">今日运行次数</div>
@@ -143,7 +143,6 @@ import { showToast } from '@/utils'
 import { Line as LineChart, Doughnut as DoughnutChart, Bar as BarChart } from 'vue-chartjs'
 import '@/utils/chart' // 按需注册 Chart.js
 import { usePlatformStore } from '@/stores/platform'
-import { CircleDollarSign, ShieldCheck, ClipboardList, Zap } from '@lucide/vue'
 
 const platformStore = usePlatformStore()
 const dashboardData = ref({})
@@ -173,20 +172,9 @@ const lineChartData = computed(() => {
 const lineChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  interaction: { mode: 'index', intersect: false },
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-      titleFont: { size: 11, weight: '600' },
-      bodyFont: { size: 11 },
-      padding: 8,
-      cornerRadius: 6,
-      displayColors: false
-    }
-  },
+  plugins: { legend: { display: false } },
   scales: {
-    y: { beginAtZero: true, grace: '10%', grid: { color: 'rgba(0,0,0,0.05)' } },
+    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
     x: { grid: { display: false } }
   }
 }
@@ -207,17 +195,7 @@ const doughnutChartData = computed(() => {
 const doughnutChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } },
-    tooltip: {
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-      titleFont: { size: 11, weight: '600' },
-      bodyFont: { size: 11 },
-      padding: 8,
-      cornerRadius: 6,
-      displayColors: false
-    }
-  }
+  plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } } }
 }
 
 const barChartData = computed(() => {
@@ -238,20 +216,9 @@ const barChartData = computed(() => {
 const barChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  interaction: { mode: 'index', intersect: false },
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-      titleFont: { size: 11, weight: '600' },
-      bodyFont: { size: 11 },
-      padding: 8,
-      cornerRadius: 6,
-      displayColors: false
-    }
-  },
+  plugins: { legend: { display: false } },
   scales: {
-    y: { beginAtZero: true, max: 100, grace: '10%', grid: { color: 'rgba(0,0,0,0.05)' } },
+    y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.05)' } },
     x: { grid: { display: false } }
   }
 }
@@ -301,20 +268,19 @@ onMounted(loadData)
   background: var(--studio-surface);
   border-radius: 16px;
   border: 1px solid var(--color-border);
-  transition: box-shadow var(--transition), border-color var(--transition);
+  transition: box-shadow var(--transition);
 }
-.stat-card:hover { box-shadow: var(--studio-shadow-hover); border-color: rgba(14, 165, 233, 0.15); }
+.stat-card:hover { box-shadow: var(--studio-shadow-hover); }
 .stat-icon {
   width: 48px; height: 48px;
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
-  color: var(--studio-text-main);
 }
 .stat-icon svg { width: 24px; height: 24px; }
 .stat-content { flex: 1; }
 .stat-label { font-size: 0.8rem; color: var(--studio-text-muted); font-weight: 500; }
-.stat-value { font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+.stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
 .stat-sub { font-size: 0.75rem; color: var(--studio-text-muted); margin-top: 0.25rem; }
 .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
 .chart-card {
@@ -323,9 +289,7 @@ onMounted(loadData)
   border: 1px solid var(--color-border);
   padding: 1.25rem;
   box-shadow: var(--studio-shadow);
-  transition: box-shadow var(--transition), border-color var(--transition);
 }
-.chart-card:hover { box-shadow: var(--studio-shadow-hover); border-color: rgba(14, 165, 233, 0.15); }
 .chart-header h3 { font-size: 1rem; font-weight: 600; color: var(--studio-text-main); margin-bottom: 1rem; }
 .chart-container { position: relative; height: 250px; }
 .chart-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--studio-text-muted); }

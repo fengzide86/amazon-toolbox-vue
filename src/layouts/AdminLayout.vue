@@ -13,10 +13,15 @@
       <AdminSidebar :class="{ 'mobile-open': showMobileSidebar }" />
       <main class="content">
         <Breadcrumb />
-        <router-view v-slot="{ Component }">
-          <keep-alive :max="10">
-            <component :is="Component" />
-          </keep-alive>
+        <router-view :key="platformKey" v-slot="{ Component }">
+          <Suspense>
+            <template #default>
+              <component :is="Component" />
+            </template>
+            <template #fallback>
+              <LoadingSkeleton :type="route.meta?.skeleton || 'default'" />
+            </template>
+          </Suspense>
         </router-view>
       </main>
     </div>
@@ -30,6 +35,7 @@ import { usePlatformStore } from '@/stores/platform'
 import AppHeader from '@/components/AppHeader.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const router = useRouter()
 const route = useRoute()

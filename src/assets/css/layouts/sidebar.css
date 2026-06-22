@@ -53,7 +53,7 @@
 }
 
 .sidebar-nav a.active {
-    background: var(--studio-accent-active);
+    background: rgba(99, 102, 241, 0.1);
     color: var(--color-accent);
     font-weight: 600;
 }

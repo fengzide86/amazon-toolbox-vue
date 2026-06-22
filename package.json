@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-"version": "1.6.4",
+  "version": "1.6.4",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -53,7 +53,7 @@
   },
   "build": {
     "appId": "com.amazon.toolbox",
-    "productName": "跨境电商赛训效率工具箱",
+    "productName": "\u8de8\u5883\u7535\u5546\u8d5b\u8bad\u6548\u7387\u5de5\u5177\u7bb1",
     "directories": {
       "output": "release"
     },

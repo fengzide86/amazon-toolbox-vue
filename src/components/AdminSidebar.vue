@@ -8,43 +8,43 @@
 
     <!-- 导航菜单 -->
     <nav class="sidebar-menu-nav">
-      <router-link to="/admin/dashboard" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/dashboard')">
+      <router-link to="/admin/dashboard" class="menu-nav-item" active-class="is-active">
         <LayoutDashboard :size="14" class="menu-icon" />
         <span class="menu-label">数据总览</span>
       </router-link>
-      <router-link to="/admin/authcodes" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/authcodes')">
+      <router-link to="/admin/authcodes" class="menu-nav-item" active-class="is-active">
         <Key :size="14" class="menu-icon" />
         <span class="menu-label">授权码管理</span>
       </router-link>
-      <router-link to="/admin/orders" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/orders')">
+      <router-link to="/admin/orders" class="menu-nav-item" active-class="is-active">
         <Receipt :size="14" class="menu-icon" />
         <span class="menu-label">订单与套餐</span>
       </router-link>
-      <router-link to="/admin/profit" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/profit')">
+      <router-link to="/admin/profit" class="menu-nav-item" active-class="is-active">
         <Percent :size="14" class="menu-icon" />
         <span class="menu-label">分润管理</span>
       </router-link>
-      <router-link to="/admin/users" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/users')">
+      <router-link to="/admin/users" class="menu-nav-item" active-class="is-active">
         <Users :size="14" class="menu-icon" />
         <span class="menu-label">用户管理</span>
       </router-link>
-      <router-link to="/admin/feedback" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/feedback')">
+      <router-link to="/admin/feedback" class="menu-nav-item" active-class="is-active">
         <Wrench :size="14" class="menu-icon" />
         <span class="menu-label">工单管理</span>
       </router-link>
-      <router-link to="/admin/knowledge" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/knowledge')">
+      <router-link to="/admin/knowledge" class="menu-nav-item" active-class="is-active">
         <BookOpen :size="14" class="menu-icon" />
         <span class="menu-label">知识库管理</span>
       </router-link>
-      <router-link to="/admin/ai-chat" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/ai-chat')">
+      <router-link to="/admin/ai-chat" class="menu-nav-item" active-class="is-active">
         <MessageSquare :size="14" class="menu-icon" />
         <span class="menu-label">AI 客服管理</span>
       </router-link>
-      <router-link to="/admin/announcements" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/announcements')">
+      <router-link to="/admin/announcements" class="menu-nav-item" active-class="is-active">
         <Megaphone :size="14" class="menu-icon" />
         <span class="menu-label">公告管理</span>
       </router-link>
-      <router-link to="/admin/settings" class="menu-nav-item" active-class="is-active" @mouseenter="prefetchRoute('/admin/settings')">
+      <router-link to="/admin/settings" class="menu-nav-item" active-class="is-active">
         <Settings :size="14" class="menu-icon" />
         <span class="menu-label">系统设置</span>
       </router-link>
@@ -69,10 +69,6 @@ import {
 } from '@lucide/vue'
 
 const router = useRouter()
-
-function prefetchRoute(path) {
-  import(/* @vite-ignore */ `@/views${path}.vue`)
-}
 
 function handleLogout() {
   if (!confirm('确定要退出登录吗？')) return
@@ -109,7 +105,7 @@ function handleLogout() {
   align-items: center;
   padding: 0 16px;
   gap: 8px;
-  border-bottom: 1px solid var(--studio-accent-hover-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
 }
 
@@ -126,7 +122,7 @@ function handleLogout() {
   .brand-text {
     font-size: 12px;
     font-weight: 600;
-    color: var(--studio-text-on-dark-muted);
+    color: var(--studio-text-on-dark-muted, #94A3B8);
     letter-spacing: 0.5px;
   }
 
@@ -161,43 +157,38 @@ function handleLogout() {
   .menu-icon {
     width: 14px;
     height: 14px;
-    color: var(--studio-icon-on-dark);
+    color: var(--studio-icon-on-dark, #94A3B8);
     stroke-width: 1.75px;
-    transition: all var(--transition);
+    transition: color 0.2s;
     flex-shrink: 0;
-  }
-
-  .menu-nav-item:hover .menu-icon {
-    transform: scale(1.1);
-    color: var(--studio-text-on-dark);
   }
 
   .menu-label {
     font-size: 12px;
     font-weight: 500;
-    color: var(--studio-text-on-dark-muted);
+    color: var(--studio-text-on-dark-muted, #94A3B8);
     transition: color 0.2s;
     white-space: nowrap;
   }
 
 /* Hover */
 .menu-nav-item:hover {
-  background-color: var(--studio-accent-hover-bg);
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
   .menu-nav-item:hover .menu-icon,
   .menu-nav-item:hover .menu-label {
-    color: var(--studio-text-on-dark);
+    color: var(--studio-text-on-dark, #F8FAFC);
   }
 
 /* Active - 3px 左侧高亮蓝条 */
   .menu-nav-item.is-active {
-    background-color: var(--studio-accent-active);
+    background-color: rgba(14, 165, 233, 0.15);
   }
 
   .menu-nav-item.is-active .menu-icon,
   .menu-nav-item.is-active .menu-label {
-    color: var(--studio-text-on-dark);
+    color: var(--studio-text-on-dark, #FFFFFF);
     font-weight: 600;
   }
 
@@ -215,7 +206,7 @@ function handleLogout() {
 /* 底部退出区 */
 .sidebar-footer-zone {
   padding: 8px;
-  border-top: 1px solid var(--studio-accent-hover-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
 }
 
