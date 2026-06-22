@@ -129,6 +129,7 @@ async def _migrate_sqlite():
         ("plans", "updated_at", "DATETIME"),
         # orders 表
         ("orders", "updated_at", "DATETIME"),
+        ("orders", "platform_key", "VARCHAR(50)"),
         # users 表
         ("users", "updated_at", "DATETIME"),
         ("users", "is_active", "BOOLEAN DEFAULT 1"),
@@ -193,6 +194,7 @@ async def _migrate_mysql():
         ("plans", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
         # orders 表
         ("orders", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        ("orders", "platform_key", "VARCHAR(50)"),
         # users 表
         ("users", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
         ("users", "is_active", "BOOLEAN DEFAULT TRUE"),
