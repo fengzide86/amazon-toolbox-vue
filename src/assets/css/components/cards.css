@@ -275,3 +275,44 @@
         animation: none;
     }
 }
+
+/* ===== Phase 6A: 统计卡片交错入场动画 ===== */
+@keyframes card-enter {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.stats-row .stat-card {
+    animation: card-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.stats-row .stat-card:nth-child(1) { animation-delay: 0ms; }
+.stats-row .stat-card:nth-child(2) { animation-delay: 50ms; }
+.stats-row .stat-card:nth-child(3) { animation-delay: 100ms; }
+.stats-row .stat-card:nth-child(4) { animation-delay: 150ms; }
+
+.charts-grid .chart-card {
+    animation: card-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.charts-grid .chart-card:nth-child(1) { animation-delay: 0ms; }
+.charts-grid .chart-card:nth-child(2) { animation-delay: 50ms; }
+
+@media (prefers-reduced-motion: reduce) {
+    .stats-row .stat-card,
+    .charts-grid .chart-card {
+        animation: none;
+    }
+}
+
+/* ===== Phase 6F: 卡片 hover 品牌色边框过渡 ===== */
+.stat-card:hover,
+.chart-card:hover {
+    border-color: rgba(14, 165, 233, 0.15);
+}

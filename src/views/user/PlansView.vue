@@ -56,10 +56,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getPlans } from '@/utils/api'
+import { getPublicSettings } from '@/utils/api/settings'
 import { showToast } from '@/utils'
 import { Check } from '@lucide/vue'
 
 const plans = ref([])
+const serviceWechat = ref('')
 
 // 判断是否为推荐套餐（优先使用is_recommended字段，否则根据价格判断）
 function isRecommended(plan) {
@@ -86,12 +88,24 @@ function getFeatures(featuresStr) {
 }
 
 function contactService() {
-  showToast('客服微信：AmazonToolbox_Support', 'info')
+  const wechat = serviceWechat.value || '暂未配置'
+  showToast(`客服微信：${wechat}`, 'info')
 }
 
 async function loadData() {
   try {
-    plans.value = await getPlans()
+    const [plansData, settingsData] = await Promise.all([
+      getPlans(),
+      getPublicSettings()
+    ])
+    plans.value = plansData
+    // 从公开设置中获取客服微信
+    if (settingsData && Array.isArray(settingsData)) {
+      const wechatSetting = settingsData.find(s => s.key === 'service_wechat' || s.key === 'wechat_id')
+      if (wechatSetting) {
+        serviceWechat.value = wechatSetting.value
+      }
+    }
   } catch (err) {
     showToast('套餐加载失败', 'error')
   }

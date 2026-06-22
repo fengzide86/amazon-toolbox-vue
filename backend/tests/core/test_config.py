@@ -3,7 +3,7 @@
 """
 import pytest
 import os
-from backend.core.config import settings
+from core.config import settings
 
 
 class TestConfig:
@@ -72,7 +72,7 @@ class TestConfig:
         try:
             os.environ['DEBUG'] = 'True'
             # 重新加载配置
-            from backend.core.config import Settings
+            from core.config import Settings
             test_settings = Settings()
             assert test_settings.DEBUG is True
         finally:

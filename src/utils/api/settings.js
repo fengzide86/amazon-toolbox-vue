@@ -8,3 +8,7 @@ export function getSettings() {
 export function updateSetting(data) {
     return api.put('/api/settings', data);
 }
+
+export function getPublicSettings() {
+    return api.get('/api/settings/public');
+}

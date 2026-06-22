@@ -10,7 +10,7 @@
         style="min-width: 240px;"
       >
         <template #prefix>
-          <el-icon><Search /></el-icon>
+          <Search :size="14" />
         </template>
       </el-input>
       <span class="filter-count">共 {{ filteredUsers.length }} 个用户</span>
@@ -99,7 +99,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { getUsers, updateUser } from '@/utils/api'
 import { showToast } from '@/utils'
-import { Search } from '@element-plus/icons-vue'
+import { Search } from '@lucide/vue'
 
 const users = ref([])
 const searchText = ref('')

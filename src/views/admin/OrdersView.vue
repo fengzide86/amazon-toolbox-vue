@@ -63,9 +63,7 @@
               <el-option label="已退款" value="refunded" />
             </el-select>
             <el-button @click="exportOrdersData">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-              </svg>
+              <Download :size="14" />
               导出 CSV
             </el-button>
           </div>
@@ -128,6 +126,7 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getOrders, createOrder as apiCreateOrder, updateOrder, refundOrder, getPlans, exportOrders, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { Download } from '@lucide/vue'
 
 const orders = ref([])
 const plans = ref([])

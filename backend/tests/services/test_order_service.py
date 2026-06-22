@@ -3,9 +3,9 @@
 """
 import pytest
 from datetime import datetime, timedelta
-from backend.services.order_service import OrderService
-from backend.models import Order, User, Plan
-from backend.database import SessionLocal
+from services.order_service import OrderService
+from models import Order, User, Plan
+from database import async_session_maker as SessionLocal
 
 
 class TestOrderService:

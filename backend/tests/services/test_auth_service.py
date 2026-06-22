@@ -3,9 +3,9 @@
 """
 import pytest
 from datetime import datetime, timedelta, timezone
-from backend.services.auth_service import AuthService
-from backend.core.security import create_access_token, verify_token, get_password_hash, verify_password
-from backend.models import User
+from services.auth_service import AuthService
+from core.security import create_access_token, verify_token, hash_password, verify_password
+from models import User
 
 
 class TestAuthService:
@@ -46,7 +46,7 @@ class TestAuthService:
     def test_password_hash(self):
         """测试密码哈希"""
         password = "test_password_123"
-        hashed = get_password_hash(password)
+        hashed = hash_password(password)
         
         assert hashed is not None
         assert hashed != password
@@ -55,14 +55,14 @@ class TestAuthService:
     def test_verify_password_correct(self):
         """测试验证正确密码"""
         password = "test_password_123"
-        hashed = get_password_hash(password)
+        hashed = hash_password(password)
         
         assert verify_password(password, hashed) is True
 
     def test_verify_password_incorrect(self):
         """测试验证错误密码"""
         password = "test_password_123"
-        hashed = get_password_hash(password)
+        hashed = hash_password(password)
         
         assert verify_password("wrong_password", hashed) is False
 
