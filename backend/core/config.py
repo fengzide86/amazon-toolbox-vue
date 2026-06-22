@@ -33,7 +33,7 @@ class Settings:
     """应用配置"""
     
     # 应用配置
-    APP_NAME: str = "亚马逊赛训效率工具箱"
+    APP_NAME: str = "跨境电商赛训效率工具箱"
     APP_VERSION: str = _get_version()
     DEBUG: bool = False
     

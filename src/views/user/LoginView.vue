@@ -26,14 +26,14 @@
           </div>
         </div>
 
-        <h1 class="brand-title">亚马逊赛训效率工具箱</h1>
+        <h1 class="brand-title">跨境电商赛训效率工具箱</h1>
         <p class="brand-subtitle">比赛 · 实训 · 交付</p>
         <div class="brand-divider">
           <span class="divider-line"></span>
           <span class="divider-dot"></span>
           <span class="divider-line"></span>
         </div>
-        <p class="brand-desc">面向亚马逊赛训与跨境电商实训场景<br>提供轻量化效率工具，提升操作效率</p>
+        <p class="brand-desc">面向跨境电商赛训与实训场景<br>提供轻量化效率工具，提升操作效率</p>
 
         <!-- 核心数据 -->
         <div class="brand-stats">
@@ -155,7 +155,7 @@
 
       <!-- 底部版权 -->
       <div class="login-footer">
-        <p>© 2026 亚马逊赛训效率工具箱 · 专业 · 高效 · 可信赖</p>
+        <p>© 2026 跨境电商赛训效率工具箱 · 专业 · 高效 · 可信赖</p>
       </div>
     </div>
 

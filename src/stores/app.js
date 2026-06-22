@@ -11,7 +11,7 @@ export const useAppStore = defineStore('app', () => {
   // ===== State =====
   
   // 应用信息
-  const appName = ref('亚马逊赛训效率工具箱')
+  const appName = ref('跨境电商赛训效率工具箱')
   const version = ref('1.0.5')
   
   // 加载状态

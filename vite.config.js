@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         manifest: {
-          name: '亚马逊赛训工具箱',
+          name: '跨境电商赛训工具箱',
           short_name: '赛训工具箱',
           description: '亚马逊跨境电商赛训效率工具',
           theme_color: '#4F46E5',
