@@ -18,9 +18,14 @@
         <Breadcrumb />
         <AnnouncementBanner />
         <router-view v-slot="{ Component }">
-          <keep-alive :max="10">
-            <component :is="Component" />
-          </keep-alive>
+          <Suspense>
+            <template #default>
+              <component :is="Component" />
+            </template>
+            <template #fallback>
+              <LoadingSkeleton :type="route.meta?.skeleton || 'default'" />
+            </template>
+          </Suspense>
         </router-view>
       </main>
     </div>
@@ -58,6 +63,7 @@ import { checkAuthStatus } from '@/utils/api'
 import AppHeader from '@/components/AppHeader.vue'
 import UserSidebar from '@/components/UserSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const router = useRouter()
 const route = useRoute()

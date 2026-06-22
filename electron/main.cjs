@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, screen, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 const { spawn } = require('child_process');
@@ -159,11 +159,6 @@ ipcMain.on('resume-download', () => {
 ipcMain.on('cancel-download', () => {
   console.log('[Updater] 取消下载');
   // electron-updater 不支持直接取消，重新设置 feed URL 来重置
-});
-
-// ===== 在系统默认浏览器中打开外部链接 =====
-ipcMain.on('open-external', (event, url) => {
-  if (url) shell.openExternal(url);
 });
 
 // ===== 窗口形变控制 =====

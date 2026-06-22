@@ -221,12 +221,8 @@ async function runTool(tool) {
     
     if (result.success && result.data && result.data.launch_url) {
       showToast(`${tool.name} 启动成功！`, 'success')
-      // 在系统默认浏览器中打开工具链接
-      if (window.electronAPI?.openExternal) {
-        window.electronAPI.openExternal(result.data.launch_url)
-      } else {
-        window.open(result.data.launch_url, '_blank')
-      }
+      // 尝试打开 launch_url
+      window.location.href = result.data.launch_url
     } else {
       // 显示后端错误文案
       const errorMsg = result.message || '启动失败'

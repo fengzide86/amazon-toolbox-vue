@@ -20,7 +20,7 @@
           </div>
         </div>
         <button
-          class="btn btn-danger btn-sm"
+          class="unbind-btn"
           @click="handleUnbind(device)"
           :disabled="devices.length <= 1 || unbinding"
           :title="devices.length <= 1 ? '至少保留一台设备' : '解绑此设备'"
@@ -144,6 +144,23 @@ onMounted(loadDevices)
 .device-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--studio-text-muted); flex-wrap: wrap; }
 .device-id { font-family: monospace; }
 
+.unbind-btn {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  color: var(--studio-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.unbind-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--studio-danger);
+}
+.unbind-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .empty-state {
   display: flex; flex-direction: column; align-items: center;

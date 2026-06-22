@@ -36,7 +36,7 @@
         <div class="card-header">
           <h3>分润比例配置</h3>
           <router-link to="/admin/settings" class="settings-link">
-            <Settings :size="14" />
+            <el-icon><Setting /></el-icon>
             去设置
           </router-link>
         </div>
@@ -62,7 +62,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getProfitSummary, getSettings } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
-import { Settings } from '@lucide/vue'
+import { Setting } from '@element-plus/icons-vue'
 
 const summary = ref({})
 const profitRatios = ref({

@@ -111,7 +111,7 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      const unbindBtn = wrapper.find('.btn-danger')
+      const unbindBtn = wrapper.find('.unbind-btn')
       expect(unbindBtn.exists()).toBe(true)
       expect(unbindBtn.text()).toBe('解绑')
     })
@@ -132,7 +132,7 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      const unbindBtn = wrapper.find('.btn-danger')
+      const unbindBtn = wrapper.find('.unbind-btn')
       expect(unbindBtn.exists()).toBe(true)
       expect(unbindBtn.attributes('disabled')).toBeDefined()
     })
@@ -159,7 +159,7 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      const unbindBtns = wrapper.findAll('.btn-danger')
+      const unbindBtns = wrapper.findAll('.unbind-btn')
       expect(unbindBtns.length).toBeGreaterThan(0)
       expect(unbindBtns[0].attributes('disabled')).toBeUndefined()
     })
@@ -205,8 +205,8 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      const unbindBtn = wrapper.find('.btn-danger')
-      await unbindBtn.trigger('click')
+    const unbindBtn = wrapper.find('.unbind-btn')
+    await unbindBtn.trigger('click')
 
       expect(confirmSpy).toHaveBeenCalled()
       confirmSpy.mockRestore()

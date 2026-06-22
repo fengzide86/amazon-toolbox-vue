@@ -10,31 +10,31 @@
 
     <!-- 导航菜单 -->
     <nav class="sidebar-menu-nav">
-      <router-link to="/user/dashboard" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/dashboard') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/dashboard')">
+      <router-link to="/user/dashboard" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/dashboard') ? 'page' : undefined">
         <LayoutDashboard :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">首页总览</span>
       </router-link>
-      <router-link to="/user/tools" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/tools') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/tools')">
+      <router-link to="/user/tools" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/tools') ? 'page' : undefined">
         <Zap :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">功能入口</span>
       </router-link>
-      <router-link to="/user/logs" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/logs') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/logs')">
+      <router-link to="/user/logs" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/logs') ? 'page' : undefined">
         <ClipboardList :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">个人日志</span>
       </router-link>
-      <router-link to="/user/faq" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/faq') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/faq')">
+      <router-link to="/user/faq" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/faq') ? 'page' : undefined">
         <HelpCircle :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">常见问题</span>
       </router-link>
-      <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/plans')">
+      <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
         <ShieldCheck :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">套餐价格</span>
       </router-link>
-      <router-link to="/user/devices" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/devices') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/devices')">
+      <router-link to="/user/devices" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/devices') ? 'page' : undefined">
         <Monitor :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">设备管理</span>
       </router-link>
-      <router-link to="/user/ai-chat" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined" @mouseenter="prefetchRoute('/user/ai-chat')">
+      <router-link to="/user/ai-chat" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
         <MessageCircle :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">AI 客服</span>
       </router-link>
@@ -63,10 +63,6 @@ const route = useRoute()
 
 function isActive(path) {
   return route.path === path
-}
-
-function prefetchRoute(path) {
-  import(/* @vite-ignore */ `@/views${path}.vue`)
 }
 
 function handleLogout() {
@@ -104,7 +100,7 @@ function handleLogout() {
   align-items: center;
   padding: 0 16px;
   gap: 8px;
-  border-bottom: 1px solid var(--studio-accent-hover-bg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
 }
 
@@ -128,7 +124,7 @@ function handleLogout() {
 .brand-text {
   font-size: 12px;
   font-weight: 600;
-  color: var(--studio-text-on-dark-muted);
+  color: var(--studio-text-on-dark-muted, #94A3B8);
   letter-spacing: 0.5px;
 }
 
@@ -163,43 +159,38 @@ function handleLogout() {
 .menu-icon {
   width: 14px;
   height: 14px;
-  color: var(--studio-icon-on-dark);
+  color: var(--studio-icon-on-dark, #94A3B8);
   stroke-width: 1.75px;
-  transition: all var(--transition);
+  transition: color 0.2s;
   flex-shrink: 0;
-}
-
-.menu-nav-item:hover .menu-icon {
-  transform: scale(1.1);
-  color: var(--studio-text-on-dark);
 }
 
 .menu-label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--studio-text-on-dark-muted);
+  color: var(--studio-text-on-dark-muted, #94A3B8);
   transition: color 0.2s;
   white-space: nowrap;
 }
 
 /* Hover */
 .menu-nav-item:hover {
-  background-color: var(--studio-accent-hover-bg);
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
 .menu-nav-item:hover .menu-icon,
 .menu-nav-item:hover .menu-label {
-  color: var(--studio-text-on-dark);
+  color: var(--studio-text-on-dark, #F8FAFC);
 }
 
 /* Active - 3px 左侧高亮蓝条 */
 .menu-nav-item.is-active {
-  background-color: var(--studio-accent-active);
+  background-color: rgba(14, 165, 233, 0.15);
 }
 
 .menu-nav-item.is-active .menu-icon,
 .menu-nav-item.is-active .menu-label {
-  color: var(--studio-text-on-dark);
+  color: var(--studio-text-on-dark, #FFFFFF);
   font-weight: 600;
 }
 
@@ -217,7 +208,7 @@ function handleLogout() {
 /* 底部退出区 */
 .sidebar-footer-zone {
   padding: 8px;
-  border-top: 1px solid var(--studio-accent-hover-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   flex-shrink: 0;
 }
 

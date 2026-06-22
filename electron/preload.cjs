@@ -32,6 +32,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 窗口形变控制：学员窄屏 / 管理员宽屏
   resizeWindow: (mode) => ipcRenderer.send('resize-window-context', mode),
-  // 在系统默认浏览器中打开外部链接
-  openExternal: (url) => ipcRenderer.send('open-external', url),
 });
