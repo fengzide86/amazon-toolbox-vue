@@ -6,7 +6,7 @@ REM  - This file MUST be saved in GBK/ANSI encoding
 REM  - UTF-8 encoding will cause this script to crash
 REM ============================================================
 echo ============================================
-echo   亚马逊赛训效率工具箱 - 后端服务启动
+echo   跨境电商赛训效率工具箱 - 后端服务启动
 echo ============================================
 echo.
 

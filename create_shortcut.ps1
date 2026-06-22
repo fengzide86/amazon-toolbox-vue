@@ -13,7 +13,7 @@ if (-not (Test-Path $ShortcutDir)) {
 $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
 $Shortcut.TargetPath = $TargetPath
 $Shortcut.WorkingDirectory = $TargetPath
-$Shortcut.Description = "亚马逊赛训效率工具箱"
+$Shortcut.Description = "跨境电商赛训效率工具箱"
 $Shortcut.Save()
 
 Write-Host "快捷方式已创建: $ShortcutPath"

@@ -551,7 +551,7 @@ async def _build_ai_messages(
     messages = []
 
     # 系统提示词
-    system_prompt = """你是亚马逊赛训效率工具箱的智能客服助手。
+    system_prompt = """你是跨境电商赛训效率工具箱的智能客服助手。
 你的职责是帮助用户解决安装、使用、授权等方面的问题。
 
 回答规则：

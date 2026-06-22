@@ -53,7 +53,7 @@
   },
   "build": {
     "appId": "com.amazon.toolbox",
-    "productName": "\u4e9a\u9a6c\u900a\u8d5b\u8bad\u6548\u7387\u5de5\u5177\u7bb1",
+    "productName": "跨境电商赛训效率工具箱",
     "directories": {
       "output": "release"
     },

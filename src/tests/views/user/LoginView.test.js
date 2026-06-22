@@ -51,7 +51,7 @@ describe('LoginView', () => {
 
     it('应该显示应用标题', () => {
       const wrapper = mountWithPinia(LoginView)
-      expect(wrapper.find('h1').text()).toBe('亚马逊赛训效率工具箱')
+      expect(wrapper.find('h1').text()).toBe('跨境电商赛训效率工具箱')
     })
 
     it('应该显示授权码提示', () => {
