@@ -39,12 +39,11 @@ function getApiBase() {
     const viteApiBase = import.meta.env.VITE_API_BASE;
     if (viteApiBase) return viteApiBase;
     
-    // 默认值：根据环境判断
-    return import.meta.env.DEV 
-        ? 'http://localhost:8000' 
-        : 'http://8.130.113.104:8000';
+    // 默认值：开发环境和打包应用都使用本地后端（toolbox-backend.exe）
+    return 'http://localhost:8000';
 }
 
+// API_BASE 动态获取（不再在模块加载时固定，让 Electron 有时间注入 localStorage）
 const API_BASE = getApiBase();
 
 // 请求去重缓存
@@ -110,7 +109,9 @@ export async function request(url, options = {}) {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时（500人规模优化）
 
-                const response = await fetch(`${API_BASE}${url}`, {
+                // 每次请求动态获取 API 地址，确保 Electron 注入的 localStorage 生效
+                const baseUrl = getApiBase();
+                const response = await fetch(`${baseUrl}${url}`, {
                     ...config,
                     signal: controller.signal,
                 });

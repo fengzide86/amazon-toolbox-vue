@@ -1,7 +1,10 @@
 import purgecss from '@fullhuman/postcss-purgecss'
+import autoprefixer from 'autoprefixer'
 
 export default {
   plugins: [
+    // 自动添加浏览器前缀
+    autoprefixer(),
     // 仅在构建时启用 PurgeCSS
     process.env.NODE_ENV === 'production' && purgecss({
       content: [

@@ -33,6 +33,11 @@ export const useAppStore = defineStore('app', () => {
   // 工具分类（缓存）
   const toolCategories = ref([])
 
+  // 工具面板状态（单窗口分屏模式）
+  const toolVisible = ref(false)
+  const toolUrl = ref('')
+  const currentTool = ref(null) // { id, name, module, category, platformKey, targetUrl }
+
   // ===== Getters =====
   
   // 是否深色模式
@@ -43,6 +48,9 @@ export const useAppStore = defineStore('app', () => {
   
   // 获取系统设置
   const getSettings = computed(() => settings.value)
+
+  // 工具面板是否可见
+  const isToolVisible = computed(() => toolVisible.value)
 
   // ===== Actions =====
   
@@ -115,12 +123,33 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /**
+   * 打开工具（分屏模式）
+   */
+  function openTool(tool) {
+    currentTool.value = tool
+    toolUrl.value = tool.targetUrl || ''
+    toolVisible.value = true
+  }
+
+  /**
+   * 关闭工具
+   */
+  function closeTool() {
+    toolVisible.value = false
+    toolUrl.value = ''
+    currentTool.value = null
+  }
+
+  /**
    * 重置应用状态
    */
   function reset() {
     settings.value = null
     plans.value = []
     toolCategories.value = []
+    toolVisible.value = false
+    toolUrl.value = ''
+    currentTool.value = null
   }
 
   return {
@@ -134,10 +163,14 @@ export const useAppStore = defineStore('app', () => {
     settings,
     plans,
     toolCategories,
+    toolVisible,
+    toolUrl,
+    currentTool,
     // Getters
     isDarkMode,
     getVersion,
     getSettings,
+    isToolVisible,
     // Actions
     setLoading,
     toggleSidebar,
@@ -147,6 +180,8 @@ export const useAppStore = defineStore('app', () => {
     setSettings,
     setPlans,
     setToolCategories,
+    openTool,
+    closeTool,
     reset,
   }
 })

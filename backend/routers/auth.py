@@ -101,8 +101,9 @@ async def refresh_token(
     user_id = payload.get("user_id")
     role = payload.get("role", "user")
     auth_code_id = payload.get("auth_code_id")
+    device_id = payload.get("device_id")
     
-    # 3. 管理员特殊处理
+    # 管理员特殊处理
     if role == "admin" and user_id == 0:
         new_token = create_access_token(data={
             "user_id": 0,
@@ -147,5 +148,6 @@ async def refresh_token(
         "user_id": user_id,
         "role": role,
         "auth_code_id": auth_code_id,
+        "device_id": device_id,
     })
     return {"success": True, "data": {"token": new_token}}

@@ -35,7 +35,17 @@ echo.
 echo [INFO] Target version: !NEW_VERSION!
 echo.
 
-echo [1/4] Building (version not changed yet)...
+echo [1/4] Updating version to !NEW_VERSION!...
+python _update_version.py !NEW_VERSION!
+if errorlevel 1 (
+    echo [ERROR] Version update failed!
+    pause
+    exit /b 1
+)
+echo Version updated to !NEW_VERSION!.
+echo.
+
+echo [2/4] Building with new version...
 echo.
 call build.bat
 echo.
@@ -47,7 +57,7 @@ if not errorlevel 1 set BUILD_OK=1
 
 if "!BUILD_OK!"=="0" (
     echo [ERROR] Build failed! No installer found in release directory.
-    echo [INFO] package.json version NOT changed, you can retry with same version.
+    echo [INFO] package.json version was changed to !NEW_VERSION!, but build failed.
     echo.
     pause
     exit /b 1
@@ -55,21 +65,10 @@ if "!BUILD_OK!"=="0" (
 echo Build complete!
 echo.
 
-echo [2/4] Updating version to !NEW_VERSION!...
-python _update_version.py !NEW_VERSION!
-if errorlevel 1 (
-    echo [ERROR] Version update failed!
-    pause
-    exit /b 1
-)
-echo Version updated to !NEW_VERSION!.
-echo.
-
-echo [3/4] Uploading files to server...
+echo [3/4] Uploading files to server (fast mode)...
 echo.
 
 set RELEASE_DIR=release
-set SERVER_URL=http://8.130.113.104:8000
 
 if not exist "!RELEASE_DIR!" (
     echo [ERROR] Release directory not found!
@@ -78,66 +77,29 @@ if not exist "!RELEASE_DIR!" (
     exit /b 1
 )
 
-set SCRIPT_DIR=%~dp0
+REM Collect all files to upload
+set UPLOAD_FILES=
+if exist "!RELEASE_DIR!\latest.yml" set UPLOAD_FILES=!UPLOAD_FILES! "!RELEASE_DIR!\latest.yml"
 
-REM Get admin token for upload authentication
-echo [AUTH] Logging in to get admin token...
-set ADMIN_PASSWORD=
-set /p ADMIN_PASSWORD="Enter admin password (default: admin123): "
-if "!ADMIN_PASSWORD!"=="" set ADMIN_PASSWORD=admin123
-
-for /f "delims=" %%t in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "$r = Invoke-RestMethod -Uri '!SERVER_URL!/api/auth/admin-login' -Method POST -ContentType 'application/json' -Body ('{\"password\":\"' + '!ADMIN_PASSWORD!' + '\"}'); if ($r.success) { Write-Host $r.data.token } else { Write-Host 'AUTH_FAILED' }"') do set ADMIN_TOKEN=%%t
-
-if "!ADMIN_TOKEN!"=="" (
-    echo [ERROR] Failed to get admin token!
-    echo.
-    pause
-    exit /b 1
+for %%f in ("!RELEASE_DIR!\*.exe") do (
+    if not "%%~nxf"=="elevate.exe" set UPLOAD_FILES=!UPLOAD_FILES! "%%f"
 )
-if "!ADMIN_TOKEN!"=="AUTH_FAILED" (
-    echo [ERROR] Admin login failed! Wrong password?
-    echo.
-    pause
-    exit /b 1
-)
-echo [OK] Admin token obtained.
-echo.
 
-if exist "!RELEASE_DIR!\latest.yml" (
-    echo Uploading latest.yml...
-    powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "!RELEASE_DIR!\latest.yml" -ServerUrl "!SERVER_URL!" -Token "!ADMIN_TOKEN!"
+for %%f in ("!RELEASE_DIR!\*.blockmap") do (
+    set UPLOAD_FILES=!UPLOAD_FILES! "%%f"
+)
+
+if "!UPLOAD_FILES!"=="" (
+    echo [WARN] No files to upload.
+) else (
+    echo Uploading: !UPLOAD_FILES!
+    python fast_upload.py !UPLOAD_FILES!
     if errorlevel 1 (
-        echo [ERROR] latest.yml upload failed!
+        echo [ERROR] Upload failed!
         echo.
         pause
         exit /b 1
     )
-) else (
-    echo [WARN] latest.yml not found, skipping.
-)
-
-set EXE_FOUND=0
-for %%f in ("!RELEASE_DIR!\*.exe") do (
-    if not "%%~nxf"=="elevate.exe" (
-        set EXE_FOUND=1
-        echo Uploading %%~nxf...
-        powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "%%f" -ServerUrl "!SERVER_URL!" -Token "!ADMIN_TOKEN!"
-        if errorlevel 1 (
-            echo [ERROR] %%~nxf upload failed!
-            echo.
-            pause
-            exit /b 1
-        )
-    )
-)
-
-if "!EXE_FOUND!"=="0" (
-    echo [WARN] No exe installer files found.
-)
-
-for %%f in ("!RELEASE_DIR!\*.blockmap") do (
-    echo Uploading %%~nxf...
-    powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!upload_file.ps1" -FilePath "%%f" -ServerUrl "!SERVER_URL!" -Token "!ADMIN_TOKEN!"
 )
 
 echo.

@@ -94,7 +94,10 @@ onUnmounted(() => {
   min-width: 0;
   padding: var(--spacing-lg, 1.5rem);
   overflow-y: auto;
+  overflow-x: hidden;
   margin-left: var(--sidebar-width, 200px);
+  max-width: calc(100vw - var(--sidebar-width, 200px));
+  box-sizing: border-box;
 }
 
 /* 移动端：取消 margin-left，侧边栏变为抽屉式 */

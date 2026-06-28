@@ -3,10 +3,10 @@
 包含工具配置的查询、更新等接口
 支持工具分类和搜索功能
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 import json
 import secrets
@@ -80,7 +80,11 @@ async def get_tools(
 
 
 @router.put("")
-async def update_tools(tools: list, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
+async def update_tools(
+    tools: List[dict] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(get_current_admin)
+):
     """更新工具配置"""
     result = await db.execute(select(Setting).where(Setting.key == "tool_configs"))
     setting = result.scalars().first()
@@ -302,6 +306,16 @@ async def create_launch_token(
         total_devices = total_devices_result.scalar() or 0
         if total_devices >= (auth_code.max_devices or 1):
             return error_response("当前设备未授权或已超过设备数量限制", 403)
+        
+        # 自动绑定新设备
+        new_device = Device(
+            auth_code_id=auth_code_id,
+            device_id=device_id,
+            device_name=f"Device-{device_id[:8]}",
+        )
+        db.add(new_device)
+        await db.flush()
+        logger.info(f"自动绑定新设备: {device_id}")
     
     # 9. 生成 launch token
     token = secrets.token_urlsafe(32)
@@ -327,7 +341,17 @@ async def create_launch_token(
     return success_response({
         "token": token,
         "expires_in": 300,  # 5分钟
-        "launch_url": f"amazon-toolbox://run?platform={platform_key}&tool={tool_id}&token={token}"
+        "launch_data": {
+            "platform_key": platform_key,
+            "tool_id": tool_id,
+            "token": token,
+            "script_key": target_tool.get("script_key"),
+            "tool_name": target_tool.get("name"),
+            "tool_module": target_tool.get("module"),
+            "target_url": target_tool.get("target_url", ""),
+            "category": target_tool.get("category", ""),
+            "description": target_tool.get("description", ""),
+        }
     })
 
 

@@ -45,6 +45,7 @@ async def get_optional_current_user(
         return None
     
     user_id = payload.get("user_id")
+    device_id = payload.get("device_id")
     if not user_id:
         return None
     
@@ -59,6 +60,7 @@ async def get_optional_current_user(
         "user_id": user.id,
         "role": "admin" if user.auth_code_id is None else "user",
         "auth_code_id": user.auth_code_id,
+        "device_id": device_id,
     }
 
 
@@ -87,6 +89,7 @@ async def get_current_user(
     user_id = payload.get("user_id")
     role = payload.get("role", "user")
     auth_code_id = payload.get("auth_code_id")
+    device_id = payload.get("device_id")
     
     # 管理员特殊处理：基于 role 判断，不再依赖 user_id==0
     if role == "admin":
@@ -94,6 +97,7 @@ async def get_current_user(
             "user_id": user_id,
             "role": "admin",
             "auth_code_id": None,
+            "device_id": device_id,
         }
     
     if not user_id:
@@ -116,6 +120,7 @@ async def get_current_user(
         "user_id": user.id,
         "role": "admin" if user.auth_code_id is None else "user",
         "auth_code_id": user.auth_code_id,
+        "device_id": device_id,
     }
 
 
