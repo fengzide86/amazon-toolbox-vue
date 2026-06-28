@@ -32,4 +32,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // 窗口形变控制：学员窄屏 / 管理员宽屏
   resizeWindow: (mode) => ipcRenderer.send('resize-window-context', mode),
+  // 工具启动控制
+  launchTool: (data) => ipcRenderer.send('launch-tool', data),
+  onLaunchToolError: (callback) => {
+    ipcRenderer.on('launch-tool-error', (event, data) => callback(data));
+  },
+  onLaunchToolSuccess: (callback) => {
+    ipcRenderer.on('launch-tool-success', (event, data) => callback(data));
+  },
+  
+  // 分屏模式：在系统浏览器中打开外部链接
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 });

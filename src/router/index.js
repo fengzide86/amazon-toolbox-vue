@@ -206,8 +206,8 @@ router.afterEach((to) => {
     // 管理后台：宽屏看板模式
     window.electronAPI?.resizeWindow('admin-large')
   } else if (to.path.startsWith('/user') && to.name !== 'UserLogin' && to.name !== 'UserTerms') {
-    // 用户端功能页面：窄屏伴侣模式
-    window.electronAPI?.resizeWindow('trainee-mini')
+    // 用户端功能页面：保持正常窗口大小，不再自动缩小
+    window.electronAPI?.resizeWindow('reset')
   } else if (to.name === 'UserLogin' || to.name === 'AdminLogin') {
     // 登录页：默认窗口
     window.electronAPI?.resizeWindow('reset')

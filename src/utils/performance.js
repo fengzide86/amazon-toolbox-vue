@@ -4,7 +4,17 @@
  */
 
 import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals'
-import { API_BASE } from './api/index.js'
+
+/**
+ * 动态获取 API 地址（每次调用时重新读取，确保 Electron 注入的 localStorage 生效）
+ */
+function getApiBase() {
+  try {
+    const electronApiBase = localStorage.getItem('toolbox_api_base')
+    if (electronApiBase) return electronApiBase
+  } catch (e) {}
+  return 'http://localhost:8000'
+}
 
 /**
  * 初始化性能监控
@@ -50,7 +60,7 @@ function sendToAnalytics(name, value) {
   // 可以在这里集成 Sentry、Google Analytics 等
   // 示例：发送到后端 API
   if (import.meta.env.PROD) {
-    fetch(`${API_BASE}/api/analytics/performance`, {
+    fetch(`${getApiBase()}/api/analytics/performance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

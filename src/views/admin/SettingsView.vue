@@ -178,6 +178,20 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="目标网址" min-width="200">
+          <template #default="{ row, $index }">
+            <el-input 
+              v-if="editingToolIndex === $index" 
+              v-model="row.target_url" 
+              size="small"
+              placeholder="https://example.com"
+            />
+            <span v-else style="font-size: 0.85rem; color: var(--studio-accent);">
+              {{ row.target_url || '未配置' }}
+            </span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="开放套餐" min-width="160">
           <template #default="{ row }">
             <span style="font-size: 0.8rem;">{{ row.available_plans?.join(', ') || '全部' }}</span>
@@ -411,6 +425,7 @@ function addTool() {
   tools.value.push({ 
     name: '新工具', 
     module: '未分类', 
+    target_url: '',
     available_plans: [], 
     status: 'online' 
   })

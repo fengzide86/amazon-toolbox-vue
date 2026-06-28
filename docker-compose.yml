@@ -9,6 +9,8 @@ services:
     container_name: amazon-toolbox-app
     ports:
       - "8000:8000"
+    volumes:
+      - /opt/amazon-toolbox/updates:/app/updates
     environment:
       # 数据库配置
       - DATABASE_URL=mysql+aiomysql://toolbox_user:toolbox_pass@db:3306/toolbox
@@ -19,6 +21,7 @@ services:
       - DEBUG=false
       - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - CORS_ORIGINS=*
     depends_on:
       db:
         condition: service_healthy
@@ -28,11 +31,16 @@ services:
     networks:
       - toolbox-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # MySQL 数据库
   db:
@@ -45,7 +53,6 @@ services:
       - MYSQL_PASSWORD=toolbox_pass
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "3306:3306"
     restart: unless-stopped
@@ -57,6 +64,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Redis 缓存
   redis:
@@ -74,6 +86,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   mysql_data:

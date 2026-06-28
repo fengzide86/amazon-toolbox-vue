@@ -178,7 +178,7 @@ class AuthService {
     } catch (e) {}
     const viteApiBase = import.meta.env?.VITE_API_BASE
     if (viteApiBase) return viteApiBase
-    return import.meta.env?.DEV ? 'http://localhost:8000' : 'http://8.130.113.104:8000'
+    return 'http://localhost:8000' // 打包应用使用内嵌本地后端
   }
 
   /**

@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.6.4",
+  "version": "1.6.8",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -37,7 +37,8 @@
     "@vitejs/plugin-vue": "^5.2.4",
     "@vitest/coverage-v8": "^2.1.9",
     "@vue/test-utils": "^2.4.11",
-    "electron": "^42.3.3",
+    "autoprefixer": "^10.5.0",
+    "electron": "^42.4.1",
     "electron-builder": "^26.8.1",
     "happy-dom": "^20.10.2",
     "jsdom": "^29.1.1",
@@ -58,9 +59,20 @@
       "output": "release"
     },
     "extraFiles": [],
+    "extraResources": [
+      {
+        "from": "electron/toolbox-backend.exe",
+        "to": "toolbox-backend.exe"
+      },
+      {
+        "from": "electron/start-backend.bat",
+        "to": "start-backend.bat"
+      }
+    ],
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "!electron/toolbox-backend.exe"
     ],
     "win": {
       "target": [

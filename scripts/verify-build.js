@@ -1,6 +1,6 @@
 /**
  * 构建验证脚本
- * 检查打包产物中是否包含正确的 API 地址
+ * 检查打包产物中是否包含正确的 API 地址（本地后端）
  */
 import { readFileSync, readdirSync } from 'fs'
 import { fileURLToPath } from 'url'
@@ -14,7 +14,7 @@ let found = false
 for (const file of files) {
   if (!file.endsWith('.js')) continue
   const content = readFileSync(join(distDir, file), 'utf8')
-  if (content.includes('8.130.113.104')) {
+  if (content.includes('localhost:8000')) {
     found = true
     console.log(`✅ API 地址已找到: ${file}`)
     break

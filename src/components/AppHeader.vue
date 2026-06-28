@@ -7,6 +7,7 @@
           class="hamburger-btn"
           @click="$emit('toggle-sidebar')"
           aria-label="打开导航菜单"
+          title="打开导航菜单"
         >
           <Menu :size="16" />
         </button>
@@ -47,9 +48,10 @@
 
         <!-- 头像下拉菜单 -->
         <el-dropdown trigger="click" placement="bottom-end" @command="handleCommand">
-          <div class="avatar-wrapper" :title="isAdmin ? '管理员' : '用户'">
-            <div class="avatar-circle">
-              {{ isAdmin ? 'A' : 'U' }}
+          <div class="avatar-wrapper" :title="displayName">
+            <div class="avatar-circle" :class="{ 'admin-avatar': isAdmin }">
+              <Crown v-if="isAdmin" :size="14" />
+              <span v-else>{{ userInitial }}</span>
             </div>
           </div>
           <template #dropdown>
@@ -79,7 +81,7 @@ import { useRouter } from 'vue-router'
 import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
-import { Menu, Zap } from '@lucide/vue'
+import { Menu, Zap, Crown } from '@lucide/vue'
 
 const props = defineProps({
   isAdmin: {
@@ -94,6 +96,22 @@ const router = useRouter()
 const platformStore = usePlatformStore()
 
 const showPlatformSwitcher = computed(() => platformStore.availablePlatforms.length > 0)
+
+// 用户信息
+const displayName = computed(() => {
+  if (props.isAdmin) return '管理员'
+  try {
+    const user = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+    return user.username || user.name || '用户'
+  } catch {
+    return '用户'
+  }
+})
+
+const userInitial = computed(() => {
+  const name = displayName.value
+  return name.charAt(0).toUpperCase()
+})
 
 const currentPlatform = computed(() => platformStore.currentPlatform)
 const adminPlatform = computed(() => platformStore.adminPlatform)
@@ -207,6 +225,7 @@ onMounted(() => {
   top: 0;
   z-index: 100;
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .header-inner {
@@ -366,6 +385,15 @@ onMounted(() => {
 .avatar-circle:hover {
   background: var(--color-border);
   color: var(--studio-text-main);
+}
+
+.avatar-circle.admin-avatar {
+  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  color: white;
+}
+
+.avatar-circle.admin-avatar:hover {
+  background: linear-gradient(135deg, var(--studio-accent-hover), var(--studio-accent));
 }
 
 /* 下拉菜单退出项 */

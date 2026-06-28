@@ -97,7 +97,8 @@ class Settings:
             self.CORS_ORIGINS = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
         else:
             # 开发环境默认允许 localhost，生产环境必须配置 CORS_ORIGINS
-            self.CORS_ORIGINS = ["http://localhost:3000", "http://localhost:5173"]
+            # null 来源对应打包后 Electron 应用的 file:// 协议页面
+            self.CORS_ORIGINS = ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173", "null"]
         
         # ===== 初始化数据库配置 =====
         # 优先使用环境变量，否则根据环境自动选择

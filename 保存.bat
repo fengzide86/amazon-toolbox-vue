@@ -5,6 +5,7 @@ REM  - Only use English/ASCII characters for echo and comments
 REM  - This file MUST be saved in GBK/ANSI encoding
 REM  - UTF-8 encoding will cause this script to crash
 REM ============================================================
+setlocal enabledelayedexpansion
 echo ========================================
 echo   Save Code to Git
 echo ========================================
@@ -12,7 +13,15 @@ echo.
 
 git add .
 
-git commit -m "%~1"
+if not "%~1"=="" (
+    set "COMMIT_MSG=%~1"
+) else (
+    for /f "tokens=1-2 delims= " %%a in ('echo %date% %time%') do set "COMMIT_MSG=update: %%a %%b"
+)
+
+if "!COMMIT_MSG!"=="" set "COMMIT_MSG=update"
+
+git commit -m "!COMMIT_MSG!"
 
 if %errorlevel% neq 0 (
     echo.

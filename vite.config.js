@@ -130,7 +130,7 @@ export default defineConfig(({ mode }) => {
     base: './',
     server: {
       port: 3000,
-      open: true
+      open: false  // 开发预览模式由 Electron 加载，不自动打开浏览器
     },
     // 预构建依赖，加速开发服务器启动
     optimizeDeps: {

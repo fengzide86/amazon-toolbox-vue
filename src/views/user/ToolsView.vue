@@ -31,10 +31,19 @@
 
     <!-- 工具列表 -->
     <div v-if="filteredTools.length" class="stats-row" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-      <div v-for="tool in filteredTools" :key="tool.name" class="stat-card tool-card" :data-testid="'tool-card-' + tool.name" @click="runTool(tool)">
+      <div 
+        v-for="tool in filteredTools" 
+        :key="tool.name" 
+        :class="['stat-card', 'tool-card', { launching: launchingToolId === tool.id }]"
+        :data-testid="'tool-card-' + tool.name" 
+        @click="runTool(tool)"
+      >
         <div class="tool-header">
           <div class="stat-label">{{ tool.name }}</div>
-          <span :class="['status-badge', tool.status === 'online' ? 'online' : 'offline']">
+          <span v-if="launchingToolId === tool.id" class="launching-badge">
+            <span class="launching-spinner"></span> 启动中...
+          </span>
+          <span v-else :class="['status-badge', tool.status === 'online' ? 'online' : 'offline']">
             {{ tool.status === 'online' ? '正常' : '维护中' }}
           </span>
         </div>
@@ -63,10 +72,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { getTools, getToolCategories, createLog } from '@/utils/api'
 import { runToolSimulation, showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { useAppStore } from '@/stores/app'
 import { Search, X } from '@lucide/vue'
 
 const platformStore = usePlatformStore()
+const appStore = useAppStore()
 const tools = ref([])
+const launchingToolId = ref(null)
 const categories = ref([
   { id: 'all', name: '全部工具', sort_order: 0 },
   { id: 'data', name: '数据分析', sort_order: 1 },
@@ -219,10 +231,31 @@ async function runTool(tool) {
     
     const result = await response.json()
     
-    if (result.success && result.data && result.data.launch_url) {
-      showToast(`${tool.name} 启动成功！`, 'success')
-      // 尝试打开 launch_url
-      window.location.href = result.data.launch_url
+    if (result.success && result.data && result.data.launch_data) {
+      const ld = result.data.launch_data
+      const targetUrl = ld.target_url || ''
+      
+      // 检查目标网址是否配置
+      if (!targetUrl) {
+        showToast('该工具暂未配置目标网址，请联系管理员', 'warning')
+        launchingToolId.value = null
+        return
+      }
+      
+      // 打开工具（分屏模式）
+      launchingToolId.value = tool.id
+      
+      appStore.openTool({
+        id: ld.tool_id || tool.id,
+        name: ld.tool_name || tool.name,
+        module: ld.tool_module || tool.module,
+        category: ld.category || tool.category,
+        platformKey: ld.platform_key || platformKey,
+        targetUrl: targetUrl
+      })
+      
+      launchingToolId.value = null
+      showToast(`${tool.name} 已启动`, 'success')
     } else {
       // 显示后端错误文案
       const errorMsg = result.message || '启动失败'
@@ -248,6 +281,21 @@ async function runTool(tool) {
   } catch (err) {}
 }
 
+// 监听 Electron 工具启动结果
+function setupElectronListeners() {
+  if (!window.electronAPI) return
+  
+  window.electronAPI.onLaunchToolSuccess?.((data) => {
+    launchingToolId.value = null
+    showToast(`${data.toolName || '工具'} 已启动`, 'success')
+  })
+  
+  window.electronAPI.onLaunchToolError?.((data) => {
+    launchingToolId.value = null
+    showToast(data.message || '工具启动失败', 'error')
+  })
+}
+
 // 监听平台变化
 watch(() => platformStore.currentPlatform, () => {
   loadData()
@@ -256,6 +304,7 @@ watch(() => platformStore.currentPlatform, () => {
 onMounted(() => {
   loadData()
   loadCategories()
+  setupElectronListeners()
 })
 </script>
 
@@ -478,6 +527,40 @@ onMounted(() => {
 
 .reset-btn:hover {
   background: var(--color-accent-light);
+}
+
+/* 启动中状态 */
+.tool-card.launching {
+  opacity: 0.7;
+  pointer-events: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+}
+
+.launching-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--color-accent);
+}
+
+.launching-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 640px) {

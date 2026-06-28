@@ -230,6 +230,7 @@ class AuthService:
             "user_id": code_obj.user_id,
             "role": "user",
             "auth_code_id": code_obj.id,
+            "device_id": device_id,
         })
         
         # 解析平台权限
@@ -370,12 +371,13 @@ class AuthService:
             "expires_at": expires_at,
         })
     
-    async def refresh_token(self, user_id: int, role: str, auth_code_id: Optional[int]) -> Dict[str, Any]:
+    async def refresh_token(self, user_id: int, role: str, auth_code_id: Optional[int], device_id: Optional[str] = None) -> Dict[str, Any]:
         """刷新 Token"""
         new_token = create_access_token(data={
             "user_id": user_id,
             "role": role,
             "auth_code_id": auth_code_id,
+            "device_id": device_id,
         })
         
         return success_response(data={"token": new_token})
