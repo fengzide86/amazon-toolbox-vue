@@ -20,8 +20,7 @@ if exist "release" (
     rd /s /q "release" 2>nul
     if exist "release" (
         echo Warning: release directory cannot be deleted, may be locked by antivirus
-        pause
-        exit /b 1
+        goto :eof
     )
     echo release directory deleted
 )
@@ -32,8 +31,7 @@ echo.
 call npm run build
 if errorlevel 1 (
     echo Frontend build failed!
-    pause
-    exit /b 1
+    goto :eof
 )
 echo Frontend build complete!
 echo.
@@ -44,8 +42,8 @@ cd backend
 python -m PyInstaller --noconfirm --onefile --console --name toolbox-backend --distpath ..\electron --workpath build --specpath build --hidden-import aiosqlite --hidden-import uvicorn.logging --hidden-import uvicorn.loops --hidden-import uvicorn.loops.auto --hidden-import uvicorn.protocols --hidden-import uvicorn.protocols.http --hidden-import uvicorn.protocols.http.auto --hidden-import uvicorn.protocols.websockets --hidden-import uvicorn.protocols.websockets.auto --hidden-import uvicorn.lifespan --hidden-import uvicorn.lifespan.on --hidden-import sqlalchemy.ext.asyncio --hidden-import sqlalchemy.dialects.sqlite --hidden-import starlette.middleware --hidden-import starlette.middleware.cors --hidden-import core.config --hidden-import core.security --hidden-import core.exceptions --hidden-import core.logging --hidden-import core.cache --hidden-import core.response --hidden-import core.pagination --hidden-import core.tasks --hidden-import core.token_blacklist --hidden-import core.dependencies --hidden-import core.audit --hidden-import routers.auth --hidden-import routers.dashboard --hidden-import routers.plans --hidden-import routers.auth_codes --hidden-import routers.orders --hidden-import routers.users --hidden-import routers.logs --hidden-import routers.feedback --hidden-import routers.profit --hidden-import routers.settings --hidden-import routers.tools --hidden-import routers.updates --hidden-import routers.devices --hidden-import routers.announcements --hidden-import routers.knowledge --hidden-import routers.user_dashboard --hidden-import routers.help --hidden-import services.seed_service --hidden-import services.ai_chat_service --hidden-import services.ai_provider --hidden-import services.auth_service --hidden-import services.dashboard_service --hidden-import services.feedback_service --hidden-import services.knowledge_service --hidden-import services.order_service --hidden-import services.plan_service --hidden-import services.user_service --hidden-import services.vector_store main.py
 if errorlevel 1 (
     echo Backend packaging failed!
-    pause
-    exit /b 1
+    cd ..
+    goto :eof
 )
 cd ..
 echo Backend packaging complete!
@@ -75,8 +73,7 @@ if errorlevel 1 (
     echo 1. Close all related programs
     echo 2. Temporarily disable antivirus real-time protection
     echo 3. Manually delete release directory and retry
-    pause
-    exit /b 1
+    goto :eof
 )
 echo.
 
@@ -88,4 +85,4 @@ echo   Installer: release\*Setup !PKG_VERSION!.exe
 echo ============================================
 echo.
 endlocal
-cmd /c exit /b 0
+goto :eof

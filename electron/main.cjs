@@ -58,6 +58,14 @@ autoUpdater.on('update-available', (info) => {
         console.log('[Updater] 用户选择立即更新，开始下载...');
         autoUpdater.downloadUpdate().catch(err => {
           console.error('[Updater] 下载失败:', err.message);
+          if (mainWindow) {
+            dialog.showMessageBox(mainWindow, {
+              type: 'error',
+              title: '更新下载失败',
+              message: '无法下载更新文件，请检查网络连接后重试。\n\n错误信息：' + err.message,
+              buttons: ['确定']
+            });
+          }
         });
       } else {
         console.log('[Updater] 用户选择稍后再说');
@@ -119,8 +127,11 @@ autoUpdater.on('update-downloaded', (info) => {
 autoUpdater.on('error', (err) => {
   console.error('[Updater] 更新错误:', err.message);
   if (mainWindow) {
-    mainWindow.webContents.send('update-error', {
-      message: '更新检查失败: ' + err.message
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: '更新失败',
+      message: '检查或下载更新时出错，请稍后重试。\n\n错误信息：' + err.message,
+      buttons: ['确定']
     });
   }
 });
