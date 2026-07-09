@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 from datetime import datetime, timedelta
 import json
+import re
 import secrets
 
 from database import get_db
@@ -37,6 +38,78 @@ DEFAULT_TARGET_URLS = {
     "amazon": "https://sellercentral.amazon.com/",
     "aliexpress": "https://sellercenter.aliexpress.com/",
 }
+
+VALID_RELEASE_STATUSES = {"available", "beta", "maintenance", "disabled"}
+VALID_TOOL_STATUSES = {"online", "maintenance", "offline"}
+
+
+def _slugify(value: str) -> str:
+    value = (value or "").strip().lower()
+    value = re.sub(r"[^a-z0-9_]+", "_", value)
+    value = re.sub(r"_+", "_", value).strip("_")
+    return value or "tool"
+
+
+def normalize_tool_config(tool: dict, index: int = 0) -> dict:
+    """补齐并收敛后台工具配置，保持 Setting JSON 可长期运营。"""
+    normalized = dict(tool or {})
+    platform_key = (normalized.get("platform_key") or "amazon").strip()
+    capability_key = (
+        normalized.get("capability_key")
+        or normalized.get("id")
+        or normalized.get("module")
+        or normalized.get("name")
+        or f"tool_{index + 1}"
+    )
+    capability_key = _slugify(str(capability_key))
+    tool_id = normalized.get("id") or f"tool_{capability_key}"
+    tool_id = _slugify(str(tool_id))
+
+    release_status = normalized.get("release_status") or "available"
+    if release_status not in VALID_RELEASE_STATUSES:
+        release_status = "maintenance"
+
+    status = normalized.get("status") or ("online" if release_status in {"available", "beta"} else "maintenance")
+    if status not in VALID_TOOL_STATUSES:
+        status = "online" if release_status in {"available", "beta"} else "maintenance"
+
+    script_key, target_url = resolve_tool_runtime(
+        {
+            **normalized,
+            "id": tool_id,
+            "platform_key": platform_key,
+            "capability_key": capability_key,
+        },
+        platform_key,
+    )
+
+    normalized.update({
+        "id": tool_id,
+        "name": (normalized.get("name") or "未命名工具").strip(),
+        "module": (normalized.get("module") or "未分类").strip(),
+        "category": normalized.get("category") or "automation",
+        "platform_key": platform_key,
+        "capability_key": capability_key,
+        "release_status": release_status,
+        "status": status,
+        "description": normalized.get("description") or "",
+        "script_key": normalized.get("script_key") or script_key,
+        "target_url": normalized.get("target_url") or target_url,
+        "tool_version": str(normalized.get("tool_version") or "1.0.0"),
+        "runner_api_version": int(normalized.get("runner_api_version") or 1),
+        "sort_order": int(normalized.get("sort_order") or index + 1),
+        "available_plans": normalized.get("available_plans") or [],
+    })
+    normalized["requires_signature"] = bool(normalized.get("requires_signature", True))
+    if isinstance(normalized["available_plans"], str):
+        normalized["available_plans"] = [
+            item.strip() for item in normalized["available_plans"].split(",") if item.strip()
+        ]
+    return normalized
+
+
+def normalize_tool_configs(tools: list[dict]) -> list[dict]:
+    return [normalize_tool_config(tool, index) for index, tool in enumerate(tools or [])]
 
 
 def resolve_tool_runtime(tool: dict, platform_key: str) -> tuple[str, str]:
@@ -88,6 +161,8 @@ async def get_tools(
                  search_lower in t.get("module", "").lower() or
                  search_lower in t.get("description", "").lower()]
     
+    tools = normalize_tool_configs(tools)
+
     # 按 sort_order 排序
     tools = sorted(tools, key=lambda t: t.get("sort_order", 0))
     
@@ -104,7 +179,8 @@ async def update_tools(
     result = await db.execute(select(Setting).where(Setting.key == "tool_configs"))
     setting = result.scalars().first()
     
-    tools_json = json.dumps(tools, ensure_ascii=False)
+    normalized_tools = normalize_tool_configs(tools)
+    tools_json = json.dumps(normalized_tools, ensure_ascii=False)
     
     if setting:
         setting.value = tools_json
@@ -114,7 +190,7 @@ async def update_tools(
     
     await db.commit()
     logger.info("工具配置已更新")
-    return {"success": True}
+    return {"success": True, "data": normalized_tools}
 
 
 @router.put("/categories")
@@ -257,6 +333,7 @@ async def create_launch_token(
     
     if not target_tool:
         return error_response("工具不存在", 404)
+    target_tool = normalize_tool_config(target_tool)
     
     # 4. 检查工具平台一致性
     if target_tool.get("platform_key") != platform_key:

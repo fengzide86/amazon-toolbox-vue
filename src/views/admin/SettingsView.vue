@@ -155,65 +155,140 @@
       </template>
 
       <el-table v-if="tools.length" :data="tools" style="width: 100%">
-        <el-table-column label="工具名称" min-width="140">
+        <el-table-column label="工具" min-width="220" fixed="left">
           <template #default="{ row, $index }">
-            <el-input 
-              v-if="editingToolIndex === $index" 
-              v-model="row.name" 
-              size="small"
-            />
-            <span v-else>{{ row.name }}</span>
+            <template v-if="editingToolIndex === $index">
+              <el-input v-model="row.name" size="small" placeholder="工具名称" />
+              <el-input v-model="row.id" size="small" placeholder="工具 ID，如 tool_reg_newbie" class="tool-sub-input" />
+            </template>
+            <template v-else>
+              <div class="tool-name">{{ row.name }}</div>
+              <div class="tool-meta">{{ row.id }}</div>
+            </template>
           </template>
         </el-table-column>
 
-        <el-table-column label="模块" width="140">
+        <el-table-column label="平台/分类" width="170">
           <template #default="{ row, $index }">
-            <el-input 
-              v-if="editingToolIndex === $index" 
-              v-model="row.module" 
-              size="small"
-              style="width: 120px;"
-            />
-            <span v-else style="font-size: 0.85rem;">{{ row.module }}</span>
+            <template v-if="editingToolIndex === $index">
+              <el-select v-model="row.platform_key" size="small" style="width: 100%;">
+                <el-option label="亚马逊" value="amazon" />
+                <el-option label="速卖通" value="aliexpress" />
+              </el-select>
+              <el-select v-model="row.category" size="small" class="tool-sub-input" style="width: 100%;">
+                <el-option label="数据分析" value="data" />
+                <el-option label="运营工具" value="operation" />
+                <el-option label="自动化工具" value="automation" />
+                <el-option label="其他工具" value="other" />
+              </el-select>
+            </template>
+            <template v-else>
+              <div>{{ platformLabel(row.platform_key) }}</div>
+              <div class="tool-meta">{{ categoryLabel(row.category) }}</div>
+            </template>
           </template>
         </el-table-column>
 
-        <el-table-column label="目标网址" min-width="200">
+        <el-table-column label="模块/能力" min-width="200">
           <template #default="{ row, $index }">
-            <el-input 
-              v-if="editingToolIndex === $index" 
-              v-model="row.target_url" 
+            <template v-if="editingToolIndex === $index">
+              <el-input v-model="row.module" size="small" placeholder="用户看到的模块名" />
+              <el-input v-model="row.capability_key" size="small" placeholder="能力 key，如 register" class="tool-sub-input" />
+            </template>
+            <template v-else>
+              <div>{{ row.module }}</div>
+              <div class="tool-meta">{{ row.capability_key || '未配置 capability_key' }}</div>
+            </template>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="自动化入口" min-width="260">
+          <template #default="{ row, $index }">
+            <template v-if="editingToolIndex === $index">
+              <el-input v-model="row.script_key" size="small" placeholder="脚本 Key，如 amazon.register.v1" />
+              <el-input v-model="row.target_url" size="small" placeholder="目标网址 https://..." class="tool-sub-input" />
+            </template>
+            <template v-else>
+              <div class="tool-code">{{ row.script_key || '未配置 script_key' }}</div>
+              <div class="tool-url">{{ row.target_url || '未配置 target_url' }}</div>
+            </template>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="版本" width="150">
+          <template #default="{ row, $index }">
+            <template v-if="editingToolIndex === $index">
+              <el-input v-model="row.tool_version" size="small" placeholder="1.0.0" />
+              <el-input-number v-model="row.runner_api_version" size="small" :min="1" :max="9" class="tool-sub-input" style="width: 100%;" />
+            </template>
+            <template v-else>
+              <div>{{ row.tool_version || '1.0.0' }}</div>
+              <div class="tool-meta">Runner API v{{ row.runner_api_version || 1 }}</div>
+            </template>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="展示/发布状态" width="170">
+          <template #default="{ row, $index }">
+            <template v-if="editingToolIndex === $index">
+              <el-select v-model="row.status" size="small" style="width: 100%;">
+                <el-option label="用户端在线" value="online" />
+                <el-option label="用户端维护" value="maintenance" />
+                <el-option label="用户端下线" value="offline" />
+              </el-select>
+              <el-select v-model="row.release_status" size="small" class="tool-sub-input" style="width: 100%;">
+                <el-option label="可启动" value="available" />
+                <el-option label="Beta 可启动" value="beta" />
+                <el-option label="维护，不可启动" value="maintenance" />
+                <el-option label="禁用，不可启动" value="disabled" />
+              </el-select>
+            </template>
+            <template v-else>
+              <el-tag :type="row.status === 'online' ? 'success' : 'danger'" size="small">
+                {{ toolStatusLabel(row.status) }}
+              </el-tag>
+              <el-tag :type="row.release_status === 'available' || row.release_status === 'beta' ? 'success' : 'warning'" size="small" class="tool-sub-tag">
+                {{ releaseStatusLabel(row.release_status) }}
+              </el-tag>
+            </template>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="套餐/排序" width="180">
+          <template #default="{ row, $index }">
+            <template v-if="editingToolIndex === $index">
+              <el-input v-model="row.available_plans_text" size="small" placeholder="Y49,Y199；空=全部" />
+              <el-input-number v-model="row.sort_order" size="small" :min="1" class="tool-sub-input" style="width: 100%;" />
+            </template>
+            <template v-else>
+              <div class="tool-meta">{{ row.available_plans?.join(', ') || '全部套餐' }}</div>
+              <div class="tool-meta">排序 {{ row.sort_order || 0 }}</div>
+            </template>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="说明" min-width="220">
+          <template #default="{ row, $index }">
+            <el-input
+              v-if="editingToolIndex === $index"
+              v-model="row.description"
+              type="textarea"
+              :rows="2"
               size="small"
-              placeholder="https://example.com"
+              placeholder="用户端工具说明"
             />
-            <span v-else style="font-size: 0.85rem; color: var(--studio-accent);">
-              {{ row.target_url || '未配置' }}
-            </span>
+            <span v-else class="tool-desc-admin">{{ row.description || '未填写' }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="开放套餐" min-width="160">
-          <template #default="{ row }">
-            <span style="font-size: 0.8rem;">{{ row.available_plans?.join(', ') || '全部' }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'online' ? 'success' : 'danger'" size="small">
-              {{ row.status === 'online' ? '在线' : '维护' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="170" fixed="right">
           <template #default="{ row, $index }">
             <template v-if="editingToolIndex === $index">
               <el-button type="primary" size="small" @click="saveTool($index)">保存</el-button>
-              <el-button size="small" @click="editingToolIndex = -1">取消</el-button>
+              <el-button size="small" @click="cancelToolEdit">取消</el-button>
             </template>
             <template v-else>
-              <el-button size="small" @click="editingToolIndex = $index">编辑</el-button>
+              <el-button size="small" @click="startToolEdit(row, $index)">编辑</el-button>
               <el-button size="small" type="danger" @click="removeTool($index)">删除</el-button>
             </template>
           </template>
@@ -351,6 +426,7 @@ const tools = ref([])
 const toolReleases = ref([])
 const editingPlan = ref(null)
 const editingToolIndex = ref(-1)
+const editingToolSnapshot = ref(null)
 const showAddPlan = ref(false)
 const showReleaseModal = ref(false)
 const releaseSaving = ref(false)
@@ -360,6 +436,13 @@ const adminPassword = ref('')
 const wechatId = ref('')
 
 const newPlan = ref({ name: '', price: 0, duration_days: 7, features: '' })
+
+const categoryOptions = [
+  { label: '数据分析', value: 'data' },
+  { label: '运营工具', value: 'operation' },
+  { label: '自动化工具', value: 'automation' },
+  { label: '其他工具', value: 'other' }
+]
 
 // 分润比例
 const showProfitModal = ref(false)
@@ -487,23 +570,96 @@ async function addPlan() {
 }
 
 function addTool() {
+  const nextOrder = tools.value.length + 1
   tools.value.push({ 
+    id: `tool_custom_${Date.now()}`,
     name: '新工具', 
     module: '未分类', 
+    category: 'automation',
+    platform_key: 'amazon',
+    capability_key: 'custom',
+    script_key: 'amazon.custom.v1',
     target_url: '',
+    tool_version: '1.0.0',
+    runner_api_version: 1,
+    release_status: 'available',
     available_plans: [], 
-    status: 'online' 
+    available_plans_text: '',
+    status: 'online',
+    sort_order: nextOrder,
+    description: ''
   })
   editingToolIndex.value = tools.value.length - 1
+  editingToolSnapshot.value = null
 }
 
-function saveTool(index) {
-  updateTools(tools.value)
-    .then(() => {
-      showToast('工具配置已保存', 'success')
-      editingToolIndex.value = -1
-    })
-    .catch(() => showToast('保存失败', 'error'))
+function startToolEdit(row, index) {
+  row.available_plans_text = (row.available_plans || []).join(',')
+  editingToolSnapshot.value = JSON.parse(JSON.stringify(row))
+  editingToolIndex.value = index
+}
+
+function cancelToolEdit() {
+  const index = editingToolIndex.value
+  if (index >= 0 && editingToolSnapshot.value) {
+    tools.value.splice(index, 1, editingToolSnapshot.value)
+  } else if (index >= 0 && tools.value[index]?.name === '新工具') {
+    tools.value.splice(index, 1)
+  }
+  editingToolIndex.value = -1
+  editingToolSnapshot.value = null
+}
+
+function normalizeToolForSave(tool, index) {
+  const platformKey = tool.platform_key || 'amazon'
+  const capabilityKey = slugify(tool.capability_key || tool.id || tool.name || `tool_${index + 1}`)
+  const id = slugify(tool.id || `tool_${capabilityKey}`)
+  const plansText = tool.available_plans_text ?? (tool.available_plans || []).join(',')
+  return {
+    ...tool,
+    id,
+    name: (tool.name || '未命名工具').trim(),
+    module: (tool.module || '未分类').trim(),
+    category: tool.category || 'automation',
+    platform_key: platformKey,
+    capability_key: capabilityKey,
+    script_key: tool.script_key || `${platformKey}.${capabilityKey}.v1`,
+    target_url: tool.target_url || '',
+    tool_version: String(tool.tool_version || '1.0.0'),
+    runner_api_version: Number(tool.runner_api_version || 1),
+    release_status: tool.release_status || 'available',
+    status: tool.status || 'online',
+    sort_order: Number(tool.sort_order || index + 1),
+    available_plans: plansText.split(',').map(item => item.trim()).filter(Boolean),
+    description: tool.description || '',
+    requires_signature: tool.requires_signature !== false
+  }
+}
+
+async function saveTool(index) {
+  const tool = normalizeToolForSave(tools.value[index], index)
+  if (!tool.name || !tool.id) {
+    showToast('请填写工具名称和 ID', 'error')
+    return
+  }
+  if (tool.target_url && !/^https?:\/\//i.test(tool.target_url)) {
+    showToast('目标网址必须以 http:// 或 https:// 开头', 'error')
+    return
+  }
+  tools.value.splice(index, 1, tool)
+  try {
+    const saved = await updateTools(tools.value.map((item, itemIndex) => normalizeToolForSave(item, itemIndex)))
+    if (Array.isArray(saved?.data)) {
+      tools.value = saved.data
+    } else {
+      await loadData()
+    }
+    showToast('工具配置已保存', 'success')
+    editingToolIndex.value = -1
+    editingToolSnapshot.value = null
+  } catch (error) {
+    showToast(error?.message || '保存失败', 'error')
+  }
 }
 
 function removeTool(index) {
@@ -512,6 +668,37 @@ function removeTool(index) {
   updateTools(tools.value)
     .then(() => showToast('已删除', 'success'))
     .catch(() => showToast('删除失败', 'error'))
+}
+
+function slugify(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '') || 'tool'
+}
+
+function platformLabel(platformKey) {
+  return platformKey === 'aliexpress' ? '速卖通' : '亚马逊'
+}
+
+function categoryLabel(category) {
+  return categoryOptions.find(item => item.value === category)?.label || '其他工具'
+}
+
+function toolStatusLabel(status) {
+  return status === 'online' ? '用户端在线' : status === 'offline' ? '用户端下线' : '用户端维护'
+}
+
+function releaseStatusLabel(status) {
+  const labels = {
+    available: '可启动',
+    beta: 'Beta 可启动',
+    maintenance: '维护中',
+    disabled: '已禁用'
+  }
+  return labels[status] || '维护中'
 }
 
 function syncReleaseScriptKey(toolId) {
@@ -632,6 +819,49 @@ onMounted(loadData)
   color: var(--studio-text-muted);
   font-size: 0.72rem;
   font-weight: 400;
+}
+
+.tool-name {
+  font-weight: 600;
+  color: var(--studio-text-main);
+}
+
+.tool-meta {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--studio-text-muted);
+  word-break: break-all;
+}
+
+.tool-code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-size: 0.78rem;
+  color: var(--studio-text-main);
+  word-break: break-all;
+}
+
+.tool-url {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--studio-accent);
+  word-break: break-all;
+}
+
+.tool-sub-input {
+  margin-top: 0.4rem;
+}
+
+.tool-sub-tag {
+  display: block;
+  width: fit-content;
+  margin-top: 0.35rem;
+}
+
+.tool-desc-admin {
+  display: inline-block;
+  color: var(--studio-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .setting-row {

@@ -4,7 +4,7 @@
 import pytest
 from httpx import AsyncClient
 
-from routers.tools import resolve_tool_runtime
+from routers.tools import normalize_tool_config, resolve_tool_runtime
 
 
 def test_resolve_tool_runtime_supports_legacy_tool_config():
@@ -15,6 +15,43 @@ def test_resolve_tool_runtime_supports_legacy_tool_config():
 
     assert script_key == "amazon.listing_script.v1"
     assert target_url == "https://sellercentral.amazon.com/"
+
+
+def test_normalize_tool_config_fills_operational_fields():
+    tool = normalize_tool_config(
+        {
+            "name": "亚马逊注册页面巡检",
+            "module": "注册工具",
+            "platform_key": "amazon",
+            "capability_key": "register",
+        },
+        0,
+    )
+
+    assert tool["id"] == "tool_register"
+    assert tool["script_key"] == "amazon.register.v1"
+    assert tool["target_url"] == "https://sellercentral.amazon.com/"
+    assert tool["tool_version"] == "1.0.0"
+    assert tool["runner_api_version"] == 1
+    assert tool["status"] == "online"
+    assert tool["release_status"] == "available"
+
+
+def test_normalize_tool_config_turns_invalid_status_into_maintenance():
+    tool = normalize_tool_config(
+        {
+            "id": "工具 A",
+            "release_status": "bad-value",
+            "status": "bad-value",
+            "available_plans": "Y49, Y199",
+        },
+        0,
+    )
+
+    assert tool["id"] == "a"
+    assert tool["release_status"] == "maintenance"
+    assert tool["status"] == "maintenance"
+    assert tool["available_plans"] == ["Y49", "Y199"]
 
 
 @pytest.mark.asyncio
