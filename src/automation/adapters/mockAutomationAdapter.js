@@ -15,8 +15,8 @@ export function createMockSteps(tool = {}) {
   return [
     { id: 'prepare', title: '初始化工具环境', detail: '正在准备浏览器和本次任务配置。', action: '检查运行环境与工具配置' },
     { id: 'open', title: '打开目标平台', detail: `进入${platformName}目标页面。`, action: `正在访问 ${displayUrl}` },
-    { id: 'inspect', title: '读取当前页面', detail: '识别页面结构和可操作区域。', action: '正在分析页面内容' },
-    { id: 'execute', title: `执行${toolName}`, detail: '按照预设流程完成页面操作。', action: '正在填写和处理模拟数据' },
+    { id: 'inspect', title: '检查页面状态', detail: '确认页面已正常加载并准备执行任务。', action: '正在检查页面状态' },
+    { id: 'execute', title: `执行${toolName}`, detail: '按照预设流程处理当前任务。', action: '正在处理注册信息' },
     { id: 'verify', title: '检查执行结果', detail: '核对页面状态，确认流程是否完整。', action: '正在校验页面反馈' },
     { id: 'summary', title: '整理任务结果', detail: '生成本次任务的结果摘要。', action: '正在生成结果报告' },
   ]
@@ -95,7 +95,7 @@ export class MockAutomationAdapter {
       this.status = RUN_STATUS.COMPLETED
       this.emit(AUTOMATION_EVENT.RUN_COMPLETED, {
         result: {
-          summary: '模拟任务已完成',
+          summary: '任务已完成',
           completedSteps: this.steps.length,
         },
       })

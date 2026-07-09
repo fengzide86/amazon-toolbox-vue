@@ -38,7 +38,7 @@ describe('taskRun store', () => {
     expect(store.status).toBe('completed')
     expect(store.completedCount).toBe(6)
     expect(store.progressPercent).toBe(100)
-    expect(store.result.summary).toBe('模拟任务已完成')
+    expect(store.result.summary).toBe('任务已完成')
   })
 
   it('暂停后不推进步骤，恢复后继续执行', async () => {

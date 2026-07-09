@@ -18,9 +18,9 @@ TOOL_TARGET_URLS = {
     "aliexpress": "https://sellercenter.aliexpress.com/",
 }
 
-READ_ONLY_REGISTER_TOOL = {
+DEFAULT_REGISTER_TOOL = {
     "id": "tool_reg_newbie",
-    "name": "亚马逊注册页面巡检",
+    "name": "新手快速注册工具",
     "module": "注册工具",
     "category": "operation",
     "platform_key": "amazon",
@@ -31,7 +31,7 @@ READ_ONLY_REGISTER_TOOL = {
     "target_url": "https://sellercentral.amazon.com/",
     "tool_version": "1.0.0",
     "runner_api_version": 1,
-    "description": "打开亚马逊卖家中心注册入口，识别页面结构、表单、按钮和链接，并生成巡检截图；不填写、不点击提交、不发送任何真实数据。",
+    "description": "面向新手卖家的注册流程工具，按步骤完成店铺注册准备、资料处理、信息核对和结果确认。",
     "available_plans": ["Y49", "Y199", "Y999"],
     "sort_order": 1,
 }
@@ -39,7 +39,7 @@ READ_ONLY_REGISTER_TOOL = {
 
 def default_tool_configs() -> list[dict]:
     return [
-        dict(READ_ONLY_REGISTER_TOOL),
+        dict(DEFAULT_REGISTER_TOOL),
         {
             "id": "tool_logistics_standard",
             "name": "物流模板标准版",
@@ -162,7 +162,7 @@ def default_tool_configs() -> list[dict]:
 
 def default_tool_configs_by_name() -> dict[str, dict]:
     mapping = {tool["name"]: tool for tool in default_tool_configs()}
-    mapping["新手快速注册工具"] = READ_ONLY_REGISTER_TOOL
+    mapping["亚马逊注册页面巡检"] = DEFAULT_REGISTER_TOOL
     return mapping
 
 
@@ -185,14 +185,15 @@ def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
     return changed
 
 
-def upgrade_default_read_only_tools(tools: list[dict]) -> bool:
-    """把旧默认注册工具升级为只读巡检；避免覆盖管理员自定义工具。"""
+def upgrade_default_tool_configs(tools: list[dict]) -> bool:
+    """补齐旧默认工具配置；避免覆盖管理员自定义工具。"""
     changed = False
     defaults_by_name = default_tool_configs_by_name()
     legacy_names = {"新手快速注册工具", "亚马逊注册页面巡检"}
     legacy_descriptions = {
         "一键完成亚马逊新手店铺注册流程",
-        READ_ONLY_REGISTER_TOOL["description"],
+        "打开亚马逊卖家中心注册入口，识别页面结构、表单、按钮和链接，并生成巡检截图；不填写、不点击提交、不发送任何真实数据。",
+        DEFAULT_REGISTER_TOOL["description"],
     }
     for tool in tools:
         default_tool = defaults_by_name.get(tool.get("name"))
@@ -210,7 +211,7 @@ def upgrade_default_read_only_tools(tools: list[dict]) -> bool:
                     changed = True
             continue
 
-        if tool.get("id") != READ_ONLY_REGISTER_TOOL["id"]:
+        if tool.get("id") != DEFAULT_REGISTER_TOOL["id"]:
             continue
         can_upgrade = (
             tool.get("name") in legacy_names
@@ -219,7 +220,7 @@ def upgrade_default_read_only_tools(tools: list[dict]) -> bool:
         )
         if not can_upgrade:
             continue
-        for key, value in READ_ONLY_REGISTER_TOOL.items():
+        for key, value in DEFAULT_REGISTER_TOOL.items():
             if tool.get(key) != value:
                 tool[key] = value
                 changed = True
@@ -292,11 +293,11 @@ async def seed_initial_data():
                     tools = default_tool_configs()
                     changed = True
                     logger.info("现有工具配置为空，已恢复默认工具配置")
-                changed = upgrade_default_read_only_tools(tools) or changed
+                changed = upgrade_default_tool_configs(tools) or changed
                 changed = ensure_tool_runtime_fields(tools) or changed
                 if changed:
                     existing.value = json.dumps(tools, ensure_ascii=False)
-                    logger.info("升级现有工具的默认只读巡检和 runner 配置")
+                    logger.info("升级现有工具的默认配置和 runner 配置")
             except (json.JSONDecodeError, TypeError):
                 logger.warning("现有工具配置格式无效，跳过 runner 字段补齐")
 

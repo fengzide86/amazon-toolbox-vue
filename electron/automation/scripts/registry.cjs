@@ -1,17 +1,17 @@
 const SCRIPTS = Object.freeze({
   'amazon.register.v1': {
     key: 'amazon.register.v1',
-    name: '亚马逊注册页面巡检',
-    mode: 'read-only',
-    description: '读取页面结构并标记主要操作区域，不填写或提交数据。',
+    name: '新手快速注册工具',
+    mode: 'workflow',
+    description: '按预设步骤处理新手店铺注册流程。',
   },
 });
 
 const FALLBACK_SCRIPT = Object.freeze({
-  key: 'read-only.page-inspection.v1',
-  name: '通用页面巡检',
-  mode: 'read-only',
-  description: '读取页面标题、表单、输入框和按钮数量，不提交数据。',
+  key: 'workflow.generic.v1',
+  name: '通用工具流程',
+  mode: 'workflow',
+  description: '按预设步骤处理工具任务。',
 });
 
 function resolveScript(scriptKey) {

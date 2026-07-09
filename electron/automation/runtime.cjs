@@ -19,18 +19,18 @@ const EVENTS = Object.freeze({
 function createSteps(tool = {}) {
   const platformName = tool.platformKey === 'aliexpress' ? '速卖通' : '亚马逊';
   const scriptKey = tool.launchGrant?.scriptKey || '';
-  const isReadOnlyInspection = scriptKey.includes('register') || scriptKey.includes('inspection');
+  const isRegisterFlow = scriptKey.includes('register');
   return [
     { id: 'prepare', title: '初始化本地运行环境', detail: '校验启动授权并准备独立浏览器 Profile。', action: '正在检查授权和浏览器环境' },
     { id: 'open', title: `打开${platformName}页面`, detail: '使用可见浏览器进入工具目标页面。', action: `正在访问 ${tool.targetUrl || '目标页面'}` },
-    { id: 'inspect', title: '读取当前页面', detail: '读取页面标题和地址，确认页面已正常加载。', action: '正在检查页面状态' },
+    { id: 'inspect', title: '检查页面状态', detail: '确认页面已正常加载并准备执行任务。', action: '正在检查页面状态' },
     {
       id: 'execute',
-      title: isReadOnlyInspection ? '标记页面关键区域' : '运行工具脚本',
-      detail: '当前阶段运行只读巡检脚本，不填写、不提交、不发送真实数据。',
-      action: isReadOnlyInspection ? '正在识别表单、按钮和主要内容区' : '正在执行本地工具脚本',
+      title: isRegisterFlow ? '执行注册流程' : '运行工具脚本',
+      detail: '按照预设流程处理当前任务。',
+      action: isRegisterFlow ? '正在处理注册信息' : '正在执行本地工具脚本',
     },
-    { id: 'verify', title: '生成巡检证据', detail: '核对浏览器状态并生成运行截图。', action: '正在生成页面截图' },
+    { id: 'verify', title: '检查执行结果', detail: '核对页面状态并生成运行结果。', action: '正在校验执行结果' },
     { id: 'summary', title: '整理任务结果', detail: '汇总本次本地 Runner 执行结果。', action: '正在生成结果摘要' },
   ];
 }

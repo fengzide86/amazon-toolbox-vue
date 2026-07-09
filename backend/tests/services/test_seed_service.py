@@ -1,12 +1,12 @@
 from services.seed_service import (
-    READ_ONLY_REGISTER_TOOL,
+    DEFAULT_REGISTER_TOOL,
     default_tool_configs,
     ensure_tool_runtime_fields,
-    upgrade_default_read_only_tools,
+    upgrade_default_tool_configs,
 )
 
 
-def test_upgrade_default_register_tool_to_read_only_inspection():
+def test_upgrade_default_register_tool_keeps_original_product_name():
     tools = [
         {
             "id": "tool_reg_newbie",
@@ -17,13 +17,13 @@ def test_upgrade_default_register_tool_to_read_only_inspection():
         }
     ]
 
-    changed = upgrade_default_read_only_tools(tools)
+    changed = upgrade_default_tool_configs(tools)
 
     assert changed is True
-    assert tools[0]["name"] == "亚马逊注册页面巡检"
+    assert tools[0]["name"] == "新手快速注册工具"
     assert tools[0]["script_key"] == "amazon.register.v1"
     assert tools[0]["target_url"] == "https://sellercentral.amazon.com/"
-    assert tools[0]["description"] == READ_ONLY_REGISTER_TOOL["description"]
+    assert tools[0]["description"] == DEFAULT_REGISTER_TOOL["description"]
 
 
 def test_upgrade_legacy_default_tool_names_fill_ids_and_runtime_fields():
@@ -35,7 +35,7 @@ def test_upgrade_legacy_default_tool_names_fill_ids_and_runtime_fields():
         }
     ]
 
-    changed = upgrade_default_read_only_tools(tools)
+    changed = upgrade_default_tool_configs(tools)
     runtime_changed = ensure_tool_runtime_fields(tools)
 
     assert changed is True
@@ -58,15 +58,15 @@ def test_upgrade_default_register_tool_keeps_custom_admin_tool():
         }
     ]
 
-    changed = upgrade_default_read_only_tools(tools)
+    changed = upgrade_default_tool_configs(tools)
 
     assert changed is False
     assert tools[0]["name"] == "我的自定义注册工具"
     assert tools[0]["script_key"] == "amazon.custom-register.v1"
 
 
-def test_ensure_tool_runtime_fields_keeps_read_only_script_key():
-    tools = [dict(READ_ONLY_REGISTER_TOOL)]
+def test_ensure_tool_runtime_fields_keeps_register_script_key():
+    tools = [dict(DEFAULT_REGISTER_TOOL)]
 
     changed = ensure_tool_runtime_fields(tools)
 
@@ -74,11 +74,11 @@ def test_ensure_tool_runtime_fields_keeps_read_only_script_key():
     assert tools[0]["script_key"] == "amazon.register.v1"
 
 
-def test_default_tool_configs_include_read_only_register_tool():
+def test_default_tool_configs_include_register_tool():
     tools = default_tool_configs()
     register_tool = next(item for item in tools if item["id"] == "tool_reg_newbie")
 
     assert len(tools) >= 10
-    assert register_tool["name"] == "亚马逊注册页面巡检"
+    assert register_tool["name"] == "新手快速注册工具"
     assert register_tool["script_key"] == "amazon.register.v1"
     assert register_tool["target_url"] == "https://sellercentral.amazon.com/"

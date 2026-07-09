@@ -11,7 +11,7 @@
           </div>
           <div>
             <h1>{{ toolName }}</h1>
-            <p>{{ platformName }} · {{ isElectron ? '本地自动化任务' : '前端模拟任务' }}</p>
+            <p>{{ platformName }} · 工具任务</p>
           </div>
         </div>
       </div>
@@ -87,7 +87,7 @@
                 <div class="mock-content">
                   <div class="mock-breadcrumb">控制台 / {{ toolName }}</div>
                   <h2>{{ currentStep.title }}</h2>
-                  <p>这是目标平台页面的前端演示区域。Electron 客户端中会显示真实网页。</p>
+                  <p>工具流程将在此区域展示，右侧同步呈现任务进度和处理结果。</p>
                   <div class="mock-stat-grid">
                     <div v-for="n in 3" :key="n" class="mock-stat-card"><span></span><strong>{{ 16 + n * 8 }}</strong></div>
                   </div>
@@ -126,8 +126,8 @@
         <div v-if="activeTab === 'process'" class="panel-content">
           <div class="goal-card">
             <span>本次目标</span>
-            <strong>完成「{{ toolName }}」{{ isElectron ? '本地运行' : '模拟流程' }}</strong>
-            <p>当前脚本仅验证运行链路，不会提交真实数据。</p>
+            <strong>完成「{{ toolName }}」任务流程</strong>
+            <p>系统将按预设步骤完成页面打开、信息处理、结果核对和任务汇总。</p>
           </div>
 
           <ol class="timeline">
@@ -151,7 +151,7 @@
             <div class="result-icon">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
             </div>
-            <h3>{{ isElectron ? '本地任务已完成' : '模拟任务已完成' }}</h3>
+            <h3>任务已完成</h3>
             <p>共完成 {{ steps.length }} 个步骤，浏览器与任务轨迹均运行正常。</p>
             <dl>
               <div><dt>工具</dt><dd>{{ toolName }}</dd></div>
