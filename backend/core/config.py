@@ -107,7 +107,17 @@ class Settings:
         else:
             # 开发环境默认允许 localhost，生产环境必须配置 CORS_ORIGINS
             # null 来源对应打包后 Electron 应用的 file:// 协议页面
-            self.CORS_ORIGINS = ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173", "null"]
+            self.CORS_ORIGINS = [
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://localhost:5173",
+                "http://localhost:4173",
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:3001",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:4173",
+                "null",
+            ]
         
         # ===== 初始化数据库配置 =====
         # 优先使用环境变量，否则根据环境自动选择
