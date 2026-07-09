@@ -18,6 +18,24 @@ TOOL_TARGET_URLS = {
     "aliexpress": "https://sellercenter.aliexpress.com/",
 }
 
+READ_ONLY_REGISTER_TOOL = {
+    "id": "tool_reg_newbie",
+    "name": "亚马逊注册页面巡检",
+    "module": "注册工具",
+    "category": "operation",
+    "platform_key": "amazon",
+    "capability_key": "register",
+    "release_status": "available",
+    "status": "online",
+    "script_key": "amazon.register.v1",
+    "target_url": "https://sellercentral.amazon.com/",
+    "tool_version": "1.0.0",
+    "runner_api_version": 1,
+    "description": "打开亚马逊卖家中心注册入口，识别页面结构、表单、按钮和链接，并生成巡检截图；不填写、不点击提交、不发送任何真实数据。",
+    "available_plans": ["Y49", "Y199", "Y999"],
+    "sort_order": 1,
+}
+
 
 def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
     """为旧工具配置补齐本地 runner 所需字段，返回是否发生修改。"""
@@ -33,6 +51,31 @@ def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
         }
         for key, value in defaults.items():
             if not tool.get(key):
+                tool[key] = value
+                changed = True
+    return changed
+
+
+def upgrade_default_read_only_tools(tools: list[dict]) -> bool:
+    """把旧默认注册工具升级为只读巡检；避免覆盖管理员自定义工具。"""
+    changed = False
+    legacy_names = {"新手快速注册工具", "亚马逊注册页面巡检"}
+    legacy_descriptions = {
+        "一键完成亚马逊新手店铺注册流程",
+        READ_ONLY_REGISTER_TOOL["description"],
+    }
+    for tool in tools:
+        if tool.get("id") != READ_ONLY_REGISTER_TOOL["id"]:
+            continue
+        can_upgrade = (
+            tool.get("name") in legacy_names
+            or tool.get("script_key") in {None, "", "amazon.register.v1"}
+            or tool.get("description") in legacy_descriptions
+        )
+        if not can_upgrade:
+            continue
+        for key, value in READ_ONLY_REGISTER_TOOL.items():
+            if tool.get(key) != value:
                 tool[key] = value
                 changed = True
     return changed
@@ -89,19 +132,7 @@ async def seed_initial_data():
         existing = result.scalars().first()
         if not existing:
             tools = [
-                {
-                    "id": "tool_reg_newbie",
-                    "name": "新手快速注册工具",
-                    "module": "注册工具",
-                    "category": "operation",
-                    "platform_key": "amazon",
-                    "capability_key": "register",
-                    "release_status": "available",
-                    "status": "online",
-                    "description": "一键完成亚马逊新手店铺注册流程",
-                    "available_plans": ["Y49", "Y199", "Y999"],
-                    "sort_order": 1
-                },
+                dict(READ_ONLY_REGISTER_TOOL),
                 {
                     "id": "tool_logistics_standard",
                     "name": "物流模板标准版",
@@ -230,9 +261,12 @@ async def seed_initial_data():
         else:
             try:
                 tools = json.loads(existing.value or "[]")
-                if ensure_tool_runtime_fields(tools):
+                changed = False
+                changed = upgrade_default_read_only_tools(tools) or changed
+                changed = ensure_tool_runtime_fields(tools) or changed
+                if changed:
                     existing.value = json.dumps(tools, ensure_ascii=False)
-                    logger.info("补齐现有工具的 runner 配置")
+                    logger.info("升级现有工具的默认只读巡检和 runner 配置")
             except (json.JSONDecodeError, TypeError):
                 logger.warning("现有工具配置格式无效，跳过 runner 字段补齐")
 

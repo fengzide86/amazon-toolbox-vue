@@ -49,6 +49,20 @@ describe('Node Automation Runner', () => {
     expect(safeProfileName({ platformKey: '../amazon seller' })).toBe('___amazon_seller')
   })
 
+  it('注册巡检脚本使用只读步骤文案', () => {
+    const steps = createSteps({
+      platformKey: 'amazon',
+      targetUrl: 'https://sellercentral.amazon.com/',
+      launchGrant: { scriptKey: 'amazon.register.v1' },
+    })
+
+    expect(steps.find(step => step.id === 'execute')).toMatchObject({
+      title: '标记页面关键区域',
+      action: '正在识别表单、按钮和主要内容区',
+    })
+    expect(steps.find(step => step.id === 'verify').title).toBe('生成巡检证据')
+  })
+
   it('把嵌入浏览器动作双向转发给 Electron Browser Host', async () => {
     const actions = []
     let resolveCompleted
