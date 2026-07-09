@@ -207,7 +207,7 @@ function handleLogout() {
   localStorage.removeItem('toolbox_admin_platform')
   localStorage.removeItem('toolbox_platform_scope')
   localStorage.removeItem('toolbox_device_id')
-  router.push('/user/login')
+  router.push(props.isAdmin ? '/admin/login' : '/user/login')
 }
 
 onMounted(() => {

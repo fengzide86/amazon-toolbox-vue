@@ -112,12 +112,6 @@ function handleLogin() {
         
         showSuccess.value = true
         showToast('登录成功！', 'success')
-        // 触发窗口形变为管理员宽屏模式
-        try {
-          window.electronAPI?.resizeWindow('admin-large')
-        } catch (e) {
-          console.warn('resizeWindow failed:', e)
-        }
         setTimeout(() => {
           router.push('/admin/dashboard')
         }, 1000)

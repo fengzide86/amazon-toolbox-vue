@@ -12,16 +12,17 @@ services:
     volumes:
       - /opt/amazon-toolbox/updates:/app/updates
     environment:
-      # 数据库配置
-      - DATABASE_URL=mysql+aiomysql://toolbox_user:toolbox_pass@db:3306/toolbox
-      # Redis 配置
-      - REDIS_URL=redis://redis:6379/0
-      # 应用配置
-      - ENVIRONMENT=production
-      - DEBUG=false
-      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
-      - CORS_ORIGINS=*
+      DB_TYPE: mysql
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-toolbox_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-toolbox}
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "false"
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?DEFAULT_ADMIN_PASSWORD is required}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
     depends_on:
       db:
         condition: service_healthy
@@ -47,14 +48,12 @@ services:
     image: mysql:8.0
     container_name: amazon-toolbox-db
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
-      - MYSQL_DATABASE=toolbox
-      - MYSQL_USER=toolbox_user
-      - MYSQL_PASSWORD=toolbox_pass
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-toolbox}
+      MYSQL_USER: ${MYSQL_USER:-toolbox_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
     restart: unless-stopped
     networks:
       - toolbox-network

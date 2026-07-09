@@ -138,6 +138,7 @@ import { ref, onMounted, watch } from 'vue'
 import { getLogs, getLogTools, exportLogs, createFeedback, getMyFeedbacks, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { authService } from '@/utils/auth'
 import { Download, Image as ImageIcon, Plus, X } from '@lucide/vue'
 
 const platformStore = usePlatformStore()
@@ -228,7 +229,7 @@ async function submitFeedback() {
       formData.append('screenshots', item.file)
     })
     
-    const token = localStorage.getItem('toolbox_token')
+    const token = authService.getAuth()?.token || sessionStorage.getItem('toolbox_token')
     const response = await fetch(`${API_BASE}/api/feedback`, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},

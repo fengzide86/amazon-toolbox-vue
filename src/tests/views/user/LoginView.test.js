@@ -157,8 +157,8 @@ describe('LoginView', () => {
       await form.trigger('submit')
       await flushPromises()
 
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_role', 'user')
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_token', 'jwt-token')
+      expect(sessionStorage.getItem('toolbox_role')).toBe('user')
+      expect(sessionStorage.getItem('toolbox_token')).toBe('jwt-token')
       expect(wrapper.find('.success-message').classes()).toContain('show')
       expect(mockShowToast).toHaveBeenCalledWith('授权成功！正在跳转...', 'success')
 

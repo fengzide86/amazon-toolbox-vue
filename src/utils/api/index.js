@@ -1,7 +1,8 @@
 // API 基础配置
 // 服务器地址优先级:
-// 1. Electron 注入的 localStorage (toolbox_api_base)
-// 2. 环境变量 VITE_API_BASE
+// 1. Electron 注入的控制面地址 (toolbox_control_api_base)
+// 2. 旧版 Electron 地址 (toolbox_api_base)
+// 3. 环境变量 VITE_CONTROL_API_BASE / VITE_API_BASE
 // 3. 默认值（开发环境用本地，生产环境用云端）
 
 import { getCache, setCache, generateCacheKey } from '../cache.js';
@@ -29,6 +30,8 @@ function shouldCache(url) {
 function getApiBase() {
     // Electron 会在窗口加载后注入这个值
     try {
+        const controlApiBase = localStorage.getItem('toolbox_control_api_base');
+        if (controlApiBase) return controlApiBase;
         const electronApiBase = localStorage.getItem('toolbox_api_base');
         if (electronApiBase) return electronApiBase;
     } catch (e) {
@@ -36,7 +39,7 @@ function getApiBase() {
     }
     
     // Vite 环境变量
-    const viteApiBase = import.meta.env.VITE_API_BASE;
+    const viteApiBase = import.meta.env.VITE_CONTROL_API_BASE || import.meta.env.VITE_API_BASE;
     if (viteApiBase) return viteApiBase;
     
     // 默认值：开发环境和打包应用都使用本地后端（toolbox-backend.exe）
@@ -53,6 +56,15 @@ const pendingRequests = new Map();
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2秒
 
+export class ApiError extends Error {
+    constructor(message, status = 0, data = null) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.data = data;
+    }
+}
+
 // 延迟函数
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -62,7 +74,7 @@ function delay(ms) {
 function getAuthToken() {
     try {
         const auth = authService.getAuth();
-        return auth?.token || localStorage.getItem('toolbox_token');
+        return auth?.token || sessionStorage.getItem('toolbox_token') || localStorage.getItem('toolbox_token');
     } catch (e) {
         return null;
     }
@@ -71,6 +83,8 @@ function getAuthToken() {
 // 统一请求方法（带防重复和重试）
 export async function request(url, options = {}) {
     const token = getAuthToken();
+    const method = (options.method || 'GET').toUpperCase();
+    const isIdempotent = method === 'GET';
     
     const defaultHeaders = {
         'Content-Type': 'application/json',
@@ -95,19 +109,21 @@ export async function request(url, options = {}) {
     }
 
     // 生成请求唯一标识
-    const key = `${config.method || 'GET'}:${url}:${config.body || ''}`;
+    const key = `${method}:${url}`;
 
     // 如果相同请求正在进行中，返回之前的 Promise
-    if (pendingRequests.has(key)) {
+    if (isIdempotent && pendingRequests.has(key)) {
         return pendingRequests.get(key);
     }
 
     const fetchPromise = (async () => {
         let lastError;
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const maxAttempts = isIdempotent ? MAX_RETRIES + 1 : 1;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            let timeoutId;
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时（500人规模优化）
+                timeoutId = setTimeout(() => controller.abort(), 10000);
 
                 // 每次请求动态获取 API 地址，确保 Electron 注入的 localStorage 生效
                 const baseUrl = getApiBase();
@@ -115,14 +131,12 @@ export async function request(url, options = {}) {
                     ...config,
                     signal: controller.signal,
                 });
-                clearTimeout(timeoutId);
-
                 // 安全解析 JSON，防止非 JSON 响应导致崩溃
                 let data;
                 try {
                     data = await response.json();
                 } catch (parseError) {
-                    throw new Error(`服务器返回非JSON响应: ${response.status}`);
+                    throw new ApiError(`服务器返回非JSON响应: ${response.status}`, response.status);
                 }
 
                 if (!response.ok) {
@@ -138,41 +152,35 @@ export async function request(url, options = {}) {
                             }
                         }
                     }
-                    // 4xx 客户端错误不重试，直接抛出
-                    if (response.status >= 400 && response.status < 500) {
-                        throw new Error(data.detail || data.message || `请求失败: ${response.status}`);
-                    }
-                    // 5xx 服务器错误继续重试
-                    throw new Error(data.detail || data.message || `服务器错误: ${response.status}`);
+                    throw new ApiError(
+                        data.detail || data.message || `请求失败: ${response.status}`,
+                        response.status,
+                        data
+                    );
                 }
 
                 return data;
             } catch (error) {
                 lastError = error;
-                // 区分错误类型
-                const isClientError = error.message.includes('请求失败: 4');
-
-                console.error(`API Error (attempt ${attempt + 1}/${MAX_RETRIES + 1}): ${url}`, error);
-
-                // 客户端错误（4xx）不重试
-                if (isClientError) {
+                console.error(`API Error (attempt ${attempt + 1}/${maxAttempts}): ${url}`, error);
+                if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
                     throw error;
                 }
-
-                if (attempt < MAX_RETRIES) {
+                if (attempt < maxAttempts - 1) {
                     await delay(RETRY_DELAY);
                 }
+            } finally {
+                if (timeoutId) clearTimeout(timeoutId);
             }
         }
         throw lastError;
     })();
 
-    pendingRequests.set(key, fetchPromise);
-    
-    // 请求完成后清理缓存，防止内存泄漏
-    fetchPromise.finally(() => {
-        pendingRequests.delete(key);
-    });
+    if (isIdempotent) {
+        pendingRequests.set(key, fetchPromise);
+        const cleanup = () => pendingRequests.delete(key);
+        fetchPromise.then(cleanup, cleanup);
+    }
     
     return fetchPromise;
 }
@@ -219,15 +227,24 @@ export const api = {
     },
 
     post: (url, data = {}) => {
-        return request(url, { method: 'POST', body: data });
+        return request(url, { method: 'POST', body: data }).then(result => {
+            clearApiCache(url.split('/').slice(0, 3).join('/'));
+            return result;
+        });
     },
 
     put: (url, data = {}) => {
-        return request(url, { method: 'PUT', body: data });
+        return request(url, { method: 'PUT', body: data }).then(result => {
+            clearApiCache(url.split('/').slice(0, 3).join('/'));
+            return result;
+        });
     },
 
     delete: (url) => {
-        return request(url, { method: 'DELETE' });
+        return request(url, { method: 'DELETE' }).then(result => {
+            clearApiCache(url.split('/').slice(0, 3).join('/'));
+            return result;
+        });
     },
 };
 
@@ -240,10 +257,11 @@ export { getPlans } from './plans.js';
 export { getOrders, exportOrders, createOrder, updateOrder, refundOrder } from './orders.js';
 export { getUsers, updateUser } from './users.js';
 export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices.js';
-export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector } from './knowledge.js';
-export { createChatSession, getChatSession, sendChatMessage, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats } from './ai-chat.js';
+export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from './knowledge.js';
+export { createChatSession, getChatSession, sendChatMessage, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats, debugAIChat } from './ai-chat.js';
 export { getAnnouncements, getActiveAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from './announcements.js';
-export { getTools, getToolCategories, updateTools, updateToolCategories } from './tools.js';
+export { getTools, getToolCategories, updateTools, updateToolCategories, createToolLaunchGrant } from './tools.js';
+export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases.js';
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback.js';
 export { getLogs, exportLogs, getLogTools, createLog } from './logs.js';
 export { getDashboard, getDashboardCharts, getProfit, getProfitSummary } from './dashboard.js';

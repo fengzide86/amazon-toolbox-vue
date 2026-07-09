@@ -11,9 +11,9 @@ export const useUserStore = defineStore('user', () => {
   // ===== State =====
   
   // 认证信息
-  const token = ref(localStorage.getItem('toolbox_token') || null)
-  const role = ref(localStorage.getItem('toolbox_role') || null)
-  const auth = ref(localStorage.getItem('toolbox_auth') || null)
+  const token = ref(sessionStorage.getItem('toolbox_token') || null)
+  const role = ref(sessionStorage.getItem('toolbox_role') || null)
+  const auth = ref(sessionStorage.getItem('toolbox_auth') || null)
   const userInfo = ref(JSON.parse(localStorage.getItem('toolbox_user') || 'null'))
   
   // 用户信息
@@ -56,19 +56,28 @@ export const useUserStore = defineStore('user', () => {
     token.value = data.token
     role.value = data.role
     auth.value = data.auth_code || data.auth
-    userInfo.value = data.user || null
+    const safeUser = data.user ? { ...data.user } : null
+    if (safeUser) {
+      delete safeUser.token
+      delete safeUser.refresh_token
+      delete safeUser.auth_code
+      delete safeUser.code
+    }
+    userInfo.value = safeUser
     
-    // 同步到 localStorage
-    localStorage.setItem('toolbox_token', data.token)
-    localStorage.setItem('toolbox_role', data.role)
-    // 写入 JSON 格式，兼容 authService.getAuth() 的 JSON.parse 解析
-    localStorage.setItem('toolbox_auth', JSON.stringify({
+    // 访问令牌仅保存在当前 Electron/浏览器会话中
+    sessionStorage.setItem('toolbox_token', data.token)
+    sessionStorage.setItem('toolbox_role', data.role)
+    sessionStorage.setItem('toolbox_auth', JSON.stringify({
       auth_code: data.auth_code || data.auth,
       token: data.token,
       role: data.role
     }))
-    if (data.user) {
-      localStorage.setItem('toolbox_user', JSON.stringify(data.user))
+    localStorage.removeItem('toolbox_token')
+    localStorage.removeItem('toolbox_role')
+    localStorage.removeItem('toolbox_auth')
+    if (safeUser) {
+      localStorage.setItem('toolbox_user', JSON.stringify(safeUser))
     }
   }
 
@@ -109,20 +118,24 @@ export const useUserStore = defineStore('user', () => {
     phone.value = null
     authCodeId.value = null
     
-    // 清除 localStorage
+    // 清除认证状态
+    sessionStorage.removeItem('toolbox_token')
+    sessionStorage.removeItem('toolbox_role')
+    sessionStorage.removeItem('toolbox_auth')
     localStorage.removeItem('toolbox_token')
     localStorage.removeItem('toolbox_role')
     localStorage.removeItem('toolbox_auth')
     localStorage.removeItem('toolbox_user')
+    window.electronAPI?.credentialStore?.clearUserCode?.().catch(() => {})
   }
 
   /**
    * 从 localStorage 恢复状态（页面刷新时）
    */
   function restoreFromStorage() {
-    token.value = localStorage.getItem('toolbox_token')
-    role.value = localStorage.getItem('toolbox_role')
-    auth.value = localStorage.getItem('toolbox_auth')
+    token.value = sessionStorage.getItem('toolbox_token')
+    role.value = sessionStorage.getItem('toolbox_role')
+    auth.value = sessionStorage.getItem('toolbox_auth')
     userInfo.value = JSON.parse(localStorage.getItem('toolbox_user') || 'null')
     
     if (userInfo.value) {
@@ -139,7 +152,7 @@ export const useUserStore = defineStore('user', () => {
    */
   function updateToken(newToken) {
     token.value = newToken
-    localStorage.setItem('toolbox_token', newToken)
+    sessionStorage.setItem('toolbox_token', newToken)
   }
 
   return {

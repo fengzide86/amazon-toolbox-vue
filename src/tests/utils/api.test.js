@@ -2,7 +2,7 @@
  * API 工具函数单元测试
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { api, verifyAuthCode, adminLogin, getPlans, getAuthCodes, getOrders, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit } from '@/utils/api'
+import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getAuthCodes, getOrders, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit } from '@/utils/api'
 
 // Mock fetch
 global.fetch = vi.fn()
@@ -117,6 +117,26 @@ describe('API Utils', () => {
       expect(api.post).toBeDefined()
       expect(api.put).toBeDefined()
       expect(api.delete).toBeDefined()
+    })
+
+    it('4xx 请求不应重试并保留状态码', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false, status: 403,
+        json: () => Promise.resolve({ detail: '禁止访问' })
+      })
+      await expect(request('/api/protected', { method: 'GET' })).rejects.toMatchObject({
+        name: 'ApiError', status: 403
+      })
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('POST 服务端错误不应自动重试', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false, status: 500,
+        json: () => Promise.resolve({ detail: '服务异常' })
+      })
+      await expect(request('/api/orders', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError)
+      expect(global.fetch).toHaveBeenCalledTimes(1)
     })
   })
 

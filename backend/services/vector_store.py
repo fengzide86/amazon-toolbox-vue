@@ -14,6 +14,11 @@ logger = get_logger(__name__)
 # ChromaDB 客户端（延迟初始化）
 _client = None
 _collection = None
+GLOBAL_SCOPE = "__all__"
+
+
+def _scope_value(value: Optional[str]) -> str:
+    return value or GLOBAL_SCOPE
 
 
 def _get_client():
@@ -56,7 +61,9 @@ async def add_knowledge(
     category: str,
     keywords: List[str] = None,
     priority: str = "medium",
-    embedding: List[float] = None
+    embedding: List[float] = None,
+    platform_key: str = None,
+    capability_key: str = None,
 ) -> str:
     """添加知识条目到向量库
     
@@ -81,6 +88,9 @@ async def add_knowledge(
         "category": category,
         "priority": priority,
         "knowledge_id": knowledge_id,
+        "platform_key": _scope_value(platform_key),
+        "capability_key": _scope_value(capability_key),
+        "status": "active",
     }
     if keywords:
         metadata["keywords"] = json.dumps(keywords, ensure_ascii=False)
@@ -112,7 +122,9 @@ async def update_knowledge(
     category: str = None,
     keywords: List[str] = None,
     priority: str = None,
-    embedding: List[float] = None
+    embedding: List[float] = None,
+    platform_key: str = None,
+    capability_key: str = None,
 ) -> bool:
     """更新知识条目向量"""
     collection = _get_collection()
@@ -137,6 +149,9 @@ async def update_knowledge(
             update_metadata["category"] = category
         if priority:
             update_metadata["priority"] = priority
+        update_metadata["platform_key"] = _scope_value(platform_key)
+        update_metadata["capability_key"] = _scope_value(capability_key)
+        update_metadata["status"] = "active"
         if keywords:
             update_metadata["keywords"] = json.dumps(keywords, ensure_ascii=False)
         
@@ -176,7 +191,9 @@ async def search_knowledge(
     query_embedding: List[float],
     top_k: int = 5,
     category: str = None,
-    min_score: float = 0.5
+    min_score: float = 0.5,
+    platform_key: str = None,
+    capability_key: str = None,
 ) -> List[Dict[str, Any]]:
     """搜索相似知识
     
@@ -195,9 +212,20 @@ async def search_knowledge(
         return []
     
     try:
-        where_filter = None
+        filters = [{"status": "active"}]
         if category:
-            where_filter = {"category": category}
+            filters.append({"category": category})
+        if platform_key:
+            filters.append({"$or": [
+                {"platform_key": platform_key},
+                {"platform_key": GLOBAL_SCOPE},
+            ]})
+        if capability_key:
+            filters.append({"$or": [
+                {"capability_key": capability_key},
+                {"capability_key": GLOBAL_SCOPE},
+            ]})
+        where_filter = filters[0] if len(filters) == 1 else {"$and": filters}
         
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(None, lambda: collection.query(
@@ -218,11 +246,14 @@ async def search_knowledge(
                     metadata = results['metadatas'][0][i]
                     matched.append({
                         "knowledge_id": metadata.get("knowledge_id"),
+                        "id": metadata.get("knowledge_id"),
                         "title": metadata.get("title", ""),
                         "category": metadata.get("category", ""),
                         "priority": metadata.get("priority", "medium"),
                         "score": round(score, 4),
-                        "content": results['documents'][0][i] if results['documents'] else ""
+                        "content": results['documents'][0][i] if results['documents'] else "",
+                        "platform_key": None if metadata.get("platform_key") == GLOBAL_SCOPE else metadata.get("platform_key"),
+                        "capability_key": None if metadata.get("capability_key") == GLOBAL_SCOPE else metadata.get("capability_key"),
                     })
         
         # 按分数排序
@@ -261,9 +292,11 @@ async def sync_all(knowledge_items: List[Dict], embed_fn=None):
     """
     collection = _get_collection()
     
-    # 清空现有数据
+    # 清空现有数据，避免已删除或禁用条目残留
     try:
-        collection.delete()
+        existing = collection.get(include=[])
+        if existing and existing.get("ids"):
+            collection.delete(ids=existing["ids"])
         logger.info("已清空向量库，开始全量同步...")
     except Exception:
         pass
@@ -299,15 +332,22 @@ async def sync_all(knowledge_items: List[Dict], embed_fn=None):
         if keywords:
             metadata["keywords"] = json.dumps(keywords, ensure_ascii=False)
         
-        ids.append(vector_id)
-        documents.append(doc_text)
-        metadatas.append(metadata)
-        
         # 计算embedding
         if embed_fn:
             emb = await embed_fn(doc_text)
-            if emb:
-                embeddings.append(emb)
+            if not emb:
+                logger.warning(f"跳过无法向量化的知识条目: {item['id']}")
+                continue
+            embeddings.append(emb)
+
+        metadata.update({
+            "platform_key": _scope_value(item.get("platform_key")),
+            "capability_key": _scope_value(item.get("capability_key")),
+            "status": "active",
+        })
+        ids.append(vector_id)
+        documents.append(doc_text)
+        metadatas.append(metadata)
     
     try:
         kwargs = {
@@ -315,7 +355,7 @@ async def sync_all(knowledge_items: List[Dict], embed_fn=None):
             "documents": documents,
             "metadatas": metadatas,
         }
-        if embeddings and len(embeddings) == len(ids):
+        if embeddings:
             kwargs["embeddings"] = embeddings
         
         loop = asyncio.get_event_loop()

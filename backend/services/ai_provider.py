@@ -119,14 +119,15 @@ async def qwen_embedding(text: str, model: str = None) -> Optional[List[float]]:
 
 # ===== OpenAI =====
 
-async def openai_chat(messages: List[dict], model: str = "gpt-3.5-turbo") -> str:
+async def openai_chat(messages: List[dict], model: str = None) -> str:
     """OpenAI对话（非流式）"""
-    api_key = settings.QWEN_API_KEY  # 复用配置字段
+    api_key = settings.OPENAI_API_KEY
+    model = model or settings.OPENAI_MODEL
     client = _get_http_client()
     
     try:
         resp = await client.post(
-            "https://api.openai.com/v1/chat/completions",
+            f"{settings.OPENAI_BASE_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -146,15 +147,16 @@ async def openai_chat(messages: List[dict], model: str = "gpt-3.5-turbo") -> str
         raise
 
 
-async def openai_chat_stream(messages: List[dict], model: str = "gpt-3.5-turbo") -> AsyncGenerator[str, None]:
+async def openai_chat_stream(messages: List[dict], model: str = None) -> AsyncGenerator[str, None]:
     """OpenAI对话（流式）"""
-    api_key = settings.QWEN_API_KEY
+    api_key = settings.OPENAI_API_KEY
+    model = model or settings.OPENAI_MODEL
     client = _get_http_client()
     
     try:
         async with client.stream(
             "POST",
-            "https://api.openai.com/v1/chat/completions",
+            f"{settings.OPENAI_BASE_URL}/chat/completions",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -186,14 +188,15 @@ async def openai_chat_stream(messages: List[dict], model: str = "gpt-3.5-turbo")
         raise
 
 
-async def openai_embedding(text: str, model: str = "text-embedding-3-small") -> Optional[List[float]]:
+async def openai_embedding(text: str, model: str = None) -> Optional[List[float]]:
     """OpenAI文本向量化"""
-    api_key = settings.QWEN_API_KEY
+    api_key = settings.OPENAI_API_KEY
+    model = model or settings.OPENAI_EMBEDDING_MODEL
     client = _get_http_client()
     
     try:
         resp = await client.post(
-            "https://api.openai.com/v1/embeddings",
+            f"{settings.OPENAI_BASE_URL}/embeddings",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -213,25 +216,29 @@ async def openai_embedding(text: str, model: str = "text-embedding-3-small") -> 
 
 # ===== 统一接口 =====
 
-async def chat_completion(messages: List[dict]) -> str:
+def has_api_key() -> bool:
+    return bool(settings.OPENAI_API_KEY if settings.AI_PROVIDER == "openai" else settings.QWEN_API_KEY)
+
+
+async def chat_completion(messages: List[dict], model: str = None) -> str:
     """统一对话接口（非流式）"""
     provider = settings.AI_PROVIDER
     
     if provider == "openai":
-        return await openai_chat(messages)
+        return await openai_chat(messages, model=model)
     else:
-        return await qwen_chat(messages)
+        return await qwen_chat(messages, model=model)
 
 
-async def chat_completion_stream(messages: List[dict]) -> AsyncGenerator[str, None]:
+async def chat_completion_stream(messages: List[dict], model: str = None) -> AsyncGenerator[str, None]:
     """统一对话接口（流式）"""
     provider = settings.AI_PROVIDER
     
     if provider == "openai":
-        async for chunk in openai_chat_stream(messages):
+        async for chunk in openai_chat_stream(messages, model=model):
             yield chunk
     else:
-        async for chunk in qwen_chat_stream(messages):
+        async for chunk in qwen_chat_stream(messages, model=model):
             yield chunk
 
 

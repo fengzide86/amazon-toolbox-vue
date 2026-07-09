@@ -1,0 +1,61 @@
+import { describe, expect, it, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const { EmbeddedBrowserHost } = require('../../../electron/automation/embedded-browser-host.cjs')
+
+function createGuest() {
+  const guest = new EventEmitter()
+  let url = 'https://example.com/'
+  let attached = false
+  guest.id = 42
+  guest.isDestroyed = () => false
+  guest.getURL = () => url
+  guest.isLoading = () => false
+  guest.loadURL = vi.fn(async nextUrl => {
+    url = nextUrl
+    queueMicrotask(() => guest.emit('did-stop-loading'))
+  })
+  guest.executeJavaScript = vi.fn(async expression => {
+    if (expression.includes('__toolbox_runner_overlay__')) return { matched: true, tagName: 'MAIN' }
+    return { title: 'Example', url, forms: 1, inputs: 2, buttons: 3, links: 4 }
+  })
+  guest.capturePage = vi.fn(async () => ({ toPNG: () => Buffer.from('png') }))
+  guest.debugger = {
+    isAttached: () => attached,
+    attach: vi.fn(() => { attached = true }),
+    detach: vi.fn(() => { attached = false }),
+    sendCommand: vi.fn(async (command, payload) => {
+      return {}
+    }),
+  }
+  return guest
+}
+
+describe('EmbeddedBrowserHost', () => {
+  it('通过受限动作控制已注册 webview 并读取页面', async () => {
+    const host = new EmbeddedBrowserHost()
+    const guest = createGuest()
+    host.register(guest)
+
+    await host.request('browser.prepare')
+    await host.request('browser.navigate', { url: 'https://example.com/next' })
+    const inspection = await host.request('browser.inspect')
+    const highlight = await host.request('browser.highlight')
+    const screenshot = await host.request('browser.screenshot')
+
+    expect(guest.loadURL).toHaveBeenCalledWith('https://example.com/next')
+    expect(inspection).toMatchObject({ title: 'Example', forms: 1, inputs: 2, buttons: 3 })
+    expect(highlight).toEqual({ matched: true, tagName: 'MAIN' })
+    expect(screenshot.base64).toBe('cG5n')
+  })
+
+  it('拒绝非 HTTP 协议和未定义动作', async () => {
+    const host = new EmbeddedBrowserHost()
+    host.register(createGuest())
+
+    await expect(host.request('browser.navigate', { url: 'file:///etc/passwd' })).rejects.toMatchObject({ code: 'TARGET_URL_INVALID' })
+    await expect(host.request('browser.eval', { code: 'alert(1)' })).rejects.toMatchObject({ code: 'BROWSER_ACTION_UNSUPPORTED' })
+  })
+})

@@ -41,6 +41,21 @@
             </el-button>
           </div>
 
+          <div class="config-row">
+            <div class="config-section">
+              <label>模型</label>
+              <el-input v-model="config.ai_model" placeholder="如 qwen-turbo" />
+            </div>
+            <div class="config-section">
+              <label>回复风格</label>
+              <el-select v-model="config.reply_style" style="width: 100%;">
+                <el-option label="简洁" value="concise" />
+                <el-option label="详细" value="detailed" />
+                <el-option label="友好" value="friendly" />
+              </el-select>
+            </div>
+          </div>
+
           <div class="config-section">
             <label>转人工规则</label>
             <el-checkbox v-model="transferRules.refund_direct_transfer" class="checkbox-item">
@@ -116,9 +131,14 @@
               <div class="message-avatar-sandbox">
                 {{ msg.role === 'user' ? '👤' : '🤖' }}
               </div>
-              <div class="message-content-sandbox">
-                <div class="message-text-sandbox">{{ msg.content }}</div>
-                <div class="message-time-sandbox">{{ formatTime(msg.time) }}</div>
+                <div class="message-content-sandbox">
+                  <div class="message-text-sandbox">{{ msg.content }}</div>
+                  <div v-if="msg.refs?.length" class="debug-refs">
+                    <el-tag v-for="ref in msg.refs" :key="ref.id" size="small">
+                      {{ ref.title }} · {{ Math.round(ref.score * 100) }}%
+                    </el-tag>
+                  </div>
+                  <div class="message-time-sandbox">{{ formatTime(msg.time) }}</div>
               </div>
             </div>
             <div v-if="!sandboxMessages.length" class="empty-sandbox">
@@ -126,8 +146,19 @@
             </div>
           </div>
 
+          <div v-if="lastDebug" class="debug-panel">
+            <div><strong>路径：</strong>{{ lastDebug.answer_mode }} · <strong>调用 AI：</strong>{{ lastDebug.ai_used ? '是' : '否' }}</div>
+            <div><strong>模型：</strong>{{ lastDebug.diagnostics?.provider || '-' }} / {{ lastDebug.diagnostics?.model || '-' }}</div>
+            <div><strong>耗时：</strong>召回 {{ lastDebug.diagnostics?.retrieval_ms || 0 }} ms · 生成 {{ lastDebug.diagnostics?.generation_ms || 0 }} ms · 总计 {{ lastDebug.diagnostics?.total_ms || 0 }} ms</div>
+            <div v-if="lastDebug.fallback_reason"><strong>降级原因：</strong>{{ lastDebug.fallback_reason }}</div>
+          </div>
+
           <!-- 输入区 -->
           <div class="chat-input-sandbox">
+            <el-select v-model="debugPlatform" style="width: 120px;" placeholder="平台">
+              <el-option label="亚马逊" value="amazon" />
+              <el-option label="速卖通" value="aliexpress" />
+            </el-select>
             <el-input
               v-model="testMessage"
               placeholder="输入测试消息..."
@@ -146,14 +177,19 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats } from '@/utils/api'
+import { getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats, debugAIChat } from '@/utils/api'
 import { showToast } from '@/utils'
+import { usePlatformStore } from '@/stores/platform'
+
+const platformStore = usePlatformStore()
 
 // 配置
 const config = ref({
   welcome_message: '',
   suggested_questions: '[]',
-  transfer_rules: '{}'
+  transfer_rules: '{}',
+  ai_model: 'qwen-turbo',
+  reply_style: 'concise'
 })
 const suggestedQuestions = ref([''])
 const transferRules = ref({
@@ -180,6 +216,8 @@ const stats = ref({})
 const testMessage = ref('')
 const sandboxMessages = ref([])
 const sendingTest = ref(false)
+const lastDebug = ref(null)
+const debugPlatform = ref(platformStore.adminPlatform === 'all' ? 'amazon' : platformStore.adminPlatform)
 
 function getStatusTagType(status) {
   const map = { active: '', resolved: 'success', transferred: 'warning' }
@@ -226,8 +264,10 @@ async function saveConfig() {
   try {
     await updateAIChatConfig({
       welcome_message: config.value.welcome_message,
-      suggested_questions: JSON.stringify(suggestedQuestions.value.filter(q => q.trim())),
-      transfer_rules: JSON.stringify(transferRules.value)
+      suggested_questions: suggestedQuestions.value.filter(q => q.trim()),
+      transfer_rules: transferRules.value,
+      ai_model: config.value.ai_model,
+      reply_style: config.value.reply_style
     })
     showToast('配置已保存', 'success')
   } catch (err) {
@@ -282,15 +322,25 @@ async function sendTest() {
   testMessage.value = ''
   sendingTest.value = true
   
-  // 模拟 AI 回复（实际应调用后端 API）
-  setTimeout(() => {
+  try {
+    const result = await debugAIChat({
+      message: userMsg.content,
+      platform_key: debugPlatform.value,
+      top_k: 5,
+      min_score: 0.3,
+    })
+    lastDebug.value = result
     sandboxMessages.value.push({
       role: 'ai',
-      content: '收到您的消息："' + userMsg.content + '"。这是沙盒测试回复。',
+      content: result.reply,
+      refs: result.knowledge_refs || [],
       time: new Date().toISOString()
     })
+  } catch (err) {
+    showToast(err.message || '调试失败', 'error')
+  } finally {
     sendingTest.value = false
-  }, 800)
+  }
 }
 
 onMounted(() => {
@@ -305,6 +355,10 @@ onMounted(() => {
   padding: 0;
   max-width: 100% !important;
 }
+
+.config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.debug-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--studio-border); border-radius: 8px; font-size: 12px; line-height: 1.8; background: var(--studio-surface-muted); }
+.debug-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 
 .page-header {
   margin-bottom: 1.5rem;

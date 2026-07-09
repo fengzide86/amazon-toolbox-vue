@@ -123,9 +123,9 @@ describe('AdminLoginView', () => {
 
       expect(mockAdminLogin).toHaveBeenCalledWith('admin123')
       
-      // 检查 localStorage 设置
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_role', 'admin')
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_token', 'test-jwt-token')
+      // 管理员令牌仅保存在当前会话
+      expect(sessionStorage.getItem('toolbox_role')).toBe('admin')
+      expect(sessionStorage.getItem('toolbox_token')).toBe('test-jwt-token')
       
       // 检查成功消息
       expect(wrapper.find('.success-message').classes()).toContain('show')

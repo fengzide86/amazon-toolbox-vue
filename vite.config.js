@@ -5,7 +5,6 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { visualizer } from 'rollup-plugin-visualizer'
-import viteImagemin from 'vite-plugin-imagemin'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => {
@@ -22,34 +21,6 @@ export default defineConfig(({ mode }) => {
       Components({
         resolvers: [ElementPlusResolver()],
         dts: 'src/components.d.ts',
-      }),
-      // 图片压缩优化
-      viteImagemin({
-        gifsicle: {
-          optimizationLevel: 7,
-          interlaced: false,
-        },
-        optipng: {
-          optimizationLevel: 7,
-        },
-        mozjpeg: {
-          quality: 80,
-        },
-        pngquant: {
-          quality: [0.8, 0.9],
-          speed: 4,
-        },
-        svgo: {
-          plugins: [
-            {
-              name: 'removeViewBox',
-            },
-            {
-              name: 'removeEmptyAttrs',
-              active: false,
-            },
-          ],
-        },
       }),
       // PWA 支持
       VitePWA({

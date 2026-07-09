@@ -13,6 +13,7 @@ from models import KnowledgeBase
 from core.logging import get_logger
 from core.dependencies import get_current_user
 from core.response import success_response, error_response
+from services import faq_service
 
 logger = get_logger(__name__)
 
@@ -51,7 +52,7 @@ async def query_help(
     logger.info(f"帮助查询: platform={platform_key}, capability={capability_key}, question={question[:50]}")
     
     # 1. 尝试匹配 FAQ
-    faq_result = await _match_faq(db, platform_key, capability_key, question)
+    faq_result = await faq_service.match_faq(db, question, platform_key, capability_key)
     
     if faq_result:
         # 匹配到 FAQ，直接返回

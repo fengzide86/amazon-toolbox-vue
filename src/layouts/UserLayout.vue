@@ -1,6 +1,7 @@
 ﻿<template>
   <div class="app-layout" data-testid="user-layout">
-    <AppHeader :is-admin="false" @toggle-sidebar="toggleSidebar" />
+    <ToolWorkspace v-if="appStore.toolVisible" />
+    <AppHeader v-else :is-admin="false" @toggle-sidebar="toggleSidebar" />
     
     <!-- 移动端侧边栏遮罩 -->
     <div
@@ -9,7 +10,7 @@
       @click="closeSidebar"
     ></div>
     
-    <div class="main-container" :class="{ 'tool-visible': appStore.toolVisible, 'is-dragging': isDragging }">
+    <div v-if="!appStore.toolVisible" class="main-container" :class="{ 'is-dragging': isDragging }">
       <!-- 左侧：应用主界面 -->
       <div class="left-panel" :style="appStore.toolVisible ? { width: leftPanelWidth } : {}">
         <div class="layout-studio">
@@ -125,6 +126,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import UserSidebar from '@/components/UserSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
+import ToolWorkspace from '@/components/ToolWorkspace.vue'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
@@ -271,8 +273,6 @@ function goToLogin() {
   localStorage.removeItem('toolbox_user')
   showKickout.value = false
   closeSidebar()
-  // 登出时恢复默认窗口
-  window.electronAPI?.resizeWindow('reset')
   router.push('/user/login')
 }
 

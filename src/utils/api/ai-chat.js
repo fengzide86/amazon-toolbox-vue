@@ -1,16 +1,16 @@
 // AI 客服相关 API
 import { api } from './index.js';
 
-export function createChatSession() {
-    return api.post('/api/ai-chat/session');
+export function createChatSession(data = {}) {
+    return api.post('/api/ai-chat/session', data);
 }
 
 export function getChatSession(sessionId) {
     return api.get(`/api/ai-chat/session/${sessionId}`);
 }
 
-export function sendChatMessage(sessionId, message) {
-    return api.post(`/api/ai-chat/session/${sessionId}/message`, { message });
+export function sendChatMessage(sessionId, message, context = {}) {
+    return api.post(`/api/ai-chat/session/${sessionId}/message`, { message, ...context });
 }
 
 export function resolveChatSession(sessionId, satisfaction = null) {
@@ -47,4 +47,8 @@ export function getAdminChatSession(sessionId) {
 
 export function getAIChatStats() {
     return api.get('/api/ai-chat/admin/stats');
+}
+
+export function debugAIChat(data) {
+    return api.post('/api/ai-chat/admin/debug', data);
 }

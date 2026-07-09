@@ -65,6 +65,11 @@ class Settings:
     
     # ===== Redis 配置（可选）=====
     REDIS_URL: Optional[str] = None
+
+    # ===== 自动化工具签名（Ed25519 原始密钥，Base64）=====
+    TOOL_SIGNING_PRIVATE_KEY_B64: str = ""
+    TOOL_SIGNING_PUBLIC_KEY_B64: str = ""
+    TOOL_SIGNING_KEY_ID: str = "tool-signing-v1"
     
     # ===== API 频率限制 =====
     RATE_LIMIT_PER_MINUTE: int = 60  # 每分钟最多60次请求
@@ -76,10 +81,14 @@ class Settings:
     DEFAULT_PROFIT_RATIOS: dict = None
     
     # ===== AI 客服配置 =====
-    AI_PROVIDER: str = "qwen"                    # qwen/openai/ollama
+    AI_PROVIDER: str = "qwen"                    # qwen/openai
     QWEN_API_KEY: str = ""                       # 通义千问API Key
     QWEN_MODEL: str = "qwen-turbo"               # 对话模型
     QWEN_EMBEDDING_MODEL: str = "text-embedding-v2"  # Embedding模型
+    OPENAI_API_KEY: str = ""                    # OpenAI API Key
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     CHROMA_PERSIST_DIR: str = "./chroma_db"      # ChromaDB数据目录
     AI_CHAT_MAX_RETRIES: int = 2                 # AI最大重试次数
     AI_CHAT_MAX_HISTORY: int = 5                 # 对话历史轮数
@@ -146,6 +155,9 @@ class Settings:
         
         # ===== 初始化 Redis 配置 =====
         self.REDIS_URL = os.getenv("REDIS_URL")  # 例如: redis://localhost:6379/0
+        self.TOOL_SIGNING_PRIVATE_KEY_B64 = os.getenv("TOOL_SIGNING_PRIVATE_KEY_B64", "")
+        self.TOOL_SIGNING_PUBLIC_KEY_B64 = os.getenv("TOOL_SIGNING_PUBLIC_KEY_B64", "")
+        self.TOOL_SIGNING_KEY_ID = os.getenv("TOOL_SIGNING_KEY_ID", "tool-signing-v1")
         
         # 初始化默认分润比例
         self.DEFAULT_PROFIT_RATIOS = {
@@ -158,6 +170,10 @@ class Settings:
         self.QWEN_API_KEY = os.getenv("QWEN_API_KEY", "")
         self.QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen-turbo")
         self.QWEN_EMBEDDING_MODEL = os.getenv("QWEN_EMBEDDING_MODEL", "text-embedding-v2")
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        self.OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+        self.OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        self.OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
         self.CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
     
     def _get_db_path(self) -> str:
@@ -215,6 +231,10 @@ class Settings:
         update_url = os.getenv("UPDATE_URL", "")
         if is_production and (not update_url or "localhost" in update_url or "127.0.0.1" in update_url):
             result["warnings"].append("生产环境 UPDATE_URL 未设置或仍为本地地址")
+
+        # 8. 工具发布签名密钥（云端控制面必需）
+        if is_production and (not self.TOOL_SIGNING_PRIVATE_KEY_B64 or not self.TOOL_SIGNING_PUBLIC_KEY_B64):
+            result["errors"].append("生产环境未配置 Ed25519 工具签名密钥")
         
         return result
 

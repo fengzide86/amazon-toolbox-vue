@@ -223,6 +223,43 @@
       <el-empty v-else description="暂无工具配置" />
     </el-card>
 
+    <el-card class="settings-card" shadow="never">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <span>自动化版本发布</span>
+            <small class="header-hint">Ed25519 签名 · 稳定哈希灰度 · 一键回滚</small>
+          </div>
+          <el-button type="primary" size="small" @click="showReleaseModal = true">+ 创建签名版本</el-button>
+        </div>
+      </template>
+
+      <el-table v-if="toolReleases.length" :data="toolReleases" style="width: 100%">
+        <el-table-column prop="tool_id" label="工具" min-width="150" />
+        <el-table-column prop="version" label="版本" width="90" />
+        <el-table-column prop="script_key" label="脚本" min-width="180" />
+        <el-table-column label="发布状态" width="130">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'published' ? 'success' : row.status === 'retired' ? 'info' : 'warning'" size="small">
+              {{ row.channel || 'draft' }} · {{ row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="灰度" width="90">
+          <template #default="{ row }">{{ row.rollout_percentage || 0 }}%</template>
+        </el-table-column>
+        <el-table-column prop="signing_key_id" label="签名密钥" width="140" />
+        <el-table-column label="操作" width="240" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="publishRelease(row, 'canary')">灰度</el-button>
+            <el-button size="small" type="success" @click="publishRelease(row, 'stable')">全量</el-button>
+            <el-button size="small" type="warning" @click="rollbackRelease(row)">回滚到此版</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="尚未创建签名工具版本" />
+    </el-card>
+
     <!-- 新增套餐弹窗 -->
     <el-dialog v-model="showAddPlan" title="新增套餐" width="500px">
       <el-form label-width="80px">
@@ -242,6 +279,29 @@
       <template #footer>
         <el-button @click="showAddPlan = false">取消</el-button>
         <el-button type="primary" @click="addPlan">确认添加</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="showReleaseModal" title="创建签名工具版本" width="560px">
+      <el-form label-width="100px">
+        <el-form-item label="工具">
+          <el-select v-model="newRelease.tool_id" style="width: 100%;" @change="syncReleaseScriptKey">
+            <el-option v-for="tool in tools" :key="tool.id" :label="tool.name" :value="tool.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="版本">
+          <el-input v-model="newRelease.version" placeholder="例如 1.1.0" />
+        </el-form-item>
+        <el-form-item label="脚本 Key">
+          <el-input v-model="newRelease.script_key" placeholder="amazon.register.v1" />
+        </el-form-item>
+        <el-form-item label="产物 SHA256">
+          <el-input v-model="newRelease.artifact_sha256" placeholder="内嵌脚本填写 embedded" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showReleaseModal = false">取消</el-button>
+        <el-button type="primary" :loading="releaseSaving" @click="saveRelease">签名并创建</el-button>
       </template>
     </el-dialog>
 
@@ -282,15 +342,19 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getPlans, getSettings, updateSetting, getTools, updateTools } from '@/utils/api'
+import { getPlans, getSettings, updateSetting, getTools, updateTools, getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from '@/utils/api'
 import { showToast } from '@/utils'
 
 const plans = ref([])
 const settings = ref([])
 const tools = ref([])
+const toolReleases = ref([])
 const editingPlan = ref(null)
 const editingToolIndex = ref(-1)
 const showAddPlan = ref(false)
+const showReleaseModal = ref(false)
+const releaseSaving = ref(false)
+const newRelease = ref({ tool_id: '', version: '1.0.0', script_key: '', artifact_sha256: 'embedded' })
 
 const adminPassword = ref('')
 const wechatId = ref('')
@@ -320,12 +384,13 @@ const profitRatiosText = computed(() => {
 
 async function loadData() {
   try {
-    const [plansRes, settingsRes, toolsRes] = await Promise.all([
-      getPlans(), getSettings(), getTools()
+    const [plansRes, settingsRes, toolsRes, releasesRes] = await Promise.all([
+      getPlans(), getSettings(), getTools(), getToolReleases()
     ])
     plans.value = (plansRes || []).filter(p => p !== null)
     settings.value = (settingsRes || []).filter(s => s !== null)
     tools.value = (toolsRes || []).filter(t => t !== null)
+    toolReleases.value = (releasesRes || []).filter(r => r !== null)
 
     const pwdSetting = settingsRes.find(s => s.key === 'admin_password')
     const wxSetting = settingsRes.find(s => s.key === 'wechat_id')
@@ -449,6 +514,61 @@ function removeTool(index) {
     .catch(() => showToast('删除失败', 'error'))
 }
 
+function syncReleaseScriptKey(toolId) {
+  const tool = tools.value.find(item => item.id === toolId)
+  if (tool) newRelease.value.script_key = tool.script_key || `${tool.platform_key}.${tool.capability_key}.v1`
+}
+
+async function saveRelease() {
+  if (!newRelease.value.tool_id || !newRelease.value.version || !newRelease.value.script_key) {
+    showToast('请完整填写工具、版本和脚本 Key', 'error')
+    return
+  }
+  releaseSaving.value = true
+  try {
+    await createToolRelease(newRelease.value)
+    showToast('签名版本已创建', 'success')
+    showReleaseModal.value = false
+    newRelease.value = { tool_id: '', version: '1.0.0', script_key: '', artifact_sha256: 'embedded' }
+    await loadData()
+  } catch (error) {
+    showToast(error?.message || '创建版本失败', 'error')
+  } finally {
+    releaseSaving.value = false
+  }
+}
+
+async function publishRelease(release, channel) {
+  let rollout = 100
+  if (channel === 'canary') {
+    const input = window.prompt('请输入灰度比例（1-99）', String(release.rollout_percentage || 10))
+    if (input === null) return
+    rollout = Number(input)
+    if (!Number.isInteger(rollout) || rollout < 1 || rollout > 99) {
+      showToast('灰度比例必须是 1-99 的整数', 'error')
+      return
+    }
+  }
+  try {
+    await publishToolRelease(release.tool_id, release.version, { channel, rollout_percentage: rollout })
+    showToast(channel === 'stable' ? '已全量发布' : `已灰度发布 ${rollout}%`, 'success')
+    await loadData()
+  } catch (error) {
+    showToast(error?.message || '发布失败', 'error')
+  }
+}
+
+async function rollbackRelease(release) {
+  if (!window.confirm(`确定将 ${release.tool_id} 回滚到 ${release.version} 吗？`)) return
+  try {
+    await rollbackToolRelease(release.tool_id, release.version)
+    showToast(`已回滚到 ${release.version}`, 'success')
+    await loadData()
+  } catch (error) {
+    showToast(error?.message || '回滚失败', 'error')
+  }
+}
+
 function openProfitEdit() {
   showProfitModal.value = true
 }
@@ -504,6 +624,14 @@ onMounted(loadData)
   font-size: 1rem;
   font-weight: 600;
   color: var(--studio-text-main);
+}
+
+.header-hint {
+  display: block;
+  margin-top: 3px;
+  color: var(--studio-text-muted);
+  font-size: 0.72rem;
+  font-weight: 400;
 }
 
 .setting-row {

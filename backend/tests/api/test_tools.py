@@ -4,6 +4,18 @@
 import pytest
 from httpx import AsyncClient
 
+from routers.tools import resolve_tool_runtime
+
+
+def test_resolve_tool_runtime_supports_legacy_tool_config():
+    script_key, target_url = resolve_tool_runtime(
+        {"id": "tool_listing", "capability_key": "listing_script"},
+        "amazon",
+    )
+
+    assert script_key == "amazon.listing_script.v1"
+    assert target_url == "https://sellercentral.amazon.com/"
+
 
 @pytest.mark.asyncio
 class TestGetTools:

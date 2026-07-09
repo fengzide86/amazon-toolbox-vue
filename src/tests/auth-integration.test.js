@@ -4,7 +4,7 @@
  * 防止格式不一致导致的认证问题
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { Auth } from '@/utils'
+import { Auth, runToolSimulation } from '@/utils'
 import { authService } from '@/utils/auth'
 import { setActivePinia, createPinia } from 'pinia'
 import { useUserStore } from '@/stores/user'
@@ -12,6 +12,7 @@ import { useUserStore } from '@/stores/user'
 describe('认证系统集成测试', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     setActivePinia(createPinia())
   })
 
@@ -28,7 +29,7 @@ describe('认证系统集成测试', () => {
     it('Auth.set() 写入的值能被 JSON.parse 解析（向后兼容）', () => {
       Auth.set('admin')
       
-      const raw = localStorage.getItem('toolbox_auth')
+      const raw = sessionStorage.getItem('toolbox_auth')
       const parsed = JSON.parse(raw)
       
       expect(parsed.auth_code).toBe('admin')
@@ -70,10 +71,10 @@ describe('认证系统集成测试', () => {
   })
 
   describe('登录后 isAuthenticated() 返回 true', () => {
-    it('Auth.set() 后 isAuthenticated() 返回 true', () => {
+    it('只有授权码、没有服务端令牌时不能视为已认证', () => {
       Auth.set('test-code')
       
-      expect(authService.isAuthenticated()).toBe(true)
+      expect(authService.isAuthenticated()).toBe(false)
     })
 
     it('userStore.setLogin() 后 isAuthenticated() 返回 true', () => {
@@ -111,6 +112,15 @@ describe('认证系统集成测试', () => {
       expect(localStorage.getItem('toolbox_auth')).toBeNull()
     })
 
+    it('退出登录时清理工具运行遮罩，登录输入框不再被遮挡', () => {
+      runToolSimulation('测试工具')
+      expect(document.querySelector('.tool-running-overlay')).not.toBeNull()
+
+      Auth.clear()
+
+      expect(document.querySelector('.tool-running-overlay')).toBeNull()
+    })
+
     it('authService.clear() 清理 toolbox_token', () => {
       localStorage.setItem('toolbox_token', 'test-token')
       localStorage.setItem('toolbox_auth', JSON.stringify({ auth_code: 'test' }))
@@ -134,10 +144,10 @@ describe('认证系统集成测试', () => {
       expect(auth.auth_code).toBe('old-auth-code')
     })
 
-    it('旧版纯字符串格式下 isAuthenticated() 返回 true', () => {
+    it('旧版纯字符串格式必须重新验证后才能认证', () => {
       localStorage.setItem('toolbox_auth', 'old-auth-code')
       
-      expect(authService.isAuthenticated()).toBe(true)
+      expect(authService.isAuthenticated()).toBe(false)
     })
   })
 })

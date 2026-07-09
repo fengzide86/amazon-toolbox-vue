@@ -43,4 +43,5 @@ globalThis.fetch = vi.fn().mockResolvedValue({
 beforeEach(() => {
   vi.clearAllMocks()
   localStorageMock.clear()
+  sessionStorage.clear()
 })

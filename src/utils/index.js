@@ -1,3 +1,5 @@
+import { authService } from './auth.js'
+
 // ===== Toast Notification System =====
 // SVG 图标定义（使用 cloneNode 避免 XSS）
 const TOAST_ICONS = {
@@ -36,6 +38,34 @@ export function showToast(message, type = 'info') {
 
 // ===== Tool Running Simulation (single instance) =====
 let activeToolOverlay = null;
+let activeToolInterval = null;
+let activeToolCompletionTimer = null;
+
+/**
+ * 清理工具运行时挂到 body 上的全屏遮罩。
+ * 该遮罩不属于具体 Vue 页面，退出登录时必须主动卸载。
+ */
+export function clearToolSimulation() {
+    if (activeToolInterval) {
+        clearInterval(activeToolInterval);
+        activeToolInterval = null;
+    }
+    if (activeToolCompletionTimer) {
+        clearTimeout(activeToolCompletionTimer);
+        activeToolCompletionTimer = null;
+    }
+    if (activeToolOverlay) {
+        activeToolOverlay.remove();
+        activeToolOverlay = null;
+    }
+
+    // 兼容热更新或旧代码创建、但模块引用已经丢失的遮罩。
+    document.querySelectorAll('.tool-running-overlay').forEach(overlay => overlay.remove());
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('toolbox:auth-cleared', clearToolSimulation);
+}
 
 // HTML 转义函数，防止 XSS
 function escapeHtml(text) {
@@ -46,10 +76,7 @@ function escapeHtml(text) {
 
 export function runToolSimulation(toolName) {
     // Remove any existing overlay first
-    if (activeToolOverlay) {
-        activeToolOverlay.remove();
-        activeToolOverlay = null;
-    }
+    clearToolSimulation();
 
     // 对 toolName 进行 HTML 转义，防止 XSS
     const safeToolName = escapeHtml(toolName);
@@ -78,26 +105,25 @@ export function runToolSimulation(toolName) {
     activeToolOverlay = overlay;
 
     const closeBtn = overlay.querySelector('#toolCloseBtn');
-    closeBtn.addEventListener('click', () => {
-        overlay.remove();
-        activeToolOverlay = null;
-    });
+    closeBtn.addEventListener('click', clearToolSimulation);
 
     let progress = 0;
-    const interval = setInterval(() => {
+    activeToolInterval = setInterval(() => {
         progress += Math.random() * 15;
         if (progress >= 100) {
             progress = 100;
-            clearInterval(interval);
-            setTimeout(() => {
+            clearInterval(activeToolInterval);
+            activeToolInterval = null;
+            activeToolCompletionTimer = setTimeout(() => {
+                activeToolCompletionTimer = null;
                 const content = overlay.querySelector('.tool-running-content');
                 const result = overlay.querySelector('.tool-result-card');
                 if (content) content.style.display = 'none';
                 if (result) result.classList.add('show');
             }, 500);
         }
-        const bar = document.getElementById('toolProgress');
-        const text = document.getElementById('toolProgressText');
+        const bar = overlay.querySelector('#toolProgress');
+        const text = overlay.querySelector('#toolProgressText');
         if (bar) bar.style.width = progress + '%';
         if (text) text.textContent = Math.round(progress) + '%';
     }, 300);
@@ -106,17 +132,18 @@ export function runToolSimulation(toolName) {
 // ===== Auth Management =====
 export const Auth = {
     set(code) {
-        // 写入 JSON 格式，兼容 authService.getAuth() 的 JSON.parse 解析
-        localStorage.setItem('toolbox_auth', JSON.stringify({ auth_code: code }));
+        const current = authService.getAuth() || {};
+        authService.setAuth({ ...current, auth_code: code });
         localStorage.setItem('toolbox_login_time', Date.now());
     },
     get() {
-        return localStorage.getItem('toolbox_auth');
+        return authService.getAuth()?.auth_code || null;
     },
     clear() {
-        localStorage.removeItem('toolbox_auth');
+        clearToolSimulation();
+        authService.clear();
         localStorage.removeItem('toolbox_login_time');
-        localStorage.removeItem('toolbox_token');
+        window.electronAPI?.credentialStore?.clearUserCode?.().catch(() => {});
     },
     check() {
         return !!this.get();

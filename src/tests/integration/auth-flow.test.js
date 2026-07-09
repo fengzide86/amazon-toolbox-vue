@@ -80,9 +80,9 @@ describe('认证流程集成测试', () => {
       expect(wrapper.find('.success-message').classes()).toContain('show')
       expect(mockShowToast).toHaveBeenCalledWith('授权成功！正在跳转...', 'success')
 
-      // Step 6: 验证 localStorage 存储
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_role', 'user')
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_token', 'user-jwt-token')
+      // Step 6: 验证安全会话存储
+      expect(sessionStorage.getItem('toolbox_role')).toBe('user')
+      expect(sessionStorage.getItem('toolbox_token')).toBe('user-jwt-token')
 
       // Step 7: 验证跳转
       vi.advanceTimersByTime(1200)
@@ -137,8 +137,8 @@ describe('认证流程集成测试', () => {
 
       // 验证
       expect(mockAdminLogin).toHaveBeenCalledWith('admin123')
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_role', 'admin')
-      expect(localStorage.setItem).toHaveBeenCalledWith('toolbox_token', 'admin-jwt-token')
+      expect(sessionStorage.getItem('toolbox_role')).toBe('admin')
+      expect(sessionStorage.getItem('toolbox_token')).toBe('admin-jwt-token')
       expect(wrapper.find('.success-message').classes()).toContain('show')
 
       vi.advanceTimersByTime(1000)

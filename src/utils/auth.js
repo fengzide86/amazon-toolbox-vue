@@ -19,7 +19,7 @@ class AuthService {
    */
   getAuth() {
     try {
-      const auth = localStorage.getItem(AUTH_KEY)
+      const auth = sessionStorage.getItem(AUTH_KEY) || localStorage.getItem(AUTH_KEY)
       if (!auth) return null
       // 尝试 JSON 解析
       try {
@@ -39,7 +39,8 @@ class AuthService {
    */
   setAuth(auth) {
     try {
-      localStorage.setItem(AUTH_KEY, JSON.stringify(auth))
+      sessionStorage.setItem(AUTH_KEY, JSON.stringify(auth))
+      localStorage.removeItem(AUTH_KEY)
     } catch (err) {
       console.error('保存认证信息失败:', err)
     }
@@ -49,14 +50,15 @@ class AuthService {
    * 获取用户角色
    */
   getRole() {
-    return localStorage.getItem(ROLE_KEY) || 'user'
+    return sessionStorage.getItem(ROLE_KEY) || localStorage.getItem(ROLE_KEY) || 'user'
   }
 
   /**
    * 设置用户角色
    */
   setRole(role) {
-    localStorage.setItem(ROLE_KEY, role)
+    sessionStorage.setItem(ROLE_KEY, role)
+    localStorage.removeItem(ROLE_KEY)
   }
 
   /**
@@ -101,11 +103,9 @@ class AuthService {
     }
 
     // 检查 token 是否存在
-    const token = localStorage.getItem(TOKEN_KEY)
+    const token = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY)
     if (token) return true
-
-    // 兼容旧版：有 auth 数据但无 token 的情况
-    return !!auth.auth_code
+    return false
   }
 
   /**
@@ -139,11 +139,19 @@ class AuthService {
    * 清除所有认证信息
    */
   clear() {
+    sessionStorage.removeItem(AUTH_KEY)
+    sessionStorage.removeItem(ROLE_KEY)
+    sessionStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(AUTH_KEY)
     localStorage.removeItem(ROLE_KEY)
     localStorage.removeItem(USER_KEY)
     localStorage.removeItem(PLATFORM_KEY)
     localStorage.removeItem(TOKEN_KEY)
+
+    // 通知页面级之外的临时 UI（例如直接挂到 body 的工具遮罩）清理自身。
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('toolbox:auth-cleared'))
+    }
   }
 
   /**
@@ -200,7 +208,11 @@ class AuthService {
       
       if (response.ok) {
         const data = await response.json()
-        this.setAuth(data)
+        const token = data?.data?.token || data?.token
+        if (token) {
+          sessionStorage.setItem(TOKEN_KEY, token)
+          this.setAuth({ ...auth, token })
+        }
       } else {
         // 刷新失败，登出
         this.logout()

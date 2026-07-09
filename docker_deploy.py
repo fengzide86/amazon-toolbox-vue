@@ -2,17 +2,17 @@
 Docker 一键部署脚本
 通过 SSH 将代码部署到服务器并使用 Docker Compose 运行
 """
-import paramiko
 import os
 import sys
 import tarfile
 import tempfile
 import time
 
+from deploy_ssh import connect_ssh
+
 # 服务器配置（优先从环境变量读取）
 SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
 SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
-SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
 REMOTE_DIR = os.environ.get("DEPLOY_REMOTE_DIR", "/opt/amazon-toolbox")
 
 # 本地项目根目录
@@ -21,10 +21,8 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def connect():
     """SSH 连接"""
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     print(f"  连接服务器 {SERVER_HOST}...")
-    ssh.connect(SERVER_HOST, username=SERVER_USER, password=SERVER_PASSWORD, timeout=15)
+    ssh = connect_ssh(SERVER_HOST, SERVER_USER, timeout=15)
     print("  ✓ 连接成功")
     return ssh
 
@@ -127,10 +125,8 @@ def extract_and_build(ssh, remote_tarball):
     
     # 解压
     print("  解压项目文件...")
-    run_cmd(ssh, f"cd {REMOTE_DIR} && rm -rf src backend electron public scripts docs tests *.json *.js *.html *.yml *.yaml Dockerfile .dockerignore .env* 2>/dev/null; tar -xzf project.tar.gz", show_output=False)
-    
-    # 复制 .env.production 作为 .env
-    run_cmd(ssh, f"cp {REMOTE_DIR}/backend/.env.production {REMOTE_DIR}/backend/.env 2>/dev/null || true", show_output=False)
+    # 保留服务器根目录的 .env；部署包不会包含任何真实密钥。
+    run_cmd(ssh, f"cd {REMOTE_DIR} && rm -rf src backend electron public scripts docs tests *.json *.js *.html *.yml *.yaml Dockerfile .dockerignore 2>/dev/null; tar -xzf project.tar.gz", show_output=False)
     
     # 构建镜像
     print("  构建 Docker 镜像...")

@@ -30,8 +30,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (callback) => {
     ipcRenderer.on('update-downloaded', (event, data) => callback(data));
   },
-  // 窗口形变控制：学员窄屏 / 管理员宽屏
-  resizeWindow: (mode) => ipcRenderer.send('resize-window-context', mode),
+  // 普通用户授权码由主进程使用操作系统能力加密保存
+  credentialStore: {
+    saveUserCode: (code) => ipcRenderer.invoke('credential-save-user-code', code),
+    loadUserCode: () => ipcRenderer.invoke('credential-load-user-code'),
+    clearUserCode: () => ipcRenderer.invoke('credential-clear-user-code'),
+  },
+  automation: {
+    start: (tool) => ipcRenderer.invoke('automation:start', tool),
+    pause: () => ipcRenderer.invoke('automation:pause'),
+    resume: () => ipcRenderer.invoke('automation:resume'),
+    cancel: () => ipcRenderer.invoke('automation:cancel'),
+    registerBrowser: (webContentsId) => ipcRenderer.invoke('automation:register-browser', webContentsId),
+    unregisterBrowser: () => ipcRenderer.invoke('automation:unregister-browser'),
+    onEvent: (callback) => {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on('automation:event', listener);
+      return () => ipcRenderer.removeListener('automation:event', listener);
+    },
+  },
   // 工具启动控制
   launchTool: (data) => ipcRenderer.send('launch-tool', data),
   onLaunchToolError: (callback) => {

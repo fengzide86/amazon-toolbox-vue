@@ -16,6 +16,8 @@ from models import Setting, LaunchToken, AuthCode
 from core.logging import get_logger
 from core.dependencies import get_current_admin, get_current_user
 from core.response import success_response, error_response
+from core.config import settings
+from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
 
 logger = get_logger(__name__)
 
@@ -30,6 +32,19 @@ DEFAULT_CATEGORIES = [
     {"id": "automation", "name": "自动化工具", "sort_order": 3},
     {"id": "other", "name": "其他工具", "sort_order": 4},
 ]
+
+DEFAULT_TARGET_URLS = {
+    "amazon": "https://sellercentral.amazon.com/",
+    "aliexpress": "https://sellercenter.aliexpress.com/",
+}
+
+
+def resolve_tool_runtime(tool: dict, platform_key: str) -> tuple[str, str]:
+    """补齐旧工具配置缺少的本地运行入口，避免启动授权写入空 script_key。"""
+    capability_key = tool.get("capability_key") or tool.get("id") or "unknown"
+    script_key = tool.get("script_key") or f"{platform_key}.{capability_key}.v1"
+    target_url = tool.get("target_url") or DEFAULT_TARGET_URLS.get(platform_key, "")
+    return script_key, target_url
 
 
 @router.get("/categories")
@@ -174,8 +189,9 @@ async def update_platforms(platforms: list, db: AsyncSession = Depends(get_db), 
     return {"success": True}
 
 
-# ===== 1.5.1 Launch Token 权限兜底 =====
+# ===== 工具启动授权（云端控制面） =====
 
+@router.post("/{tool_id}/launch-grant")
 @router.post("/{tool_id}/launch-token")
 async def create_launch_token(
     tool_id: str,
@@ -317,7 +333,31 @@ async def create_launch_token(
         await db.flush()
         logger.info(f"自动绑定新设备: {device_id}")
     
-    # 9. 生成 launch token
+    # 9. 生成一次性启动授权。launch-token 路径保留给旧客户端兼容。
+    script_key, target_url = resolve_tool_runtime(target_tool, platform_key)
+    release = await resolve_release_for_launch(db, tool_id, device_id or str(user_id))
+    if release:
+        manifest = release["manifest"]
+        signature = release["signature"]
+        signing_key_id = release.get("signing_key_id", settings.TOOL_SIGNING_KEY_ID)
+        signature_required = True
+        script_key = manifest["scriptKey"]
+        tool_version = manifest["version"]
+        runner_api_version = manifest["runnerApiVersion"]
+    else:
+        tool_version = target_tool.get("tool_version", "1.0.0")
+        runner_api_version = int(target_tool.get("runner_api_version", 1))
+        manifest = build_manifest({
+            "tool_id": tool_id,
+            "version": tool_version,
+            "script_key": script_key,
+            "runner_api_version": runner_api_version,
+            "artifact_sha256": "embedded",
+            "artifact_url": None,
+        })
+        signature_required = bool(settings.TOOL_SIGNING_PRIVATE_KEY_B64 and settings.TOOL_SIGNING_PUBLIC_KEY_B64)
+        signature = sign_manifest(manifest) if signature_required else None
+        signing_key_id = settings.TOOL_SIGNING_KEY_ID if signature_required else None
     token = secrets.token_urlsafe(32)
     expires_at = datetime.now() + timedelta(minutes=5)  # 5分钟有效期
     
@@ -327,7 +367,7 @@ async def create_launch_token(
         auth_code_id=auth_code_id,
         platform_key=platform_key,
         tool_id=tool_id,
-        script_key=target_tool.get("script_key"),
+        script_key=script_key,
         device_id=device_id,
         expires_at=expires_at,
         status="pending"
@@ -341,20 +381,29 @@ async def create_launch_token(
     return success_response({
         "token": token,
         "expires_in": 300,  # 5分钟
+        "expires_at": expires_at.isoformat(),
         "launch_data": {
             "platform_key": platform_key,
             "tool_id": tool_id,
             "token": token,
-            "script_key": target_tool.get("script_key"),
+            "script_key": script_key,
             "tool_name": target_tool.get("name"),
             "tool_module": target_tool.get("module"),
-            "target_url": target_tool.get("target_url", ""),
+            "target_url": target_url,
             "category": target_tool.get("category", ""),
             "description": target_tool.get("description", ""),
+            "expires_at": expires_at.isoformat(),
+            "runner_api_version": runner_api_version,
+            "tool_version": tool_version,
+            "tool_manifest": manifest,
+            "tool_signature": signature,
+            "signing_key_id": signing_key_id,
+            "signature_required": signature_required,
         }
     })
 
 
+@router.post("/launch-grant/verify")
 @router.post("/launch-token/verify")
 async def verify_launch_token(
     token: str,

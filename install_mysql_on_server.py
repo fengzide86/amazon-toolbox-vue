@@ -2,20 +2,18 @@
 在云服务器上安装 MySQL
 使用 MariaDB 替代（完全兼容 MySQL，阿里云镜像源有）
 """
-import paramiko
 import time
 import os
+
+from deploy_ssh import connect_ssh, require_env
 
 # 服务器配置（优先从环境变量读取，默认值仅供开发使用）
 SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
 SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
-SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
+MYSQL_ROOT_PASSWORD = require_env("DEPLOY_MYSQL_ROOT_PASSWORD")
 
 def connect():
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(SERVER_HOST, username=SERVER_USER, password=SERVER_PASSWORD, timeout=30)
-    return ssh
+    return connect_ssh(SERVER_HOST, SERVER_USER, timeout=30)
 
 def run_cmd(ssh, cmd, timeout=300):
     print(f"\n>>> {cmd}")
@@ -59,15 +57,15 @@ def main():
 
     # 设置 root 密码
     print("\n=== 设置 root 密码 ===")
-    run_cmd(ssh, f'mysql -u root -e "ALTER USER \'root\'@\'localhost\' IDENTIFIED BY \'{SERVER_PASSWORD}\'; FLUSH PRIVILEGES;"')
+    run_cmd(ssh, f'mysql -u root -e "ALTER USER \'root\'@\'localhost\' IDENTIFIED BY \'{MYSQL_ROOT_PASSWORD}\'; FLUSH PRIVILEGES;"')
 
     # 创建数据库
     print("\n=== 创建数据库 ===")
-    run_cmd(ssh, f'mysql -u root -p{SERVER_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS amazon_toolbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"')
+    run_cmd(ssh, f'mysql -u root -p{MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE IF NOT EXISTS amazon_toolbox CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"')
 
     # 显示数据库列表
     print("\n=== 数据库列表 ===")
-    run_cmd(ssh, f'mysql -u root -p{SERVER_PASSWORD} -e "SHOW DATABASES;"')
+    run_cmd(ssh, f'mysql -u root -p{MYSQL_ROOT_PASSWORD} -e "SHOW DATABASES;"')
 
     # 重启后端服务
     print("\n=== 重启后端服务 ===")

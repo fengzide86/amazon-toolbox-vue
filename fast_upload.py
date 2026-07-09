@@ -2,16 +2,16 @@
 快速上传脚本 - 使用 SSH 批量上传更新包
 比 PowerShell 快 3-5 倍（复用连接）
 """
-import paramiko
 import os
 import sys
 import time
 
+from deploy_ssh import connect_ssh
+
 # 服务器配置
 SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
 SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
-SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
-REMOTE_DIR = "/opt/amazon-toolbox/backend/updates"
+REMOTE_DIR = os.environ.get("DEPLOY_UPDATE_DIR", "/opt/amazon-toolbox/backend/updates")
 
 def main():
     if len(sys.argv) < 2:
@@ -29,9 +29,7 @@ def main():
     print(f"[INFO] Connecting to {SERVER_HOST}...")
     
     # SSH 连接
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(SERVER_HOST, username=SERVER_USER, password=SERVER_PASSWORD, timeout=10)
+    ssh = connect_ssh(SERVER_HOST, SERVER_USER, timeout=10)
     
     # 创建远程目录
     ssh.exec_command(f"mkdir -p {REMOTE_DIR}")

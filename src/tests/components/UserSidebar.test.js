@@ -66,8 +66,8 @@ describe('UserSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      // 7 个菜单项 + 1 个退出按钮
-      expect(menuItems.length).toBe(8)
+      // 6 个菜单项 + 1 个退出按钮（FAQ 已合并进 AI 客服）
+      expect(menuItems.length).toBe(7)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -80,7 +80,7 @@ describe('UserSidebar', () => {
       expect(labels).toContain('首页总览')
       expect(labels).toContain('功能入口')
       expect(labels).toContain('个人日志')
-      expect(labels).toContain('常见问题')
+      expect(labels).not.toContain('常见问题')
       expect(labels).toContain('套餐价格')
       expect(labels).toContain('设备管理')
       expect(labels).toContain('AI 客服')

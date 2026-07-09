@@ -92,10 +92,12 @@ async def get_by_id(db: AsyncSession, knowledge_id: int) -> Optional[Dict]:
     )
     item = result.scalar_one_or_none()
     if item:
+        await db.refresh(item)
         # 增加查看次数
         item.view_count = (item.view_count or 0) + 1
+        data = _knowledge_to_dict(item)
         await db.commit()
-        return _knowledge_to_dict(item)
+        return data
     return None
 
 
@@ -126,7 +128,7 @@ async def create(
 
     # 同步到向量库
     try:
-        embedding = await ai_provider.get_embedding(f"{title}\n{content}")
+        embedding = await ai_provider.get_embedding(f"{title}\n{content}") if ai_provider.has_api_key() else None
         if embedding:
             vector_id = await vector_store.add_knowledge(
                 knowledge_id=item.id,
@@ -136,6 +138,8 @@ async def create(
                 keywords=keywords,
                 priority=priority,
                 embedding=embedding,
+                platform_key=platform_key,
+                capability_key=capability_key,
             )
             item.vector_id = vector_id
             await db.commit()
@@ -187,8 +191,13 @@ async def update(
 
     # 同步到向量库
     try:
-        embedding = await ai_provider.get_embedding(f"{item.title}\n{item.content}")
-        if item.vector_id:
+        if item.status != "active":
+            await vector_store.delete_knowledge(item.id)
+            item.vector_id = None
+            await db.commit()
+        else:
+            embedding = await ai_provider.get_embedding(f"{item.title}\n{item.content}") if ai_provider.has_api_key() else None
+        if item.status == "active" and item.vector_id:
             await vector_store.update_knowledge(
                 knowledge_id=item.id,
                 title=item.title,
@@ -197,8 +206,10 @@ async def update(
                 keywords=json.loads(item.keywords) if item.keywords else None,
                 priority=item.priority,
                 embedding=embedding,
+                platform_key=item.platform_key,
+                capability_key=item.capability_key,
             )
-        elif embedding:
+        elif item.status == "active" and embedding:
             vector_id = await vector_store.add_knowledge(
                 knowledge_id=item.id,
                 title=item.title,
@@ -207,6 +218,8 @@ async def update(
                 keywords=json.loads(item.keywords) if item.keywords else None,
                 priority=item.priority,
                 embedding=embedding,
+                platform_key=item.platform_key,
+                capability_key=item.capability_key,
             )
             item.vector_id = vector_id
             await db.commit()
@@ -301,6 +314,8 @@ async def get_stats(db: AsyncSession) -> Dict:
 
 async def sync_all_to_vector(db: AsyncSession) -> Dict:
     """全量同步知识库到向量库"""
+    if not ai_provider.has_api_key():
+        raise RuntimeError("当前 AI 提供商未配置 API Key，无法重建向量库")
     result = await db.execute(
         select(KnowledgeBase).where(KnowledgeBase.status == "active")
     )
@@ -315,6 +330,8 @@ async def sync_all_to_vector(db: AsyncSession) -> Dict:
             "category": item.category,
             "keywords": json.loads(item.keywords) if item.keywords else [],
             "priority": item.priority,
+            "platform_key": item.platform_key,
+            "capability_key": item.capability_key,
         })
 
     await vector_store.sync_all(knowledge_items, embed_fn=ai_provider.get_embedding)

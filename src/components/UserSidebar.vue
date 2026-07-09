@@ -22,10 +22,6 @@
         <ClipboardList :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">个人日志</span>
       </router-link>
-      <router-link to="/user/faq" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/faq') ? 'page' : undefined">
-        <HelpCircle :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">常见问题</span>
-      </router-link>
       <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
         <ShieldCheck :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">套餐价格</span>
@@ -54,7 +50,7 @@
 import { useRouter, useRoute } from 'vue-router'
 import { Auth, showToast } from '@/utils'
 import {
-  Zap, LayoutDashboard, ClipboardList, HelpCircle,
+  Zap, LayoutDashboard, ClipboardList,
   ShieldCheck, Monitor, MessageCircle, LogOut
 } from '@lucide/vue'
 

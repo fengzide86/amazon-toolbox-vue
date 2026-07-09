@@ -20,7 +20,13 @@
           </div>
           <div class="message-content">
             <div class="message-text" style="white-space: pre-wrap;">{{ msg.content }}</div>
-            <div v-if="msg.knowledge_ids && msg.knowledge_ids.length" class="message-refs">
+            <div v-if="msg.knowledge_refs?.length" class="message-refs">
+              <span class="ref-label">参考知识：</span>
+              <span v-for="ref in msg.knowledge_refs" :key="ref.id" class="ref-tag">
+                {{ ref.title }}<template v-if="ref.score != null"> · {{ Math.round(ref.score * 100) }}%</template>
+              </span>
+            </div>
+            <div v-else-if="msg.knowledge_ids?.length" class="message-refs">
               <span class="ref-label">参考知识：</span>
               <span v-for="kid in msg.knowledge_ids" :key="kid" class="ref-tag">#{{ kid }}</span>
             </div>
@@ -94,7 +100,7 @@
 
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
-import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, api } from '@/utils/api'
+import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, getChatHistory } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 
@@ -171,57 +177,12 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
-    // 1. 先查询 FAQ（不调用 AI）
-    const faqRes = await api.post('/api/help/query', {
-      question: text,
-      platform_key: platformStore.currentPlatform,
-    })
-
-    if (faqRes.success && faqRes.data) {
-      if (faqRes.data.matched && !faqRes.data.ai_used) {
-        // FAQ 命中，直接展示答案，不调用 AI
-        messages.value.push({
-          id: nextMsgId++,
-          role: 'ai',
-          content: faqRes.data.answer,
-          knowledge_ids: faqRes.data.faq_id ? [faqRes.data.faq_id] : [],
-          created_at: new Date().toISOString()
-        })
-        lastAiMessage.value = faqRes.data.answer
-        showActions.value = true
-        isLoading.value = false
-        scrollToBottom()
-        return
-      }
-
-      if (faqRes.data.need_ai) {
-        // FAQ 未命中，提示用户是否使用 AI 诊断
-        messages.value.push({
-          id: nextMsgId++,
-          role: 'ai',
-          content: '未找到匹配的 FAQ 答案。是否使用 AI 智能诊断来帮您解答？',
-          created_at: new Date().toISOString()
-        })
-        // 添加 AI 诊断按钮
-        messages.value.push({
-          id: nextMsgId++,
-          role: 'system',
-          content: '__AI_DIAGNOSIS_PROMPT__',
-          created_at: new Date().toISOString()
-        })
-        isLoading.value = false
-        scrollToBottom()
-        return
-      }
-    }
-
-    // 2. FAQ 未命中且用户确认，或 FAQ 查询失败，调用 AI
     const res = await sendChatMessage(sessionId.value, text, { platform_key: platformStore.currentPlatform })
     messages.value.push({
       id: nextMsgId++,
       role: 'ai',
       content: res.reply,
-      knowledge_ids: res.knowledge_refs?.map(r => r.id) || [],
+      knowledge_refs: res.knowledge_refs || [],
       created_at: new Date().toISOString()
     })
     lastAiMessage.value = res.reply
@@ -234,43 +195,6 @@ async function sendMessage() {
       created_at: new Date().toISOString()
     })
     showToast('发送失败', 'error')
-  } finally {
-    isLoading.value = false
-    scrollToBottom()
-  }
-}
-
-// AI 诊断确认
-async function confirmAIDiagnosis() {
-  // 找到最后一个用户消息
-  const lastUserMsg = [...messages.value].reverse().find(m => m.role === 'user')
-  if (!lastUserMsg) return
-
-  // 移除提示消息
-  messages.value = messages.value.filter(m => m.content !== '__AI_DIAGNOSIS_PROMPT__')
-
-  isLoading.value = true
-  scrollToBottom()
-
-  try {
-    const res = await sendChatMessage(sessionId.value, lastUserMsg.content, { platform_key: platformStore.currentPlatform })
-    messages.value.push({
-      id: nextMsgId++,
-      role: 'ai',
-      content: res.reply,
-      knowledge_ids: res.knowledge_refs?.map(r => r.id) || [],
-      created_at: new Date().toISOString()
-    })
-    lastAiMessage.value = res.reply
-    showActions.value = true
-  } catch (err) {
-    messages.value.push({
-      id: nextMsgId++,
-      role: 'ai',
-      content: '抱歉，AI 诊断失败，请检查网络连接后重试。',
-      created_at: new Date().toISOString()
-    })
-    showToast('AI 诊断失败', 'error')
   } finally {
     isLoading.value = false
     scrollToBottom()
@@ -326,7 +250,7 @@ async function loadSession(sid) {
   try {
     const res = await getChatSession(sid)
     sessionId.value = sid
-    messages.value = res.messages || []
+    messages.value = (res.messages || []).map(message => ({ ...message, id: nextMsgId++ }))
     sessionResolved.value = res.status === 'resolved'
     sessionTransferred.value = res.status === 'transferred'
     showActions.value = res.status === 'active' && messages.value.some(m => m.role === 'ai')

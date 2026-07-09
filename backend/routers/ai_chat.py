@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db
-from core.dependencies import get_current_admin, get_current_user, get_optional_current_user
+from core.dependencies import get_current_admin, get_current_user
 from services import ai_chat_service
 
 router = APIRouter()
@@ -19,7 +19,19 @@ router = APIRouter()
 # ===== 请求体模型 =====
 
 class SendMessage(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=4000)
+    platform_key: Optional[str] = None
+    capability_key: Optional[str] = None
+
+
+class CreateSession(BaseModel):
+    platform_key: Optional[str] = None
+    capability_key: Optional[str] = None
+
+
+class DebugChatRequest(SendMessage):
+    top_k: int = Field(default=5, ge=1, le=20)
+    min_score: float = Field(default=0.3, ge=-1, le=1)
 
 
 class ResolveSession(BaseModel):
@@ -27,7 +39,7 @@ class ResolveSession(BaseModel):
 
 
 class RateSession(BaseModel):
-    satisfaction: int
+    satisfaction: int = Field(ge=1, le=5)
 
 
 class UpdateConfig(BaseModel):
@@ -43,21 +55,38 @@ class UpdateConfig(BaseModel):
 
 @router.post("/session")
 async def create_session(
+    req: Optional[CreateSession] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[dict] = Depends(get_optional_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """创建/恢复会话"""
-    user_id = current_user.get("user_id") if current_user else None
-    return await ai_chat_service.create_session(db, user_id=user_id)
+    user_id = current_user.get("user_id")
+    result = await ai_chat_service.create_session(db, user_id=user_id)
+    if req:
+        record = await ai_chat_service.get_session_record(db, result["session_id"])
+        record.platform_key = req.platform_key
+        record.capability_key = req.capability_key
+        await db.commit()
+    return result
+
+
+async def _require_session_owner(db: AsyncSession, session_id: str, current_user: dict):
+    record = await ai_chat_service.get_session_record(db, session_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    if record.user_id != current_user.get("user_id"):
+        raise HTTPException(status_code=403, detail="无权访问该会话")
+    return record
 
 
 @router.get("/session/{session_id}")
 async def get_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """获取会话详情（含消息列表）"""
+    await _require_session_owner(db, session_id, current_user)
     session = await ai_chat_service.get_session(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="会话不存在")
@@ -69,10 +98,13 @@ async def send_message(
     session_id: str,
     req: SendMessage,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """发送消息（非流式，返回完整回答）"""
-    return await ai_chat_service.send_message(db, session_id, req.message)
+    await _require_session_owner(db, session_id, current_user)
+    return await ai_chat_service.send_message(
+        db, session_id, req.message, req.platform_key, req.capability_key
+    )
 
 
 @router.post("/session/{session_id}/message/stream")
@@ -80,9 +112,10 @@ async def send_message_stream(
     session_id: str,
     req: SendMessage,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """发送消息（SSE 流式返回）"""
+    await _require_session_owner(db, session_id, current_user)
     async def event_generator():
         async for chunk in ai_chat_service.send_message_stream(db, session_id, req.message):
             yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
@@ -104,9 +137,10 @@ async def resolve_session(
     session_id: str,
     req: ResolveSession,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """标记会话已解决"""
+    await _require_session_owner(db, session_id, current_user)
     success = await ai_chat_service.resolve_session(db, session_id, req.satisfaction)
     if not success:
         raise HTTPException(status_code=404, detail="会话不存在")
@@ -120,6 +154,7 @@ async def transfer_to_human(
     current_user: dict = Depends(get_current_user),
 ):
     """转人工（自动创建工单）"""
+    await _require_session_owner(db, session_id, current_user)
     user_id = current_user.get("user_id")
     feedback_id = await ai_chat_service.transfer_to_human(db, session_id, user_id=user_id)
     return {"message": "已转人工客服", "feedback_id": feedback_id}
@@ -130,9 +165,10 @@ async def rate_session(
     session_id: str,
     req: RateSession,
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """满意度评分"""
+    await _require_session_owner(db, session_id, current_user)
     success = await ai_chat_service.rate_session(db, session_id, req.satisfaction)
     if not success:
         raise HTTPException(status_code=404, detail="会话不存在")
@@ -152,6 +188,18 @@ async def get_history(
 
 
 # ===== 管理端路由 =====
+
+@router.post("/admin/debug")
+async def debug_chat(
+    req: DebugChatRequest,
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(get_current_admin),
+):
+    """真实无状态问答调试，不生成会话或统计。"""
+    return await ai_chat_service.answer_question(
+        db, req.message, req.platform_key, req.capability_key,
+        top_k=req.top_k, min_score=req.min_score,
+    )
 
 @router.get("/admin/config")
 async def get_config(

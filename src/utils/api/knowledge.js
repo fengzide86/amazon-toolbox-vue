@@ -36,3 +36,7 @@ export function batchImportKnowledge(items) {
 export function syncKnowledgeVector() {
     return api.post('/api/knowledge/sync-vector');
 }
+
+export function testKnowledgeRetrieval(data) {
+    return api.post('/api/knowledge/retrieval-test', data);
+}

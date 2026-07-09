@@ -239,6 +239,7 @@ import { Auth, showToast, getDeviceId, getDeviceName } from '@/utils'
 import { verifyAuthCode } from '@/utils/api'
 import { api } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
+import { saveRememberedUserCode } from '@/utils/credentialStore'
 import { Zap, Check, CircleAlert, CircleCheck, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
 
 const router = useRouter()
@@ -345,18 +346,13 @@ function handleLogin() {
         })
         userStore.setDevice(deviceId.value, deviceName.value)
         Auth.set(authCode.value.trim())
+        saveRememberedUserCode(authCode.value.trim()).catch(() => {})
         // 存储平台权限信息供 AppHeader 使用
         if (res.data.platform_scope) {
           localStorage.setItem('toolbox_platform_scope', JSON.stringify(res.data.platform_scope))
         }
         showSuccess.value = true
         showToast('授权成功！正在跳转...', 'success')
-        // 触发窗口形变为学员窄屏伴侣模式
-        try {
-          window.electronAPI?.resizeWindow('trainee-mini')
-        } catch (e) {
-          console.warn('resizeWindow failed:', e)
-        }
         // 延迟跳转，让用户看到成功提示
         setTimeout(() => {
           router.push('/user/dashboard')
@@ -426,6 +422,12 @@ onMounted(() => {
   checkOnlineStatus()
   window.addEventListener('online', checkOnlineStatus)
   window.addEventListener('offline', checkOnlineStatus)
+  const autoLoginError = localStorage.getItem('toolbox_auto_login_error')
+  if (autoLoginError) {
+    localStorage.removeItem('toolbox_auto_login_error')
+    errorMessage.value = autoLoginError
+    showError.value = true
+  }
 })
 
 onUnmounted(() => {

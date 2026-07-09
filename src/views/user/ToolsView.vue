@@ -69,8 +69,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { getTools, getToolCategories, createLog } from '@/utils/api'
-import { runToolSimulation, showToast } from '@/utils'
+import { getTools, getToolCategories, createToolLaunchGrant } from '@/utils/api'
+import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { useAppStore } from '@/stores/app'
 import { Search, X } from '@lucide/vue'
@@ -194,7 +194,7 @@ function checkPlatformPermission() {
   return true
 }
 
-// 运行工具（调用 launch-token 接口）
+// 运行工具：先从云端控制面获取一次性启动授权，再交给本地任务运行层。
 async function runTool(tool) {
   if (tool.status !== 'online' && tool.status !== 'available' && tool.status !== 'beta') {
     showToast(`${tool.name} 正在维护中`, 'warning')
@@ -213,26 +213,11 @@ async function runTool(tool) {
   showToast(`正在启动 ${tool.name}...`, 'info')
   
   try {
-    // 调用 launch-token 接口
-    const response = await fetch(
-      `${import.meta.env.DEV ? 'http://localhost:8000' : ''}/api/tools/${tool.id}/launch-token?platform_key=${platformKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('toolbox_token')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          platform_key: platformKey,
-          device_id: deviceId,
-        }),
-      }
-    )
-    
-    const result = await response.json()
-    
-    if (result.success && result.data && result.data.launch_data) {
-      const ld = result.data.launch_data
+    launchingToolId.value = tool.id
+    const grantResponse = await createToolLaunchGrant(tool.id, { platformKey, deviceId })
+    const ld = grantResponse?.launch_data || grantResponse?.grant
+
+    if (ld) {
       const targetUrl = ld.target_url || ''
       
       // 检查目标网址是否配置
@@ -243,57 +228,39 @@ async function runTool(tool) {
       }
       
       // 打开工具（分屏模式）
-      launchingToolId.value = tool.id
-      
       appStore.openTool({
         id: ld.tool_id || tool.id,
         name: ld.tool_name || tool.name,
         module: ld.tool_module || tool.module,
         category: ld.category || tool.category,
         platformKey: ld.platform_key || platformKey,
-        targetUrl: targetUrl
+        capabilityKey: tool.capability_key,
+        targetUrl,
+        launchGrant: {
+          token: ld.token,
+          expiresAt: ld.expires_at || grantResponse.expires_at,
+          expiresIn: grantResponse.expires_in,
+          scriptKey: ld.script_key,
+          runnerApiVersion: ld.runner_api_version || 1,
+          toolVersion: ld.tool_version || '1.0.0',
+          toolManifest: ld.tool_manifest,
+          toolSignature: ld.tool_signature,
+          signingKeyId: ld.signing_key_id,
+          signatureRequired: Boolean(ld.signature_required),
+        },
       })
       
       launchingToolId.value = null
       showToast(`${tool.name} 已启动`, 'success')
     } else {
       // 显示后端错误文案
-      const errorMsg = result.message || '启动失败'
-      showToast(errorMsg, 'error')
+      showToast('启动授权数据不完整', 'error')
     }
   } catch (err) {
-    showToast('网络连接失败，请检查后端服务', 'error')
+    showToast(err?.message || '网络连接失败，请检查控制服务', 'error')
+  } finally {
+    launchingToolId.value = null
   }
-
-  // 记录日志
-  try {
-    const userInfo = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
-    await createLog({
-      user_id: userInfo.user_id || null,
-      device_id: deviceId,
-      tool_name: tool.name,
-      module: tool.module,
-      status: 'success',
-      platform_key: platformKey,
-      capability_key: tool.capability_key,
-      tool_id: tool.id
-    })
-  } catch (err) {}
-}
-
-// 监听 Electron 工具启动结果
-function setupElectronListeners() {
-  if (!window.electronAPI) return
-  
-  window.electronAPI.onLaunchToolSuccess?.((data) => {
-    launchingToolId.value = null
-    showToast(`${data.toolName || '工具'} 已启动`, 'success')
-  })
-  
-  window.electronAPI.onLaunchToolError?.((data) => {
-    launchingToolId.value = null
-    showToast(data.message || '工具启动失败', 'error')
-  })
 }
 
 // 监听平台变化
@@ -304,7 +271,6 @@ watch(() => platformStore.currentPlatform, () => {
 onMounted(() => {
   loadData()
   loadCategories()
-  setupElectronListeners()
 })
 </script>
 

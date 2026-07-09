@@ -13,6 +13,30 @@ from core.logging import get_logger
 
 logger = get_logger(__name__)
 
+TOOL_TARGET_URLS = {
+    "amazon": "https://sellercentral.amazon.com/",
+    "aliexpress": "https://sellercenter.aliexpress.com/",
+}
+
+
+def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
+    """为旧工具配置补齐本地 runner 所需字段，返回是否发生修改。"""
+    changed = False
+    for tool in tools:
+        platform_key = tool.get("platform_key", "amazon")
+        capability_key = tool.get("capability_key") or tool.get("id") or "unknown"
+        defaults = {
+            "script_key": f"{platform_key}.{capability_key}.v1",
+            "target_url": TOOL_TARGET_URLS.get(platform_key, ""),
+            "tool_version": "1.0.0",
+            "runner_api_version": 1,
+        }
+        for key, value in defaults.items():
+            if not tool.get(key):
+                tool[key] = value
+                changed = True
+    return changed
+
 
 async def seed_initial_data():
     """初始化默认数据
@@ -196,12 +220,21 @@ async def seed_initial_data():
                     "sort_order": 10
                 },
             ]
+            ensure_tool_runtime_fields(tools)
             db.add(Setting(
                 key="tool_configs", 
                 value=json.dumps(tools, ensure_ascii=False), 
                 description="工具配置列表"
             ))
             logger.info("创建默认工具配置")
+        else:
+            try:
+                tools = json.loads(existing.value or "[]")
+                if ensure_tool_runtime_fields(tools):
+                    existing.value = json.dumps(tools, ensure_ascii=False)
+                    logger.info("补齐现有工具的 runner 配置")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning("现有工具配置格式无效，跳过 runner 字段补齐")
 
         await db.commit()
         logger.info("种子数据初始化完成")

@@ -1,14 +1,14 @@
 """
 设置 999 套餐的 SVIP 前缀 - 通过 SSH 直接操作数据库
 """
-import paramiko
 import os
+
+from deploy_ssh import connect_ssh, require_env
 
 # 服务器配置（优先从环境变量读取，默认值仅供开发使用）
 SERVER_HOST = os.environ.get("DEPLOY_SERVER_HOST", "8.130.113.104")
 SERVER_USER = os.environ.get("DEPLOY_SERVER_USER", "root")
-SERVER_PASSWORD = os.environ.get("DEPLOY_SERVER_PASSWORD", "Wei99991221")
-MYSQL_PASSWORD = os.environ.get("DEPLOY_MYSQL_PASSWORD", "Wei99991221")
+MYSQL_PASSWORD = require_env("DEPLOY_MYSQL_PASSWORD")
 
 def run_cmd(ssh, cmd):
     stdin, stdout, stderr = ssh.exec_command(cmd)
@@ -18,9 +18,7 @@ def run_cmd(ssh, cmd):
 
 def main():
     print("=== 连接服务器 ===")
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(SERVER_HOST, username=SERVER_USER, password=SERVER_PASSWORD, timeout=10)
+    ssh = connect_ssh(SERVER_HOST, SERVER_USER, timeout=10)
     print("  连接成功!")
 
     # 1. 查看所有套餐

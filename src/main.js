@@ -6,21 +6,27 @@ import router from './router'
 import '@/assets/css/main.css'
 import { initSentry } from './utils/sentry'
 import { initPerformanceMonitoring } from './utils/performance'
+import { initializeRememberedLogin } from './utils/authBootstrap'
 
 // 不在启动时清除登录状态，由路由守卫和 token 过期机制管理登录态
 
-const app = createApp(App)
-const pinia = createPinia()
+async function bootstrap() {
+  const app = createApp(App)
+  const pinia = createPinia()
 
-app.use(pinia)
-app.use(router)
+  app.use(pinia)
+  await initializeRememberedLogin()
+  app.use(router)
 
 // 初始化 Sentry 错误监控（生产环境自动启用）
-initSentry(app, router)
+  initSentry(app, router)
 
 // 初始化性能监控（生产环境）
-if (import.meta.env.PROD) {
-  initPerformanceMonitoring()
+  if (import.meta.env.PROD) {
+    initPerformanceMonitoring()
+  }
+
+  app.mount('#app')
 }
 
-app.mount('#app')
+bootstrap()

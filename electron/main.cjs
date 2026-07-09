@@ -1,10 +1,16 @@
-const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, webContents } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const { spawn } = require('child_process');
+const { RunnerClient } = require('./automation/runner-client.cjs');
+const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
+const toolSigningConfig = require('./tool-signing-config.cjs');
 
 let mainWindow;
 let backendProcess = null;
+let automationRunner = null;
+const embeddedBrowserHost = new EmbeddedBrowserHost();
 
 // ===== 单实例锁 =====
 const gotTheLock = app.requestSingleInstanceLock();
@@ -22,6 +28,11 @@ if (!gotTheLock) {
 // ===== 自动更新功能 =====
 // 更新服务器地址（优先从环境变量读取，默认值仅供开发使用）
 const UPDATE_SERVER_URL = process.env.ELECTRON_UPDATE_URL || 'http://8.130.113.104:8000/updates/';
+// 云端控制面地址。配置为远程 HTTPS 后，桌面端不会再启动打包的 Python 后端。
+const CONTROL_API_BASE = (process.env.TOOLBOX_CONTROL_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+const USE_BUNDLED_BACKEND = process.env.TOOLBOX_USE_BUNDLED_BACKEND
+  ? process.env.TOOLBOX_USE_BUNDLED_BACKEND === 'true'
+  : CONTROL_API_BASE === 'http://localhost:8000';
 
 // 配置自动更新
 autoUpdater.autoDownload = false; // 不自动下载，先通知用户
@@ -147,6 +158,7 @@ ipcMain.on('start-download-update', () => {
 ipcMain.on('install-update', () => {
   console.log('[Updater] 安装更新，即将重启...');
   cleanupBackend();
+  cleanupAutomationRunner();
   autoUpdater.quitAndInstall();
 });
 
@@ -185,7 +197,7 @@ ipcMain.on('launch-tool', async (event, data) => {
   const launchData = data.launchData || {};
   const toolName = data.toolName || '未知工具';
   
-  console.log('[LaunchTool] 启动工具:', toolName, '数据:', JSON.stringify(launchData));
+  console.log('[LaunchTool] 启动工具:', toolName, 'toolId:', launchData.tool_id);
   
   // 兼容旧的 launchUrl 模式
   if (!launchData.token && data.launchUrl) {
@@ -206,8 +218,7 @@ ipcMain.on('launch-tool', async (event, data) => {
   }
   
   try {
-    const apiBase = 'http://localhost:8000'; // 打包应用使用内嵌本地后端
-    const verifyUrl = `${apiBase}/api/tools/launch-token/verify?token=${launchData.token}`;
+    const verifyUrl = `${CONTROL_API_BASE}/api/tools/launch-grant/verify?token=${encodeURIComponent(launchData.token)}`;
     
     const request = net.request({ method: 'POST', url: verifyUrl });
     
@@ -248,44 +259,91 @@ ipcMain.on('launch-tool', async (event, data) => {
   }
 });
 
-// ===== 窗口形变控制 =====
-ipcMain.on('resize-window-context', (event, targetMode) => {
-  if (!mainWindow) return;
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const { width: scrWidth, height: scrHeight } = primaryDisplay.workAreaSize;
+// ===== 安全凭据存储 =====
+function credentialFilePath() {
+  return path.join(app.getPath('userData'), 'user-credential.bin');
+}
 
-  if (targetMode === 'trainee-mini') {
-    // 学员窄屏伴侣：420px 宽，贴右，强制置顶
-    mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(380, 600);
-    mainWindow.setBounds({
-      x: scrWidth - 420,
-      y: 0,
-      width: 420,
-      height: scrHeight
-    }, true);
-    mainWindow.setAlwaysOnTop(true, 'screen-saver');
-  } else if (targetMode === 'admin-large') {
-    // 管理员宽屏看板：1200x800 居中，取消置顶
-    mainWindow.setAlwaysOnTop(false);
-    mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(900, 600);
-    mainWindow.setBounds({
-      x: Math.floor((scrWidth - 1200) / 2),
-      y: Math.floor((scrHeight - 800) / 2),
-      width: 1200,
-      height: 800
-    }, true);
-  } else if (targetMode === 'reset') {
-    // 重置为默认窗口
-    mainWindow.setAlwaysOnTop(false);
-    mainWindow.setMinimumSize(900, 600);
-    mainWindow.setBounds({
-      x: Math.floor((scrWidth - 1280) / 2),
-      y: Math.floor((scrHeight - 800) / 2),
-      width: 1280,
-      height: 800
-    }, true);
+ipcMain.handle('credential-save-user-code', async (_event, code) => {
+  if (typeof code !== 'string' || !code.trim() || !safeStorage.isEncryptionAvailable()) {
+    return false;
+  }
+  const target = credentialFilePath();
+  const temp = `${target}.tmp`;
+  fs.writeFileSync(temp, safeStorage.encryptString(code.trim()));
+  if (fs.existsSync(target)) fs.unlinkSync(target);
+  fs.renameSync(temp, target);
+  return true;
+});
+
+// ===== 本地 Node Automation Runner =====
+function getAutomationRunner() {
+  if (automationRunner) return automationRunner;
+  automationRunner = new RunnerClient({
+    scriptPath: path.join(__dirname, 'automation-runner.cjs'),
+    env: {
+      TOOLBOX_CONTROL_API_URL: CONTROL_API_BASE,
+      TOOLBOX_PROFILE_ROOT: path.join(app.getPath('userData'), 'automation-profiles'),
+      TOOLBOX_ARTIFACT_ROOT: path.join(app.getPath('userData'), 'automation-artifacts'),
+      TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64: process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || toolSigningConfig.publicKeyB64,
+    },
+    onEvent: event => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('automation:event', event);
+      }
+    },
+    onHostRequest: (action, payload) => embeddedBrowserHost.request(action, payload),
+  });
+  return automationRunner;
+}
+
+ipcMain.handle('automation:start', async (_event, tool) => {
+  if (!tool || typeof tool !== 'object' || !tool.id) throw new Error('工具启动数据不完整');
+  return getAutomationRunner().start({
+    ...tool,
+    browserMode: embeddedBrowserHost.isReady() ? 'embedded-cdp' : 'playwright',
+  });
+});
+ipcMain.handle('automation:pause', () => getAutomationRunner().pause());
+ipcMain.handle('automation:resume', () => getAutomationRunner().resume());
+ipcMain.handle('automation:cancel', () => getAutomationRunner().cancel());
+ipcMain.handle('automation:register-browser', (event, webContentsId) => {
+  const guest = webContents.fromId(Number(webContentsId));
+  if (!guest || guest.getType?.() !== 'webview') throw new Error('无法注册工作区浏览器');
+  if (guest.hostWebContents && guest.hostWebContents.id !== event.sender.id) {
+    throw new Error('工作区浏览器归属校验失败');
+  }
+  return embeddedBrowserHost.register(guest);
+});
+ipcMain.handle('automation:unregister-browser', () => embeddedBrowserHost.release());
+
+function cleanupAutomationRunner() {
+  embeddedBrowserHost.release();
+  if (!automationRunner) return;
+  const runner = automationRunner;
+  automationRunner = null;
+  runner.stop().catch(error => console.error('[AutomationRunner] 关闭失败:', error.message));
+}
+
+ipcMain.handle('credential-load-user-code', async () => {
+  try {
+    const target = credentialFilePath();
+    if (!safeStorage.isEncryptionAvailable() || !fs.existsSync(target)) return null;
+    return safeStorage.decryptString(fs.readFileSync(target));
+  } catch (err) {
+    console.error('[CredentialStore] 读取凭据失败:', err.message);
+    return null;
+  }
+});
+
+ipcMain.handle('credential-clear-user-code', async () => {
+  try {
+    const target = credentialFilePath();
+    if (fs.existsSync(target)) fs.unlinkSync(target);
+    return true;
+  } catch (err) {
+    console.error('[CredentialStore] 清理凭据失败:', err.message);
+    return false;
   }
 });
 
@@ -415,7 +473,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    minWidth: 380,
+    minWidth: 900,
     minHeight: 600,
     icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
@@ -445,31 +503,13 @@ function createWindow() {
     mainWindow.show();
   });
 
-  // 设置 API 服务器地址到 localStorage（开发和打包模式都使用本地后端）
-  let hasClearedDevAuth = false;
+  // 将云端控制面地址注入渲染进程；旧 key 暂时保留以兼容已有版本。
   mainWindow.webContents.on('did-finish-load', () => {
-    const apiBase = 'http://localhost:8000'; // 打包应用使用内嵌本地后端
-    
-    if (isDev && !hasClearedDevAuth) {
-      // 开发模式：首次加载时清除旧的云端认证信息（仅一次，刷新不清除）
-      hasClearedDevAuth = true;
-      mainWindow.webContents.executeJavaScript(`
-        localStorage.setItem('toolbox_api_base', '${apiBase}');
-        localStorage.removeItem('toolbox_token');
-        localStorage.removeItem('toolbox_auth');
-        localStorage.removeItem('toolbox_user');
-        localStorage.removeItem('toolbox_role');
-        localStorage.removeItem('toolbox_device_id');
-        localStorage.removeItem('toolbox_platform_scope');
-        localStorage.removeItem('toolbox_current_platform');
-        localStorage.removeItem('toolbox_admin_platform');
-        console.log('[Dev] 已清除旧认证信息，请重新登录本地后端');
-      `).catch(() => {});
-    } else {
-      mainWindow.webContents.executeJavaScript(`
-        localStorage.setItem('toolbox_api_base', '${apiBase}');
-      `).catch(() => {});
-    }
+    const apiBase = JSON.stringify(CONTROL_API_BASE);
+    mainWindow.webContents.executeJavaScript(`
+      localStorage.setItem('toolbox_control_api_base', ${apiBase});
+      localStorage.setItem('toolbox_api_base', ${apiBase});
+    `).catch(() => {});
   });
 
   mainWindow.on('closed', () => {
@@ -480,9 +520,6 @@ function createWindow() {
   setTimeout(checkForUpdates, 5000);
 }
 
-// 绕过系统代理，直连服务器（不受 Clash/VPN 等代理软件影响）
-app.commandLine.appendSwitch('no-proxy-server');
-
 app.whenReady().then(async () => {
   console.log('[INFO] App ready');
 
@@ -490,13 +527,13 @@ app.whenReady().then(async () => {
   const isDev = process.env.NODE_ENV === 'development' 
     || !require('fs').existsSync(path.join(__dirname, '../dist'));
 
-  // 开发模式跳过 exe 启动（开发预览.bat 已经启动了 python main.py）
-  if (!isDev) {
+  // 仅兼容期的 localhost 配置启动旧 Python 后端；远程控制面模式不再携带服务端进程。
+  if (!isDev && USE_BUNDLED_BACKEND) {
     startBackend();
     // 等待后端就绪再加载窗口，避免前端请求全部 ERR_CONNECTION_REFUSED
     await waitForBackend(15000);
   } else {
-    console.log('[Dev] 跳过后端启动（开发模式）');
+    console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }
 
   // 创建窗口
@@ -505,6 +542,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   cleanupBackend();
+  cleanupAutomationRunner();
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -512,4 +550,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   cleanupBackend();
+  cleanupAutomationRunner();
 });

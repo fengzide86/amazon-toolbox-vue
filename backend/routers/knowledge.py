@@ -5,12 +5,14 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+import time
 
 from database import get_db
 from core.dependencies import get_current_admin
 from core.audit import log_admin_action
 from services import knowledge_service
+from services import ai_provider, vector_store
 
 router = APIRouter()
 
@@ -46,7 +48,40 @@ class BatchImportItem(BaseModel):
     priority: Optional[str] = "medium"
 
 
+class RetrievalTestRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=2000)
+    platform_key: Optional[str] = None
+    capability_key: Optional[str] = None
+    top_k: int = Field(default=5, ge=1, le=20)
+    min_score: float = Field(default=0.3, ge=-1, le=1)
+
+
 # ===== 路由 =====
+
+@router.post("/retrieval-test")
+async def retrieval_test(
+    req: RetrievalTestRequest,
+    _admin: dict = Depends(get_current_admin),
+):
+    """管理员单条召回调试，不写入正式会话。"""
+    if not ai_provider.has_api_key():
+        raise HTTPException(status_code=503, detail="当前 AI 提供商未配置 API Key")
+    started = time.perf_counter()
+    embedding = await ai_provider.get_embedding(req.query)
+    if not embedding:
+        raise HTTPException(status_code=503, detail="Embedding 服务不可用或未配置")
+    results = await vector_store.search_knowledge(
+        embedding, top_k=req.top_k, min_score=req.min_score,
+        platform_key=req.platform_key, capability_key=req.capability_key,
+    )
+    return {
+        "query": req.query,
+        "filters": {"platform_key": req.platform_key, "capability_key": req.capability_key},
+        "top_k": req.top_k,
+        "min_score": req.min_score,
+        "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+        "results": results,
+    }
 
 @router.get("")
 async def get_knowledge_list(
@@ -125,7 +160,7 @@ async def create_knowledge(
         user_name=_admin.get("name", "admin"),
         action="create_knowledge",
         target_type="knowledge",
-        target_id=result.id if result else None,
+        target_id=result.get("id") if result else None,
         detail={"title": req.title, "category": req.category},
         request=request,
     )
@@ -183,7 +218,7 @@ async def delete_knowledge(
     """删除知识条目"""
     # 先获取标题用于审计日志
     item = await knowledge_service.get_by_id(db, knowledge_id)
-    title = item.title if item else None
+    title = item.get("title") if item else None
     
     success = await knowledge_service.delete(db, knowledge_id)
     if not success:

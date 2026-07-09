@@ -3,6 +3,7 @@
     <div class="page-header">
       <h2 class="page-title">知识库管理</h2>
       <div class="header-actions">
+        <el-button @click="openRetrievalTest">🔍 召回测试</el-button>
         <el-button @click="syncVector" :loading="syncing">
           {{ syncing ? '同步中...' : '🔄 同步向量库' }}
         </el-button>
@@ -158,12 +159,64 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-drawer v-model="showRetrievalTest" title="单条召回测试" size="560px">
+      <el-form label-position="top">
+        <el-form-item label="测试问题">
+          <el-input v-model="retrievalForm.query" type="textarea" :rows="3" placeholder="输入用户可能提出的问题" />
+        </el-form-item>
+        <el-form-item label="适用平台">
+          <el-select v-model="form.platform_key" clearable placeholder="全平台" style="width: 100%;">
+            <el-option label="亚马逊" value="amazon" />
+            <el-option label="速卖通" value="aliexpress" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="功能标识">
+          <el-input v-model="form.capability_key" clearable placeholder="留空表示平台通用" />
+        </el-form-item>
+        <div class="retrieval-options">
+          <el-form-item label="平台">
+            <el-select v-model="retrievalForm.platform_key" clearable placeholder="全平台">
+              <el-option label="亚马逊" value="amazon" />
+              <el-option label="速卖通" value="aliexpress" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="功能标识">
+            <el-input v-model="retrievalForm.capability_key" clearable placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="Top-K">
+            <el-input-number v-model="retrievalForm.top_k" :min="1" :max="20" />
+          </el-form-item>
+          <el-form-item label="最低相关度">
+            <el-input-number v-model="retrievalForm.min_score" :min="-1" :max="1" :step="0.05" :precision="2" />
+          </el-form-item>
+        </div>
+        <el-button type="primary" :loading="retrievalLoading" @click="runRetrievalTest">开始测试</el-button>
+      </el-form>
+
+      <div v-if="retrievalResult" class="retrieval-result">
+        <div class="retrieval-summary">
+          召回 {{ retrievalResult.results?.length || 0 }} 条 · {{ retrievalResult.elapsed_ms }} ms
+        </div>
+        <el-card v-for="item in retrievalResult.results" :key="item.id" class="retrieval-item" shadow="never">
+          <div class="retrieval-item-header">
+            <strong>{{ item.title }}</strong>
+            <el-tag :type="item.score >= 0.7 ? 'success' : item.score >= 0.4 ? 'warning' : 'info'">
+              {{ Math.round(item.score * 100) }}%
+            </el-tag>
+          </div>
+          <div class="retrieval-meta">{{ item.category }} · {{ item.platform_key || '全平台' }} · {{ item.capability_key || '通用' }}</div>
+          <div class="retrieval-content">{{ item.content }}</div>
+        </el-card>
+        <el-empty v-if="!retrievalResult.results?.length" description="当前条件没有召回结果" />
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, createKnowledge, updateKnowledge, deleteKnowledge, syncKnowledgeVector } from '@/utils/api'
+import { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, createKnowledge, updateKnowledge, deleteKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Search } from '@element-plus/icons-vue'
@@ -183,6 +236,10 @@ const editingId = ref(null)
 const submitting = ref(false)
 const syncing = ref(false)
 const keywordsStr = ref('')
+const showRetrievalTest = ref(false)
+const retrievalLoading = ref(false)
+const retrievalResult = ref(null)
+const retrievalForm = ref({ query: '', platform_key: '', capability_key: '', top_k: 5, min_score: 0.3 })
 
 const allCategories = ['安装教程', '授权说明', '使用教程', '报错处理', '套餐说明', '退款规则', '比赛须知', '其他']
 
@@ -289,9 +346,36 @@ async function syncVector() {
     showToast(`已同步 ${res.synced} 条`, 'success')
     await loadMeta()
   } catch (err) {
-    showToast('同步失败', 'error')
+    showToast(err.message || '同步失败', 'error')
   } finally {
     syncing.value = false
+  }
+}
+
+function openRetrievalTest() {
+  const platform = platformStore.adminPlatform
+  retrievalForm.value.platform_key = platform && platform !== 'all' ? platform : ''
+  retrievalResult.value = null
+  showRetrievalTest.value = true
+}
+
+async function runRetrievalTest() {
+  if (!retrievalForm.value.query.trim()) {
+    showToast('请输入测试问题', 'warning')
+    return
+  }
+  retrievalLoading.value = true
+  try {
+    retrievalResult.value = await testKnowledgeRetrieval({
+      ...retrievalForm.value,
+      query: retrievalForm.value.query.trim(),
+      platform_key: retrievalForm.value.platform_key || null,
+      capability_key: retrievalForm.value.capability_key || null,
+    })
+  } catch (err) {
+    showToast(err.message || '召回测试失败', 'error')
+  } finally {
+    retrievalLoading.value = false
   }
 }
 
@@ -321,6 +405,19 @@ onMounted(() => {
   display: flex;
   gap: 0.5rem;
 }
+
+.retrieval-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.retrieval-result { margin-top: 20px; }
+.retrieval-summary { margin-bottom: 12px; color: var(--studio-text-muted); }
+.retrieval-item { margin-bottom: 10px; }
+.retrieval-item-header { display: flex; justify-content: space-between; gap: 12px; }
+.retrieval-meta { margin: 6px 0; color: var(--studio-text-muted); font-size: 12px; }
+.retrieval-content { max-height: 120px; overflow: auto; white-space: pre-wrap; line-height: 1.5; }
 
 .stats-row {
   margin-bottom: 1rem;
