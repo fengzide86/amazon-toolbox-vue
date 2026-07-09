@@ -1,5 +1,6 @@
 from services.seed_service import (
     READ_ONLY_REGISTER_TOOL,
+    default_tool_configs,
     ensure_tool_runtime_fields,
     upgrade_default_read_only_tools,
 )
@@ -51,3 +52,13 @@ def test_ensure_tool_runtime_fields_keeps_read_only_script_key():
 
     assert changed is False
     assert tools[0]["script_key"] == "amazon.register.v1"
+
+
+def test_default_tool_configs_include_read_only_register_tool():
+    tools = default_tool_configs()
+    register_tool = next(item for item in tools if item["id"] == "tool_reg_newbie")
+
+    assert len(tools) >= 10
+    assert register_tool["name"] == "亚马逊注册页面巡检"
+    assert register_tool["script_key"] == "amazon.register.v1"
+    assert register_tool["target_url"] == "https://sellercentral.amazon.com/"
