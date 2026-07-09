@@ -129,6 +129,22 @@ class TestGetTools:
         assert resp.status_code == 200
         assert len(resp.json()) == 1
 
+    async def test_get_tools_platform_filter_normalizes_legacy_tools_first(self, client: AsyncClient, db_session):
+        """旧工具没有 platform_key 时，平台筛选前应先补齐默认运行字段"""
+        from models import Setting
+        import json
+        tools = [{"id": "tool_reg_newbie", "name": "旧注册工具", "module": "注册工具", "status": "online"}]
+        db_session.add(Setting(key="tool_configs", value=json.dumps(tools, ensure_ascii=False)))
+        await db_session.commit()
+
+        resp = await client.get("/api/tools", params={"platform_key": "amazon"})
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["platform_key"] == "amazon"
+        assert data[0]["script_key"] == "amazon.tool_reg_newbie.v1"
+
     async def test_get_tools_category_all(self, client: AsyncClient, db_session, auth_headers: dict):
         """category=all 返回全部"""
         from models import Setting

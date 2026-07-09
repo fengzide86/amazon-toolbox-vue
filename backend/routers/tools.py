@@ -144,6 +144,8 @@ async def get_tools(
     tools = []
     if setting and setting.value:
         tools = json.loads(setting.value)
+
+    tools = normalize_tool_configs(tools)
     
     # ===== 1.5 平台筛选 =====
     if platform_key and platform_key != "all":
@@ -161,8 +163,6 @@ async def get_tools(
                  search_lower in t.get("module", "").lower() or
                  search_lower in t.get("description", "").lower()]
     
-    tools = normalize_tool_configs(tools)
-
     # 按 sort_order 排序
     tools = sorted(tools, key=lambda t: t.get("sort_order", 0))
     
