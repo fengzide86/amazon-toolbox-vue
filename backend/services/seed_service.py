@@ -160,6 +160,12 @@ def default_tool_configs() -> list[dict]:
     ]
 
 
+def default_tool_configs_by_name() -> dict[str, dict]:
+    mapping = {tool["name"]: tool for tool in default_tool_configs()}
+    mapping["新手快速注册工具"] = READ_ONLY_REGISTER_TOOL
+    return mapping
+
+
 def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
     """为旧工具配置补齐本地 runner 所需字段，返回是否发生修改。"""
     changed = False
@@ -182,12 +188,28 @@ def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
 def upgrade_default_read_only_tools(tools: list[dict]) -> bool:
     """把旧默认注册工具升级为只读巡检；避免覆盖管理员自定义工具。"""
     changed = False
+    defaults_by_name = default_tool_configs_by_name()
     legacy_names = {"新手快速注册工具", "亚马逊注册页面巡检"}
     legacy_descriptions = {
         "一键完成亚马逊新手店铺注册流程",
         READ_ONLY_REGISTER_TOOL["description"],
     }
     for tool in tools:
+        default_tool = defaults_by_name.get(tool.get("name"))
+        if default_tool and (
+            not tool.get("id")
+            or tool.get("id") == "tool_tool"
+            or not tool.get("platform_key")
+            or not tool.get("capability_key")
+            or not tool.get("script_key")
+            or tool.get("script_key") == "amazon.unknown.v1"
+        ):
+            for key, value in default_tool.items():
+                if tool.get(key) != value:
+                    tool[key] = value
+                    changed = True
+            continue
+
         if tool.get("id") != READ_ONLY_REGISTER_TOOL["id"]:
             continue
         can_upgrade = (

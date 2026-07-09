@@ -26,6 +26,26 @@ def test_upgrade_default_register_tool_to_read_only_inspection():
     assert tools[0]["description"] == READ_ONLY_REGISTER_TOOL["description"]
 
 
+def test_upgrade_legacy_default_tool_names_fill_ids_and_runtime_fields():
+    tools = [
+        {
+            "name": "物流模板标准版",
+            "module": "物流模块",
+            "status": "online",
+        }
+    ]
+
+    changed = upgrade_default_read_only_tools(tools)
+    runtime_changed = ensure_tool_runtime_fields(tools)
+
+    assert changed is True
+    assert runtime_changed is True
+    assert tools[0]["id"] == "tool_logistics_standard"
+    assert tools[0]["platform_key"] == "amazon"
+    assert tools[0]["capability_key"] == "logistics_standard"
+    assert tools[0]["script_key"] == "amazon.logistics_standard.v1"
+
+
 def test_upgrade_default_register_tool_keeps_custom_admin_tool():
     tools = [
         {
