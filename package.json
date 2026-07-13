@@ -1,21 +1,21 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --mode development",
-    "build": "vite build --mode production",
+    "build": "set \"TEMP=D:\\AmazonToolboxData\\build-tmp\"&& set \"TMP=D:\\AmazonToolboxData\\build-tmp\"&& vite build --mode production",
     "preview": "vite preview",
     "electron:dev": "vite build --mode production && electron .",
-    "electron:build": "vite build --mode production && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win nsis",
+    "electron:build": "npm run build && set \"ELECTRON_CACHE=D:\\AmazonToolboxData\\electron-cache\"&& set \"ELECTRON_BUILDER_CACHE=D:\\AmazonToolboxData\\electron-builder-cache\"&& set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win nsis",
     "electron:preview": "electron .",
     "test": "vitest run",
     "test:run": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
+    "test:e2e": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test",
     "test:embedded-browser": "electron scripts/embedded-browser-smoke.cjs",
     "security:audit": "python scripts/audit_secrets.py",
     "security:audit-history": "python scripts/audit_secrets.py --history",
@@ -56,7 +56,7 @@
   },
   "build": {
     "appId": "com.amazon.toolbox",
-    "productName": "跨境电商赛训效率工具箱",
+    "productName": "\u8de8\u5883\u7535\u5546\u8d5b\u8bad\u6548\u7387\u5de5\u5177\u7bb1",
     "artifactName": "AmazonToolbox Setup ${version}.${ext}",
     "directories": {
       "output": "release"
@@ -81,6 +81,7 @@
       "node_modules/playwright-core/**/*"
     ],
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]
@@ -90,7 +91,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "亚马逊工具箱"
+      "shortcutName": "\u4e9a\u9a6c\u900a\u5de5\u5177\u7bb1"
     },
     "publish": {
       "provider": "generic",

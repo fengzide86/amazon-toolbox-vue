@@ -187,9 +187,13 @@ class Settings:
         self.CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
     
     def _get_db_path(self) -> str:
-        """获取数据库路径：始终使用用户 AppData 目录"""
-        appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
-        db_dir = os.path.join(appdata, "AmazonToolbox")
+        """Get the local SQLite database path, preferring the configured runtime root."""
+        runtime_root = os.environ.get('TOOLBOX_RUNTIME_DIR', '').strip()
+        if runtime_root:
+            db_dir = os.path.join(runtime_root, "AmazonToolbox")
+        else:
+            appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+            db_dir = os.path.join(appdata, "AmazonToolbox")
         os.makedirs(db_dir, exist_ok=True)
         return os.path.join(db_dir, "toolbox.db")
     

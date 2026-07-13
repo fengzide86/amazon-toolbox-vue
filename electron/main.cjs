@@ -12,6 +12,23 @@ let backendProcess = null;
 let automationRunner = null;
 const embeddedBrowserHost = new EmbeddedBrowserHost();
 
+// Keep customer runtime data off the system drive by default. The environment
+// override remains available for deployments that need a different location.
+function configureRuntimeRoot() {
+  const preferredRoot = process.env.TOOLBOX_RUNTIME_DIR || 'D:\\AmazonToolboxData';
+  try {
+    fs.mkdirSync(preferredRoot, { recursive: true });
+    app.setPath('userData', preferredRoot);
+    app.setPath('sessionData', path.join(preferredRoot, 'session-data'));
+    return preferredRoot;
+  } catch (error) {
+    console.warn('[Runtime] Unable to use preferred data directory:', error.message);
+    return app.getPath('userData');
+  }
+}
+
+const RUNTIME_ROOT = configureRuntimeRoot();
+
 // ===== 单实例锁 =====
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -285,6 +302,7 @@ function getAutomationRunner() {
       TOOLBOX_CONTROL_API_URL: CONTROL_API_BASE,
       TOOLBOX_PROFILE_ROOT: path.join(app.getPath('userData'), 'automation-profiles'),
       TOOLBOX_ARTIFACT_ROOT: path.join(app.getPath('userData'), 'automation-artifacts'),
+      PLAYWRIGHT_BROWSERS_PATH: path.join(RUNTIME_ROOT, 'playwright-browsers'),
       TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64: process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || toolSigningConfig.publicKeyB64,
     },
     onEvent: event => {
@@ -386,6 +404,36 @@ function waitForBackend(maxWaitMs = 15000) {
   });
 }
 
+function checkBackendHealth(timeoutMs = 1200) {
+  const http = require('http');
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = value => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const request = http.get('http://localhost:8000/api/health', response => {
+      response.resume();
+      finish(response.statusCode === 200);
+    });
+    request.once('error', () => finish(false));
+    request.setTimeout(timeoutMs, () => {
+      request.destroy();
+      finish(false);
+    });
+  });
+}
+
+async function ensureBackend() {
+  if (await checkBackendHealth()) {
+    console.log('[Backend] Reusing healthy service on localhost:8000');
+    return true;
+  }
+  startBackend();
+  return waitForBackend(15000);
+}
+
 function startBackend() {
   // 打包后 exe 在 resources/ 目录（由 extraResources 提取），开发模式不走此路径
   const backendExe = path.join(process.resourcesPath, 'toolbox-backend.exe');
@@ -397,7 +445,7 @@ function startBackend() {
   }
 
   // 将后端错误日志写到用户可访问的位置，方便排查
-  const logDir = path.join(process.env.APPDATA || path.join(require('os').homedir(), 'AppData', 'Roaming'), 'AmazonToolbox');
+  const logDir = path.join(RUNTIME_ROOT, 'logs');
   fs.mkdirSync(logDir, { recursive: true });
   const logPath = path.join(logDir, 'backend-error.log');
   let logStream;
@@ -411,7 +459,12 @@ function startBackend() {
     backendProcess = spawn(backendExe, [], {
       detached: false,
       stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true
+      windowsHide: true,
+      env: {
+        ...process.env,
+        TOOLBOX_RUNTIME_DIR: RUNTIME_ROOT,
+        APPDATA: RUNTIME_ROOT,
+      },
     });
     console.log('[Backend] 后端进程已启动, PID:', backendProcess.pid);
     console.log('[Backend] exe 路径:', backendExe);
@@ -481,6 +534,7 @@ function createWindow() {
       contextIsolation: true,
       webviewTag: true,
       preload: path.join(__dirname, 'preload.cjs'),
+      additionalArguments: [`--toolbox-control-api-base=${CONTROL_API_BASE}`],
     },
     frame: true,
     show: false,
@@ -529,9 +583,8 @@ app.whenReady().then(async () => {
 
   // 仅兼容期的 localhost 配置启动旧 Python 后端；远程控制面模式不再携带服务端进程。
   if (!isDev && USE_BUNDLED_BACKEND) {
-    startBackend();
     // 等待后端就绪再加载窗口，避免前端请求全部 ERR_CONNECTION_REFUSED
-    await waitForBackend(15000);
+    await ensureBackend();
   } else {
     console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }

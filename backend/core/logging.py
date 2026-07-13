@@ -172,8 +172,12 @@ def setup_logging(
     
     # ===== 文件处理器（带轮转）=====
     if log_dir is None:
-        appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
-        log_dir = os.path.join(appdata, "AmazonToolbox", "logs")
+        runtime_root = os.environ.get('TOOLBOX_RUNTIME_DIR', '').strip()
+        if runtime_root:
+            log_dir = os.path.join(runtime_root, "AmazonToolbox", "logs")
+        else:
+            appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+            log_dir = os.path.join(appdata, "AmazonToolbox", "logs")
     
     try:
         os.makedirs(log_dir, exist_ok=True)

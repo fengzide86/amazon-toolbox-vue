@@ -28,6 +28,12 @@ function shouldCache(url) {
 }
 
 function getApiBase() {
+    try {
+        const runtimeApiBase = window.electronAPI?.runtime?.controlApiBase;
+        if (runtimeApiBase) return runtimeApiBase;
+    } catch (e) {
+        // Non-Electron runtime: continue with storage and environment configuration.
+    }
     // Electron 会在窗口加载后注入这个值
     try {
         const controlApiBase = localStorage.getItem('toolbox_control_api_base');

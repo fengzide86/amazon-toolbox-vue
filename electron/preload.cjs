@@ -1,5 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+function readControlApiBase() {
+  const prefix = '--toolbox-control-api-base=';
+  const argument = process.argv.find(value => value.startsWith(prefix));
+  return argument ? argument.slice(prefix.length).replace(/\/$/, '') : '';
+}
+
+const controlApiBase = readControlApiBase();
+
 // 将 IPC 事件桥接到 window 事件，供 Vue 组件监听
 ipcRenderer.on('update-download-progress', (event, data) => {
   window.dispatchEvent(new CustomEvent('update-download-progress', { detail: data }));
@@ -19,6 +27,9 @@ ipcRenderer.on('update-error', (event, data) => {
 
 // 暴露安全的 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
+  runtime: {
+    controlApiBase,
+  },
   startDownloadUpdate: () => ipcRenderer.send('start-download-update'),
   installUpdate: () => ipcRenderer.send('install-update'),
   pauseDownload: () => ipcRenderer.send('pause-download'),

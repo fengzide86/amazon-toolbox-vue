@@ -181,6 +181,10 @@ class AuthService {
    */
   _getApiBase() {
     try {
+      const runtimeApiBase = window.electronAPI?.runtime?.controlApiBase
+      if (runtimeApiBase) return runtimeApiBase
+      const controlApiBase = localStorage.getItem('toolbox_control_api_base')
+      if (controlApiBase) return controlApiBase
       const electronApiBase = localStorage.getItem('toolbox_api_base')
       if (electronApiBase) return electronApiBase
     } catch (e) {}
