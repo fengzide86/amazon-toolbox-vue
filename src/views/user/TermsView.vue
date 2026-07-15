@@ -77,18 +77,19 @@
   justify-content: center;
   min-height: 100vh;
   padding: 2rem;
+  background: var(--color-canvas);
 }
 .terms-card {
-  background: white;
-  border-radius: 24px;
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
   padding: 3rem;
   max-width: 800px;
   width: 100%;
-  box-shadow: 0 25px 50px rgba(15,23,42,0.1);
+  box-shadow: var(--shadow-medium);
   border: 1px solid var(--color-border);
 }
 .terms-header {
-  text-align: center;
+  text-align: left;
   margin-bottom: 2.5rem;
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--color-border);
@@ -97,7 +98,7 @@
   font-family: var(--font-heading);
   font-size: 1.875rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 .terms-date {
@@ -111,13 +112,13 @@
   font-family: var(--font-heading);
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-text);
   margin-bottom: 0.75rem;
   padding-left: 0.75rem;
-  border-left: 3px solid var(--color-accent);
+  border-left: 3px solid var(--color-primary);
 }
 .terms-content p {
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   line-height: 1.7;
   margin-bottom: 0.5rem;
@@ -129,7 +130,7 @@
   line-height: 1.7;
 }
 .terms-footer {
-  text-align: center;
+  text-align: left;
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid var(--color-border);

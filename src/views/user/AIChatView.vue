@@ -1,7 +1,7 @@
 <template>
   <div class="ai-chat-container">
     <div class="chat-header">
-      <h2>AI 客服</h2>
+      <div><span>执行支持</span><h2>工具帮助</h2><p>遇到授权、设备或自动操作问题，直接描述你看到的情况。</p></div>
       <button v-if="sessionId" class="btn btn-secondary" @click="showHistory = true">历史记录</button>
     </div>
 
@@ -303,22 +303,27 @@ onMounted(async () => {
   max-width: 900px;
   margin: 0 auto;
   background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-low);
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: 20px 24px;
   border-bottom: 1px solid var(--color-border);
 }
 
 .chat-header h2 {
-  margin: 0;
-  font-size: 1.25rem;
+  margin: 3px 0 0;
+  color: var(--color-text);
+  font-size: 20px;
+  letter-spacing: -.02em;
 }
+.chat-header div > span { color: var(--color-primary); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.chat-header p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: 12px; }
 
 .chat-messages {
   flex: 1;
@@ -356,7 +361,14 @@ onMounted(async () => {
 }
 
 .message-avatar {
-  font-size: 1.5rem;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  font-size: 1rem;
   flex-shrink: 0;
 }
 
@@ -364,11 +376,14 @@ onMounted(async () => {
   max-width: 70%;
   background: var(--color-bg-secondary);
   padding: 0.75rem 1rem;
-  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px 12px 12px 4px;
   position: relative;
 }
 
 .message.user .message-content {
+  border-color: var(--color-primary);
+  border-radius: 12px 12px 4px 12px;
   background: var(--color-primary);
   color: white;
 }
@@ -421,7 +436,7 @@ onMounted(async () => {
   height: 8px;
   background: var(--color-text-secondary);
   border-radius: 50%;
-  animation: typing 1.4s infinite;
+  animation: typing var(--motion-ambient) infinite;
 }
 
 .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
@@ -493,8 +508,8 @@ onMounted(async () => {
 .resolved-notice {
   text-align: center;
   padding: 0.75rem;
-  background: rgba(16, 185, 129, 0.1);
-  color: #10b981;
+  background: var(--color-success-soft);
+  color: var(--color-success);
   border-radius: 8px;
   margin: 1rem 0;
 }
@@ -502,8 +517,8 @@ onMounted(async () => {
 .transferred-notice {
   text-align: center;
   padding: 0.75rem;
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
   border-radius: 8px;
   margin: 1rem 0;
 }
@@ -526,12 +541,14 @@ onMounted(async () => {
 .chat-input input:focus {
   outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: var(--color-overlay);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -541,6 +558,8 @@ onMounted(async () => {
 .modal {
   background: var(--color-bg-card);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-overlay);
   padding: 1.5rem;
   max-width: 500px;
   width: 90%;
@@ -610,5 +629,15 @@ onMounted(async () => {
 .btn-warning {
   background: var(--studio-warning);
   color: white;
+}
+
+@media (max-width: 640px) {
+  .ai-chat-container { height: calc(100vh - 100px); }
+  .chat-header { padding: 16px; }
+  .chat-header p { display: none; }
+  .chat-messages { padding: 16px; }
+  .message-content { max-width: 84%; }
+  .quick-questions { margin: 10px 0 16px 42px; }
+  .chat-input { padding: 12px; }
 }
 </style>

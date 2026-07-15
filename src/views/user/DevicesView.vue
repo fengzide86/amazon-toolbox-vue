@@ -1,10 +1,19 @@
 ﻿<template>
-  <div>
-    <h2 class="page-title">设备管理</h2>
+  <div class="devices-page">
+    <header class="devices-header">
+      <span>本机授权</span>
+      <h2 class="page-title">设备授权</h2>
+      <p>查看当前电脑是否已获得使用权限，必要时可管理其他已绑定设备。</p>
+    </header>
 
     <div class="device-info-banner">
-      <AlertTriangle :size="20" />
-      <span>每个授权码可绑定 <strong>{{ maxDevices }}</strong> 台设备，当前已绑定 <strong>{{ devices.length }}</strong> 台</span>
+      <CircleCheck v-if="currentDeviceBound" :size="21" />
+      <AlertTriangle v-else :size="21" />
+      <div>
+        <strong>{{ currentDeviceBound ? '当前电脑已授权' : '未识别到当前电脑授权' }}</strong>
+        <span>{{ currentDeviceBound ? '你可以在这台电脑上正常使用已开通的工具。' : '如刚完成换绑，请重新登录；仍未恢复可联系工具帮助。' }}</span>
+      </div>
+      <small>已绑定 {{ devices.length }} / {{ maxDevices }} 台</small>
     </div>
 
     <div v-if="devices.length" class="device-list">
@@ -13,7 +22,7 @@
           <Monitor :size="28" :stroke-width="1.5" />
         </div>
         <div class="device-info">
-          <div class="device-name">{{ device.device_name || '未知设备' }}</div>
+          <div class="device-name">{{ device.device_name || '未知设备' }} <span v-if="isCurrentDevice(device)">当前电脑</span></div>
           <div class="device-meta">
             <span class="device-id">{{ device.device_id }}</span>
             <span class="bind-time">绑定于 {{ formatTime(device.created_at) }}</span>
@@ -38,14 +47,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { getMyDevices, userUnbindDevice } from '@/utils/api'
-import { showToast } from '@/utils'
-import { AlertTriangle, Monitor } from '@lucide/vue'
+import { getDeviceId, showToast } from '@/utils'
+import { AlertTriangle, CircleCheck, Monitor } from '@lucide/vue'
 
 const devices = ref([])
 const maxDevices = ref(1)
 const unbinding = ref(false)
+const currentDeviceId = getDeviceId()
+const currentDeviceBound = computed(() => devices.value.some(isCurrentDevice))
+
+function isCurrentDevice(device) {
+  return Boolean(currentDeviceId && device.device_id === currentDeviceId)
+}
 
 function formatTime(timeStr) {
   if (!timeStr) return '-'
@@ -93,28 +108,32 @@ onMounted(loadDevices)
 </script>
 
 <style scoped>
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  color: var(--studio-text-main);
-  margin-bottom: 1.5rem;
-}
+.devices-page { width: min(980px, 100%); margin: 0 auto; }
+.devices-header { margin-bottom: 22px; }
+.devices-header > span { display: block; margin-bottom: 8px; color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.devices-header h2 { margin: 0; color: var(--color-text); font-size: var(--font-page-title); letter-spacing: -.03em; }
+.devices-header p { margin: 8px 0 0; color: var(--color-text-secondary); font-size: 13px; }
 
 .device-info-banner {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
-  background: rgba(14, 165, 233, 0.06);
-  border: 1px solid rgba(14, 165, 233, 0.15);
+  background: var(--color-primary-soft);
+  border: 1px solid rgba(45, 95, 202, .12);
   border-radius: 12px;
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
-  color: var(--studio-text-muted);
+  color: var(--color-primary);
 }
 
 .device-info-banner svg { color: var(--studio-accent); flex-shrink: 0; }
-.device-info-banner strong { color: var(--studio-accent); }
+.device-info-banner div { flex: 1; min-width: 0; }
+.device-info-banner strong,
+.device-info-banner span { display: block; }
+.device-info-banner strong { color: var(--color-text); font-size: 14px; }
+.device-info-banner span { margin-top: 3px; color: var(--color-text-secondary); font-size: 12px; }
+.device-info-banner small { color: var(--color-text-secondary); white-space: nowrap; }
 
 .device-list { display: flex; flex-direction: column; gap: 0.75rem; }
 
@@ -128,12 +147,12 @@ onMounted(loadDevices)
   border: 1px solid var(--color-border);
   transition: box-shadow 0.2s;
 }
-.device-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.device-card:hover { box-shadow: var(--shadow-medium); border-color: var(--color-border-strong); }
 
 .device-icon {
   width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(14, 165, 233, 0.08);
+  background: var(--color-primary-soft);
   border-radius: 12px;
   color: var(--studio-accent);
   flex-shrink: 0;
@@ -141,6 +160,7 @@ onMounted(loadDevices)
 
 .device-info { flex: 1; min-width: 0; }
 .device-name { font-weight: 600; font-size: 0.95rem; color: var(--studio-text-main); margin-bottom: 0.25rem; }
+.device-name span { margin-left: 7px; padding: 3px 7px; border-radius: 999px; color: var(--color-success); background: var(--color-success-soft); font-size: 10px; }
 .device-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--studio-text-muted); flex-wrap: wrap; }
 .device-id { font-family: monospace; }
 
@@ -156,8 +176,8 @@ onMounted(loadDevices)
   white-space: nowrap;
 }
 .unbind-btn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: var(--color-danger-soft);
+  border-color: rgba(195, 61, 73, .28);
   color: var(--studio-danger);
 }
 .unbind-btn:disabled { opacity: 0.4; cursor: not-allowed; }

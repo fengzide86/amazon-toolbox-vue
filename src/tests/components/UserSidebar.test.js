@@ -78,7 +78,7 @@ describe('UserSidebar', () => {
 
       const labels = wrapper.findAll('.menu-label').map(el => el.text())
       expect(labels).toContain('工具箱')
-      expect(labels).toContain('使用记录')
+      expect(labels).toContain('执行记录')
       expect(labels).toContain('套餐与授权')
       expect(labels).toContain('设备授权')
       expect(labels).toContain('AI 客服')

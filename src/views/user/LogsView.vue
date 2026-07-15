@@ -1,7 +1,7 @@
 <template>
   <div class="records-page">
     <header class="records-header">
-      <div><h2>使用记录</h2><p>查看最近使用过的工具和处理结果。</p></div>
+      <div><span class="records-eyebrow">历史记录</span><h2>执行记录</h2><p>查看最近使用过的工具、处理结果和可继续的操作。</p></div>
       <router-link class="support-link" to="/user/ai-chat"><MessageCircle :size="16" />联系客服</router-link>
     </header>
 
@@ -100,21 +100,23 @@ onMounted(loadRecords)
 
 <style scoped>
 .records-page { width: min(1050px, 100%); margin: 0 auto; }
+.records-eyebrow { display: block; margin-bottom: 8px; color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
 .records-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
-.records-header h2 { margin: 0; color: var(--studio-text-main); font-size: 26px; }
+.records-header h2 { margin: 0; color: var(--studio-text-main); font-size: var(--font-page-title); letter-spacing: -.03em; }
 .records-header p { margin: 7px 0 0; color: var(--studio-text-muted); font-size: 13px; }
-.support-link { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border: 1px solid var(--studio-border); border-radius: 8px; color: var(--studio-text-main); background: white; font-size: 12px; font-weight: 700; text-decoration: none; }
+.support-link { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 13px; border: 1px solid var(--studio-border); border-radius: var(--radius-md); color: var(--studio-text-main); background: var(--color-surface); font-size: 12px; font-weight: 700; text-decoration: none; }
 .support-link:hover { color: var(--studio-accent); border-color: var(--studio-accent-light); }
-.records-card { overflow: hidden; border: 1px solid var(--studio-border); border-radius: var(--radius-lg); background: white; box-shadow: var(--studio-shadow); }
-.record-row { min-height: 74px; display: grid; grid-template-columns: 38px minmax(160px, 1fr) 86px auto; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--studio-border); }
+.records-card { overflow: hidden; border: 1px solid var(--studio-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--studio-shadow); }
+.record-row { min-height: 76px; display: grid; grid-template-columns: 40px minmax(160px, 1fr) 86px auto; align-items: center; gap: 14px; padding: 13px 18px; border-bottom: 1px solid var(--studio-border); transition: background var(--motion-fast); }
+.record-row:hover { background: var(--color-surface-soft); }
 .record-row:last-child { border-bottom: 0; }
 .record-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 9px; color: var(--studio-accent); background: var(--studio-accent-bg); }
 .record-main strong, .record-main span { display: block; }
 .record-main strong { color: var(--studio-text-main); font-size: 13px; }
 .record-main span { margin-top: 4px; color: var(--studio-text-muted); font-size: 11px; }
 .result-badge { justify-self: start; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.result-badge.success { color: #047857; background: #ecfdf5; }
-.result-badge.failed { color: #b91c1c; background: #fef2f2; }
+.result-badge.success { color: var(--color-success); background: var(--color-success-soft); }
+.result-badge.failed { color: var(--color-danger); background: var(--color-danger-soft); }
 .result-badge.cancelled { color: var(--studio-text-muted); background: var(--studio-bg-hover); }
 .record-actions { display: flex; gap: 7px; }
 .record-actions button { min-height: 32px; padding: 0 10px; border: 1px solid var(--studio-border); border-radius: 7px; color: var(--studio-text-main); background: white; font-size: 11px; font-weight: 700; cursor: pointer; }

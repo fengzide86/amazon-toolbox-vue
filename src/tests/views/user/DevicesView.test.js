@@ -14,7 +14,8 @@ vi.mock('@/utils/api', () => ({
 
 // Mock utils
 vi.mock('@/utils', () => ({
-  showToast: vi.fn()
+  showToast: vi.fn(),
+  getDeviceId: vi.fn(() => 'device_001')
 }))
 
 describe('DevicesView', () => {
@@ -41,7 +42,7 @@ describe('DevicesView', () => {
       await flushPromises()
 
       expect(wrapper.find('.page-title').exists()).toBe(true)
-      expect(wrapper.find('.page-title').text()).toBe('设备管理')
+      expect(wrapper.find('.page-title').text()).toBe('设备授权')
     })
 
     it('应该显示设备数量提示', async () => {
@@ -50,8 +51,8 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      expect(wrapper.text()).toContain('每个授权码可绑定')
-      expect(wrapper.text()).toContain('台设备')
+      expect(wrapper.text()).toContain('已绑定')
+      expect(wrapper.text()).toContain('台')
     })
   })
 

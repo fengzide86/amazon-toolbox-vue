@@ -16,7 +16,7 @@
       </router-link>
       <router-link to="/user/logs" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/logs') ? 'page' : undefined">
         <ClipboardList :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">使用记录</span>
+        <span class="menu-label">执行记录</span>
       </router-link>
       <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
         <ShieldCheck :size="14" class="menu-icon" aria-hidden="true" />

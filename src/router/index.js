@@ -47,7 +47,7 @@ const routes = [
         path: 'logs',
         name: 'UserLogs',
         component: () => import('@/views/user/LogsView.vue'),
-        meta: { title: '使用记录', skeleton: 'table' }
+        meta: { title: '执行记录', skeleton: 'table' }
       },
       {
         path: 'faq',
@@ -64,13 +64,13 @@ const routes = [
         path: 'devices',
         name: 'UserDevices',
         component: () => import('@/views/user/DevicesView.vue'),
-        meta: { title: '设备管理', skeleton: 'table' }
+        meta: { title: '设备授权', skeleton: 'table' }
       },
       {
         path: 'ai-chat',
         name: 'UserAIChat',
         component: () => import('@/views/user/AIChatView.vue'),
-        meta: { title: 'AI 客服', skeleton: 'default' }
+        meta: { title: '工具帮助', skeleton: 'default' }
       }
     ]
   },

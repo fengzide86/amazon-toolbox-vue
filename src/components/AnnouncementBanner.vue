@@ -84,9 +84,9 @@ onMounted(async () => {
   gap: 10px;
   margin-bottom: 14px;
   padding: 8px 11px;
-  border: 1px solid rgba(14, 165, 233, .18);
-  border-radius: 9px;
-  color: var(--studio-accent-hover);
+  border: 1px solid rgba(45, 95, 202, .14);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
   background: var(--studio-accent-bg);
 }
 .info-banner div { min-width: 0; display: flex; align-items: baseline; gap: 9px; }
@@ -94,13 +94,13 @@ onMounted(async () => {
 .info-banner span { overflow: hidden; color: var(--studio-text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .info-banner button, .modal-close-btn { display: grid; place-items: center; border: 0; color: var(--studio-text-muted); background: transparent; cursor: pointer; }
 
-.announcement-overlay { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px; background: rgba(15, 23, 42, .58); backdrop-filter: blur(5px); }
-.announcement-modal { position: relative; width: min(420px, 100%); padding: 28px; border-top: 4px solid var(--studio-accent); border-radius: 14px; background: white; box-shadow: 0 24px 60px rgba(15, 23, 42, .22); }
+.announcement-overlay { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; padding: 16px; background: var(--color-overlay); backdrop-filter: blur(5px); }
+.announcement-modal { position: relative; width: min(420px, 100%); padding: 28px; border: 1px solid var(--color-border); border-top: 3px solid var(--color-primary); border-radius: var(--radius-xl); background: var(--color-surface); box-shadow: var(--shadow-overlay); }
 .announcement-modal.maintenance { border-top-color: var(--studio-danger); }
 .modal-close-btn { position: absolute; top: 13px; right: 13px; width: 30px; height: 30px; border-radius: 7px; }
 .modal-close-btn:hover { background: var(--studio-bg-hover); }
 .type-icon { width: 44px; height: 44px; display: grid; place-items: center; margin-bottom: 14px; border-radius: 11px; color: var(--studio-accent); background: var(--studio-accent-bg); }
-.maintenance .type-icon { color: var(--studio-danger); background: #fef2f2; }
+.maintenance .type-icon { color: var(--studio-danger); background: var(--color-danger-soft); }
 .type-label { color: var(--studio-text-muted); font-size: 11px; font-weight: 700; }
 .announcement-modal h3 { margin: 6px 0 10px; color: var(--studio-text-main); font-size: 19px; }
 .announcement-modal > p { margin: 0; color: var(--studio-text-muted); font-size: 13px; line-height: 1.75; white-space: pre-wrap; }
