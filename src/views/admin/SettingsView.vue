@@ -57,6 +57,18 @@
             </div>
           </div>
         </el-form-item>
+
+        <el-form-item>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-title">专业批量工作台</div>
+              <div class="setting-desc">全局发布开关。关闭后所有 B 端入口和接口立即停用，不影响普通用户。</div>
+            </div>
+            <div class="setting-control">
+              <el-switch v-model="businessWorkspaceEnabled" inline-prompt active-text="已开启" inactive-text="未开启" @change="saveBusinessWorkspaceSetting" />
+            </div>
+          </div>
+        </el-form-item>
       </el-form>
     </el-card>
 
@@ -117,6 +129,14 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="产品类型" width="130">
+          <template #default="{ row }">
+            <el-tag :type="row.product_type === 'business' ? 'warning' : 'info'" size="small">
+              {{ row.product_type === 'business' ? '专业 B 端' : '普通 C 端' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 'active' ? 'success' : 'danger'" size="small">
@@ -125,7 +145,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="255" fixed="right">
           <template #default="{ row }">
             <template v-if="editingPlan?.id === row.id">
               <el-button type="primary" size="small" @click="savePlan(row)">保存</el-button>
@@ -133,6 +153,7 @@
             </template>
             <template v-else>
               <el-button size="small" @click="startEdit(row)">编辑</el-button>
+              <el-button size="small" @click="openPlanPermissions(row)">产品权限</el-button>
               <el-button 
                 size="small" 
                 :type="row.status === 'active' ? 'danger' : 'success'"
@@ -267,6 +288,23 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="能力展示 / B端" min-width="270">
+          <template #default="{ row, $index }">
+            <template v-if="editingToolIndex === $index">
+              <el-input v-model="row.capability_tags_text" size="small" placeholder="能力标签，最多3个，逗号分隔" />
+              <el-input v-model="row.preparation_notes_text" size="small" class="tool-sub-input" placeholder="准备事项，逗号分隔" />
+              <el-input v-model="row.intervention_scenarios_text" size="small" class="tool-sub-input" placeholder="需要操作的情形，逗号分隔" />
+              <div class="batch-switch"><el-switch v-model="row.supports_batch" size="small" /><span>开放 B 端批量</span></div>
+              <el-input v-if="row.supports_batch" v-model="row.business_description" size="small" class="tool-sub-input" placeholder="B 端工具说明" />
+              <el-input v-if="row.supports_batch" v-model="row.batch_schema_text" type="textarea" :rows="2" class="tool-sub-input" placeholder="account_label|客户简称|text|required" />
+            </template>
+            <template v-else>
+              <div class="capability-preview"><el-tag v-for="tag in (row.capability_tags || []).slice(0,3)" :key="tag" size="small" effect="plain">{{ tag }}</el-tag></div>
+              <div class="tool-meta">{{ row.supports_batch ? '已开放 B 端批量' : '仅单工具使用' }}</div>
+            </template>
+          </template>
+        </el-table-column>
+
         <el-table-column label="说明" min-width="220">
           <template #default="{ row, $index }">
             <el-input
@@ -350,11 +388,43 @@
         <el-form-item label="功能描述">
           <el-input v-model="newPlan.features" type="textarea" :rows="3" placeholder="请输入功能描述" />
         </el-form-item>
+        <el-form-item label="产品类型">
+          <el-select v-model="newPlan.product_type" style="width:100%">
+            <el-option label="普通 C 端" value="consumer" />
+            <el-option label="专业 B 端" value="business" />
+          </el-select>
+        </el-form-item>
+        <template v-if="newPlan.product_type === 'business'">
+          <el-form-item label="单批上限"><el-input-number v-model="newPlan.entitlements.max_batch_rows" :min="1" :max="1000" style="width:100%" /></el-form-item>
+          <el-form-item label="浏览器现场"><el-input-number v-model="newPlan.entitlements.max_open_sessions" :min="2" :max="10" style="width:100%" /></el-form-item>
+        </template>
       </el-form>
       <template #footer>
         <el-button @click="showAddPlan = false">取消</el-button>
         <el-button type="primary" @click="addPlan">确认添加</el-button>
       </template>
+    </el-dialog>
+
+    <el-dialog v-model="showPlanPermissions" title="产品与专业权限" width="520px">
+      <el-form v-if="planPermissionDraft" label-position="top">
+        <el-form-item label="产品类型">
+          <el-radio-group v-model="planPermissionDraft.product_type">
+            <el-radio-button value="consumer">普通 C 端</el-radio-button>
+            <el-radio-button value="business">专业 B 端</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <template v-if="planPermissionDraft.product_type === 'business'">
+          <div class="permission-assurance">B 端固定只有 1 个活动脚本；等待验证的浏览器现场会保留，后续账号继续。</div>
+          <el-form-item label="批量工作台"><el-switch v-model="planPermissionDraft.batchEnabled" active-text="开放批量执行与多账号工作台" /></el-form-item>
+          <div class="permission-grid">
+            <el-form-item label="单批最大行数"><el-input-number v-model="planPermissionDraft.maxBatchRows" :min="1" :max="1000" /></el-form-item>
+            <el-form-item label="最多浏览器现场"><el-input-number v-model="planPermissionDraft.maxOpenSessions" :min="2" :max="10" /></el-form-item>
+          </div>
+          <el-form-item label="桌面通知"><el-switch v-model="planPermissionDraft.desktopNotification" active-text="登录或验证时提醒" /></el-form-item>
+        </template>
+        <div v-else class="permission-assurance neutral">普通套餐不会因为席位数量增加而获得批量能力。</div>
+      </el-form>
+      <template #footer><el-button @click="showPlanPermissions=false">取消</el-button><el-button type="primary" @click="savePlanPermissions">保存权限</el-button></template>
     </el-dialog>
 
     <el-dialog v-model="showReleaseModal" title="创建签名工具版本" width="560px">
@@ -417,7 +487,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getPlans, getSettings, updateSetting, getTools, updateTools, getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from '@/utils/api'
+import { getPlansAdmin, getSettings, updateSetting, getTools, updateTools, getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from '@/utils/api'
 import { showToast } from '@/utils'
 
 const plans = ref([])
@@ -428,14 +498,18 @@ const editingPlan = ref(null)
 const editingToolIndex = ref(-1)
 const editingToolSnapshot = ref(null)
 const showAddPlan = ref(false)
+const showPlanPermissions = ref(false)
+const planPermissionDraft = ref(null)
 const showReleaseModal = ref(false)
 const releaseSaving = ref(false)
 const newRelease = ref({ tool_id: '', version: '1.0.0', script_key: '', artifact_sha256: 'embedded' })
 
 const adminPassword = ref('')
 const wechatId = ref('')
+const businessWorkspaceEnabled = ref(false)
 
-const newPlan = ref({ name: '', price: 0, duration_days: 7, features: '' })
+const defaultEntitlements = () => ({ batch_execution: true, multi_account_workspace: true, desktop_notification: true, usage_metering: false, max_batch_rows: 50, max_open_sessions: 6 })
+const newPlan = ref({ name: '', price: 0, duration_days: 7, features: '', product_type: 'consumer', entitlements: defaultEntitlements() })
 
 const categoryOptions = [
   { label: '数据分析', value: 'data' },
@@ -468,7 +542,7 @@ const profitRatiosText = computed(() => {
 async function loadData() {
   try {
     const [plansRes, settingsRes, toolsRes, releasesRes] = await Promise.all([
-      getPlans(), getSettings(), getTools(), getToolReleases()
+      getPlansAdmin(), getSettings(), getTools(), getToolReleases()
     ])
     plans.value = (plansRes || []).filter(p => p !== null)
     settings.value = (settingsRes || []).filter(s => s !== null)
@@ -478,7 +552,9 @@ async function loadData() {
     const pwdSetting = settingsRes.find(s => s.key === 'admin_password')
     const wxSetting = settingsRes.find(s => s.key === 'wechat_id')
     const profitSetting = settingsRes.find(s => s.key === 'profit_ratios')
+    const businessSetting = settingsRes.find(s => s.key === 'business_workspace_enabled')
     if (wxSetting) wechatId.value = wxSetting.value
+    businessWorkspaceEnabled.value = String(businessSetting?.value || '').toLowerCase() === 'true'
     if (profitSetting && profitSetting.value) {
       try {
         const ratios = JSON.parse(profitSetting.value)
@@ -523,6 +599,16 @@ async function saveWechat() {
   }
 }
 
+async function saveBusinessWorkspaceSetting(value) {
+  try {
+    await updateSetting({ key: 'business_workspace_enabled', value: value ? 'true' : 'false', description: '专业批量工作台全局发布开关' })
+    showToast(value ? '专业批量工作台已开启' : '专业批量工作台已关闭', 'success')
+  } catch {
+    businessWorkspaceEnabled.value = !value
+    showToast('发布开关保存失败', 'error')
+  }
+}
+
 function startEdit(plan) {
   editingPlan.value = { ...plan }
 }
@@ -537,6 +623,44 @@ async function savePlan(plan) {
     await loadData()
   } catch (err) {
     showToast('更新失败', 'error')
+  }
+}
+
+function openPlanPermissions(plan) {
+  const entitlements = { ...defaultEntitlements(), ...(plan.entitlements || {}) }
+  planPermissionDraft.value = {
+    id: plan.id,
+    product_type: plan.product_type || 'consumer',
+    batchEnabled: Boolean(entitlements.batch_execution && entitlements.multi_account_workspace),
+    maxBatchRows: Number(entitlements.max_batch_rows || 50),
+    maxOpenSessions: Number(entitlements.max_open_sessions || 6),
+    desktopNotification: entitlements.desktop_notification !== false,
+  }
+  showPlanPermissions.value = true
+}
+
+async function savePlanPermissions() {
+  if (!planPermissionDraft.value) return
+  const draft = planPermissionDraft.value
+  const isBusiness = draft.product_type === 'business'
+  try {
+    const { api } = await import('@/utils/api')
+    await api.put(`/api/plans/${draft.id}`, {
+      product_type: draft.product_type,
+      entitlements: {
+        batch_execution: isBusiness && draft.batchEnabled,
+        multi_account_workspace: isBusiness && draft.batchEnabled,
+        desktop_notification: draft.desktopNotification,
+        usage_metering: false,
+        max_batch_rows: draft.maxBatchRows,
+        max_open_sessions: draft.maxOpenSessions,
+      },
+    })
+    showPlanPermissions.value = false
+    showToast('产品权限已更新', 'success')
+    await loadData()
+  } catch (error) {
+    showToast(error?.message || '权限保存失败', 'error')
   }
 }
 
@@ -559,10 +683,18 @@ async function addPlan() {
   }
   try {
     const { api } = await import('@/utils/api')
-    await api.post('/api/plans', newPlan.value)
+    const payload = {
+      ...newPlan.value,
+      entitlements: {
+        ...newPlan.value.entitlements,
+        batch_execution: newPlan.value.product_type === 'business',
+        multi_account_workspace: newPlan.value.product_type === 'business',
+      },
+    }
+    await api.post('/api/plans', payload)
     showToast('套餐已添加', 'success')
     showAddPlan.value = false
-    newPlan.value = { name: '', price: 0, duration_days: 7, features: '' }
+    newPlan.value = { name: '', price: 0, duration_days: 7, features: '', product_type: 'consumer', entitlements: defaultEntitlements() }
     await loadData()
   } catch (err) {
     showToast('添加失败', 'error')
@@ -587,7 +719,17 @@ function addTool() {
     available_plans_text: '',
     status: 'online',
     sort_order: nextOrder,
-    description: ''
+    description: '',
+    capability_tags: [],
+    capability_tags_text: '',
+    preparation_notes: [],
+    preparation_notes_text: '',
+    intervention_scenarios: [],
+    intervention_scenarios_text: '',
+    supports_batch: false,
+    business_description: '',
+    batch_input_schema: [],
+    batch_schema_text: 'account_label|客户简称|text|required'
   })
   editingToolIndex.value = tools.value.length - 1
   editingToolSnapshot.value = null
@@ -595,6 +737,10 @@ function addTool() {
 
 function startToolEdit(row, index) {
   row.available_plans_text = (row.available_plans || []).join(',')
+  row.capability_tags_text = (row.capability_tags || []).join(',')
+  row.preparation_notes_text = (row.preparation_notes || []).join(',')
+  row.intervention_scenarios_text = (row.intervention_scenarios || []).join(',')
+  row.batch_schema_text = formatBatchSchema(row.batch_input_schema)
   editingToolSnapshot.value = JSON.parse(JSON.stringify(row))
   editingToolIndex.value = index
 }
@@ -611,12 +757,20 @@ function cancelToolEdit() {
 }
 
 function normalizeToolForSave(tool, index) {
+  const {
+    available_plans_text: _availablePlansText,
+    capability_tags_text: capabilityTagsText,
+    preparation_notes_text: preparationNotesText,
+    intervention_scenarios_text: interventionScenariosText,
+    batch_schema_text: batchSchemaText,
+    ...toolData
+  } = tool
   const platformKey = tool.platform_key || 'amazon'
   const capabilityKey = slugify(tool.capability_key || tool.id || tool.name || `tool_${index + 1}`)
   const id = slugify(tool.id || `tool_${capabilityKey}`)
   const plansText = tool.available_plans_text ?? (tool.available_plans || []).join(',')
   return {
-    ...tool,
+    ...toolData,
     id,
     name: (tool.name || '未命名工具').trim(),
     module: (tool.module || '未分类').trim(),
@@ -632,8 +786,36 @@ function normalizeToolForSave(tool, index) {
     sort_order: Number(tool.sort_order || index + 1),
     available_plans: plansText.split(',').map(item => item.trim()).filter(Boolean),
     description: tool.description || '',
+    capability_tags: splitList(capabilityTagsText ?? tool.capability_tags, 3),
+    preparation_notes: splitList(preparationNotesText ?? tool.preparation_notes),
+    intervention_scenarios: splitList(interventionScenariosText ?? tool.intervention_scenarios),
+    supports_batch: Boolean(tool.supports_batch),
+    business_description: tool.business_description || '',
+    batch_input_schema: tool.supports_batch ? parseBatchSchema(batchSchemaText, tool.batch_input_schema) : [],
     requires_signature: tool.requires_signature !== false
   }
+}
+
+function splitList(value, limit = 20) {
+  const source = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/)
+  return source.map(item => String(item).trim()).filter(Boolean).slice(0, limit)
+}
+
+function formatBatchSchema(schema = []) {
+  const rows = schema.length ? schema : [{ key: 'account_label', label: '客户简称', type: 'text', required: true }]
+  return rows.map(field => `${field.key}|${field.label || field.key}|text|${field.required ? 'required' : 'optional'}`).join('\n')
+}
+
+function parseBatchSchema(text, fallback = []) {
+  const forbidden = /password|passwd|pwd|secret|token|cookie/i
+  const rows = String(text || formatBatchSchema(fallback)).split('\n').map(line => {
+    const [rawKey, rawLabel, , required] = line.split('|').map(item => item?.trim())
+    const key = slugify(rawKey)
+    if (!key || forbidden.test(key)) return null
+    return { key, label: rawLabel || key, type: 'text', required: required !== 'optional', sensitive: false }
+  }).filter(Boolean)
+  if (!rows.some(field => field.key === 'account_label')) rows.unshift({ key: 'account_label', label: '客户简称', type: 'text', required: true, sensitive: false })
+  return rows
 }
 
 async function saveTool(index) {
@@ -856,6 +1038,44 @@ onMounted(loadData)
   width: fit-content;
   margin-top: 0.35rem;
 }
+
+.batch-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+  color: var(--studio-text-muted);
+  font-size: 0.75rem;
+}
+
+.capability-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.permission-assurance {
+  margin-bottom: 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.permission-assurance.neutral {
+  color: var(--studio-text-muted);
+  background: var(--studio-bg);
+}
+
+.permission-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.permission-grid :deep(.el-input-number) { width: 100%; }
 
 .tool-desc-admin {
   display: inline-block;

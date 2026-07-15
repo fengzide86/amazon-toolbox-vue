@@ -10,7 +10,7 @@
     <nav class="sidebar-menu-nav">
       <router-link to="/admin/dashboard" class="menu-nav-item" active-class="is-active">
         <LayoutDashboard :size="14" class="menu-icon" />
-        <span class="menu-label">数据总览</span>
+        <span class="menu-label">行动中心</span>
       </router-link>
       <router-link to="/admin/authcodes" class="menu-nav-item" active-class="is-active">
         <Key :size="14" class="menu-icon" />

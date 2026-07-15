@@ -1,333 +1,142 @@
 <template>
-  <div>
-    <h2 class="page-title">
-      数据总览
-    </h2>
+  <div class="action-center">
+    <header class="page-heading">
+      <div><span>OPERATIONS</span><h2>行动中心</h2><p>先处理会影响客户使用的事项，再查看日常经营数据。</p></div>
+      <button class="refresh-button" :disabled="loading" @click="loadData"><RefreshCw :size="15" :class="{ spin: loading }" />刷新</button>
+    </header>
 
-    <!-- 统计卡片 -->
-    <section class="stats-row">
-      <article class="stat-card">
-        <div class="stat-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <section class="summary-grid" aria-label="待处理事项摘要">
+      <button v-for="card in summaryCards" :key="card.key" :class="['summary-card', `tone-${card.tone}`]" @click="scrollToSection(card.key)">
+        <span class="summary-icon"><component :is="card.icon" :size="20" /></span>
+        <span><small>{{ card.label }}</small><strong>{{ card.value }}</strong><em>{{ card.hint }}</em></span>
+        <ChevronRight :size="17" />
+      </button>
+    </section>
+
+    <section class="priority-grid">
+      <article id="waiting_interventions" class="action-panel primary-panel">
+        <header><div><span>优先处理</span><h3>需要人工介入的执行</h3></div><span class="count-badge warning">{{ data.waiting_interventions?.length || 0 }}</span></header>
+        <div v-if="data.waiting_interventions?.length" class="action-list">
+          <button v-for="item in data.waiting_interventions" :key="`${item.batch_id}-${item.account_label_masked}`" @click="openBatch(item.batch_id)">
+            <span class="row-icon warning"><UserRoundCheck :size="17" /></span>
+            <span class="row-copy"><strong>{{ item.tool_name }}</strong><small>{{ item.account_label_masked }} · {{ interventionText(item.intervention_type) }}</small></span>
+            <span class="row-time">{{ formatRelative(item.updated_at) }}</span><ChevronRight :size="15" />
+          </button>
         </div>
-        <div class="stat-content">
-          <div class="stat-label">总收入</div>
-          <div class="stat-value" style="color: var(--studio-accent);">¥{{ dashboardData.total_revenue?.toFixed(2) || '0.00' }}</div>
-          <div class="stat-sub">{{ dashboardData.total_orders || 0 }} 笔订单</div>
-        </div>
+        <EmptyState v-else :icon="CheckCircle2" title="暂时没有需要介入的执行" description="客户端遇到登录或验证时，会出现在这里。" />
       </article>
-      <article class="stat-card">
-        <div class="stat-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+
+      <article id="stale_batches" class="action-panel">
+        <header><div><span>运行关注</span><h3>连接异常候选</h3></div><span class="count-badge">{{ data.stale_batches?.length || 0 }}</span></header>
+        <div v-if="data.stale_batches?.length" class="action-list compact">
+          <button v-for="item in data.stale_batches" :key="item.batch_id" @click="openBatch(item.batch_id)">
+            <span class="row-icon danger"><WifiOff :size="16" /></span>
+            <span class="row-copy"><strong>{{ item.tool_name }}</strong><small>超过 90 秒未收到本地状态</small></span>
+            <span class="row-time">{{ formatRelative(item.last_heartbeat_at) }}</span><ChevronRight :size="15" />
+          </button>
         </div>
-        <div class="stat-content">
-          <div class="stat-label">活跃授权码</div>
-          <div class="stat-value" style="color: var(--studio-success);">{{ dashboardData.active_codes || 0 }}</div>
-          <div class="stat-sub">总用户 {{ dashboardData.total_users || 0 }}</div>
-        </div>
-      </article>
-      <article class="stat-card">
-        <div class="stat-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">待处理工单</div>
-          <div class="stat-value" style="color: var(--studio-warning);">{{ dashboardData.pending_tickets || 0 }}</div>
-          <div class="stat-sub">需要及时处理</div>
-        </div>
-      </article>
-      <article class="stat-card">
-        <div class="stat-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-label">今日运行次数</div>
-          <div class="stat-value" style="color: var(--studio-info);">{{ dashboardData.today_runs || 0 }}</div>
-          <div class="stat-sub">今日工具使用</div>
-        </div>
+        <EmptyState v-else :icon="CheckCircle2" title="批次连接正常" description="当前没有超时未同步的运行批次。" />
       </article>
     </section>
 
-    <!-- 图表区域 -->
-    <section class="charts-grid">
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>收入趋势（近7天）</h3>
+    <section class="operations-grid">
+      <article id="expiring_authorizations" class="action-panel">
+        <header><div><span>7 天内</span><h3>即将到期授权</h3></div><router-link to="/admin/authcodes">全部授权</router-link></header>
+        <div v-if="data.expiring_authorizations?.length" class="simple-list">
+          <div v-for="item in data.expiring_authorizations.slice(0, 6)" :key="item.id"><span><KeyRound :size="15" />{{ item.code_masked }}</span><strong>{{ formatDate(item.expires_at) }}</strong></div>
         </div>
-        <div class="chart-container">
-          <LineChart v-if="chartsLoaded" :data="lineChartData" :options="lineChartOptions" />
-          <div v-else class="chart-loading">加载中...</div>
+        <EmptyState v-else :icon="CheckCircle2" title="近期没有授权到期" description="未来 7 天无需续期跟进。" />
+      </article>
+
+      <article id="device_anomalies" class="action-panel">
+        <header><div><span>授权边界</span><h3>设备与席位异常</h3></div><router-link to="/admin/authcodes">去处理</router-link></header>
+        <div v-if="data.device_anomalies?.length" class="simple-list">
+          <div v-for="item in data.device_anomalies.slice(0, 6)" :key="item.auth_code_id"><span><MonitorSmartphone :size="15" />{{ item.code_masked }}</span><strong>{{ item.device_used }}/{{ item.device_limit }} 设备 · {{ item.seat_used }}/{{ item.seat_limit }} 席位</strong></div>
         </div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3>套餐销售分布</h3>
+        <EmptyState v-else :icon="CheckCircle2" title="授权使用正常" description="没有超出设备或席位上限的授权。" />
+      </article>
+
+      <article id="pending_tickets" class="action-panel">
+        <header><div><span>客户支持</span><h3>待处理工单</h3></div><router-link to="/admin/feedback">全部工单</router-link></header>
+        <div v-if="data.pending_tickets?.length" class="simple-list">
+          <div v-for="item in data.pending_tickets.slice(0, 6)" :key="item.id"><span><MessageSquareText :size="15" />{{ item.title }}</span><strong>{{ priorityText(item.priority) }} · {{ formatRelative(item.created_at) }}</strong></div>
         </div>
-        <div class="chart-container">
-          <DoughnutChart v-if="chartsLoaded" :data="doughnutChartData" :options="doughnutChartOptions" />
-          <div v-else class="chart-loading">加载中...</div>
-        </div>
-      </div>
-      <div class="chart-card" style="grid-column: 1 / -1;">
-        <div class="chart-header">
-          <h3>工具成功率</h3>
-        </div>
-        <div class="chart-container" style="max-height: 250px;">
-          <BarChart v-if="chartsLoaded" :data="barChartData" :options="barChartOptions" />
-          <div v-else class="chart-loading">加载中...</div>
-        </div>
-      </div>
+        <EmptyState v-else :icon="CheckCircle2" title="工单已经处理完" description="当前没有等待回复的客户问题。" />
+      </article>
     </section>
 
-    <!-- 最近订单 -->
-    <section class="table-card">
-      <div class="table-header">
-        <h3>最近订单</h3>
-        <router-link to="/admin/orders" class="view-all-link">查看全部 →</router-link>
-      </div>
-      <el-table :data="recentOrders" style="width: 100%" class="studio-table" size="small">
-        <el-table-column label="订单号" min-width="140">
-          <template #default="{ row }">
-            <span style="font-family:monospace;font-size:0.85rem">{{ row.order_no }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="套餐" min-width="100">
-          <template #default="{ row }">{{ getPlanName(row.plan_id) }}</template>
-        </el-table-column>
-        <el-table-column label="金额" width="100">
-          <template #default="{ row }">¥{{ row.amount }}</template>
-        </el-table-column>
-        <el-table-column label="渠道" width="100">
-          <template #default="{ row }">{{ row.channel || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.status === 'paid' ? 'success' : row.status === 'pending' ? 'warning' : 'danger'" size="small">
-              {{ getStatusText(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="时间" width="120">
-          <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
-        </el-table-column>
-        <template #empty>
-          <div class="empty-row">暂无订单数据</div>
-        </template>
-      </el-table>
-    </section>
-
-    <!-- 最近运行日志 -->
-    <section class="table-card" style="margin-top: 1.5rem;">
-      <div class="table-header">
-        <h3>最近运行日志</h3>
-      </div>
-      <div v-if="dashboardData.recent_logs?.length" class="log-list">
-        <div v-for="log in dashboardData.recent_logs" :key="log.id" class="log-item">
-          <span class="log-tool">{{ log.tool_name || '未知工具' }}</span>
-          <span class="log-module">{{ log.module || '-' }}</span>
-          <span :class="['log-badge', log.status === 'success' ? 'log-badge-success' : 'log-badge-fail']">
-            {{ log.status === 'success' ? '成功' : '失败' }}
-          </span>
-          <span class="log-time">{{ formatTime(log.created_at) }}</span>
+    <el-drawer v-model="batchDrawerVisible" size="min(560px, 94vw)" title="批次详情" class="batch-detail-drawer">
+      <div v-if="batchLoading" class="drawer-loading"><LoaderCircle :size="22" class="spin" />正在读取脱敏状态</div>
+      <div v-else-if="batchDetail" class="batch-detail">
+        <div class="detail-hero"><span>业务工具</span><strong>{{ batchDetail.tool_name }}</strong><small>{{ batchDetail.total_count }} 个账号 · {{ batchStatusText(batchDetail.status) }}</small></div>
+        <div class="privacy-note"><ShieldCheck :size="16" />这里只展示脱敏标签和执行状态，不保存客户文件、密码或页面内容。</div>
+        <div class="batch-items">
+          <div v-for="(item,index) in batchDetail.items" :key="`${item.account_label_masked}-${index}`">
+            <span :class="['item-state', `is-${item.status}`]"></span>
+            <span><strong>{{ item.account_label_masked }}</strong><small>{{ item.customer_message || batchStatusText(item.status) }}</small></span>
+            <em>{{ interventionText(item.intervention_type) }}</em>
+          </div>
         </div>
       </div>
-      <div v-else class="empty-state">暂无运行日志</div>
-    </section>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { getDashboard, getOrders, getPlans, getDashboardCharts } from '@/utils/api'
+import { computed, onMounted, ref } from 'vue'
+import { CheckCircle2, ChevronRight, KeyRound, LoaderCircle, MessageSquareText, MonitorSmartphone, RefreshCw, ShieldAlert, ShieldCheck, TicketCheck, TimerReset, UserRoundCheck, WifiOff } from '@lucide/vue'
+import EmptyState from '@/components/EmptyState.vue'
+import { getAdminActionCenter, getAdminBusinessBatch } from '@/utils/api'
 import { showToast } from '@/utils'
-import { Line as LineChart, Doughnut as DoughnutChart, Bar as BarChart } from 'vue-chartjs'
-import '@/utils/chart' // 按需注册 Chart.js
-import { usePlatformStore } from '@/stores/platform'
 
-const platformStore = usePlatformStore()
-const dashboardData = ref({})
-const recentOrders = ref([])
-const plans = ref([])
-const chartsData = ref(null)
-const chartsLoaded = ref(false)
-const planNameMap = {}
+const data = ref({ summary: {} })
+const loading = ref(false)
+const batchLoading = ref(false)
+const batchDrawerVisible = ref(false)
+const batchDetail = ref(null)
 
-const lineChartData = computed(() => {
-  if (!chartsData.value) return { labels: [], datasets: [] }
-  return {
-    labels: chartsData.value.revenue_trend.map(d => d.date),
-    datasets: [{
-      label: '收入 (¥)',
-      data: chartsData.value.revenue_trend.map(d => d.amount),
-      borderColor: '#2D5FCA',
-      backgroundColor: 'rgba(45,95,202,0.08)',
-      fill: true,
-      tension: 0.4,
-      pointRadius: 4,
-      pointHoverRadius: 6,
-    }]
-  }
-})
-
-const lineChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
-  scales: {
-    y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-    x: { grid: { display: false } }
-  }
-}
-
-const doughnutChartData = computed(() => {
-  if (!chartsData.value) return { labels: [], datasets: [] }
-  const colors = ['#2D5FCA', '#A98552', '#168A63', '#C33D49', '#6F63B6', '#4776D7']
-  return {
-    labels: chartsData.value.plan_distribution.map(d => d.name),
-    datasets: [{
-      data: chartsData.value.plan_distribution.map(d => d.count),
-      backgroundColor: colors.slice(0, chartsData.value.plan_distribution.length),
-      borderWidth: 0,
-    }]
-  }
-})
-
-const doughnutChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true } } }
-}
-
-const barChartData = computed(() => {
-  if (!chartsData.value) return { labels: [], datasets: [] }
-  return {
-    labels: chartsData.value.tool_success_rate.map(d => d.name),
-    datasets: [{
-      label: '成功率 (%)',
-      data: chartsData.value.tool_success_rate.map(d => d.rate),
-      backgroundColor: chartsData.value.tool_success_rate.map(d =>
-        d.rate >= 95 ? 'rgba(16,185,129,0.7)' : d.rate >= 80 ? 'rgba(245,158,11,0.7)' : 'rgba(239,68,68,0.7)'
-      ),
-      borderRadius: 6,
-    }]
-  }
-})
-
-const barChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
-  scales: {
-    y: { beginAtZero: true, max: 100, grid: { color: 'rgba(0,0,0,0.05)' } },
-    x: { grid: { display: false } }
-  }
-}
-
-function getPlanName(planId) { return planNameMap[planId] || '未知套餐' }
-function getStatusText(status) {
-  const map = { pending: '待确认', paid: '已完成', refunded: '已退款' }
-  return map[status] || status
-}
-function formatTime(timeStr) {
-  if (!timeStr) return '-'
-  const d = new Date(timeStr)
-  return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
-}
+const summaryCards = computed(() => [
+  { key: 'expiring_authorizations', label: '即将到期授权', value: data.value.summary?.expiring_authorizations || 0, hint: '7 天内需要跟进', icon: TimerReset, tone: 'premium' },
+  { key: 'device_anomalies', label: '设备与席位异常', value: data.value.summary?.device_anomalies || 0, hint: '检查授权使用边界', icon: ShieldAlert, tone: 'danger' },
+  { key: 'pending_tickets', label: '待处理工单', value: data.value.summary?.pending_tickets || 0, hint: '等待运营回复', icon: TicketCheck, tone: 'neutral' },
+  { key: 'waiting_interventions', label: '需要人工介入', value: data.value.summary?.waiting_interventions || 0, hint: '客户执行正在等待', icon: UserRoundCheck, tone: 'warning' },
+])
 
 async function loadData() {
-  try {
-    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
-    const [dashRes, ordersRes, plansRes, chartsRes] = await Promise.all([
-      getDashboard({ platform_key: platformKey }), 
-      getOrders(), 
-      getPlans(), 
-      getDashboardCharts({ platform_key: platformKey })
-    ])
-    dashboardData.value = dashRes
-    recentOrders.value = ordersRes.slice(0, 5)
-    plans.value = plansRes
-    chartsData.value = chartsRes
-    plansRes.forEach(p => { planNameMap[p.id] = p.name })
-    chartsLoaded.value = true
-  } catch (err) {
-    showToast('数据加载失败，请检查后端服务', 'error')
-  }
+  loading.value = true
+  try { data.value = await getAdminActionCenter() }
+  catch { showToast('行动中心加载失败，请稍后重试', 'error') }
+  finally { loading.value = false }
 }
 
-watch(() => platformStore.adminPlatform, () => { loadData() })
+async function openBatch(batchId) {
+  batchDrawerVisible.value = true
+  batchLoading.value = true
+  batchDetail.value = null
+  try { batchDetail.value = await getAdminBusinessBatch(batchId) }
+  catch { showToast('批次详情读取失败', 'error') }
+  finally { batchLoading.value = false }
+}
 
+function scrollToSection(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+function formatDate(value) { return value ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(value)) : '-' }
+function formatRelative(value) {
+  if (!value) return '-'
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes} 分钟前`
+  if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时前`
+  return formatDate(value)
+}
+function interventionText(type) { return ({ login: '需要登录', captcha: '需要验证码', two_factor: '需要二次验证', page_confirmation: '需要页面确认', other: '需要操作' }[type] || '查看状态') }
+function priorityText(value) { return ({ high: '高优先级', medium: '普通', low: '低优先级' }[value] || '普通') }
+function batchStatusText(status) { return ({ running: '正在处理', completed: '已完成', cancelled: '已结束', interrupted: '连接中断', waiting_user: '需要操作', failed: '未完成', pending: '等待处理' }[status] || status) }
 onMounted(loadData)
 </script>
 
 <style scoped>
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.25rem;
-  background: var(--studio-surface);
-  border-radius: 16px;
-  border: 1px solid var(--color-border);
-  transition: box-shadow var(--transition);
-}
-.stat-card:hover { box-shadow: var(--studio-shadow-hover); }
-.stat-icon {
-  width: 48px; height: 48px;
-  border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.stat-icon svg { width: 24px; height: 24px; }
-.stat-content { flex: 1; }
-.stat-label { font-size: 0.8rem; color: var(--studio-text-muted); font-weight: 500; }
-.stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
-.stat-sub { font-size: 0.75rem; color: var(--studio-text-muted); margin-top: 0.25rem; }
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-.chart-card {
-  background: var(--studio-surface);
-  border-radius: 16px;
-  border: 1px solid var(--color-border);
-  padding: 1.25rem;
-  box-shadow: var(--studio-shadow);
-}
-.chart-header h3 { font-size: 1rem; font-weight: 600; color: var(--studio-text-main); margin-bottom: 1rem; }
-.chart-container { position: relative; height: 250px; }
-.chart-loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--studio-text-muted); }
-
-.table-card {
-  background: var(--studio-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem;
-  box-shadow: var(--studio-shadow);
-}
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-.table-header h3 { font-size: 1rem; font-weight: 600; color: var(--studio-text-main); }
-.view-all-link { font-size: 0.85rem; color: var(--studio-accent); text-decoration: none; font-weight: 600; }
-.view-all-link:hover { color: var(--studio-accent-hover); }
-
-:deep(.studio-table) {
-  --el-table-border-color: #E2E8F0;
-  --el-table-header-bg-color: #F8FAFC;
-  --el-table-row-hover-bg-color: #F1F5F9;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.log-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.log-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--studio-bg); border-radius: 8px; font-size: 0.85rem; }
-.log-tool { font-weight: 600; color: var(--studio-text-main); min-width: 120px; }
-.log-module { color: var(--studio-text-muted); }
-.log-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
-.log-badge-success { background: rgba(16,185,129,0.1); color: #10B981; }
-.log-badge-fail { background: rgba(239,68,68,0.1); color: #EF4444; }
-.log-time { margin-left: auto; color: var(--studio-text-muted); font-size: 0.8rem; }
-.empty-row { text-align: center; color: var(--studio-text-muted); padding: 1rem; }
-.empty-state { padding: 2rem; text-align: center; color: var(--studio-text-muted); }
-@media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+.action-center{display:grid;gap:18px}.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.page-heading>div>span{color:var(--color-accent);font-size:10px;font-weight:800;letter-spacing:.14em}.page-heading h2{margin:6px 0 0;color:var(--studio-text-main);font-size:var(--font-page-title);letter-spacing:-.035em}.page-heading p{margin:7px 0 0;color:var(--studio-text-muted);font-size:12px}.refresh-button{height:34px;display:flex;align-items:center;gap:7px;padding:0 11px;border:1px solid var(--studio-border);border-radius:9px;color:var(--studio-text-muted);background:var(--studio-surface);cursor:pointer}.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.summary-card{min-height:116px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:16px;border:1px solid var(--studio-border);border-radius:15px;background:var(--studio-surface);text-align:left;cursor:pointer;box-shadow:var(--studio-shadow);transition:transform var(--motion-fast),border-color var(--motion-fast),box-shadow var(--motion-fast)}.summary-card:hover{transform:translateY(-2px);border-color:var(--color-border-strong);box-shadow:var(--studio-shadow-hover)}.summary-icon{width:39px;height:39px;display:grid;place-items:center;border-radius:11px;color:var(--color-primary);background:var(--color-primary-soft)}.summary-card>span:nth-child(2){display:grid;gap:3px}.summary-card small{color:var(--studio-text-muted);font-size:10px}.summary-card strong{color:var(--studio-text-main);font-size:24px;font-variant-numeric:tabular-nums}.summary-card em{color:var(--studio-text-muted);font-size:9px;font-style:normal}.summary-card>svg{color:var(--color-border-strong)}.tone-premium .summary-icon{color:var(--color-premium);background:var(--color-premium-soft)}.tone-warning .summary-icon{color:var(--color-warning);background:var(--color-warning-soft)}.tone-danger .summary-icon{color:var(--color-danger);background:var(--color-danger-soft)}.priority-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr);gap:14px}.operations-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.action-panel{min-width:0;border:1px solid var(--studio-border);border-radius:15px;background:var(--studio-surface);box-shadow:var(--studio-shadow);overflow:hidden}.primary-panel{border-color:rgba(183,121,31,.18)}.action-panel>header{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 17px;border-bottom:1px solid var(--studio-border)}.action-panel header div{display:grid;gap:4px}.action-panel header span{color:var(--studio-text-muted);font-size:9px;letter-spacing:.05em}.action-panel h3{margin:0;color:var(--studio-text-main);font-size:13px}.action-panel header a{color:var(--color-primary);font-size:10px;text-decoration:none}.count-badge{min-width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:var(--studio-text-muted);background:var(--studio-bg);font-size:11px;font-weight:800}.count-badge.warning{color:var(--color-warning);background:var(--color-warning-soft)}.action-list{padding:7px}.action-list button{width:100%;min-height:56px;display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:9px;padding:7px 9px;border:0;border-radius:10px;background:transparent;text-align:left;cursor:pointer}.action-list button:hover{background:var(--studio-bg)}.row-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:9px}.row-icon.warning{color:var(--color-warning);background:var(--color-warning-soft)}.row-icon.danger{color:var(--color-danger);background:var(--color-danger-soft)}.row-copy{min-width:0;display:grid;gap:3px}.row-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--studio-text-main);font-size:11px}.row-copy small,.row-time{color:var(--studio-text-muted);font-size:9px}.action-list button>svg{color:var(--color-border-strong)}.simple-list{padding:8px 13px}.simple-list>div{min-height:43px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--studio-border)}.simple-list>div:last-child{border:0}.simple-list span{min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--studio-text-main);font-size:10px}.simple-list span svg{flex:0 0 auto;color:var(--color-primary)}.simple-list strong{flex:0 0 auto;color:var(--studio-text-muted);font-size:9px;font-weight:600}.drawer-loading{min-height:260px;display:grid;place-content:center;justify-items:center;gap:10px;color:var(--studio-text-muted);font-size:11px}.batch-detail{display:grid;gap:16px}.detail-hero{display:grid;gap:5px;padding:17px;border-radius:13px;background:var(--color-primary-soft)}.detail-hero span,.detail-hero small{color:var(--studio-text-muted);font-size:10px}.detail-hero strong{color:var(--studio-text-main);font-size:16px}.privacy-note{display:flex;align-items:flex-start;gap:8px;padding:11px;border-radius:10px;color:var(--color-success);background:var(--color-success-soft);font-size:10px;line-height:1.55}.batch-items{display:grid;gap:5px}.batch-items>div{min-height:49px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--studio-border);border-radius:10px}.item-state{width:8px;height:8px;border-radius:50%;background:var(--color-border-strong)}.item-state.is-running{background:var(--color-primary)}.item-state.is-waiting_user{background:var(--color-warning)}.item-state.is-completed{background:var(--color-success)}.item-state.is-failed{background:var(--color-danger)}.batch-items>div>span:nth-child(2){display:grid;gap:3px}.batch-items strong{color:var(--studio-text-main);font-size:11px}.batch-items small,.batch-items em{color:var(--studio-text-muted);font-size:9px;font-style:normal}.spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:1100px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-grid{grid-template-columns:1fr}.priority-grid{grid-template-columns:1fr}}
+@media(max-width:620px){.summary-grid{grid-template-columns:1fr}.page-heading{display:grid}.refresh-button{width:max-content}.row-time{display:none}}
+@media(prefers-reduced-motion:reduce){.summary-card{transition:none}.summary-card:hover{transform:none}.spin{animation:none}}
 </style>
