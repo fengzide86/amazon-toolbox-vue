@@ -91,6 +91,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  const html = '<webview src="about:blank" style="width:800px;height:600px" partition="persist:smoke"></webview>';
+  const html = '<webview src="about:blank" style="width:800px;height:600px" partition="smoke"></webview>';
   await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
 });
