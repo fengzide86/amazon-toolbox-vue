@@ -36,9 +36,22 @@
         <span class="tool-copy">
           <strong>{{ tool.name }}</strong>
           <span>{{ tool.description || defaultDescription(tool) }}</span>
+          <span v-if="toolCapabilities(tool).length" class="capability-tags" aria-label="工具能力">
+            <span v-for="tag in toolCapabilities(tool)" :key="tag">{{ tag }}</span>
+          </span>
         </span>
 
         <span class="tool-action">
+          <span
+            v-if="hasToolDetails(tool)"
+            class="learn-more"
+            role="button"
+            tabindex="0"
+            @click.stop="openDetails(tool)"
+            @keydown.enter.stop.prevent="openDetails(tool)"
+            @keydown.space.stop.prevent="openDetails(tool)"
+          >了解能力</span>
+          <span class="action-label">
           <template v-if="launchingToolId === tool.id">
             <LoaderCircle :size="16" class="spin" /> 正在打开…
           </template>
@@ -49,6 +62,7 @@
           <template v-else>
             一键启动 <ArrowRight :size="16" />
           </template>
+          </span>
         </span>
       </button>
     </div>
@@ -58,6 +72,36 @@
       <h3>当前平台暂无可用工具</h3>
       <p>你可以切换平台，或稍后再试。</p>
     </div>
+
+    <el-drawer v-model="detailsVisible" direction="rtl" size="min(420px, 92vw)" class="tool-detail-drawer">
+      <template #header>
+        <div class="drawer-heading">
+          <span class="drawer-icon"><component :is="detailsTool ? toolIcon(detailsTool) : Boxes" :size="20" /></span>
+          <div><small>工具能力</small><strong>{{ detailsTool?.name }}</strong></div>
+        </div>
+      </template>
+      <div v-if="detailsTool" class="drawer-content">
+        <p class="drawer-description">{{ detailsTool.description || defaultDescription(detailsTool) }}</p>
+        <section v-if="toolCapabilities(detailsTool).length">
+          <span class="section-label">可以帮你完成</span>
+          <div class="drawer-tags"><span v-for="tag in toolCapabilities(detailsTool)" :key="tag"><CheckCircle2 :size="14" />{{ tag }}</span></div>
+        </section>
+        <section v-if="normalizedList(detailsTool.preparation_notes).length">
+          <span class="section-label">开始前准备</span>
+          <ul><li v-for="note in normalizedList(detailsTool.preparation_notes)" :key="note">{{ note }}</li></ul>
+        </section>
+        <section v-if="normalizedList(detailsTool.intervention_scenarios).length">
+          <span class="section-label">什么时候需要你操作</span>
+          <ul><li v-for="scenario in normalizedList(detailsTool.intervention_scenarios)" :key="scenario">{{ scenario }}</li></ul>
+        </section>
+        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>系统会自动处理；确实需要你操作时，才会明确提醒。</span></div>
+      </div>
+      <template #footer>
+        <button class="drawer-primary" :disabled="detailsTool && toolState(detailsTool) === 'maintenance'" @click="launchFromDetails">
+          {{ detailsActionText }} <ArrowRight :size="16" />
+        </button>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -68,6 +112,7 @@ import {
   ArrowRight,
   BadgeDollarSign,
   Boxes,
+  CheckCircle2,
   LoaderCircle,
   LockKeyhole,
   Megaphone,
@@ -92,6 +137,8 @@ const platformStore = usePlatformStore()
 const tools = ref([])
 const loading = ref(true)
 const launchingToolId = ref(null)
+const detailsVisible = ref(false)
+const detailsTool = ref(null)
 
 const userInfo = computed(() => {
   try {
@@ -128,6 +175,41 @@ function toolIcon(tool) {
 
 function defaultDescription(tool) {
   return `自动处理${tool.name || '当前功能'}中的重复操作`
+}
+
+function normalizedList(value) {
+  if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean)
+  if (typeof value === 'string') return value.split(/[\n,，]/).map(item => item.trim()).filter(Boolean)
+  return []
+}
+
+function toolCapabilities(tool) {
+  return normalizedList(tool?.capability_tags).slice(0, 3)
+}
+
+function hasToolDetails(tool) {
+  return toolCapabilities(tool).length
+    || normalizedList(tool?.preparation_notes).length
+    || normalizedList(tool?.intervention_scenarios).length
+}
+
+function openDetails(tool) {
+  detailsTool.value = tool
+  detailsVisible.value = true
+}
+
+const detailsActionText = computed(() => {
+  if (!detailsTool.value) return '关闭'
+  if (toolState(detailsTool.value) === 'locked') return '查看可用套餐'
+  if (toolState(detailsTool.value) === 'maintenance') return '当前维护中'
+  return '开始处理'
+})
+
+function launchFromDetails() {
+  if (!detailsTool.value || toolState(detailsTool.value) === 'maintenance') return
+  const tool = detailsTool.value
+  detailsVisible.value = false
+  handleToolClick(tool)
 }
 
 function toolState(tool) {
@@ -373,15 +455,89 @@ onMounted(loadData)
   line-height: 1.65;
 }
 
+.tool-copy .capability-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.tool-copy .capability-tags > span {
+  display: inline-flex;
+  padding: 3px 7px;
+  border: 1px solid rgba(45, 95, 202, .12);
+  border-radius: 6px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .tool-action {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 6px;
   color: var(--studio-accent);
   font-size: 12px;
   font-weight: 700;
 }
+
+.learn-more {
+  position: relative;
+  z-index: 2;
+  padding: 4px 0;
+  color: var(--studio-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.learn-more:hover,
+.learn-more:focus-visible {
+  color: var(--color-primary);
+  outline: none;
+}
+
+.action-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawer-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.drawer-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.drawer-heading div { display: grid; gap: 3px; }
+.drawer-heading small { color: var(--studio-text-muted); font-size: 10px; letter-spacing: .08em; }
+.drawer-heading strong { color: var(--studio-text-main); font-size: 15px; }
+.drawer-content { display: grid; gap: 25px; }
+.drawer-description { margin: 0; color: var(--studio-text-muted); font-size: 13px; line-height: 1.75; }
+.drawer-content section { display: grid; gap: 11px; }
+.section-label { color: var(--studio-text-main); font-size: 12px; font-weight: 750; }
+.drawer-tags { display: grid; gap: 7px; }
+.drawer-tags > span { display: flex; align-items: center; gap: 8px; padding: 10px 11px; border-radius: 10px; color: var(--color-primary); background: var(--color-primary-soft); font-size: 12px; }
+.drawer-content ul { margin: 0; padding-left: 18px; color: var(--studio-text-muted); font-size: 12px; line-height: 1.8; }
+.drawer-assurance { display: flex; align-items: flex-start; gap: 9px; padding: 12px; border-radius: 11px; color: var(--color-success); background: var(--color-success-soft); }
+.drawer-assurance span { font-size: 11px; line-height: 1.6; }
+.drawer-primary { width: 100%; height: 42px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 11px; color: #fff; background: var(--color-primary); font-weight: 700; cursor: pointer; }
+.drawer-primary:disabled { opacity: .5; cursor: default; }
+:deep(.tool-detail-drawer .el-drawer__header) { margin: 0; padding: 22px 22px 16px; border-bottom: 1px solid var(--studio-border); }
+:deep(.tool-detail-drawer .el-drawer__body) { padding: 22px; }
+:deep(.tool-detail-drawer .el-drawer__footer) { padding: 16px 22px 22px; border-top: 1px solid var(--studio-border); }
 
 .is-locked .tool-icon,
 .is-locked .tool-action {
