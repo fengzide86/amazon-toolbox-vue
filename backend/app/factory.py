@@ -1,0 +1,141 @@
+from __future__ import annotations
+
+import os
+import platform
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
+from app.lifecycle import lifespan
+from app.middleware import request_tracking_middleware
+from core.cache import cache
+from core.config import settings
+from core.exceptions import register_exception_handlers
+from core.security import configure_cors
+from core.tasks import task_manager
+from database import check_db_health, get_db_stats
+from routers import (
+    admin_action_center,
+    ai_chat,
+    announcements,
+    auth,
+    auth_codes,
+    business,
+    dashboard,
+    devices,
+    feedback,
+    knowledge,
+    logs,
+    orders,
+    plans,
+    profit,
+    tool_releases,
+    tools,
+    updates,
+    users,
+)
+from routers import (
+    help as help_router,
+)
+from routers import (
+    settings as settings_router,
+)
+
+
+def _create_limiter() -> Limiter:
+    return Limiter(
+        key_func=get_remote_address,
+        default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"],
+        storage_uri=settings.REDIS_URL or "memory://",
+    )
+
+
+def _register_routers(app: FastAPI) -> None:
+    routes = (
+        (auth.router, "/api/auth", ["认证"]),
+        (dashboard.router, "/api/dashboard", ["数据看板"]),
+        (plans.router, "/api/plans", ["套餐管理"]),
+        (auth_codes.router, "/api/auth-codes", ["授权码管理"]),
+        (orders.router, "/api/orders", ["订单管理"]),
+        (users.router, "/api/users", ["用户管理"]),
+        (logs.router, "/api/logs", ["运行日志"]),
+        (feedback.router, "/api/feedback", ["工单反馈"]),
+        (profit.router, "/api/profit", ["分润管理"]),
+        (settings_router.router, "/api/settings", ["系统设置"]),
+        (tools.router, "/api/tools", ["工具配置"]),
+        (updates.router, "/api/updates", ["自动更新"]),
+        (devices.router, "/api/devices", ["设备管理"]),
+        (knowledge.router, "/api/knowledge", ["知识库管理"]),
+        (ai_chat.router, "/api/ai-chat", ["AI客服"]),
+        (announcements.router, "/api/announcements", ["公告管理"]),
+        (tool_releases.router, "/api/tool-releases", ["工具版本发布"]),
+        (business.router, "/api/business", ["专业批量工作台"]),
+        (admin_action_center.router, "/api/admin", ["管理行动中心"]),
+        (help_router.router, "/api/help", ["帮助查询"]),
+    )
+    for router, prefix, tags in routes:
+        app.include_router(router, prefix=prefix, tags=tags)
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title=settings.APP_NAME,
+        version=settings.APP_VERSION,
+        lifespan=lifespan,
+        docs_url="/api/docs" if settings.DEBUG else None,
+        redoc_url="/api/redoc" if settings.DEBUG else None,
+    )
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    configure_cors(app)
+    limiter = _create_limiter()
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    register_exception_handlers(app)
+    app.middleware("http")(request_tracking_middleware)
+    _register_routers(app)
+
+    @app.get("/api/health")
+    @limiter.limit("30/minute")
+    async def health_check(request: Request) -> dict[str, Any]:
+        del request
+        database = await check_db_health()
+        health: dict[str, Any] = {
+            "status": "ok" if database["status"] == "ok" else "degraded",
+            "version": settings.APP_VERSION,
+            "checks": {"database": database},
+        }
+        if cache.redis:
+            try:
+                await cache.redis.ping()
+                health["checks"]["redis"] = {"status": "ok"}
+            except Exception as error:
+                health["checks"]["redis"] = {"status": "error", "error": str(error)}
+                health["status"] = "degraded"
+        else:
+            health["checks"]["redis"] = {"status": "not_configured"}
+        health["checks"]["pool"] = (await get_db_stats()).get("pool", {})
+        health["checks"]["tasks"] = {"pending": task_manager.pending_count}
+        return health
+
+    @app.get("/api/system-info")
+    @limiter.limit("10/minute")
+    async def system_info(request: Request) -> dict[str, Any]:
+        del request
+        return {
+            "app": {"name": settings.APP_NAME, "version": settings.APP_VERSION},
+            "runtime": {"python": platform.python_version(), "platform": platform.platform()},
+            "database": {"type": settings.DB_TYPE},
+            "cache": {"enabled": cache.redis is not None, "type": "redis" if cache.redis else "memory"},
+            "features": {"rate_limit": True, "gzip": True, "request_tracking": True, "token_blacklist": True},
+        }
+
+    updates_directory = Path(os.path.dirname(os.path.dirname(__file__))) / "updates"
+    updates_directory.mkdir(parents=True, exist_ok=True)
+    app.mount("/updates", StaticFiles(directory=updates_directory), name="updates")
+    return app
