@@ -36,13 +36,20 @@ set /p "NEW_VERSION=New version (press Enter to keep !CURRENT_VERSION!): "
 
 if not "!NEW_VERSION!"=="" (
     echo [INFO] Updating version to !NEW_VERSION!...
-    "%PYTHON%" _update_version.py !NEW_VERSION!
+    "%PYTHON%" _update_version.py "!NEW_VERSION!"
     if errorlevel 1 (
         echo [ERROR] Version update failed.
         set "EXIT_CODE=1"
         goto :finish
     )
     set "FINAL_VERSION=!NEW_VERSION!"
+)
+
+findstr /c:"\"version\": \"!FINAL_VERSION!\"" package.json >nul
+if errorlevel 1 (
+    echo [ERROR] package.json does not contain the requested version !FINAL_VERSION!.
+    set "EXIT_CODE=1"
+    goto :finish
 )
 
 echo.
@@ -59,6 +66,13 @@ set "BLOCKMAP=release\AmazonToolbox Setup !FINAL_VERSION!.exe.blockmap"
 if not exist "%INSTALLER%" (
     echo [ERROR] Expected installer was not generated:
     echo         %INSTALLER%
+    set "EXIT_CODE=1"
+    goto :finish
+)
+
+findstr /b /c:"version: !FINAL_VERSION!" "release\latest.yml" >nul
+if errorlevel 1 (
+    echo [ERROR] latest.yml does not match the built version !FINAL_VERSION!.
     set "EXIT_CODE=1"
     goto :finish
 )

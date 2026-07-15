@@ -15,6 +15,7 @@ async function clearAuth(page) {
   await page.waitForLoadState('networkidle')
   await page.evaluate(() => {
     localStorage.clear()
+    sessionStorage.clear()
   })
 }
 
@@ -36,7 +37,7 @@ async function loginUser(page, authCode) {
   expect(resp.status()).toBe(200)
 
   await page.waitForFunction(() => {
-    return localStorage.getItem('toolbox_auth') !== null
+    return sessionStorage.getItem('toolbox_auth') !== null
   }, { timeout: 10000 })
 
   await expect(page.getByTestId('user-layout')).toBeVisible({ timeout: 15000 })
@@ -53,7 +54,7 @@ test.describe('视觉回归测试 - 用户端', () => {
   })
 
   test('用户端侧边栏图标正确渲染', async ({ page }) => {
-    const sidebar = page.locator('.sidebar-dark')
+    const sidebar = page.locator('.studio-user-sidebar')
     await expect(sidebar).toBeVisible()
 
     // 检查 SVG 图标存在（Lucide 图标渲染为 SVG）
@@ -68,7 +69,7 @@ test.describe('视觉回归测试 - 用户端', () => {
   })
 
   test('用户端页面布局正确', async ({ page }) => {
-    const layout = page.locator('.layout-studio')
+    const layout = page.locator('.main-container')
     await expect(layout).toBeVisible()
 
     // 检查 flex 布局（全高骨架设计）
@@ -94,18 +95,13 @@ test.describe('视觉回归测试 - 用户端', () => {
     // --studio-bg: #F5F6F9 → rgb(245, 246, 249)
     expect(bgColor).toMatch(/rgb\(245, 246, 249\)/)
 
-    // 检查内容区背景色
-    const content = page.locator('.content-studio')
-    const contentBg = await content.evaluate(el => {
-      return window.getComputedStyle(el).backgroundColor
-    })
-
-    // --studio-surface: #FFFFFF → rgb(255, 255, 255)
-    expect(contentBg).toMatch(/rgb\(255, 255, 255\)/)
+    await expect(page.locator('.toolbox-page')).toBeVisible()
+    await expect(page.getByText('选择一个工具开始')).toBeVisible()
+    await expect(page.getByText('成功率')).toHaveCount(0)
   })
 
   test('用户端侧边栏配色正确', async ({ page }) => {
-    const sidebar = page.locator('.sidebar-dark')
+    const sidebar = page.locator('.studio-user-sidebar')
     const sidebarBg = await sidebar.evaluate(el => {
       return window.getComputedStyle(el).backgroundColor
     })
@@ -124,8 +120,8 @@ test.describe('视觉回归测试 - 用户端', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
 
-    // 导航回来
-    await page.goto(`${FRONTEND_URL}/#/user/dashboard`)
+    // 切换到使用记录
+    await page.goto(`${FRONTEND_URL}/#/user/logs`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
   })
@@ -162,10 +158,10 @@ test.describe('视觉回归测试 - 后台', () => {
     await page.goto(`${FRONTEND_URL}/#/admin/dashboard`)
     await page.waitForLoadState('networkidle')
 
-    const sidebar = page.locator('.sidebar-dark')
+    const sidebar = page.locator('.studio-admin-sidebar')
     await expect(sidebar).toBeVisible()
 
-    // AdminSidebar 使用内联 SVG，检查 SVG 元素存在
+    // AdminSidebar 使用 Lucide 图标，检查 SVG 元素存在
     const svgIcons = await sidebar.locator('svg').count()
     expect(svgIcons).toBeGreaterThan(5)
   })

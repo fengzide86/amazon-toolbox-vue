@@ -1,139 +1,94 @@
-"""
-套餐服务测试
-"""
+"""套餐服务当前异步契约测试。"""
 import pytest
-from datetime import datetime, timedelta, timezone
-from services.plan_service import PlanService
+
 from models import Plan
-from database import async_session_maker as SessionLocal
+from services.plan_service import PlanService
 
 
+@pytest.mark.asyncio
 class TestPlanService:
-    """套餐服务测试"""
+    async def test_create_plan(self, db_session):
+        service = PlanService(db_session)
+        result = await service.create_plan({
+            "name": "Y199 冲刺包",
+            "price": 199.00,
+            "duration_days": 5,
+            "features": '{"benefits":["完整工具"],"allowed_tools":["listing"]}',
+        })
 
-    @pytest.fixture
-    def plan_service(self):
-        """创建套餐服务实例"""
-        db = SessionLocal()
-        try:
-            yield PlanService(db)
-        finally:
-            db.close()
+        assert result["success"] is True
+        assert result["data"]["name"] == "Y199 冲刺包"
+        assert result["data"]["plan_code"] == "Y199"
+        assert result["data"]["benefits"] == ["完整工具"]
+        assert result["data"]["allowed_tools"] == ["listing"]
 
-    def test_create_plan(self, plan_service):
-        """测试创建套餐"""
-        plan = plan_service.create_plan(
-            name="Test Plan",
-            price=99.99,
-            duration_days=30,
-            features=["feature1", "feature2"]
-        )
-        
-        assert plan is not None
-        assert plan.name == "Test Plan"
-        assert plan.price == 99.99
-        assert plan.duration_days == 30
+    async def test_create_duplicate_plan(self, db_session):
+        service = PlanService(db_session)
+        payload = {"name": "重复套餐", "price": 99, "duration_days": 7}
+        await service.create_plan(payload)
+        duplicate = await service.create_plan(payload)
 
-    def test_get_plan_by_id(self, plan_service):
-        """测试根据ID获取套餐"""
-        plan = plan_service.create_plan(
-            name="Test Plan",
-            price=99.99,
-            duration_days=30
-        )
-        
-        retrieved_plan = plan_service.get_plan_by_id(plan.id)
-        assert retrieved_plan is not None
-        assert retrieved_plan.id == plan.id
-        assert retrieved_plan.name == "Test Plan"
+        assert duplicate["success"] is False
+        assert "已存在" in duplicate["message"]
 
-    def test_get_all_plans(self, plan_service):
-        """测试获取所有套餐"""
-        for i in range(3):
-            plan_service.create_plan(
-                name=f"Plan {i}",
-                price=99.99 + i,
-                duration_days=30
-            )
-        
-        plans = plan_service.get_all_plans()
-        assert len(plans) >= 3
+    async def test_get_plans_list_excludes_deleted(self, db_session):
+        db_session.add_all([
+            Plan(name="Y15 体验卡", price=15, duration_days=1, status="active"),
+            Plan(name="已删除", price=0, duration_days=1, status="deleted"),
+        ])
+        await db_session.commit()
+        result = await PlanService(db_session).get_plans_list()
 
-    def test_update_plan(self, plan_service):
-        """测试更新套餐"""
-        plan = plan_service.create_plan(
-            name="Original Plan",
-            price=99.99,
-            duration_days=30
-        )
-        
-        updated_plan = plan_service.update_plan(
-            plan.id,
-            name="Updated Plan",
-            price=199.99
-        )
-        
-        assert updated_plan.name == "Updated Plan"
-        assert updated_plan.price == 199.99
+        assert result["success"] is True
+        assert [plan["name"] for plan in result["data"]] == ["Y15 体验卡"]
 
-    def test_delete_plan(self, plan_service):
-        """测试删除套餐"""
-        plan = plan_service.create_plan(
-            name="Delete Plan",
-            price=99.99,
-            duration_days=30
-        )
-        
-        result = plan_service.delete_plan(plan.id)
-        assert result is True
-        
-        deleted_plan = plan_service.get_plan_by_id(plan.id)
-        assert deleted_plan is None
+    async def test_serialize_legacy_feature_text(self, db_session):
+        db_session.add(Plan(
+            name="Y49 开局提速卡",
+            price=49,
+            duration_days=7,
+            status="active",
+            features="物流模板+新手工具",
+        ))
+        await db_session.commit()
+        result = await PlanService(db_session).get_plans_list(status="active")
 
-    def test_get_active_plans(self, plan_service):
-        """测试获取激活的套餐"""
-        plan1 = plan_service.create_plan(
-            name="Active Plan",
-            price=99.99,
-            duration_days=30,
-            is_active=True
-        )
-        plan2 = plan_service.create_plan(
-            name="Inactive Plan",
-            price=199.99,
-            duration_days=60,
-            is_active=False
-        )
-        
-        active_plans = plan_service.get_active_plans()
-        assert len(active_plans) >= 1
-        assert all(p.is_active for p in active_plans)
+        plan = result["data"][0]
+        assert plan["plan_code"] == "Y49"
+        assert plan["benefits"] == ["物流模板", "新手工具"]
+        assert plan["allowed_tools"] == []
 
-    def test_calculate_expire_date(self, plan_service):
-        """测试计算过期日期"""
-        plan = plan_service.create_plan(
-            name="Test Plan",
-            price=99.99,
-            duration_days=30
-        )
-        
-        start_date = datetime.now(timezone.utc)
-        expire_date = plan_service.calculate_expire_date(plan.id, start_date)
-        
-        expected_expire = start_date + timedelta(days=30)
-        assert expire_date == expected_expire
+    async def test_update_plan(self, db_session):
+        plan = Plan(name="原套餐", price=99, duration_days=30, status="active")
+        db_session.add(plan)
+        await db_session.commit()
+        result = await PlanService(db_session).update_plan(plan.id, {"name": "更新套餐", "price": 149})
 
-    def test_get_plan_features(self, plan_service):
-        """测试获取套餐特性"""
-        plan = plan_service.create_plan(
-            name="Feature Plan",
-            price=99.99,
-            duration_days=30,
-            features=["feature1", "feature2", "feature3"]
-        )
-        
-        features = plan_service.get_plan_features(plan.id)
-        assert len(features) == 3
-        assert "feature1" in features
-        assert "feature2" in features
-        assert "feature3" in features
+        assert result["success"] is True
+        assert result["data"]["name"] == "更新套餐"
+        assert result["data"]["price"] == 149.0
+
+    async def test_get_plan_by_id(self, db_session):
+        plan = Plan(name="Y999 全程陪跑包", price=999, duration_days=90, status="active")
+        db_session.add(plan)
+        await db_session.commit()
+        result = await PlanService(db_session).get_plan_by_id(plan.id)
+
+        assert result["success"] is True
+        assert result["data"]["display_badge"] == "全程服务"
+        assert "updated_at" in result["data"]
+
+    async def test_delete_plan_soft_deletes(self, db_session):
+        plan = Plan(name="待删除套餐", price=99, duration_days=30, status="active")
+        db_session.add(plan)
+        await db_session.commit()
+        result = await PlanService(db_session).delete_plan(plan.id)
+        await db_session.refresh(plan)
+
+        assert result["success"] is True
+        assert plan.status == "deleted"
+
+    async def test_missing_plan_returns_error(self, db_session):
+        result = await PlanService(db_session).get_plan_by_id(99999)
+        assert result["success"] is False
+        assert "不存在" in result["message"]

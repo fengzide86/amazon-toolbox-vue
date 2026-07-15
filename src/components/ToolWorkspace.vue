@@ -2,36 +2,29 @@
   <section class="tool-workspace" data-testid="tool-workspace">
     <header class="workspace-topbar">
       <div class="workspace-heading">
-        <button class="icon-button back-button" type="button" title="返回工具箱" @click="closeWorkspace">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+        <button class="icon-button" type="button" aria-label="返回工具箱" @click="closeWorkspace">
+          <ArrowLeft :size="18" />
         </button>
+        <div class="tool-mark"><Zap :size="18" /></div>
         <div class="tool-identity">
-          <div class="tool-mark">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z" /></svg>
-          </div>
-          <div>
-            <h1>{{ toolName }}</h1>
-            <p>{{ platformName }} · 工具任务</p>
-          </div>
+          <h1>{{ toolName }}</h1>
+          <p>{{ platformName }} · 自动处理</p>
         </div>
       </div>
 
-      <div class="workspace-status">
-        <span :class="['status-pill', runStatus]">
-          <span class="status-dot"></span>
-          {{ statusText }}
+      <div class="workspace-actions">
+        <span :class="['status-pill', `is-${runStatus}`]">
+          <span class="status-dot"></span>{{ customerStatusText }}
         </span>
-        <span class="elapsed-time">{{ formattedElapsed }}</span>
-        <button v-if="['running', 'paused'].includes(runStatus)" class="control-button" type="button" @click="togglePause">
-          <svg v-if="runStatus === 'paused'" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z" /></svg>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14" /></svg>
-          {{ runStatus === 'paused' ? '继续' : '暂停' }}
+        <button v-if="isActiveRun" class="control-button danger" type="button" @click="stopRun">
+          <Square :size="14" />停止操作
         </button>
-        <button class="control-button" type="button" :disabled="restarting" @click="restartSimulation">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>
-          {{ restarting ? '准备中' : '重新运行' }}
+        <button v-else-if="isTerminal" class="control-button" type="button" :disabled="restarting" @click="restartRun">
+          <LoaderCircle v-if="restarting" :size="14" class="spin" />
+          <RotateCcw v-else :size="14" />
+          {{ restarting ? '正在打开…' : '重新执行' }}
         </button>
-        <button class="control-button danger" type="button" @click="closeWorkspace">退出</button>
+        <button v-if="isTerminal" class="control-button" type="button" @click="closeWorkspace">返回工具箱</button>
       </div>
     </header>
 
@@ -39,31 +32,15 @@
       <main class="browser-stage">
         <div class="browser-frame">
           <div class="browser-toolbar">
-            <div class="browser-controls">
-              <button type="button" title="后退" @click="goBack">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-              </button>
-              <button type="button" title="前进" @click="goForward">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
-              </button>
-              <button type="button" title="刷新" @click="reloadBrowser">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" /></svg>
-              </button>
-            </div>
-            <div class="address-bar">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-              <span>{{ displayUrl }}</span>
-            </div>
-            <button class="open-external" type="button" title="在系统浏览器中打开" @click="openExternal">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-            </button>
+            <LockKeyhole :size="14" />
+            <span>{{ displayUrl }}</span>
+            <span class="browser-note">自动操作窗口</span>
           </div>
 
           <div class="browser-viewport">
             <div v-if="browserLoading" class="browser-loading">
-              <span class="large-spinner"></span>
+              <LoaderCircle :size="28" class="spin" />
               <strong>正在打开目标页面</strong>
-              <small>{{ displayUrl }}</small>
             </div>
 
             <webview
@@ -74,97 +51,83 @@
               partition="persist:tool-workspace"
             ></webview>
 
-            <div v-else class="browser-mock" aria-label="模拟浏览器页面">
+            <div v-else class="browser-mock" aria-label="自动处理预览页面">
               <div class="mock-site-header">
-                <div class="mock-logo">{{ platformShortName }}</div>
-                <div class="mock-search"></div>
-                <div class="mock-avatar"></div>
+                <strong>{{ platformShortName }}</strong><span></span><i></i>
               </div>
               <div class="mock-page">
-                <aside class="mock-nav">
-                  <span v-for="n in 6" :key="n" :class="{ active: n === 2 }"></span>
-                </aside>
+                <aside><span v-for="item in 6" :key="item"></span></aside>
                 <div class="mock-content">
-                  <div class="mock-breadcrumb">控制台 / {{ toolName }}</div>
-                  <h2>{{ currentStep.title }}</h2>
-                  <p>工具流程将在此区域展示，右侧同步呈现任务进度和处理结果。</p>
-                  <div class="mock-stat-grid">
-                    <div v-for="n in 3" :key="n" class="mock-stat-card"><span></span><strong>{{ 16 + n * 8 }}</strong></div>
-                  </div>
-                  <div class="mock-table">
-                    <div class="mock-table-head"></div>
-                    <div v-for="n in 5" :key="n" class="mock-table-row"><i></i><span></span><span></span><em></em></div>
-                  </div>
+                  <small>控制台 / {{ toolName }}</small>
+                  <h2>{{ stageItems[currentStageIndex]?.label }}</h2>
+                  <p>系统正在目标页面中自动处理。</p>
+                  <div class="mock-cards"><i v-for="item in 3" :key="item"></i></div>
+                  <div class="mock-table"><span v-for="item in 6" :key="item"></span></div>
                 </div>
               </div>
             </div>
 
-            <div v-if="runStatus === 'running'" class="action-toast">
-              <span class="mini-spinner"></span>
-              <div><small>工具正在操作</small><strong>{{ currentStep.action }}</strong></div>
+            <div v-if="interactionLocked && !browserLoading" class="interaction-shield">
+              <div><LoaderCircle :size="16" class="spin" />正在自动处理，请不要操作页面</div>
             </div>
           </div>
         </div>
       </main>
 
-      <aside class="activity-panel">
-        <div class="panel-header">
-          <div>
-            <span class="eyebrow">TASK ACTIVITY</span>
-            <h2>任务轨迹</h2>
-          </div>
-          <span class="progress-count">{{ completedCount }}/{{ steps.length }}</span>
-        </div>
+      <aside class="progress-panel">
+        <template v-if="!isTerminal">
+          <header class="panel-heading">
+            <span>处理进度</span>
+            <strong>{{ stageProgress }}</strong>
+          </header>
 
-        <div class="progress-track"><span :style="{ width: progressPercent + '%' }"></span></div>
-
-        <div class="panel-tabs">
-          <button :class="{ active: activeTab === 'process' }" type="button" @click="activeTab = 'process'">执行过程</button>
-          <button :class="{ active: activeTab === 'result' }" type="button" @click="activeTab = 'result'">任务结果</button>
-        </div>
-
-        <div v-if="activeTab === 'process'" class="panel-content">
-          <div class="goal-card">
-            <span>本次目标</span>
-            <strong>完成「{{ toolName }}」任务流程</strong>
-            <p>系统将按预设步骤完成页面打开、信息处理、结果核对和任务汇总。</p>
-          </div>
-
-          <ol class="timeline">
-            <li v-for="(step, index) in steps" :key="step.id" :class="stepState(index)">
-              <div class="timeline-icon">
-                <svg v-if="stepState(index) === 'done'" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
-                <span v-else-if="stepState(index) === 'active'" class="mini-spinner"></span>
+          <ol class="stage-list">
+            <li v-for="(stage, index) in stageItems" :key="stage.key" :class="stageState(index)">
+              <span class="stage-icon">
+                <Check v-if="stageState(index) === 'done'" :size="15" />
+                <LoaderCircle v-else-if="stageState(index) === 'active'" :size="15" class="spin" />
                 <span v-else>{{ index + 1 }}</span>
-              </div>
-              <div class="timeline-copy">
-                <div class="timeline-title"><strong>{{ step.title }}</strong><time>{{ stepTime(index) }}</time></div>
-                <p>{{ step.detail }}</p>
-                <div v-if="stepState(index) === 'active'" class="active-action">{{ step.action }}</div>
-              </div>
+              </span>
+              <div><strong>{{ stage.label }}</strong><p>{{ stage.description }}</p></div>
             </li>
           </ol>
+
+          <div v-if="runStatus === 'waiting_user'" class="user-action-card">
+            <CircleAlert :size="22" />
+            <h3>{{ userAction?.title || '需要你完成一步' }}</h3>
+            <p>{{ userAction?.instruction || '请按左侧页面提示完成操作，然后继续。' }}</p>
+            <button type="button" @click="completeUserAction">我已完成，继续处理</button>
+          </div>
+
+          <div v-else class="running-note">
+            <LoaderCircle :size="17" class="spin" />
+            <div><strong>{{ runningMessage }}</strong><span>完成前请不要关闭窗口</span></div>
+          </div>
+        </template>
+
+        <div v-else-if="runStatus === 'completed'" class="result-card success">
+          <div class="result-icon"><Check :size="28" /></div>
+          <h2>处理完成</h2>
+          <p>自动操作已经完成，请以左侧赛训平台页面结果为准。</p>
+          <button class="primary-action" type="button" @click="closeWorkspace">再用一个工具</button>
+          <button class="secondary-action" type="button" @click="restartRun">再次执行</button>
         </div>
 
-        <div v-else class="panel-content result-content">
-          <div v-if="runStatus === 'completed'" class="result-card success">
-            <div class="result-icon">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
-            </div>
-            <h3>任务已完成</h3>
-            <p>共完成 {{ steps.length }} 个步骤，浏览器与任务轨迹均运行正常。</p>
-            <dl>
-              <div><dt>工具</dt><dd>{{ toolName }}</dd></div>
-              <div><dt>平台</dt><dd>{{ platformName }}</dd></div>
-              <div><dt>耗时</dt><dd>{{ formattedElapsed }}</dd></div>
-            </dl>
-            <button type="button" @click="restartSimulation">再次运行</button>
-          </div>
-          <div v-else class="result-card waiting">
-            <span class="large-spinner"></span>
-            <h3>任务仍在执行</h3>
-            <p>完成后，这里将汇总执行结果和生成的数据。</p>
-          </div>
+        <div v-else-if="runStatus === 'failed'" class="result-card failed">
+          <div class="result-icon"><CircleAlert :size="27" /></div>
+          <h2>本次操作未完成</h2>
+          <p>系统已经停止后续操作，不会继续修改页面。</p>
+          <div class="problem-code">问题编号：{{ problemCode }}</div>
+          <button class="primary-action" type="button" @click="restartRun">重新执行</button>
+          <button class="secondary-action" type="button" @click="openSupport">联系客服</button>
+        </div>
+
+        <div v-else class="result-card cancelled">
+          <div class="result-icon"><Square :size="23" /></div>
+          <h2>操作已停止</h2>
+          <p>本次自动操作已经停止。</p>
+          <button class="primary-action" type="button" @click="restartRun">重新执行</button>
+          <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
         </div>
       </aside>
     </div>
@@ -174,91 +137,146 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
+import {
+  ArrowLeft,
+  Check,
+  CircleAlert,
+  LoaderCircle,
+  LockKeyhole,
+  RotateCcw,
+  Square,
+  Zap,
+} from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useTaskRunStore } from '@/stores/taskRun'
 import { createLog } from '@/utils/api'
 import { createToolLaunchGrant } from '@/utils/api/tools'
 import { showToast } from '@/utils'
 
+const router = useRouter()
 const appStore = useAppStore()
 const taskRunStore = useTaskRunStore()
 const {
   status: runStatus,
-  steps,
   currentStep,
-  completedCount,
-  progressPercent,
-  formattedElapsed,
-  statusText,
+  browserUrl,
+  userAction,
 } = storeToRefs(taskRunStore)
 
 const webviewRef = ref(null)
 const browserLoading = ref(true)
-const activeTab = ref('process')
 const restarting = ref(false)
 const taskStarted = ref(false)
 const taskStarting = ref(false)
 const loggedRunIds = new Set()
 let browserReadyFallback = null
 
+const stageItems = [
+  { key: 'prepare', label: '准备环境', description: '正在打开并检查目标页面' },
+  { key: 'process', label: '自动处理', description: '系统按照预设流程完成操作' },
+  { key: 'verify', label: '检查结果', description: '核对页面反馈和处理结果' },
+  { key: 'complete', label: '完成', description: '结束本次自动操作' },
+]
+
 const toolName = computed(() => appStore.currentTool?.name || '自动化工具')
 const toolUrl = computed(() => appStore.toolUrl || 'https://sellercentral.amazon.com')
 const isElectron = computed(() => Boolean(window.electronAPI))
 const platformName = computed(() => appStore.currentTool?.platformKey === 'aliexpress' ? '速卖通' : '亚马逊')
 const platformShortName = computed(() => platformName.value === '速卖通' ? 'AliExpress' : 'amazon seller')
+const isActiveRun = computed(() => ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
+const isTerminal = computed(() => ['completed', 'failed', 'cancelled'].includes(runStatus.value))
+const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
 const displayUrl = computed(() => {
+  const value = browserUrl.value || toolUrl.value
   try {
-    const parsed = new URL(toolUrl.value)
+    const parsed = new URL(value)
     return parsed.host + parsed.pathname
   } catch {
-    return toolUrl.value
+    return value
   }
 })
 
-function stepState(index) {
-  return steps.value[index]?.status || 'pending'
+const currentStageIndex = computed(() => {
+  if (runStatus.value === 'completed') return 3
+  const stepId = currentStep.value?.id
+  if (stepId === 'execute') return 1
+  if (['verify', 'summary'].includes(stepId)) return 2
+  return 0
+})
+
+const stageProgress = computed(() => `${Math.min(currentStageIndex.value + 1, 4)}/4`)
+const runningMessage = computed(() => {
+  if (runStatus.value === 'preparing' || runStatus.value === 'idle') return '正在准备自动操作'
+  if (runStatus.value === 'paused') return '自动操作已暂停'
+  if (currentStageIndex.value === 2) return '正在检查处理结果'
+  return '正在自动处理'
+})
+const customerStatusText = computed(() => ({
+  idle: '正在准备',
+  preparing: '正在准备',
+  running: '正在自动处理',
+  waiting_user: '需要你的操作',
+  paused: '已暂停',
+  completed: '处理完成',
+  failed: '本次未完成',
+  cancelled: '已停止',
+}[runStatus.value] || '正在处理'))
+const problemCode = computed(() => {
+  const source = taskRunStore.runId || taskRunStore.error?.code || 'UNKNOWN'
+  return String(source).replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase() || 'UNKNOWN'
+})
+
+function stageState(index) {
+  if (runStatus.value === 'completed') return 'done'
+  if (index < currentStageIndex.value) return 'done'
+  if (index === currentStageIndex.value) return 'active'
+  return 'pending'
 }
 
-function stepTime(index) {
-  const step = steps.value[index]
-  if (!step) return ''
-  if (step.completedAt) {
-    return new Date(step.completedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+async function completeUserAction() {
+  try {
+    await taskRunStore.completeUserAction()
+  } catch (error) {
+    showToast('暂时无法继续，请重试', 'error')
   }
-  if (['active', 'paused'].includes(step.status)) return step.status === 'paused' ? '已暂停' : '进行中'
-  return ''
 }
 
-function togglePause() {
-  if (runStatus.value === 'paused') taskRunStore.resume()
-  else taskRunStore.pause()
+async function stopRun() {
+  if (!window.confirm('确定停止本次自动操作吗？')) return
+  await taskRunStore.cancel()
 }
 
-async function restartSimulation() {
-  activeTab.value = 'process'
-  if (!window.electronAPI?.automation) {
-    taskRunStore.restart()
-    return
-  }
+async function closeWorkspace() {
+  if (isActiveRun.value && !window.confirm('自动操作尚未完成，现在退出将停止本次处理。')) return
+  if (isActiveRun.value) await taskRunStore.cancel()
+  taskRunStore.reset()
+  await window.electronAPI?.automation?.unregisterBrowser?.()
+  appStore.closeTool()
+}
 
-  const currentTool = appStore.currentTool
-  if (!currentTool?.id || restarting.value) return
+async function restartRun() {
+  if (restarting.value) return
   restarting.value = true
   try {
-    const grantResponse = await createToolLaunchGrant(currentTool.id, {
+    if (!window.electronAPI?.automation) {
+      await taskRunStore.restart()
+      return
+    }
+    const currentTool = appStore.currentTool
+    const response = await createToolLaunchGrant(currentTool.id, {
       platformKey: currentTool.platformKey,
       deviceId: localStorage.getItem('toolbox_device_id') || '',
     })
-    const grant = grantResponse?.launch_data || grantResponse?.grant
-    if (!grant?.token) throw new Error('新的启动授权数据不完整')
-
+    const grant = response?.launch_data || response?.grant
+    if (!grant?.token) throw new Error('工具启动数据不完整')
     const nextTool = {
       ...currentTool,
       targetUrl: grant.target_url || currentTool.targetUrl,
       launchGrant: {
         token: grant.token,
-        expiresAt: grant.expires_at || grantResponse.expires_at,
-        expiresIn: grantResponse.expires_in,
+        expiresAt: grant.expires_at || response.expires_at,
+        expiresIn: response.expires_in,
         scriptKey: grant.script_key,
         runnerApiVersion: grant.runner_api_version || 1,
         toolVersion: grant.tool_version || '1.0.0',
@@ -272,34 +290,23 @@ async function restartSimulation() {
     appStore.toolUrl = nextTool.targetUrl
     await taskRunStore.start(nextTool)
   } catch (error) {
-    showToast(error?.message || '重新运行失败', 'error')
+    showToast(error?.message || '暂时无法重新执行', 'error')
   } finally {
     restarting.value = false
   }
 }
 
-function closeWorkspace() {
-  taskRunStore.cancel()
-  taskRunStore.reset()
-  window.electronAPI?.automation?.unregisterBrowser?.()
-  appStore.closeTool()
-}
-
-function reloadBrowser() {
-  webviewRef.value?.reload?.()
-}
-
-function goBack() {
-  if (webviewRef.value?.canGoBack?.()) webviewRef.value.goBack()
-}
-
-function goForward() {
-  if (webviewRef.value?.canGoForward?.()) webviewRef.value.goForward()
-}
-
-function openExternal() {
-  if (window.electronAPI?.openExternal) window.electronAPI.openExternal(toolUrl.value)
-  else window.open(toolUrl.value, '_blank', 'noopener,noreferrer')
+async function openSupport() {
+  localStorage.setItem('toolbox_support_context', JSON.stringify({
+    run_id: taskRunStore.runId,
+    tool_id: appStore.currentTool?.id,
+    tool_name: toolName.value,
+    platform_key: appStore.currentTool?.platformKey,
+    error_code: taskRunStore.error?.code,
+    problem_code: problemCode.value,
+  }))
+  await closeWorkspace()
+  if (!appStore.toolVisible) router.push('/user/ai-chat')
 }
 
 async function startTaskWithBrowser() {
@@ -313,17 +320,12 @@ async function startTaskWithBrowser() {
       console.warn('[ToolWorkspace] 嵌入浏览器注册失败，将使用独立浏览器:', error?.message || error)
     }
   }
-
   taskStarted.value = true
   if (browserReadyFallback) clearTimeout(browserReadyFallback)
   try {
-    await taskRunStore.start({
-      ...appStore.currentTool,
-      targetUrl: toolUrl.value,
-    })
+    await taskRunStore.start({ ...appStore.currentTool, targetUrl: toolUrl.value })
   } catch (error) {
-    taskRunStore.reset()
-    showToast(error?.message || '本地 Runner 启动失败', 'error')
+    showToast('自动处理启动失败，你可以重新执行或联系客服', 'error')
   } finally {
     taskStarting.value = false
   }
@@ -340,7 +342,6 @@ function bindWebviewEvents() {
   webview.addEventListener('did-stop-loading', () => { browserLoading.value = false })
   webview.addEventListener('did-fail-load', () => { browserLoading.value = false })
   webview.addEventListener('dom-ready', startTaskWithBrowser, { once: true })
-
   try {
     if (webview.getWebContentsId?.()) startTaskWithBrowser()
   } catch {}
@@ -348,16 +349,15 @@ function bindWebviewEvents() {
 
 async function recordTerminalRun(status) {
   const runId = taskRunStore.runId
-  if (!runId || loggedRunIds.has(runId) || !['completed', 'failed'].includes(status)) return
+  if (!runId || loggedRunIds.has(runId) || !['completed', 'failed', 'cancelled'].includes(status)) return
   loggedRunIds.add(runId)
-
   const tool = taskRunStore.tool || appStore.currentTool || {}
   try {
     await createLog({
       device_id: localStorage.getItem('toolbox_device_id') || null,
       tool_name: tool.name,
       module: tool.module,
-      status: status === 'completed' ? 'success' : 'failed',
+      status: status === 'completed' ? 'success' : status,
       error_code: status === 'failed' ? (taskRunStore.error?.code || 'AUTOMATION_FAILED') : null,
       detail: JSON.stringify({
         run_id: runId,
@@ -382,10 +382,7 @@ onMounted(() => {
   browserReadyFallback = setTimeout(startTaskWithBrowser, 6000)
 })
 
-watch(runStatus, status => {
-  if (status === 'completed') activeTab.value = 'result'
-  recordTerminalRun(status)
-})
+watch(runStatus, recordTerminalRun)
 
 onUnmounted(() => {
   if (browserReadyFallback) clearTimeout(browserReadyFallback)
@@ -401,168 +398,139 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  color: #172033;
+  color: var(--studio-text-main);
   background: #edf1f6;
 }
 
-button { font: inherit; }
-svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-
 .workspace-topbar {
-  height: 62px;
+  height: 58px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 0 18px;
-  background: #fff;
-  border-bottom: 1px solid #dfe5ed;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
-  z-index: 20;
+  gap: 16px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--studio-border);
+  background: var(--studio-surface);
 }
 
-.workspace-heading, .workspace-status, .tool-identity { display: flex; align-items: center; }
-.workspace-heading { gap: 12px; min-width: 0; }
-.workspace-status { gap: 8px; }
+.workspace-heading,
+.workspace-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
 
-.icon-button, .browser-controls button, .open-external {
-  border: 0;
-  background: transparent;
-  color: #64748b;
-  cursor: pointer;
+.icon-button {
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--studio-text-muted);
+  background: transparent;
+  cursor: pointer;
 }
 
-.icon-button { width: 34px; height: 34px; border-radius: 9px; }
-.icon-button:hover, .browser-controls button:hover, .open-external:hover { background: #eef2f7; color: #0f172a; }
-.tool-identity { gap: 10px; min-width: 0; }
-.tool-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, #4f46e5, #7c3aed); box-shadow: 0 7px 16px rgba(79, 70, 229, .22); }
-.tool-mark svg { width: 17px; }
-.tool-identity h1 { margin: 0; font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tool-identity p { margin: 2px 0 0; color: #8491a5; font-size: 11px; }
+.icon-button:hover { background: var(--studio-bg-hover); color: var(--studio-text-main); }
+.tool-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; color: white; background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-hover)); }
+.tool-identity h1 { margin: 0; font-size: 14px; }
+.tool-identity p { margin: 2px 0 0; color: var(--studio-text-muted); font-size: 11px; }
 
-.status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.status-pill.running { color: #2563eb; background: #eff6ff; }
-.status-pill.paused { color: #b45309; background: #fffbeb; }
-.status-pill.completed { color: #047857; background: #ecfdf5; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent); }
-.status-pill.running .status-dot { animation: pulse 1.4s infinite; }
-.elapsed-time { width: 42px; color: #64748b; font-size: 12px; font-variant-numeric: tabular-nums; }
-.control-button { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid #dfe5ed; border-radius: 8px; background: #fff; color: #475569; font-size: 12px; font-weight: 600; cursor: pointer; }
-.control-button svg { width: 14px; height: 14px; }
-.control-button:hover { border-color: #a8b4c6; background: #f8fafc; }
-.control-button.danger { color: #dc2626; }
+.status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 999px; color: var(--studio-accent-hover); background: var(--studio-accent-bg); font-size: 12px; font-weight: 700; }
+.status-pill.is-completed { color: #047857; background: #ecfdf5; }
+.status-pill.is-failed { color: #b91c1c; background: #fef2f2; }
+.status-pill.is-cancelled { color: var(--studio-text-muted); background: var(--studio-bg-hover); }
+.status-pill.is-waiting_user { color: #b45309; background: #fffbeb; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.is-running .status-dot, .is-preparing .status-dot { animation: pulse 1.3s infinite; }
 
-.workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 10px; padding: 10px; }
+.control-button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid var(--studio-border); border-radius: 8px; color: var(--studio-text-main); background: white; font-size: 12px; font-weight: 700; cursor: pointer; }
+.control-button:hover { border-color: var(--studio-accent-light); background: var(--studio-bg-hover); }
+.control-button.danger { color: var(--studio-danger); }
+
+.workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 10px; padding: 10px; }
 .browser-stage { min-width: 0; min-height: 0; }
-.browser-frame { height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #d9e0e9; border-radius: 12px; background: #fff; box-shadow: 0 8px 30px rgba(15, 23, 42, .07); }
-.browser-toolbar { height: 45px; flex-shrink: 0; display: grid; grid-template-columns: auto minmax(180px, 680px) auto; align-items: center; justify-content: center; gap: 12px; padding: 0 12px; background: #f8fafc; border-bottom: 1px solid #e5eaf0; }
-.browser-controls { display: flex; gap: 2px; }
-.browser-controls button, .open-external { width: 28px; height: 28px; border-radius: 7px; }
-.browser-controls svg, .open-external svg { width: 15px; height: 15px; }
-.address-bar { height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid #e0e6ee; border-radius: 8px; background: #fff; color: #56657a; font-size: 12px; overflow: hidden; }
-.address-bar svg { width: 13px; height: 13px; color: #16a34a; flex-shrink: 0; }
-.address-bar span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.browser-viewport { position: relative; flex: 1; min-height: 0; background: #fff; }
-.workspace-webview { display: flex; width: 100%; height: 100%; }
+.browser-frame, .progress-panel { height: 100%; overflow: hidden; border: 1px solid var(--studio-border); border-radius: 12px; background: white; box-shadow: var(--studio-shadow); }
+.browser-frame { display: flex; flex-direction: column; }
+.browser-toolbar { height: 42px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--studio-border); color: var(--studio-text-muted); background: #f8fafc; font-size: 12px; }
+.browser-toolbar > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.browser-note { margin-left: auto; color: var(--studio-accent-hover); font-weight: 700; }
+.browser-viewport { position: relative; flex: 1; min-height: 0; }
+.workspace-webview { width: 100%; height: 100%; display: flex; }
+.browser-loading { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,.96); }
 
-.browser-loading { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; background: rgba(255,255,255,.94); color: #334155; }
-.browser-loading small { color: #94a3b8; }
-.large-spinner, .mini-spinner { display: inline-block; border: 2px solid #dbeafe; border-top-color: #4f46e5; border-radius: 50%; animation: spin .8s linear infinite; }
-.large-spinner { width: 28px; height: 28px; }
-.mini-spinner { width: 13px; height: 13px; flex-shrink: 0; }
+.interaction-shield { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-start; justify-content: center; padding-top: 14px; background: rgba(255,255,255,.015); cursor: wait; }
+.interaction-shield div { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid rgba(14,165,233,.2); border-radius: 999px; color: var(--studio-accent-hover); background: rgba(255,255,255,.96); box-shadow: var(--shadow-md); font-size: 12px; font-weight: 700; }
 
-.browser-mock { height: 100%; display: flex; flex-direction: column; background: #f6f7f9; }
-.mock-site-header { height: 58px; flex-shrink: 0; display: flex; align-items: center; gap: 28px; padding: 0 24px; color: #fff; background: #111827; }
-.mock-logo { font-size: 17px; font-weight: 700; color: #ffb11b; }
-.mock-search { width: 38%; height: 28px; border-radius: 6px; background: #fff; opacity: .92; }
-.mock-avatar { width: 28px; height: 28px; margin-left: auto; border-radius: 50%; background: #475569; }
-.mock-page { flex: 1; min-height: 0; display: flex; }
-.mock-nav { width: 164px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; padding: 24px 18px; background: #fff; border-right: 1px solid #e5e7eb; }
-.mock-nav span { width: 80%; height: 10px; border-radius: 5px; background: #dfe5ed; }
-.mock-nav span.active { width: 100%; height: 28px; background: #fff3d6; }
-.mock-content { flex: 1; min-width: 0; padding: 28px; }
-.mock-breadcrumb { color: #94a3b8; font-size: 11px; }
-.mock-content h2 { margin: 14px 0 6px; font-size: 22px; }
-.mock-content p { margin: 0 0 24px; color: #64748b; font-size: 13px; }
-.mock-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.mock-stat-card { min-height: 86px; padding: 17px; border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; box-shadow: 0 2px 6px rgba(15,23,42,.03); }
-.mock-stat-card span { display: block; width: 42%; height: 8px; margin-bottom: 14px; border-radius: 4px; background: #e2e8f0; }
-.mock-stat-card strong { font-size: 24px; }
-.mock-table { margin-top: 18px; overflow: hidden; border: 1px solid #e5e7eb; border-radius: 9px; background: #fff; }
-.mock-table-head { height: 38px; background: #f8fafc; border-bottom: 1px solid #e5e7eb; }
-.mock-table-row { height: 50px; display: grid; grid-template-columns: 24px 1fr 1fr 54px; align-items: center; gap: 20px; padding: 0 18px; border-bottom: 1px solid #f1f5f9; }
-.mock-table-row i { width: 15px; height: 15px; border: 1px solid #cbd5e1; border-radius: 4px; }
-.mock-table-row span { height: 8px; border-radius: 4px; background: #e2e8f0; }
-.mock-table-row em { height: 20px; border-radius: 10px; background: #dcfce7; }
-.action-toast { position: absolute; left: 18px; bottom: 18px; z-index: 4; max-width: 360px; display: flex; align-items: center; gap: 11px; padding: 10px 14px; border: 1px solid rgba(99,102,241,.18); border-radius: 10px; background: rgba(255,255,255,.96); box-shadow: 0 12px 28px rgba(15,23,42,.16); }
-.action-toast small, .action-toast strong { display: block; }
-.action-toast small { margin-bottom: 2px; color: #7c8ba1; font-size: 10px; }
-.action-toast strong { color: #334155; font-size: 12px; }
+.browser-mock { height: 100%; background: #f5f6f8; }
+.mock-site-header { height: 56px; display: flex; align-items: center; gap: 24px; padding: 0 22px; color: white; background: #111827; }
+.mock-site-header strong { color: var(--studio-warning); }
+.mock-site-header span { width: 38%; height: 28px; border-radius: 6px; background: white; }
+.mock-site-header i { width: 28px; height: 28px; margin-left: auto; border-radius: 50%; background: #475569; }
+.mock-page { height: calc(100% - 56px); display: flex; }
+.mock-page aside { width: 160px; display: flex; flex-direction: column; gap: 14px; padding: 24px 18px; background: white; }
+.mock-page aside span { width: 80%; height: 10px; border-radius: 5px; background: #e2e8f0; }
+.mock-content { flex: 1; padding: 28px; }
+.mock-content small { color: #94a3b8; }
+.mock-content h2 { margin: 14px 0 6px; }
+.mock-content p { margin: 0; color: var(--studio-text-muted); }
+.mock-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 24px; }
+.mock-cards i { height: 86px; border: 1px solid var(--studio-border); border-radius: 9px; background: white; }
+.mock-table { margin-top: 18px; padding: 14px 18px; border: 1px solid var(--studio-border); border-radius: 9px; background: white; }
+.mock-table span { display: block; height: 9px; margin: 13px 0; border-radius: 5px; background: #e2e8f0; }
 
-.activity-panel { min-height: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #d9e0e9; border-radius: 12px; background: #fff; box-shadow: 0 8px 30px rgba(15, 23, 42, .07); }
-.panel-header { display: flex; align-items: flex-end; justify-content: space-between; padding: 18px 18px 12px; }
-.eyebrow { color: #7c8ba1; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
-.panel-header h2 { margin: 3px 0 0; font-size: 17px; }
-.progress-count { color: #64748b; font-size: 12px; font-weight: 600; }
-.progress-track { height: 3px; margin: 0 18px 13px; overflow: hidden; border-radius: 3px; background: #edf1f6; }
-.progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #4f46e5, #8b5cf6); transition: width .45s ease; }
-.panel-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 0 18px; border-bottom: 1px solid #e8edf3; }
-.panel-tabs button { position: relative; padding: 10px 0; border: 0; background: transparent; color: #8794a7; font-size: 12px; font-weight: 600; cursor: pointer; }
-.panel-tabs button.active { color: #4f46e5; }
-.panel-tabs button.active::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: -1px; height: 2px; border-radius: 2px; background: #4f46e5; }
-.panel-content { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 20px; }
-.goal-card { padding: 13px 14px; border: 1px solid #e3e7ff; border-radius: 9px; background: #f7f7ff; }
-.goal-card span { display: block; margin-bottom: 4px; color: #7c8ba1; font-size: 10px; }
-.goal-card strong { display: block; color: #312e81; font-size: 12px; }
-.goal-card p { margin: 5px 0 0; color: #7c8ba1; font-size: 10px; line-height: 1.45; }
-.timeline { margin: 18px 0 0; padding: 0; list-style: none; }
-.timeline li { position: relative; display: grid; grid-template-columns: 26px 1fr; gap: 10px; padding-bottom: 17px; }
-.timeline li:not(:last-child)::before { content: ''; position: absolute; top: 26px; bottom: 0; left: 12px; width: 1px; background: #e2e8f0; }
-.timeline-icon { position: relative; z-index: 1; width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid #dfe5ed; border-radius: 50%; background: #fff; color: #94a3b8; font-size: 9px; font-weight: 700; }
-.timeline-icon svg { width: 13px; height: 13px; }
-.timeline li.done .timeline-icon { color: #fff; border-color: #10b981; background: #10b981; }
-.timeline li.active .timeline-icon { border-color: #c7d2fe; background: #eef2ff; }
-.timeline li.paused .timeline-icon { color: #d97706; border-color: #fde68a; background: #fffbeb; }
-.timeline-copy { min-width: 0; padding-top: 3px; }
-.timeline-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.timeline-title strong { color: #334155; font-size: 12px; }
-.timeline-title time { color: #a0aabc; font-size: 9px; white-space: nowrap; }
-.timeline-copy p { margin: 4px 0 0; color: #8a96a8; font-size: 10px; line-height: 1.45; }
-.timeline li.pending { opacity: .55; }
-.active-action { margin-top: 7px; padding: 7px 9px; border-radius: 6px; background: #f1f5f9; color: #4f46e5; font-size: 10px; }
+.progress-panel { display: flex; flex-direction: column; padding: 20px; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--studio-border); }
+.panel-heading span { font-size: 17px; font-weight: 800; }
+.panel-heading strong { color: var(--studio-text-muted); font-size: 12px; }
+.stage-list { margin: 22px 0 0; padding: 0; list-style: none; }
+.stage-list li { position: relative; display: grid; grid-template-columns: 30px 1fr; gap: 11px; min-height: 72px; }
+.stage-list li:not(:last-child)::before { content: ''; position: absolute; top: 30px; bottom: 0; left: 14px; width: 1px; background: var(--studio-border); }
+.stage-icon { position: relative; z-index: 1; width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--studio-border); border-radius: 50%; color: #94a3b8; background: white; font-size: 10px; font-weight: 800; }
+.stage-list li.done .stage-icon { border-color: var(--studio-success); color: white; background: var(--studio-success); }
+.stage-list li.active .stage-icon { border-color: var(--studio-accent-light); color: var(--studio-accent); background: var(--studio-accent-bg); }
+.stage-list li.pending { opacity: .55; }
+.stage-list strong { display: block; padding-top: 3px; font-size: 13px; }
+.stage-list p { margin: 4px 0 0; color: var(--studio-text-muted); font-size: 12px; line-height: 1.5; }
 
-.result-content { display: flex; }
-.result-card { width: 100%; align-self: flex-start; padding: 24px 18px; text-align: center; border: 1px solid #e5eaf0; border-radius: 11px; }
-.result-icon { width: 44px; height: 44px; margin: 0 auto 12px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #10b981; }
-.result-card h3 { margin: 0 0 7px; font-size: 15px; }
-.result-card > p { margin: 0; color: #7c8ba1; font-size: 11px; line-height: 1.6; }
-.result-card dl { margin: 20px 0; border-top: 1px solid #edf1f5; }
-.result-card dl div { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #edf1f5; font-size: 11px; }
-.result-card dt { color: #8a96a8; }
-.result-card dd { margin: 0; color: #334155; font-weight: 600; }
-.result-card button { width: 100%; padding: 9px; border: 0; border-radius: 7px; background: #4f46e5; color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; }
-.result-card.waiting { padding-top: 48px; padding-bottom: 48px; }
-.result-card.waiting .large-spinner { margin-bottom: 14px; }
+.running-note, .user-action-card { margin-top: auto; border-radius: 10px; }
+.running-note { display: flex; align-items: center; gap: 10px; padding: 12px; color: var(--studio-accent-hover); background: var(--studio-accent-bg); }
+.running-note strong, .running-note span { display: block; }
+.running-note strong { font-size: 12px; }
+.running-note span { margin-top: 2px; color: var(--studio-text-muted); font-size: 11px; }
+.user-action-card { padding: 16px; color: #92400e; background: #fffbeb; }
+.user-action-card h3 { margin: 10px 0 6px; font-size: 15px; }
+.user-action-card p { margin: 0 0 14px; color: #78350f; font-size: 12px; line-height: 1.6; }
+.user-action-card button { width: 100%; min-height: 38px; border: 0; border-radius: 8px; color: white; background: var(--studio-warning); font-weight: 700; cursor: pointer; }
 
+.result-card { margin: auto 0; text-align: center; }
+.result-icon { width: 56px; height: 56px; margin: 0 auto 15px; display: grid; place-items: center; border-radius: 50%; }
+.success .result-icon { color: white; background: var(--studio-success); }
+.failed .result-icon { color: var(--studio-danger); background: #fef2f2; }
+.cancelled .result-icon { color: var(--studio-text-muted); background: var(--studio-bg-hover); }
+.result-card h2 { margin: 0 0 9px; font-size: 19px; }
+.result-card p { margin: 0 0 20px; color: var(--studio-text-muted); font-size: 12px; line-height: 1.7; }
+.problem-code { margin: -5px 0 18px; padding: 9px; border-radius: 7px; color: var(--studio-text-muted); background: var(--studio-bg-hover); font-size: 11px; }
+.primary-action, .secondary-action { width: 100%; min-height: 40px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.primary-action { border: 0; color: white; background: var(--studio-accent); }
+.secondary-action { margin-top: 9px; border: 1px solid var(--studio-border); color: var(--studio-text-main); background: white; }
+
+.spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@keyframes pulse { 50% { opacity: .45; } }
+@keyframes pulse { 50% { opacity: .4; } }
 
-@media (max-width: 960px) {
-  .workspace-body { grid-template-columns: minmax(0, 1fr) 320px; }
-  .control-button { padding: 0 8px; }
-  .tool-identity p, .elapsed-time { display: none; }
+@media (max-width: 900px) {
+  .workspace-body { grid-template-columns: minmax(0, 1fr) 310px; }
+  .status-pill { display: none; }
 }
 
-@media (max-width: 760px) {
-  .workspace-topbar { padding: 0 10px; }
-  .workspace-status .status-pill, .workspace-status .control-button:not(.danger) { display: none; }
+@media (max-width: 720px) {
+  .tool-identity p { display: none; }
   .workspace-body { display: flex; flex-direction: column; overflow-y: auto; }
   .browser-stage { min-height: 58vh; }
-  .activity-panel { min-height: 420px; }
-  .mock-nav { display: none; }
-  .mock-content { padding: 18px; }
+  .progress-panel { min-height: 390px; }
+  .mock-page aside { display: none; }
 }
 </style>

@@ -26,5 +26,13 @@ export function createToolLaunchGrant(toolId, { platformKey, deviceId } = {}) {
             platform_key: platformKey,
             device_id: deviceId,
         },
-    ).then(response => response?.data ?? response);
+    ).then(response => {
+        if (response?.success === false) {
+            const error = new Error(response.message || '工具启动失败');
+            error.code = response.error_code;
+            error.data = response.detail;
+            throw error;
+        }
+        return response?.data ?? response;
+    });
 }

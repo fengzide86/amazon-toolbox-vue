@@ -122,6 +122,8 @@ export class MockAutomationAdapter {
     this.scheduleNextStep()
   }
 
+  completeUserAction() {}
+
   cancel() {
     if ([RUN_STATUS.IDLE, RUN_STATUS.COMPLETED, RUN_STATUS.CANCELLED].includes(this.status)) return
     this.status = RUN_STATUS.CANCELLED

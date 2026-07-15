@@ -11,6 +11,7 @@ describe('API Utils', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
+    sessionStorage.clear()
   })
 
   describe('api.get', () => {
@@ -128,6 +129,22 @@ describe('API Utils', () => {
         name: 'ApiError', status: 403
       })
       expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('套餐未包含的 403 不应该清空用户登录', async () => {
+      sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'user-token' }))
+      sessionStorage.setItem('toolbox_token', 'user-token')
+      sessionStorage.setItem('toolbox_role', 'user')
+      global.fetch.mockResolvedValueOnce({
+        ok: false, status: 403,
+        json: () => Promise.resolve({ message: '当前套餐暂未包含该工具', error_code: 3006 })
+      })
+
+      await expect(request('/api/tools/listing/launch-grant', { method: 'POST' })).rejects.toMatchObject({
+        name: 'ApiError', status: 403
+      })
+      expect(sessionStorage.getItem('toolbox_token')).toBe('user-token')
+      expect(window.location.hash).not.toContain('/login')
     })
 
     it('POST 服务端错误不应自动重试', async () => {

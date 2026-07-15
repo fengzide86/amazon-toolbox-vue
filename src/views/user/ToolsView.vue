@@ -1,542 +1,438 @@
 <template>
-  <div>
-    <div class="page-header">
-      <h2 class="page-title">功能入口</h2>
-      <!-- 搜索框 -->
-        <div class="search-box">
-          <Search :size="18" />
-        <input 
-          type="text" 
-          v-model="searchText" 
-          placeholder="搜索工具..." 
-          @input="handleSearch"
-        />
-          <button v-if="searchText" class="clear-btn" @click="clearSearch">
-            <X :size="16" />
-          </button>
+  <div class="toolbox-page">
+    <header class="toolbox-header">
+      <div>
+        <h2>选择一个工具开始</h2>
+        <p>点击后系统会自动打开并处理，请不要重复点击。</p>
       </div>
+      <router-link class="plan-chip" to="/user/plans">
+        <ShieldCheck :size="15" />
+        {{ currentPlanName }}
+      </router-link>
+    </header>
+
+    <div v-if="loading" class="tool-grid" aria-label="工具加载中">
+      <div v-for="item in 6" :key="item" class="tool-card skeleton-card"></div>
     </div>
 
-    <!-- 分类标签 -->
-    <div class="category-tabs">
-      <button 
-        v-for="cat in categories" 
-        :key="cat.id"
-        :class="['tab-btn', { active: selectedCategory === cat.id }]"
-        @click="selectCategory(cat.id)"
+    <div v-else-if="tools.length" class="tool-grid">
+      <button
+        v-for="tool in tools"
+        :key="tool.id"
+        type="button"
+        :class="['tool-card', `is-${toolState(tool)}`, { 'is-launching': launchingToolId === tool.id, 'is-focused': route.query?.tool === tool.id }]"
+        :disabled="launchingToolId !== null || toolState(tool) === 'maintenance'"
+        :data-testid="'tool-card-' + tool.name"
+        @click="handleToolClick(tool)"
       >
-        {{ cat.name }}
+        <span class="tool-card-top">
+          <span class="tool-icon"><component :is="toolIcon(tool)" :size="21" /></span>
+          <span v-if="toolState(tool) === 'locked'" class="state-badge locked"><LockKeyhole :size="12" /> 当前套餐未包含</span>
+          <span v-else-if="toolState(tool) === 'maintenance'" class="state-badge maintenance">暂时不可用</span>
+        </span>
+
+        <span class="tool-copy">
+          <strong>{{ tool.name }}</strong>
+          <span>{{ tool.description || defaultDescription(tool) }}</span>
+        </span>
+
+        <span class="tool-action">
+          <template v-if="launchingToolId === tool.id">
+            <LoaderCircle :size="16" class="spin" /> 正在打开…
+          </template>
+          <template v-else-if="toolState(tool) === 'locked'">
+            查看可用套餐 <ArrowRight :size="16" />
+          </template>
+          <template v-else-if="toolState(tool) === 'maintenance'">维护中</template>
+          <template v-else>
+            一键启动 <ArrowRight :size="16" />
+          </template>
+        </span>
       </button>
     </div>
 
-    <!-- 工具列表 -->
-    <div v-if="filteredTools.length" class="stats-row" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
-      <div 
-        v-for="tool in filteredTools" 
-        :key="tool.name" 
-        :class="['stat-card', 'tool-card', { launching: launchingToolId === tool.id }]"
-        :data-testid="'tool-card-' + tool.name" 
-        @click="runTool(tool)"
-      >
-        <div class="tool-header">
-          <div class="stat-label">{{ tool.name }}</div>
-          <span v-if="launchingToolId === tool.id" class="launching-badge">
-            <span class="launching-spinner"></span> 启动中...
-          </span>
-          <span v-else :class="['status-badge', tool.status === 'online' ? 'online' : 'offline']">
-            {{ tool.status === 'online' ? '正常' : '维护中' }}
-          </span>
-        </div>
-        <div class="stat-value" style="font-size: 1.1rem;">{{ tool.module }}</div>
-        <div v-if="tool.description" class="tool-desc">{{ tool.description }}</div>
-        <div class="tool-footer">
-          <span class="tool-category">{{ getCategoryName(tool.category) }}</span>
-        </div>
-      </div>
-    </div>
-    
-    <!-- 空状态 -->
-      <div v-else class="empty-state">
-        <Search :size="48" :stroke-width="1.5" />
-      <p v-if="searchText">未找到匹配 "{{ searchText }}" 的工具</p>
-      <p v-else>暂无可用工具</p>
-      <button v-if="searchText || selectedCategory !== 'all'" class="reset-btn" @click="resetFilters">
-        清除筛选
-      </button>
+    <div v-else class="empty-state">
+      <Wrench :size="44" :stroke-width="1.5" />
+      <h3>当前平台暂无可用工具</h3>
+      <p>你可以切换平台，或稍后再试。</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { getTools, getToolCategories, createToolLaunchGrant } from '@/utils/api'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  ArrowRight,
+  BadgeDollarSign,
+  Boxes,
+  LoaderCircle,
+  LockKeyhole,
+  Megaphone,
+  PackageCheck,
+  PackagePlus,
+  ShieldCheck,
+  Truck,
+  UserPlus,
+  Warehouse,
+  Wrench,
+  Zap,
+} from '@lucide/vue'
+import { getTools, createToolLaunchGrant } from '@/utils/api'
 import { showToast } from '@/utils'
-import { usePlatformStore } from '@/stores/platform'
 import { useAppStore } from '@/stores/app'
-import { Search, X } from '@lucide/vue'
+import { usePlatformStore } from '@/stores/platform'
 
-const platformStore = usePlatformStore()
+const router = useRouter() || { push: () => {} }
+const route = useRoute() || { query: {} }
 const appStore = useAppStore()
+const platformStore = usePlatformStore()
 const tools = ref([])
+const loading = ref(true)
 const launchingToolId = ref(null)
-const categories = ref([
-  { id: 'all', name: '全部工具', sort_order: 0 },
-  { id: 'data', name: '数据分析', sort_order: 1 },
-  { id: 'operation', name: '运营工具', sort_order: 2 },
-  { id: 'automation', name: '自动化工具', sort_order: 3 },
-  { id: 'other', name: '其他工具', sort_order: 4 },
-])
-const selectedCategory = ref('all')
-const searchText = ref('')
-let searchTimer = null
 
-// 筛选后的工具列表
-const filteredTools = computed(() => {
-  let result = tools.value
-  
-  // 分类筛选
-  if (selectedCategory.value && selectedCategory.value !== 'all') {
-    result = result.filter(t => t.category === selectedCategory.value)
+const userInfo = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+  } catch {
+    return {}
   }
-  
-  // 搜索筛选
-  if (searchText.value) {
-    const search = searchText.value.toLowerCase()
-    result = result.filter(t => 
-      (t.name || '').toLowerCase().includes(search) ||
-      (t.module || '').toLowerCase().includes(search) ||
-      (t.description || '').toLowerCase().includes(search)
-    )
-  }
-  
-  // 速卖通平台下过滤掉 FBA/AGL
-  if (platformStore.currentPlatform === 'aliexpress') {
-    result = result.filter(t => t.capability_key !== 'fba_agl')
-  }
-  
-  return result
 })
 
-// 加载工具数据
+const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
+const currentPlanCode = computed(() => {
+  return userInfo.value.plan_code || userInfo.value.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase() || ''
+})
+
+const iconMap = {
+  register: UserPlus,
+  ali_register: UserPlus,
+  logistics_standard: Truck,
+  logistics_template: Truck,
+  logistics_cost: BadgeDollarSign,
+  ad_script: Megaphone,
+  ads: Megaphone,
+  ship_script: PackageCheck,
+  ali_ship: PackageCheck,
+  listing_script: PackagePlus,
+  listing: PackagePlus,
+  ali_listing: PackagePlus,
+  fba_agl: Warehouse,
+}
+
+function toolIcon(tool) {
+  return iconMap[tool.capability_key] || (tool.category === 'automation' ? Zap : Boxes)
+}
+
+function defaultDescription(tool) {
+  return `自动处理${tool.name || '当前功能'}中的重复操作`
+}
+
+function toolState(tool) {
+  const releaseStatus = tool.release_status || (tool.status === 'online' ? 'available' : tool.status)
+  if (!['available', 'beta', 'online'].includes(releaseStatus)) return 'maintenance'
+  const availablePlans = Array.isArray(tool.available_plans)
+    ? tool.available_plans.map(item => String(item).toUpperCase())
+    : []
+  if (availablePlans.length && currentPlanCode.value && !availablePlans.includes(currentPlanCode.value)) return 'locked'
+  return 'available'
+}
+
+function handleToolClick(tool) {
+  const state = toolState(tool)
+  if (state === 'locked') {
+    router.push({ path: '/user/plans', query: { tool: tool.id } })
+    return
+  }
+  if (state === 'maintenance') return
+  runTool(tool)
+}
+
 async function loadData() {
+  loading.value = true
   try {
-    const params = {
-      platform_key: platformStore.currentPlatform
-    }
-    tools.value = await getTools(params)
-  } catch (err) {
-    showToast('工具加载失败', 'error')
+    tools.value = await getTools({ platform_key: platformStore.currentPlatform })
+  } catch (error) {
+    showToast('工具加载失败，请稍后重试', 'error')
+  } finally {
+    loading.value = false
   }
 }
 
-// 加载分类数据
-async function loadCategories() {
-  try {
-    const cats = await getToolCategories()
-    if (cats && cats.length > 0) {
-      categories.value = cats
-    }
-  } catch (err) {
-    // 使用默认分类
-  }
-}
-
-// 选择分类
-function selectCategory(catId) {
-  selectedCategory.value = catId
-}
-
-// 搜索处理（防抖）
-function handleSearch() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    // 搜索逻辑在 computed 中处理
-  }, 300)
-}
-
-// 清除搜索
-function clearSearch() {
-  searchText.value = ''
-}
-
-// 重置筛选
-function resetFilters() {
-  searchText.value = ''
-  selectedCategory.value = 'all'
-}
-
-// 获取分类名称
-function getCategoryName(catId) {
-  const cat = categories.value.find(c => c.id === catId)
-  return cat ? cat.name : '未分类'
-}
-
-// 检查平台权限
-function checkPlatformPermission() {
-  // 优先从登录时存储的 JSON 数组读取
-  try {
-    const scope = localStorage.getItem('toolbox_platform_scope')
-    if (scope) {
-      const parsed = JSON.parse(scope)
-      if (Array.isArray(parsed)) return platformStore.hasPlatformPermission(parsed.join(','), platformStore.currentPlatform)
-    }
-  } catch (e) {}
-  // 兼容旧格式
-  try {
-    const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
-    if (authData.platform_scope) {
-      const scope = Array.isArray(authData.platform_scope)
-        ? authData.platform_scope.join(',')
-        : authData.platform_scope
-      return platformStore.hasPlatformPermission(scope, platformStore.currentPlatform)
-    }
-  } catch (e) {}
-  return true
-}
-
-// 运行工具：先从云端控制面获取一次性启动授权，再交给本地任务运行层。
 async function runTool(tool) {
-  if (tool.status !== 'online' && tool.status !== 'available' && tool.status !== 'beta') {
-    showToast(`${tool.name} 正在维护中`, 'warning')
-    return
-  }
-  
-  // 检查平台权限
-  if (!checkPlatformPermission()) {
-    showToast('当前授权暂未包含该平台，如需使用请升级授权', 'error')
-    return
-  }
-  
-  const platformKey = platformStore.currentPlatform
-  const deviceId = localStorage.getItem('toolbox_device_id') || ''
-  
-  showToast(`正在启动 ${tool.name}...`, 'info')
-  
+  if (launchingToolId.value !== null) return
+  launchingToolId.value = tool.id
   try {
-    launchingToolId.value = tool.id
-    const grantResponse = await createToolLaunchGrant(tool.id, { platformKey, deviceId })
-    const ld = grantResponse?.launch_data || grantResponse?.grant
+    const platformKey = platformStore.currentPlatform
+    const deviceId = localStorage.getItem('toolbox_device_id') || ''
+    const response = await createToolLaunchGrant(tool.id, { platformKey, deviceId })
+    const grant = response?.launch_data || response?.grant
+    if (!grant?.token || !grant?.target_url) throw new Error('工具启动数据不完整，请重试')
 
-    if (ld) {
-      const targetUrl = ld.target_url || ''
-      
-      // 检查目标网址是否配置
-      if (!targetUrl) {
-        showToast('该工具暂未配置目标网址，请联系管理员', 'warning')
-        launchingToolId.value = null
-        return
-      }
-      
-      // 打开工具（分屏模式）
-      appStore.openTool({
-        id: ld.tool_id || tool.id,
-        name: ld.tool_name || tool.name,
-        module: ld.tool_module || tool.module,
-        category: ld.category || tool.category,
-        platformKey: ld.platform_key || platformKey,
-        capabilityKey: tool.capability_key,
-        targetUrl,
-        launchGrant: {
-          token: ld.token,
-          expiresAt: ld.expires_at || grantResponse.expires_at,
-          expiresIn: grantResponse.expires_in,
-          scriptKey: ld.script_key,
-          runnerApiVersion: ld.runner_api_version || 1,
-          toolVersion: ld.tool_version || '1.0.0',
-          toolManifest: ld.tool_manifest,
-          toolSignature: ld.tool_signature,
-          signingKeyId: ld.signing_key_id,
-          signatureRequired: Boolean(ld.signature_required),
-        },
-      })
-      
-      launchingToolId.value = null
-      showToast(`${tool.name} 已启动`, 'success')
+    appStore.openTool({
+      id: grant.tool_id || tool.id,
+      name: grant.tool_name || tool.name,
+      module: grant.tool_module || tool.module,
+      category: grant.category || tool.category,
+      platformKey: grant.platform_key || platformKey,
+      capabilityKey: tool.capability_key,
+      targetUrl: grant.target_url,
+      launchGrant: {
+        token: grant.token,
+        expiresAt: grant.expires_at || response.expires_at,
+        expiresIn: response.expires_in,
+        scriptKey: grant.script_key,
+        runnerApiVersion: grant.runner_api_version || 1,
+        toolVersion: grant.tool_version || '1.0.0',
+        toolManifest: grant.tool_manifest,
+        toolSignature: grant.tool_signature,
+        signingKeyId: grant.signing_key_id,
+        signatureRequired: Boolean(grant.signature_required),
+      },
+    })
+  } catch (error) {
+    if (error?.code === 3006) {
+      showToast('当前套餐暂未包含该工具', 'warning')
+      router.push({ path: '/user/plans', query: { tool: tool.id } })
+    } else if (error?.code === 3007) {
+      showToast('当前授权暂未包含该平台，请联系客服', 'warning')
+    } else if (error?.code === 3003) {
+      showToast('当前设备尚未获得授权，请管理设备或联系客服', 'warning')
     } else {
-      // 显示后端错误文案
-      showToast('启动授权数据不完整', 'error')
+      showToast(error?.message || '暂时无法启动，请重试', 'error')
     }
-  } catch (err) {
-    showToast(err?.message || '网络连接失败，请检查控制服务', 'error')
   } finally {
     launchingToolId.value = null
   }
 }
 
-// 监听平台变化
-watch(() => platformStore.currentPlatform, () => {
-  loadData()
-})
-
-onMounted(() => {
-  loadData()
-  loadCategories()
-})
+watch(() => platformStore.currentPlatform, loadData)
+onMounted(loadData)
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-  gap: 1rem;
-  flex-wrap: wrap;
+.toolbox-page {
+  width: min(1180px, 100%);
+  margin: 0 auto;
 }
 
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  color: var(--color-primary);
+.toolbox-header {
+  min-height: 74px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+}
+
+.toolbox-header h2 {
   margin: 0;
+  color: var(--studio-text-main);
+  font-size: 26px;
+  line-height: 1.3;
 }
 
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-  min-width: 240px;
-  max-width: 320px;
-  flex: 1;
+.toolbox-header p {
+  margin: 7px 0 0;
+  color: var(--studio-text-muted);
+  font-size: 13px;
 }
 
-.search-box svg {
-  position: absolute;
-  left: 12px;
-  width: 18px;
-  height: 18px;
-  color: var(--color-muted);
-  pointer-events: none;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 0.625rem 2.5rem 0.625rem 2.5rem;
-  background: white;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  font-size: 0.875rem;
-  color: var(--color-foreground);
-  transition: all 0.2s;
-}
-
-.search-box input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
-}
-
-.clear-btn {
-  position: absolute;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: var(--color-muted);
-  cursor: pointer;
-}
-
-.clear-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--color-foreground);
-}
-
-/* 分类标签 */
-.category-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--color-border);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.category-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.tab-btn {
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--color-muted);
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.tab-btn:hover {
-  background: rgba(14, 165, 233, 0.05);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-
-.tab-btn.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: white;
-}
-
-/* 工具卡片 */
-.tool-card {
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1.25rem;
-  transition: all 0.2s;
-}
-
-.tool-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border-color: var(--color-accent);
-}
-
-.tool-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-}
-
-.tool-header .stat-label {
-  font-weight: 600;
-  font-size: 0.95rem;
-  color: var(--color-primary);
-}
-
-.status-badge {
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.status-badge.online {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--studio-success);
-}
-
-.status-badge.offline {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--studio-danger);
-}
-
-.tool-desc {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.tool-footer {
-  margin-top: auto;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--color-border);
-}
-
-.tool-category {
-  font-size: 0.75rem;
-  color: var(--color-accent);
-  background: rgba(14, 165, 233, 0.08);
-  padding: 0.2rem 0.6rem;
-  border-radius: 4px;
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 2rem;
-  text-align: center;
-  color: var(--color-muted);
-}
-
-.empty-state svg {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 1rem;
-  opacity: 0.5;
-}
-
-.empty-state p {
-  margin: 0.5rem 0;
-  font-size: 0.9rem;
-}
-
-.reset-btn {
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reset-btn:hover {
-  background: var(--color-accent-light);
-}
-
-/* 启动中状态 */
-.tool-card.launching {
-  opacity: 0.7;
-  pointer-events: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
-}
-
-.launching-badge {
+.plan-chip {
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.2rem 0.6rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  color: var(--studio-text-muted);
+  background: var(--studio-surface);
+  font-size: 12px;
   font-weight: 600;
-  background: rgba(14, 165, 233, 0.1);
-  color: var(--color-accent);
+  text-decoration: none;
 }
 
-.launching-spinner {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--color-accent);
-  border-top-color: transparent;
-  border-radius: 50%;
+.plan-chip:hover {
+  color: var(--studio-accent);
+  border-color: var(--studio-accent-light);
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.tool-card {
+  min-height: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 20px;
+  border: 1px solid var(--studio-border);
+  border-radius: var(--radius-lg);
+  color: var(--studio-text-main);
+  background: var(--studio-surface);
+  box-shadow: var(--studio-shadow);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.tool-card:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: var(--studio-accent-light);
+  box-shadow: var(--studio-shadow-hover);
+}
+
+.tool-card:focus-visible {
+  outline: 3px solid rgba(14, 165, 233, 0.22);
+  outline-offset: 2px;
+}
+
+.tool-card:disabled {
+  cursor: default;
+}
+
+.tool-card-top {
+  min-height: 38px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tool-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--studio-accent);
+  background: var(--studio-accent-bg);
+}
+
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.state-badge.locked {
+  color: #b45309;
+  background: rgba(255, 153, 0, 0.12);
+}
+
+.state-badge.maintenance {
+  color: var(--studio-text-muted);
+  background: var(--studio-bg-hover);
+}
+
+.tool-copy {
+  display: block;
+  flex: 1;
+  padding: 16px 0 18px;
+}
+
+.tool-copy strong,
+.tool-copy span {
+  display: block;
+}
+
+.tool-copy strong {
+  margin-bottom: 8px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.tool-copy span {
+  color: var(--studio-text-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.tool-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--studio-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.is-locked .tool-icon,
+.is-locked .tool-action {
+  color: #b45309;
+  background-color: rgba(255, 153, 0, 0.1);
+}
+
+.is-maintenance {
+  opacity: 0.68;
+}
+
+.is-maintenance .tool-action {
+  color: var(--studio-text-muted);
+}
+
+.is-launching {
+  border-color: var(--studio-accent-light);
+}
+
+.is-focused {
+  border-color: var(--studio-accent);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12), var(--studio-shadow-hover);
+}
+
+.spin {
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.skeleton-card {
+  border-color: transparent;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
 }
 
-@media (max-width: 640px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .search-box {
-    max-width: none;
-  }
+.empty-state {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 9px;
+  color: var(--studio-text-muted);
+  text-align: center;
+}
+
+.empty-state h3,
+.empty-state p {
+  margin: 0;
+}
+
+.empty-state h3 {
+  color: var(--studio-text-main);
+  font-size: 16px;
+}
+
+.empty-state p {
+  font-size: 13px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@media (max-width: 980px) {
+  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .toolbox-header { flex-direction: column; gap: 12px; }
+  .tool-grid { grid-template-columns: 1fr; }
 }
 </style>

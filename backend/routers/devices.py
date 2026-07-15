@@ -10,7 +10,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 
 from database import get_db
-from models import Device, AuthCode, User
+from models import Device, AuthCode, AuthSeat, User
 from core.logging import get_logger
 from core.exceptions import NotFoundException, ConflictException
 from core.dependencies import get_current_admin, get_current_user
@@ -18,6 +18,20 @@ from core.dependencies import get_current_admin, get_current_user
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+async def release_device_seat(db: AsyncSession, device: Device) -> None:
+    """Release active seats associated with a device being unbound."""
+    result = await db.execute(
+        select(AuthSeat).where(
+            AuthSeat.auth_code_id == device.auth_code_id,
+            AuthSeat.device_id == device.device_id,
+            AuthSeat.status == "active"
+        )
+    )
+    for seat in result.scalars().all():
+        seat.status = "inactive"
+        seat.updated_at = datetime.utcnow()
 
 
 @router.get("")
@@ -102,6 +116,7 @@ async def unbind_device(
         raise NotFoundException("设备不存在")
     
     device_name = device.device_name or "未知设备"
+    await release_device_seat(db, device)
     await db.delete(device)
     await db.commit()
     
@@ -150,6 +165,7 @@ async def user_unbind_device(
         raise ConflictException("至少需要保留一个设备")
     
     device_name = device.device_name or "未知设备"
+    await release_device_seat(db, device)
     await db.delete(device)
     await db.commit()
     

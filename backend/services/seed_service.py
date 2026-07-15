@@ -31,8 +31,8 @@ DEFAULT_REGISTER_TOOL = {
     "target_url": "https://sellercentral.amazon.com/",
     "tool_version": "1.0.0",
     "runner_api_version": 1,
-    "description": "面向新手卖家的注册流程工具，按步骤完成店铺注册准备、资料处理、信息核对和结果确认。",
-    "available_plans": ["Y49", "Y199", "Y999"],
+    "description": "自动完成店铺注册准备、资料处理、信息核对和结果确认。",
+    "available_plans": ["Y15", "Y49", "Y199", "Y999"],
     "sort_order": 1,
 }
 
@@ -192,6 +192,7 @@ def upgrade_default_tool_configs(tools: list[dict]) -> bool:
     legacy_names = {"新手快速注册工具", "亚马逊注册页面巡检"}
     legacy_descriptions = {
         "一键完成亚马逊新手店铺注册流程",
+        "面向新手卖家的注册流程工具，按步骤完成店铺注册准备、资料处理、信息核对和结果确认。",
         "打开亚马逊卖家中心注册入口，识别页面结构、表单、按钮和链接，并生成巡检截图；不填写、不点击提交、不发送任何真实数据。",
         DEFAULT_REGISTER_TOOL["description"],
     }

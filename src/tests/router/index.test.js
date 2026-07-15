@@ -15,11 +15,11 @@ describe('Router Configuration', () => {
       { 
         path: '/user',
         children: [
-          { path: 'dashboard', name: 'UserDashboard', meta: { title: '首页总览' } },
-          { path: 'tools', name: 'UserTools', meta: { title: '功能入口' } },
-          { path: 'logs', name: 'UserLogs', meta: { title: '个人日志与问题反馈' } },
+      { path: 'dashboard', name: 'UserDashboard', meta: { title: '工具箱' } },
+      { path: 'tools', name: 'UserTools', meta: { title: '工具箱' } },
+      { path: 'logs', name: 'UserLogs', meta: { title: '使用记录' } },
           { path: 'faq', name: 'UserFaq', meta: { title: '常见问题' } },
-          { path: 'plans', name: 'UserPlans', meta: { title: '套餐价格' } },
+      { path: 'plans', name: 'UserPlans', meta: { title: '套餐与授权' } },
           { path: 'devices', name: 'UserDevices', meta: { title: '设备管理' } },
           { path: 'ai-chat', name: 'UserAIChat', meta: { title: 'AI 客服' } }
         ]

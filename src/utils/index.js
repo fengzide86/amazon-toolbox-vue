@@ -181,7 +181,9 @@ export function formatDate(dateStr) {
 export function getDeviceId() {
     let deviceId = localStorage.getItem('toolbox_device_id');
     if (!deviceId) {
-        deviceId = 'DEV-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+        // Keep a saved ID; use Electron's stable machine ID only when absent.
+        deviceId = window.electronAPI?.runtime?.deviceId
+            || ('DEV-' + Math.random().toString(36).substring(2, 10).toUpperCase());
         localStorage.setItem('toolbox_device_id', deviceId);
     }
     return deviceId;
@@ -190,7 +192,8 @@ export function getDeviceId() {
 export function getDeviceName() {
     let deviceName = localStorage.getItem('toolbox_device_name');
     if (!deviceName) {
-        deviceName = 'DESKTOP-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+        deviceName = window.electronAPI?.runtime?.deviceName
+            || ('DESKTOP-' + Math.random().toString(36).substring(2, 8).toUpperCase());
         localStorage.setItem('toolbox_device_name', deviceName);
     }
     return deviceName;

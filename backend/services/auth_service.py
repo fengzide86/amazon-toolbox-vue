@@ -4,6 +4,7 @@
 """
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
+import re
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -63,6 +64,8 @@ class AuthService:
         code_obj = row[0]
         plan_name = row[1] or "未知"
         plan_duration = row[2] or 30  # 默认30天
+        plan_match = re.search(r"Y\d+", plan_name, re.IGNORECASE)
+        plan_code = plan_match.group(0).upper() if plan_match else None
         
         # 2. 检查状态
         if code_obj.status == "frozen":
@@ -118,6 +121,52 @@ class AuthService:
             )
         )
         seat_obj = existing_seat.scalars().first()
+
+        # Legacy clients deleted the local device ID on logout. Rebind only when the
+        # retained device name identifies exactly one active seat for this auth code.
+        if not seat_obj and device_name:
+            legacy_seat_result = await self.db.execute(
+                select(AuthSeat).where(
+                    AuthSeat.auth_code_id == code_obj.id,
+                    AuthSeat.device_name == device_name,
+                    AuthSeat.status == "active"
+                )
+            )
+            legacy_seats = legacy_seat_result.scalars().all()
+            if len(legacy_seats) == 1:
+                seat_obj = legacy_seats[0]
+                legacy_device_id = seat_obj.device_id
+                seat_obj.device_id = device_id
+                seat_obj.device_name = device_name
+
+                if legacy_device_id:
+                    legacy_devices_result = await self.db.execute(
+                        select(Device).where(
+                            Device.auth_code_id == code_obj.id,
+                            Device.device_id == legacy_device_id
+                        )
+                    )
+                    for legacy_device in legacy_devices_result.scalars().all():
+                        legacy_device.device_id = device_id
+                        legacy_device.device_name = device_name
+
+                    if code_obj.device_id == legacy_device_id:
+                        code_obj.device_id = device_id
+                        code_obj.device_name = device_name
+
+                    if code_obj.user_id:
+                        legacy_user_result = await self.db.execute(
+                            select(User).where(User.id == code_obj.user_id)
+                        )
+                        legacy_user = legacy_user_result.scalars().first()
+                        if legacy_user and legacy_user.device_id == legacy_device_id:
+                            legacy_user.device_id = device_id
+                            legacy_user.device_name = device_name
+
+                logger.info(
+                    f"授权码 {code} 恢复同一设备席位: "
+                    f"{legacy_device_id or 'unknown'} -> {device_id}"
+                )
         
         # 缓存席位计数，后续响应直接复用
         if not seat_obj:
@@ -243,6 +292,7 @@ class AuthService:
                 "user_id": code_obj.user_id,
                 "code": code_obj.code,
                 "plan_name": plan_name,
+                "plan_code": plan_code,
                 "expires_at": code_obj.expires_at.isoformat() if code_obj.expires_at else None,
                 "device_id": code_obj.device_id,
                 # 1.5 新增字段

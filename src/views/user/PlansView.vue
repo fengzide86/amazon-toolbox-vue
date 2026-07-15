@@ -1,200 +1,118 @@
 <template>
-  <div>
-    <h2 class="page-title">套餐价格</h2>
+  <div class="plans-page">
+    <header class="plans-header">
+      <div><h2>套餐与授权</h2><p>选择包含所需工具的套餐，购买后使用授权码登录。</p></div>
+      <div class="current-plan"><ShieldCheck :size="16" /><span>当前套餐</span><strong>{{ currentPlanName }}</strong></div>
+    </header>
+
+    <div v-if="route.query?.tool" class="upgrade-notice">
+      <LockKeyhole :size="17" />当前套餐暂未包含你选择的工具，可查看下面的可用套餐。
+    </div>
+
     <div v-if="plans.length" class="plans-grid">
-      <el-card
-        v-for="(plan, index) in plans"
+      <article
+        v-for="plan in plans"
         :key="plan.id"
-        class="plan-card"
-        :class="{ featured: isRecommended(plan) }"
-        shadow="hover"
+        :class="['plan-card', { featured: plan.is_recommended, current: isCurrent(plan), anchor: plan.plan_code === 'Y999' }]"
       >
-        <!-- 推荐标签 -->
-        <el-tag
-          v-if="isRecommended(plan)"
-          type="warning"
-          effect="dark"
-          size="small"
-          class="recommend-tag"
-        >
-          🔥 推荐
-        </el-tag>
-        <!-- SVIP 标识 -->
-        <div v-if="plan.code_prefix" class="svip-badge">
-          {{ plan.code_prefix }}
+        <div class="plan-topline">
+          <span v-if="plan.display_badge" class="plan-badge">{{ plan.display_badge }}</span>
+          <span v-if="isCurrent(plan)" class="current-badge">当前使用</span>
         </div>
-        <div class="plan-name">{{ plan.name }}</div>
-        <div class="plan-price" :style="{ color: priceColor(index) }">
-          ¥{{ plan.price }}
-        </div>
-        <div class="plan-duration">{{ plan.duration_days }} 天有效期</div>
-        <!-- 授权码前缀展示 -->
-        <div v-if="plan.code_prefix" class="code-prefix-info">
-          授权码前缀: <strong>{{ plan.code_prefix }}</strong>
-        </div>
-        <ul class="plan-features">
-          <li v-for="(feature, i) in getFeatures(plan.features)" :key="i">
-            <Check :size="14" />
-            {{ feature }}
-          </li>
+        <h3>{{ cleanPlanName(plan.name) }}</h3>
+        <div class="plan-price"><small>¥</small><strong>{{ formatPrice(plan.price) }}</strong></div>
+        <div class="plan-duration">{{ plan.duration_label || `${plan.duration_days} 天` }}</div>
+        <ul>
+          <li v-for="benefit in benefitsOf(plan)" :key="benefit"><Check :size="15" />{{ benefit }}</li>
         </ul>
-        <el-button
-          :type="isRecommended(plan) ? 'warning' : 'primary'"
-          style="width: 100%;"
-          @click="contactService"
-        >
-          联系客服购买
-        </el-button>
-      </el-card>
+        <button v-if="isCurrent(plan)" type="button" disabled>当前套餐</button>
+        <button v-else type="button" @click="contactService(plan)">联系客服购买</button>
+      </article>
     </div>
-    <div v-else class="empty-state">
-      <p>暂无套餐信息</p>
-    </div>
+
+    <div v-else class="empty-state">暂无套餐信息</div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { Check, LockKeyhole, ShieldCheck } from '@lucide/vue'
 import { getPlans } from '@/utils/api'
 import { showToast } from '@/utils'
-import { Check } from '@lucide/vue'
 
+const route = useRoute() || { query: {} }
 const plans = ref([])
+const userInfo = computed(() => {
+  try { return JSON.parse(localStorage.getItem('toolbox_user') || '{}') } catch { return {} }
+})
+const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
+const currentPlanCode = computed(() => userInfo.value.plan_code || userInfo.value.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase() || '')
 
-// 判断是否为推荐套餐（优先使用is_recommended字段，否则根据价格判断）
-function isRecommended(plan) {
-  // 如果套餐有is_recommended字段，直接使用
-  if (plan.is_recommended !== undefined) {
-    return plan.is_recommended
-  }
-  // 否则根据价格判断：价格在100-300之间的为推荐套餐
-  return plan.price >= 100 && plan.price <= 300
+function cleanPlanName(name = '') {
+  return name.replace(/^Y\d+\s*/i, '') || name
 }
 
-function priceColor(index) {
-  const colors = ['var(--studio-accent)', 'var(--studio-warning)', 'var(--studio-success)', '#8B5CF6']
-  return colors[index] || 'var(--studio-accent)'
+function formatPrice(price) {
+  const value = Number(price || 0)
+  return Number.isInteger(value) ? value : value.toFixed(2)
 }
 
-function getFeatures(featuresStr) {
-  if (!featuresStr) return ['基础功能']
+function isCurrent(plan) {
+  return Boolean(currentPlanCode.value && plan.plan_code === currentPlanCode.value)
+}
+
+function benefitsOf(plan) {
+  if (Array.isArray(plan.benefits) && plan.benefits.length) return plan.benefits
+  if (!plan.features) return ['基础工具权限']
+  return String(plan.features).split(/[+\n]/).map(item => item.trim()).filter(Boolean)
+}
+
+function contactService(plan) {
+  showToast(`购买 ${cleanPlanName(plan.name)}：请联系客服 AmazonToolbox_Support`, 'info')
+}
+
+async function loadPlans() {
   try {
-    return featuresStr.split('\n').filter(f => f.trim())
-  } catch {
-    return [featuresStr]
-  }
-}
-
-function contactService() {
-  showToast('客服微信：AmazonToolbox_Support', 'info')
-}
-
-async function loadData() {
-  try {
-    plans.value = await getPlans()
-  } catch (err) {
+    plans.value = (await getPlans()).filter(plan => plan.status === 'active')
+  } catch (error) {
     showToast('套餐加载失败', 'error')
   }
 }
 
-onMounted(loadData)
+onMounted(loadPlans)
 </script>
 
 <style scoped>
-.plans-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
-}
-
-.plan-card {
-  text-align: center;
-  position: relative;
-  padding: var(--spacing-lg);
-}
-
-.plan-card.featured {
-  border: 2px solid var(--studio-accent) !important;
-}
-
-.recommend-tag {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-}
-
-.svip-badge {
-  display: inline-block;
-  background: linear-gradient(135deg, #FFD700, #FFA500);
-  color: white;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
-}
-
-.plan-name {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--studio-text-main);
-  margin-bottom: var(--spacing-sm);
-}
-
-.plan-price {
-  font-family: var(--font-heading);
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin-bottom: var(--spacing-xs);
-}
-
-.plan-duration {
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-  margin-bottom: var(--spacing-sm);
-}
-
-.code-prefix-info {
-  margin: var(--spacing-sm) 0;
-  padding: 0.5rem;
-  background: rgba(14, 165, 233, 0.06);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  color: var(--studio-text-muted);
-}
-
-.code-prefix-info strong {
-  color: var(--studio-accent);
-  font-family: monospace;
-  letter-spacing: 1px;
-}
-
-.plan-features {
-  list-style: none;
-  padding: 0;
-  margin: var(--spacing-md) 0;
-  text-align: left;
-}
-
-.plan-features li {
-  padding: 0.4rem 0;
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-  border-bottom: 1px solid var(--color-border-light);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.plan-features li svg {
-  color: var(--studio-success);
-  flex-shrink: 0;
-}
-
-.plan-features li:last-child {
-  border-bottom: none;
-}
+.plans-page { width: min(1180px, 100%); margin: 0 auto; }
+.plans-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.plans-header h2 { margin: 0; color: var(--studio-text-main); font-size: 26px; }
+.plans-header p { margin: 7px 0 0; color: var(--studio-text-muted); font-size: 13px; }
+.current-plan { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 7px; padding: 9px 12px; border: 1px solid var(--studio-border); border-radius: 9px; color: var(--studio-accent); background: white; }
+.current-plan span { color: var(--studio-text-muted); font-size: 10px; }
+.current-plan strong { grid-column: 2; color: var(--studio-text-main); font-size: 12px; }
+.upgrade-notice { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 11px 13px; border: 1px solid rgba(255,153,0,.25); border-radius: 9px; color: #92400e; background: rgba(255,153,0,.08); font-size: 12px; }
+.plans-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.plan-card { position: relative; min-height: 390px; display: flex; flex-direction: column; padding: 20px; border: 1px solid var(--studio-border); border-radius: var(--radius-lg); background: white; box-shadow: var(--studio-shadow); }
+.plan-card.featured { transform: translateY(-5px); border: 2px solid var(--studio-warning); box-shadow: 0 16px 36px rgba(255,153,0,.12); }
+.plan-card.current { border-color: var(--studio-accent-light); }
+.plan-card.anchor { background: linear-gradient(180deg, #fff 0%, #fffbeb 100%); }
+.plan-topline { min-height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-badge, .current-badge { padding: 4px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.plan-badge { color: white; background: var(--studio-warning); }
+.current-badge { color: var(--studio-accent-hover); background: var(--studio-accent-bg); }
+.plan-card h3 { margin: 16px 0 8px; color: var(--studio-text-main); font-size: 17px; }
+.plan-price { display: flex; align-items: flex-start; color: var(--studio-text-main); }
+.plan-price small { margin-top: 7px; font-size: 14px; }
+.plan-price strong { font-size: 34px; line-height: 1.1; }
+.plan-duration { margin-top: 5px; color: var(--studio-text-muted); font-size: 11px; }
+.plan-card ul { flex: 1; margin: 20px 0; padding: 16px 0 0; border-top: 1px solid var(--studio-border); list-style: none; }
+.plan-card li { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 11px; color: var(--studio-text-main); font-size: 12px; line-height: 1.5; }
+.plan-card li svg { flex-shrink: 0; margin-top: 1px; color: var(--studio-success); }
+.plan-card button { width: 100%; min-height: 40px; border: 0; border-radius: 8px; color: white; background: var(--studio-accent); font-size: 12px; font-weight: 800; cursor: pointer; }
+.featured button, .anchor button { background: var(--studio-warning); }
+.plan-card button:disabled { color: var(--studio-text-muted); background: var(--studio-bg-hover); cursor: default; }
+.empty-state { padding: 80px; color: var(--studio-text-muted); text-align: center; }
+@media (max-width: 1050px) { .plans-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .plan-card.featured { transform: none; } }
+@media (max-width: 620px) { .plans-header { flex-direction: column; } .plans-grid { grid-template-columns: 1fr; } }
 </style>

@@ -20,6 +20,10 @@ export class ElectronAutomationAdapter {
     return this.api.resume()
   }
 
+  completeUserAction() {
+    return this.api.completeUserAction?.()
+  }
+
   cancel() {
     return this.api.cancel()
   }

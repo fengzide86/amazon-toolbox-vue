@@ -1,4 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const crypto = require('crypto');
+const os = require('os');
 
 function readControlApiBase() {
   const prefix = '--toolbox-control-api-base=';
@@ -7,6 +9,18 @@ function readControlApiBase() {
 }
 
 const controlApiBase = readControlApiBase();
+
+// Expose only a hash of machine attributes, never the raw home directory.
+function buildStableDeviceIdentity() {
+  const source = [os.hostname(), os.homedir(), os.platform(), os.arch()].join('|');
+  const digest = crypto.createHash('sha256').update(source).digest('hex').slice(0, 20).toUpperCase();
+  return {
+    deviceId: `DEV-${digest}`,
+    deviceName: os.hostname() || 'Windows 设备',
+  };
+}
+
+const stableDeviceIdentity = buildStableDeviceIdentity();
 
 // 将 IPC 事件桥接到 window 事件，供 Vue 组件监听
 ipcRenderer.on('update-download-progress', (event, data) => {
@@ -29,6 +43,8 @@ ipcRenderer.on('update-error', (event, data) => {
 contextBridge.exposeInMainWorld('electronAPI', {
   runtime: {
     controlApiBase,
+    deviceId: stableDeviceIdentity.deviceId,
+    deviceName: stableDeviceIdentity.deviceName,
   },
   startDownloadUpdate: () => ipcRenderer.send('start-download-update'),
   installUpdate: () => ipcRenderer.send('install-update'),
@@ -51,6 +67,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     start: (tool) => ipcRenderer.invoke('automation:start', tool),
     pause: () => ipcRenderer.invoke('automation:pause'),
     resume: () => ipcRenderer.invoke('automation:resume'),
+    completeUserAction: () => ipcRenderer.invoke('automation:complete-user-action'),
     cancel: () => ipcRenderer.invoke('automation:cancel'),
     registerBrowser: (webContentsId) => ipcRenderer.invoke('automation:register-browser', webContentsId),
     unregisterBrowser: () => ipcRenderer.invoke('automation:unregister-browser'),

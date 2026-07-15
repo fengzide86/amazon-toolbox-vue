@@ -10,6 +10,8 @@ const EVENTS = Object.freeze({
   STEP_COMPLETED: 'step.completed',
   RUN_PAUSED: 'run.paused',
   RUN_RESUMED: 'run.resumed',
+  USER_ACTION_REQUIRED: 'user.action_required',
+  USER_ACTION_COMPLETED: 'user.action_completed',
   RUN_COMPLETED: 'run.completed',
   RUN_FAILED: 'run.failed',
   RUN_CANCELLED: 'run.cancelled',

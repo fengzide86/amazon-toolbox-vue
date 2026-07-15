@@ -86,7 +86,7 @@ describe('认证流程集成测试', () => {
 
       // Step 7: 验证跳转
       vi.advanceTimersByTime(1200)
-      expect(mockPush).toHaveBeenCalledWith('/user/dashboard')
+      expect(mockPush).toHaveBeenCalledWith('/user/tools')
     })
 
     it('错误流程：输入无效授权码 → 显示错误 → 可重新输入', async () => {

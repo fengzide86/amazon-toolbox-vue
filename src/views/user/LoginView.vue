@@ -83,7 +83,7 @@
         <!-- 成功消息 -->
         <div class="success-message" :class="{ show: showSuccess }">
           <CircleCheck :size="18" />
-          <span>授权成功！正在跳转到首页...</span>
+          <span>授权成功！正在打开工具箱...</span>
         </div>
 
         <!-- 连接状态 -->
@@ -100,11 +100,15 @@
                 <KeyRound :size="18" />
               </span>
               <input
+                ref="authCodeInput"
                 type="text"
                 id="authCode"
                 v-model="authCode"
                 placeholder="请输入您的授权码"
                 autocomplete="one-time-code"
+                autocapitalize="characters"
+                spellcheck="false"
+                autofocus
                 required
                 @focus="inputFocused = true"
                 @blur="inputFocused = false"
@@ -185,7 +189,7 @@
         </div>
         <div class="modal-notice">
           <AlertTriangle :size="16" />
-          每个授权码只能绑定一台设备，如需更换设备请联系客服。
+          系统会根据套餐自动绑定当前设备，如需更换或增加设备请联系客服。
         </div>
         <div class="modal-btns">
           <button class="btn-confirm" @click="closeModals">我知道了</button>
@@ -233,7 +237,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Auth, showToast, getDeviceId, getDeviceName } from '@/utils'
 import { verifyAuthCode } from '@/utils/api'
@@ -246,6 +250,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const authCode = ref('')
+const authCodeInput = ref(null)
 const isLoading = ref(false)
 const showError = ref(false)
 const showSuccess = ref(false)
@@ -282,7 +287,7 @@ const helpSteps = [
   '购买套餐后，您会收到一个授权码',
   '在此页面输入授权码进行激活',
   '系统会自动绑定您的 Windows 设备',
-  '激活成功后即可使用所有工具箱功能',
+  '激活成功后即可使用当前套餐包含的工具',
 ]
 
 // 连接状态
@@ -321,6 +326,16 @@ function validateAuthCode(code) {
   return { valid: true }
 }
 
+function focusLoginInput() {
+  nextTick(() => {
+    const input = authCodeInput.value
+    if (!input || isLoading.value) return
+    input.focus({ preventScroll: true })
+    const end = input.value.length
+    input.setSelectionRange?.(end, end)
+  })
+}
+
 function handleLogin() {
   showError.value = false
   showSuccess.value = false
@@ -330,6 +345,7 @@ function handleLogin() {
     errorMessage.value = validation.message
     showError.value = true
     showToast(validation.message, 'error')
+    focusLoginInput()
     return
   }
 
@@ -355,13 +371,14 @@ function handleLogin() {
         showToast('授权成功！正在跳转...', 'success')
         // 延迟跳转，让用户看到成功提示
         setTimeout(() => {
-          router.push('/user/dashboard')
+          router.push('/user/tools')
         }, 800)
       } else {
         errorMessage.value = res.message
         showError.value = true
         showToast(res.message, 'error')
         isLoading.value = false
+        focusLoginInput()
       }
     })
     .catch((err) => {
@@ -370,6 +387,7 @@ function handleLogin() {
       isOnline.value = false
       showToast('网络连接失败', 'error')
       isLoading.value = false
+      focusLoginInput()
     })
 }
 
@@ -428,6 +446,7 @@ onMounted(() => {
     errorMessage.value = autoLoginError
     showError.value = true
   }
+  focusLoginInput()
 })
 
 onUnmounted(() => {
@@ -1014,6 +1033,14 @@ onUnmounted(() => {
   font-size: 0.9rem;
   font-family: var(--font-family);
   color: var(--studio-text-main);
+  caret-color: var(--studio-accent);
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
   transition: all 0.3s ease;
   outline: none;
 }

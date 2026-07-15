@@ -324,6 +324,7 @@ ipcMain.handle('automation:start', async (_event, tool) => {
 });
 ipcMain.handle('automation:pause', () => getAutomationRunner().pause());
 ipcMain.handle('automation:resume', () => getAutomationRunner().resume());
+ipcMain.handle('automation:complete-user-action', () => getAutomationRunner().completeUserAction());
 ipcMain.handle('automation:cancel', () => getAutomationRunner().cancel());
 ipcMain.handle('automation:register-browser', (event, webContentsId) => {
   const guest = webContents.fromId(Number(webContentsId));

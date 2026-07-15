@@ -17,7 +17,7 @@ import { Home } from '@lucide/vue'
 const route = useRoute()
 
 const homePath = computed(() => {
-  return route.path?.startsWith('/admin') ? '/admin/dashboard' : '/user/dashboard'
+  return route.path?.startsWith('/admin') ? '/admin/dashboard' : '/user/tools'
 })
 
 const currentTitle = computed(() => {

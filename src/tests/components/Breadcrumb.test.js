@@ -112,7 +112,7 @@ describe('Breadcrumb', () => {
         }
       })
       const homeLink = wrapper.findComponent(RouterLinkStub)
-      expect(homeLink.props('to')).toBe('/user/dashboard')
+      expect(homeLink.props('to')).toBe('/user/tools')
     })
 
     it('首页链接应该包含首页图标', () => {

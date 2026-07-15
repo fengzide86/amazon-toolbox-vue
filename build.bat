@@ -69,7 +69,7 @@ for /L %%R in (1,1,3) do (
     if "!BACKEND_COPIED!"=="0" (
         copy /Y "dist\toolbox-backend.exe" "..\..\electron\toolbox-backend.exe" >nul
         if errorlevel 1 (
-            echo [INFO] Bundled backend is still busy; retrying (%%R/3)...
+            echo [INFO] Bundled backend is still busy; retry %%R of 3...
             timeout /t 2 /nobreak >nul
         ) else (
             set "BACKEND_COPIED=1"

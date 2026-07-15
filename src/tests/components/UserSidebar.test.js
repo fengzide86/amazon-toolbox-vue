@@ -33,8 +33,8 @@ describe('UserSidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
-    // 设置初始路由
-    mockRouter.push('/user/dashboard')
+    // 工具箱是登录后的默认页
+    mockRouter.push('/user/tools')
   })
 
   describe('品牌区渲染', () => {
@@ -66,8 +66,8 @@ describe('UserSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      // 6 个菜单项 + 1 个退出按钮（FAQ 已合并进 AI 客服）
-      expect(menuItems.length).toBe(7)
+      // 4 个核心菜单项 + 1 个退出按钮
+      expect(menuItems.length).toBe(5)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -77,18 +77,17 @@ describe('UserSidebar', () => {
       await flushPromises()
 
       const labels = wrapper.findAll('.menu-label').map(el => el.text())
-      expect(labels).toContain('首页总览')
-      expect(labels).toContain('功能入口')
-      expect(labels).toContain('个人日志')
-      expect(labels).not.toContain('常见问题')
-      expect(labels).toContain('套餐价格')
-      expect(labels).toContain('设备管理')
+      expect(labels).toContain('工具箱')
+      expect(labels).toContain('使用记录')
+      expect(labels).toContain('套餐与授权')
       expect(labels).toContain('AI 客服')
       expect(labels).toContain('退出登录')
+      expect(labels).not.toContain('首页总览')
+      expect(labels).not.toContain('设备管理')
     })
 
     it('当前路由对应的菜单项应该有 is-active 类', async () => {
-      mockRouter.push('/user/dashboard')
+      mockRouter.push('/user/tools')
       await mockRouter.isReady()
 
       const wrapper = mount(UserSidebar, {
@@ -98,7 +97,7 @@ describe('UserSidebar', () => {
 
       const activeItems = wrapper.findAll('.menu-nav-item.is-active')
       expect(activeItems.length).toBe(1)
-      expect(activeItems[0].text()).toContain('首页总览')
+      expect(activeItems[0].text()).toContain('工具箱')
     })
   })
 

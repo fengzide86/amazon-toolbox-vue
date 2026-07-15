@@ -163,7 +163,7 @@ describe('LoginView', () => {
       expect(mockShowToast).toHaveBeenCalledWith('授权成功！正在跳转...', 'success')
 
       vi.advanceTimersByTime(1200)
-      expect(mockPush).toHaveBeenCalledWith('/user/dashboard')
+      expect(mockPush).toHaveBeenCalledWith('/user/tools')
     })
 
     it('登录失败应该显示错误信息', async () => {

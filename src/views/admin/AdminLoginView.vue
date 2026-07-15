@@ -35,14 +35,16 @@
               </svg>
             </span>
             <input
+              ref="passwordInput"
               :type="showPassword ? 'text' : 'password'"
               id="adminPassword"
               v-model="password"
               placeholder="请输入管理员密码"
               autocomplete="current-password"
+              autofocus
               required
             >
-            <button type="button" class="toggle-password" @click="showPassword = !showPassword" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :title="showPassword ? '隐藏密码' : '显示密码'">
+            <button type="button" class="toggle-password" @mousedown.prevent @click="togglePasswordVisibility" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :title="showPassword ? '隐藏密码' : '显示密码'">
               <svg v-if="!showPassword" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
               </svg>
@@ -70,7 +72,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Auth, showToast } from '@/utils'
 import { adminLogin } from '@/utils/api'
@@ -79,11 +81,27 @@ import { useUserStore } from '@/stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 const password = ref('')
+const passwordInput = ref(null)
 const showPassword = ref(false)
 const isLoading = ref(false)
 const showError = ref(false)
 const showSuccess = ref(false)
 const errorMessage = ref('')
+
+function focusPasswordInput() {
+  nextTick(() => {
+    const input = passwordInput.value
+    if (!input || isLoading.value) return
+    input.focus({ preventScroll: true })
+    const end = input.value.length
+    input.setSelectionRange?.(end, end)
+  })
+}
+
+function togglePasswordVisibility() {
+  showPassword.value = !showPassword.value
+  focusPasswordInput()
+}
 
 function handleLogin() {
   showError.value = false
@@ -91,6 +109,7 @@ function handleLogin() {
 
   if (!password.value.trim()) {
     showToast('请输入密码', 'error')
+    focusPasswordInput()
     return
   }
 
@@ -120,6 +139,7 @@ function handleLogin() {
         showError.value = true
         showToast(res.message, 'error')
         isLoading.value = false
+        focusPasswordInput()
       }
     })
     .catch((err) => {
@@ -127,12 +147,15 @@ function handleLogin() {
       showError.value = true
       showToast('连接失败', 'error')
       isLoading.value = false
+      focusPasswordInput()
     })
 }
 
 function goToUserLogin() {
   router.push('/user/login')
 }
+
+onMounted(focusPasswordInput)
 </script>
 
 <style scoped>
@@ -213,6 +236,14 @@ function goToUserLogin() {
   border: 2px solid var(--color-border);
   border-radius: 12px;
   color: var(--color-foreground);
+  caret-color: var(--studio-accent);
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
   font-size: 1rem;
   font-family: var(--font-family);
   transition: all var(--transition);
@@ -236,6 +267,7 @@ function goToUserLogin() {
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-muted);
+  pointer-events: none;
 }
 
 .input-icon svg {

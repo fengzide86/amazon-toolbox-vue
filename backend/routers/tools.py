@@ -16,7 +16,7 @@ from database import get_db
 from models import Setting, LaunchToken, AuthCode
 from core.logging import get_logger
 from core.dependencies import get_current_admin, get_current_user
-from core.response import success_response, error_response
+from core.response import success_response, error_response, ErrorCodes
 from core.config import settings
 from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
 
@@ -48,6 +48,11 @@ def _slugify(value: str) -> str:
     value = re.sub(r"[^a-z0-9_]+", "_", value)
     value = re.sub(r"_+", "_", value).strip("_")
     return value or "tool"
+
+
+def _plan_code(plan_name: str) -> str | None:
+    match = re.search(r"Y\d+", plan_name or "", re.IGNORECASE)
+    return match.group(0).upper() if match else None
 
 
 def normalize_tool_config(tool: dict, index: int = 0) -> dict:
@@ -293,7 +298,7 @@ async def create_launch_token(
     device_id = current_user.get("device_id")
     
     if not auth_code_id:
-        return error_response("未找到授权信息", 401)
+        return error_response("未找到授权信息", ErrorCodes.UNAUTHORIZED)
     
     # 1. 检查授权码
     result = await db.execute(
@@ -302,19 +307,23 @@ async def create_launch_token(
     auth_code = result.scalar_one_or_none()
     
     if not auth_code:
-        return error_response("授权码不存在", 404)
+        return error_response("授权码不存在", ErrorCodes.AUTH_CODE_INVALID)
     
     if auth_code.status != "active":
-        return error_response("授权码状态异常", 403)
+        return error_response("授权码状态异常", ErrorCodes.AUTH_CODE_FROZEN)
     
     if auth_code.expires_at and auth_code.expires_at < datetime.now():
-        return error_response("授权码已过期", 403)
+        return error_response("授权码已过期", ErrorCodes.AUTH_CODE_EXPIRED)
     
     # 2. 检查平台权限
     platform_scope = auth_code.platform_scope or "amazon"
     allowed_platforms = [p.strip() for p in platform_scope.split(",")]
     if platform_key not in allowed_platforms:
-        return error_response(f"授权码不包含 {platform_key} 平台权限", 403)
+        return error_response(
+            f"当前授权暂未包含 {platform_key} 平台",
+            ErrorCodes.PLATFORM_NOT_INCLUDED,
+            {"reason": "platform_not_included", "platform_key": platform_key},
+        )
     
     # 3. 获取工具配置
     result = await db.execute(select(Setting).where(Setting.key == "tool_configs"))
@@ -342,28 +351,52 @@ async def create_launch_token(
     # 5. 检查工具状态
     release_status = target_tool.get("release_status", "available")
     if release_status not in ["available", "beta"]:
-        return error_response(f"工具当前状态不可启动: {release_status}", 403)
+        return error_response(
+            "该工具暂时不可用，请稍后再试",
+            ErrorCodes.TOOL_UNAVAILABLE,
+            {"reason": "tool_unavailable", "release_status": release_status},
+        )
     
-    # 6. 检查套餐工具权限
-    # 从 Plan 的 features 字段读取允许的工具列表
+    # 6. 检查套餐工具权限。新旧数据兼容：
+    # - 工具配置 available_plans 是主权限来源；
+    # - Plan.features 中的 JSON allowed_tools 继续作为可选的精细覆盖。
     if auth_code.plan_id:
         from models import Plan
         plan_result = await db.execute(
             select(Plan).where(Plan.id == auth_code.plan_id)
         )
         plan = plan_result.scalar_one_or_none()
+        if plan:
+            plan_code = _plan_code(plan.name)
+            available_plans = [str(item).upper() for item in target_tool.get("available_plans", [])]
+            if available_plans and plan_code not in available_plans:
+                return error_response(
+                    "当前套餐暂未包含该工具",
+                    ErrorCodes.PLAN_TOOL_NOT_INCLUDED,
+                    {
+                        "reason": "plan_not_included",
+                        "tool_id": tool_id,
+                        "plan_code": plan_code,
+                        "available_plans": available_plans,
+                    },
+                )
+
         if plan and plan.features:
             try:
                 plan_features = json.loads(plan.features)
-                allowed_tools = plan_features.get("allowed_tools", [])
+                allowed_tools = plan_features.get("allowed_tools", []) if isinstance(plan_features, dict) else []
                 # 如果有配置允许工具列表，则检查当前工具是否在列表中
                 if allowed_tools and tool_id not in allowed_tools:
                     # 检查 capability_key 是否在允许列表中
                     capability_key = target_tool.get("capability_key")
                     if capability_key and capability_key not in allowed_tools:
-                        return error_response("当前套餐暂不包含该工具", 403)
+                        return error_response(
+                            "当前套餐暂未包含该工具",
+                            ErrorCodes.PLAN_TOOL_NOT_INCLUDED,
+                            {"reason": "plan_not_included", "tool_id": tool_id},
+                        )
             except (json.JSONDecodeError, TypeError):
-                # features 解析失败，保守策略：拒绝启动
+                # 旧套餐是中文权益文案，权限已由 available_plans 兜底。
                 pass
     
     # 7. 检查 seat 有效性

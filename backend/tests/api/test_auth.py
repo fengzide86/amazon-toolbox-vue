@@ -6,7 +6,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Setting, Plan, AuthCode, User
+from models import Setting, Plan, AuthCode, AuthSeat, Device, User
 from core.security import hash_password
 
 
@@ -88,7 +88,7 @@ class TestAuthVerify:
     async def test_verify_valid_code(self, client: AsyncClient, db_session: AsyncSession):
         """测试有效授权码验证"""
         # 创建套餐
-        plan = Plan(name="测试套餐", price=99.00, duration_days=30, status="active")
+        plan = Plan(name="Y199 测试套餐", price=99.00, duration_days=30, status="active")
         db_session.add(plan)
         await db_session.commit()
         
@@ -112,7 +112,8 @@ class TestAuthVerify:
         data = response.json()
         assert data["success"] is True
         assert "token" in data["data"]
-        assert data["data"]["plan_name"] == "测试套餐"
+        assert data["data"]["plan_name"] == "Y199 测试套餐"
+        assert data["data"]["plan_code"] == "Y199"
     
     @pytest.mark.asyncio
     async def test_verify_invalid_code(self, client: AsyncClient):
@@ -251,6 +252,67 @@ class TestAuthVerify:
         data = response.json()
         assert data["success"] is True
         assert "token" in data["data"]
+
+    @pytest.mark.asyncio
+    async def test_same_device_name_recovers_rotated_legacy_device_id(
+        self, client: AsyncClient, db_session: AsyncSession
+    ):
+        """旧客户端退出后丢失 device_id，同一电脑不得被当成第二个席位。"""
+        plan = Plan(name="Y15 体验卡", price=15, duration_days=1, status="active")
+        db_session.add(plan)
+        await db_session.flush()
+        auth_code = AuthCode(
+            code="LEGACY-ROTATED-DEVICE",
+            plan_id=plan.id,
+            max_devices=1,
+            seat_limit=1,
+            status="active",
+            device_id="DEV-OLD",
+            device_name="DESKTOP-SAME",
+        )
+        db_session.add(auth_code)
+        await db_session.flush()
+        user = User(
+            auth_code_id=auth_code.id,
+            device_id="DEV-OLD",
+            device_name="DESKTOP-SAME",
+            total_seats=1,
+        )
+        db_session.add(user)
+        await db_session.flush()
+        auth_code.user_id = user.id
+        seat = AuthSeat(
+            auth_code_id=auth_code.id,
+            user_id=user.id,
+            device_id="DEV-OLD",
+            device_name="DESKTOP-SAME",
+            seat_no=1,
+            status="active",
+        )
+        device = Device(
+            auth_code_id=auth_code.id,
+            device_id="DEV-OLD",
+            device_name="DESKTOP-SAME",
+        )
+        db_session.add_all([seat, device])
+        await db_session.commit()
+
+        response = await client.post("/api/auth/verify", json={
+            "code": "LEGACY-ROTATED-DEVICE",
+            "device_id": "DEV-STABLE-NEW",
+            "device_name": "DESKTOP-SAME",
+        })
+        body = response.json()
+
+        assert body["success"] is True
+        assert body["data"]["seat_used"] == 1
+        assert body["data"]["device_used"] == 1
+        await db_session.refresh(seat)
+        await db_session.refresh(device)
+        await db_session.refresh(user)
+        assert seat.device_id == "DEV-STABLE-NEW"
+        assert device.device_id == "DEV-STABLE-NEW"
+        assert user.device_id == "DEV-STABLE-NEW"
 
 
 class TestGetCurrentUser:

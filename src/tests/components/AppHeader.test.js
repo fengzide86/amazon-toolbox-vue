@@ -11,7 +11,9 @@ import AppHeader from '@/components/AppHeader.vue'
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: '/', component: { template: '<div>Home</div>' } }
+    { path: '/', component: { template: '<div>Home</div>' } },
+    { path: '/user/login', component: { template: '<div>User login</div>' } },
+    { path: '/admin/login', component: { template: '<div>Admin login</div>' } }
   ]
 })
 
@@ -61,5 +63,33 @@ describe('AppHeader', () => {
       }
     })
     expect(wrapper.props('isAdmin')).toBe(true)
+  })
+
+  it('退出登录后应保留本机设备身份', async () => {
+    localStorage.setItem('toolbox_device_id', 'DEV-STABLE-001')
+    localStorage.setItem('toolbox_device_name', 'TRAINING-PC')
+    localStorage.setItem('toolbox_role', 'user')
+
+    const wrapper = mount(AppHeader, {
+      global: {
+        plugins: [router],
+        stubs: {
+          'router-link': true,
+          'el-select': true,
+          'el-option': true,
+          'el-dropdown': {
+            template: '<button class="logout-test" @click="$emit(\'command\', \'logout\')">logout</button>'
+          },
+          'el-dropdown-menu': true,
+          'el-dropdown-item': true
+        }
+      }
+    })
+
+    await wrapper.find('.logout-test').trigger('click')
+
+    expect(localStorage.getItem('toolbox_device_id')).toBe('DEV-STABLE-001')
+    expect(localStorage.getItem('toolbox_device_name')).toBe('TRAINING-PC')
+    expect(localStorage.getItem('toolbox_role')).toBeNull()
   })
 })

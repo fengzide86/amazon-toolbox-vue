@@ -29,24 +29,25 @@ const routes = [
   {
     path: '/user',
     component: () => import('@/layouts/UserLayout.vue'),
+    redirect: { name: 'UserTools' },
     children: [
       {
         path: 'dashboard',
         name: 'UserDashboard',
-        component: () => import('@/views/user/DashboardView.vue'),
-        meta: { title: '首页总览', skeleton: 'dashboard' }
+        redirect: { name: 'UserTools' },
+        meta: { title: '工具箱' }
       },
       {
         path: 'tools',
         name: 'UserTools',
         component: () => import('@/views/user/ToolsView.vue'),
-        meta: { title: '功能入口', skeleton: 'grid' }
+        meta: { title: '工具箱', skeleton: 'grid' }
       },
       {
         path: 'logs',
         name: 'UserLogs',
         component: () => import('@/views/user/LogsView.vue'),
-        meta: { title: '个人日志与问题反馈', skeleton: 'table' }
+        meta: { title: '使用记录', skeleton: 'table' }
       },
       {
         path: 'faq',
@@ -57,7 +58,7 @@ const routes = [
         path: 'plans',
         name: 'UserPlans',
         component: () => import('@/views/user/PlansView.vue'),
-        meta: { title: '套餐价格', skeleton: 'grid' }
+        meta: { title: '套餐与授权', skeleton: 'grid' }
       },
       {
         path: 'devices',
@@ -162,7 +163,7 @@ router.beforeEach((to, from, next) => {
     if (to.name === 'UserLogin' || to.name === 'AdminLogin' || to.name === 'UserTerms') {
       if (isAuthenticated) {
         // 已登录，根据角色跳转
-        next({ name: isAdmin ? 'AdminDashboard' : 'UserDashboard' })
+        next({ name: isAdmin ? 'AdminDashboard' : 'UserTools' })
       } else {
         next()
       }
@@ -176,7 +177,7 @@ router.beforeEach((to, from, next) => {
         return
       }
       if (!isAdmin) {
-        next({ name: 'UserDashboard' })
+        next({ name: 'UserTools' })
         return
       }
       next()

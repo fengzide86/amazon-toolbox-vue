@@ -11,7 +11,7 @@
         >
           <Menu :size="16" />
         </button>
-        <router-link :to="isAdmin ? '/admin/dashboard' : '/user/dashboard'" class="logo-link">
+        <router-link :to="isAdmin ? '/admin/dashboard' : '/user/tools'" class="logo-link">
           <div class="logo-icon">
             <Zap :size="16" />
           </div>
@@ -40,8 +40,7 @@
       </div>
 
       <div class="header-right">
-        <!-- SVIP 徽章（仅用户端显示） -->
-        <span v-if="!isAdmin && isSvip" class="badge-svip">SVIP</span>
+        <span v-if="!isAdmin && planBadge" class="badge-svip">{{ planBadge }}</span>
 
         <!-- 管理员标记 -->
         <span v-if="isAdmin" class="admin-badge">Owner</span>
@@ -95,7 +94,7 @@ const emit = defineEmits(['toggle-sidebar', 'platform-change'])
 const router = useRouter()
 const platformStore = usePlatformStore()
 
-const showPlatformSwitcher = computed(() => platformStore.availablePlatforms.length > 0)
+const showPlatformSwitcher = computed(() => availablePlatformsForUser.value.length > 1)
 
 // 用户信息
 const displayName = computed(() => {
@@ -189,13 +188,15 @@ const handleCommand = (command) => {
   }
 }
 
-// 检查是否 SVIP
-const isSvip = computed(() => {
+const planBadge = computed(() => {
   try {
     const user = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
-    return user.plan_name && user.plan_name.includes('冲刺')
+    const code = user.plan_code || user.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase()
+    if (code === 'Y999') return '陪跑包'
+    if (code === 'Y199') return '冲刺包'
+    return ''
   } catch (e) {
-    return false
+    return ''
   }
 })
 
@@ -206,7 +207,7 @@ function handleLogout() {
   localStorage.removeItem('toolbox_current_platform')
   localStorage.removeItem('toolbox_admin_platform')
   localStorage.removeItem('toolbox_platform_scope')
-  localStorage.removeItem('toolbox_device_id')
+  // Device identity is machine-scoped, so it must survive logout.
   router.push(props.isAdmin ? '/admin/login' : '/user/login')
 }
 

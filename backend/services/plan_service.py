@@ -3,6 +3,8 @@
 包含套餐 CRUD、缓存管理、排序等业务逻辑
 """
 from typing import Optional, Dict, Any, List
+import json
+import re
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -244,19 +246,41 @@ class PlanService:
     
     def _serialize_plan(self, plan: Plan, detailed: bool = False) -> dict:
         """序列化套餐对象"""
+        name = plan.name or ""
+        plan_match = re.search(r"Y\d+", name, re.IGNORECASE)
+        plan_code = plan_match.group(0).upper() if plan_match else None
+        feature_text = plan.features or ""
+        benefits = []
+        allowed_tools = []
+        if feature_text:
+            try:
+                parsed = json.loads(feature_text)
+                if isinstance(parsed, dict):
+                    benefits = parsed.get("benefits", []) or []
+                    allowed_tools = parsed.get("allowed_tools", []) or []
+                elif isinstance(parsed, list):
+                    benefits = parsed
+            except (ValueError, TypeError):
+                benefits = [item.strip() for item in feature_text.replace("+", "\n").splitlines() if item.strip()]
         data = {
             "id": plan.id,
             "name": plan.name,
             "price": float(plan.price),
             "duration_days": plan.duration_days,
+            "duration_label": f"{plan.duration_days} 天",
             "status": plan.status,
             "code_prefix": plan.code_prefix,
             "sort_order": plan.sort_order,
+            "plan_code": plan_code,
+            "benefits": benefits,
+            "allowed_tools": allowed_tools,
+            "is_recommended": plan_code == "Y199",
+            "display_badge": "赛期主推" if plan_code == "Y199" else ("全程服务" if plan_code == "Y999" else None),
+            "features": plan.features,
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
         }
         
         if detailed:
-            data["features"] = plan.features
             data["updated_at"] = plan.updated_at.isoformat() if plan.updated_at else None
         
         return data

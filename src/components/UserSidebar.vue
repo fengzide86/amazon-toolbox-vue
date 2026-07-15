@@ -10,25 +10,17 @@
 
     <!-- 导航菜单 -->
     <nav class="sidebar-menu-nav">
-      <router-link to="/user/dashboard" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/dashboard') ? 'page' : undefined">
-        <LayoutDashboard :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">首页总览</span>
-      </router-link>
       <router-link to="/user/tools" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/tools') ? 'page' : undefined">
         <Zap :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">功能入口</span>
+        <span class="menu-label">工具箱</span>
       </router-link>
       <router-link to="/user/logs" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/logs') ? 'page' : undefined">
         <ClipboardList :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">个人日志</span>
+        <span class="menu-label">使用记录</span>
       </router-link>
       <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
         <ShieldCheck :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">套餐价格</span>
-      </router-link>
-      <router-link to="/user/devices" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/devices') ? 'page' : undefined">
-        <Monitor :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">设备管理</span>
+        <span class="menu-label">套餐与授权</span>
       </router-link>
       <router-link to="/user/ai-chat" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
         <MessageCircle :size="14" class="menu-icon" aria-hidden="true" />
@@ -49,10 +41,7 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
 import { Auth, showToast } from '@/utils'
-import {
-  Zap, LayoutDashboard, ClipboardList,
-  ShieldCheck, Monitor, MessageCircle, LogOut
-} from '@lucide/vue'
+import { Zap, ClipboardList, ShieldCheck, MessageCircle, LogOut } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()

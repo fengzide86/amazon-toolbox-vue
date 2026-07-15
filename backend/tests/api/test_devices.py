@@ -3,9 +3,10 @@
 """
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Device, AuthCode, User, Plan
+from models import Device, AuthCode, AuthSeat, User, Plan
 from tests.conftest import get_data
 
 
@@ -67,10 +68,25 @@ class TestGetMyDevices:
 @pytest.mark.asyncio
 class TestUnbindDevice:
     async def test_unbind_device_admin(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        _, _, devices = await seed_devices(db_session)
+        auth_code, user, devices = await seed_devices(db_session)
+        seat = AuthSeat(
+            auth_code_id=auth_code.id,
+            user_id=user.id,
+            device_id=devices[0].device_id,
+            device_name=devices[0].device_name,
+            status="active"
+        )
+        db_session.add(seat)
+        await db_session.commit()
+
         resp = await client.post(f"/api/devices/unbind?device_id={devices[0].id}", headers=auth_headers)
         assert resp.status_code == 200
         assert get_data(resp)["success"] is True
+
+        released_seat = (
+            await db_session.execute(select(AuthSeat).where(AuthSeat.id == seat.id))
+        ).scalars().one()
+        assert released_seat.status == "inactive"
 
     async def test_unbind_device_requires_admin(self, client: AsyncClient, db_session: AsyncSession):
         _, _, devices = await seed_devices(db_session)

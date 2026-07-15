@@ -28,6 +28,7 @@ class AutomationRuntime {
     this.page = null;
     this.cancelRequested = false;
     this.pauseWaiters = [];
+    this.userActionWaiters = [];
     this.eventSequence = 0;
     this.execution = null;
     this.hostSequence = 0;
@@ -62,6 +63,7 @@ class AutomationRuntime {
     this.steps = createSteps(tool);
     this.status = 'running';
     this.cancelRequested = false;
+    this.userActionWaiters = [];
     this.eventSequence = 0;
 
     this.emit(EVENTS.RUN_STARTED, {
@@ -299,6 +301,20 @@ class AutomationRuntime {
     return { status: this.status };
   }
 
+  requestUserAction(action = {}) {
+    this.status = 'waiting_user';
+    this.emit(EVENTS.USER_ACTION_REQUIRED, { action });
+    return new Promise(resolve => this.userActionWaiters.push(resolve));
+  }
+
+  completeUserAction() {
+    if (this.status !== 'waiting_user') return { status: this.status };
+    this.status = 'running';
+    this.userActionWaiters.splice(0).forEach(resolve => resolve());
+    this.emit(EVENTS.USER_ACTION_COMPLETED);
+    return { status: this.status };
+  }
+
   async cancel(emitEvent = true) {
     if (['idle', 'completed', 'failed', 'cancelled'].includes(this.status)) {
       await this.closeBrowser();
@@ -307,6 +323,7 @@ class AutomationRuntime {
     this.cancelRequested = true;
     this.status = 'cancelled';
     this.pauseWaiters.splice(0).forEach(resolve => resolve());
+    this.userActionWaiters.splice(0).forEach(resolve => resolve());
     await this.closeBrowser();
     if (emitEvent) this.emit(EVENTS.RUN_CANCELLED);
     return { status: this.status };
@@ -385,6 +402,7 @@ process.on('message', async message => {
     if (command === 'start') data = await runtime.start(payload.tool);
     else if (command === 'pause') data = runtime.pause();
     else if (command === 'resume') data = runtime.resume();
+    else if (command === 'complete-user-action') data = runtime.completeUserAction();
     else if (command === 'cancel') data = await runtime.cancel();
     else if (command === 'shutdown') data = await runtime.shutdown();
     else throw Object.assign(new Error(`Unknown runner command: ${command}`), { code: 'UNKNOWN_COMMAND' });

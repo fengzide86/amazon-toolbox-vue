@@ -13,6 +13,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
   const result = ref(null)
   const error = ref(null)
   const artifacts = ref([])
+  const userAction = ref(null)
 
   let adapter = null
   let unsubscribe = null
@@ -32,6 +33,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     [RUN_STATUS.IDLE]: '未开始',
     [RUN_STATUS.PREPARING]: '准备中',
     [RUN_STATUS.RUNNING]: '执行中',
+    [RUN_STATUS.WAITING_USER]: '需要操作',
     [RUN_STATUS.PAUSED]: '已暂停',
     [RUN_STATUS.COMPLETED]: '已完成',
     [RUN_STATUS.FAILED]: '执行失败',
@@ -70,6 +72,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
         result.value = null
         error.value = null
         artifacts.value = []
+        userAction.value = null
         startClock()
         break
       case AUTOMATION_EVENT.BROWSER_NAVIGATED:
@@ -91,6 +94,16 @@ export const useTaskRunStore = defineStore('taskRun', () => {
         break
       case AUTOMATION_EVENT.RUN_RESUMED:
         status.value = RUN_STATUS.RUNNING
+        updateStep(currentStepId.value, { status: 'active' })
+        break
+      case AUTOMATION_EVENT.USER_ACTION_REQUIRED:
+        status.value = RUN_STATUS.WAITING_USER
+        userAction.value = event.action || { title: '需要你完成一步', instruction: event.message || '' }
+        updateStep(currentStepId.value, { status: 'paused' })
+        break
+      case AUTOMATION_EVENT.USER_ACTION_COMPLETED:
+        status.value = RUN_STATUS.RUNNING
+        userAction.value = null
         updateStep(currentStepId.value, { status: 'active' })
         break
       case AUTOMATION_EVENT.RUN_COMPLETED:
@@ -123,7 +136,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     adapter = null
   }
 
-  function start(nextTool, options = {}) {
+  async function start(nextTool, options = {}) {
     disposeAdapter()
     stopClock()
     runId.value = null
@@ -136,9 +149,17 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     result.value = null
     error.value = null
     artifacts.value = []
+    userAction.value = null
     adapter = markRaw(options.adapter || createAutomationAdapter(options))
     unsubscribe = adapter.subscribe(applyEvent)
-    return adapter.start(nextTool)
+    try {
+      return await adapter.start(nextTool)
+    } catch (startError) {
+      status.value = RUN_STATUS.FAILED
+      error.value = { code: startError?.code || 'RUNNER_START_FAILED', message: startError?.message || '自动处理启动失败' }
+      stopClock()
+      throw startError
+    }
   }
 
   function pause() {
@@ -151,6 +172,10 @@ export const useTaskRunStore = defineStore('taskRun', () => {
 
   function cancel() {
     adapter?.cancel?.()
+  }
+
+  function completeUserAction() {
+    return adapter?.completeUserAction?.()
   }
 
   function restart() {
@@ -171,6 +196,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     result.value = null
     error.value = null
     artifacts.value = []
+    userAction.value = null
   }
 
   return {
@@ -184,6 +210,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     result,
     error,
     artifacts,
+    userAction,
     completedCount,
     progressPercent,
     currentStep,
@@ -193,6 +220,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     pause,
     resume,
     cancel,
+    completeUserAction,
     restart,
     reset,
     applyEvent,

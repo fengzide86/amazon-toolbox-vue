@@ -88,6 +88,7 @@ class RunnerClient {
   start(tool) { return this.command('start', { tool }); }
   pause() { return this.command('pause'); }
   resume() { return this.command('resume'); }
+  completeUserAction() { return this.command('complete-user-action'); }
   cancel() { return this.command('cancel'); }
 
   async stop() {

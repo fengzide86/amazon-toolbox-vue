@@ -1,16 +1,14 @@
 <template>
   <div class="ai-chat-container">
     <div class="chat-header">
-      <h2>AI 智能客服</h2>
+      <h2>AI 客服</h2>
       <button v-if="sessionId" class="btn btn-secondary" @click="showHistory = true">历史记录</button>
     </div>
 
     <div class="chat-messages" ref="messagesContainer">
       <div v-if="!sessionId" class="welcome-message">
-        <div class="welcome-icon">🤖</div>
-        <h3>欢迎使用 AI 智能客服</h3>
-        <p>我可以帮您解答关于工具箱使用、授权、安装等方面的问题</p>
-        <button class="btn btn-primary" @click="startNewSession">开始对话</button>
+        <div class="typing-indicator"><span></span><span></span><span></span></div>
+        <p>正在连接客服…</p>
       </div>
 
       <div v-else>
@@ -23,7 +21,7 @@
             <div v-if="msg.knowledge_refs?.length" class="message-refs">
               <span class="ref-label">参考知识：</span>
               <span v-for="ref in msg.knowledge_refs" :key="ref.id" class="ref-tag">
-                {{ ref.title }}<template v-if="ref.score != null"> · {{ Math.round(ref.score * 100) }}%</template>
+                {{ ref.title }}
               </span>
             </div>
             <div v-else-if="msg.knowledge_ids?.length" class="message-refs">
@@ -46,6 +44,12 @@
         <div v-if="showActions && lastAiMessage && !sessionResolved && !sessionTransferred" class="message-actions">
           <button class="btn btn-success" @click="markResolved">✓ 已解决</button>
           <button class="btn btn-warning" @click="transferToHuman">转人工客服</button>
+        </div>
+
+        <div v-if="messages.length <= 1 && !isLoading && !sessionResolved" class="quick-questions">
+          <button v-for="question in quickQuestions" :key="question" type="button" @click="askQuickQuestion(question)">
+            {{ question }}
+          </button>
         </div>
 
         <div v-if="showRating" class="rating-panel">
@@ -120,6 +124,7 @@ const messagesContainer = ref(null)
 const showHistory = ref(false)
 const historySessions = ref([])
 let nextMsgId = 0
+const quickQuestions = ['授权码无法使用', '工具一直没有反应', '本次操作未完成', '需要更换设备', '联系人工客服']
 
 function formatTime(timeStr) {
   if (!timeStr) return ''
@@ -156,9 +161,20 @@ async function startNewSession() {
     sessionResolved.value = false
     sessionTransferred.value = false
     scrollToBottom()
+    return true
   } catch (err) {
     showToast('创建会话失败', 'error')
+    return false
   }
+}
+
+function askQuickQuestion(question) {
+  if (question === '联系人工客服') {
+    transferToHuman()
+    return
+  }
+  inputMessage.value = question
+  sendMessage()
 }
 
 async function sendMessage() {
@@ -261,8 +277,21 @@ async function loadSession(sid) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadHistory()
+  const started = await startNewSession()
+  if (!started) return
+  try {
+    const context = JSON.parse(localStorage.getItem('toolbox_support_context') || 'null')
+    if (context) {
+      localStorage.removeItem('toolbox_support_context')
+      const problem = context.problem_code ? `，问题编号 ${context.problem_code}` : ''
+      inputMessage.value = `${context.tool_name || '工具'}本次操作未完成${problem}，请帮我处理。`
+      await sendMessage()
+    }
+  } catch {
+    localStorage.removeItem('toolbox_support_context')
+  }
 })
 </script>
 
@@ -408,6 +437,30 @@ onMounted(() => {
   justify-content: center;
   gap: 1rem;
   margin: 1rem 0;
+}
+
+.quick-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 52px 20px;
+}
+
+.quick-questions button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--studio-border);
+  border-radius: 999px;
+  color: var(--studio-text-main);
+  background: white;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.quick-questions button:hover {
+  color: var(--studio-accent);
+  border-color: var(--studio-accent-light);
+  background: var(--studio-accent-bg);
 }
 
 .rating-panel {

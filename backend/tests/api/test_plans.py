@@ -59,6 +59,29 @@ class TestGetPlans:
         assert len(data) == 1
         assert data[0]["name"] == "有效套餐"
 
+    @pytest.mark.asyncio
+    async def test_get_plans_returns_customer_entitlements(self, client: AsyncClient, db_session: AsyncSession):
+        """套餐列表返回前端展示所需的用户权益，不依赖授权码前缀。"""
+        plan = Plan(
+            name="Y199冲刺包",
+            price=199.00,
+            duration_days=5,
+            status="active",
+            features='{"benefits":["完整自动化工具","赛期支持"],"allowed_tools":["listing"]}',
+        )
+        db_session.add(plan)
+        await db_session.commit()
+
+        response = await client.get("/api/plans")
+        data = get_data(response)
+
+        assert response.status_code == 200
+        assert data[0]["plan_code"] == "Y199"
+        assert data[0]["benefits"] == ["完整自动化工具", "赛期支持"]
+        assert data[0]["allowed_tools"] == ["listing"]
+        assert data[0]["is_recommended"] is True
+        assert data[0]["display_badge"] == "赛期主推"
+
 
 class TestCreatePlan:
     """创建套餐测试"""

@@ -146,8 +146,12 @@ export async function request(url, options = {}) {
                 }
 
                 if (!response.ok) {
-                    // 全局处理 401/403 错误（授权码被冻结、被踢出等）
-                    if (response.status === 401 || response.status === 403) {
+                    // 401 或明确的认证失效错误才清理会话；套餐/平台权限 403 保持登录。
+                    const authInvalidCodes = new Set([2000, 2001, 2002, 3000, 3001, 3002]);
+                    const shouldClearAuth = response.status === 401 || (
+                        response.status === 403 && authInvalidCodes.has(data?.error_code)
+                    );
+                    if (shouldClearAuth) {
                         const auth = authService.getAuth();
                         const role = authService.getRole();
                         if (auth) {

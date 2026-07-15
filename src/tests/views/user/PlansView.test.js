@@ -1,187 +1,86 @@
-/**
- * PlansView 组件测试
- * 测试套餐页面功能，包括推荐标签逻辑、价格显示等
- */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import PlansView from '@/views/user/PlansView.vue'
 
-// Mock API
-vi.mock('@/utils/api', () => ({
-  getPlans: vi.fn().mockResolvedValue([])
+const mocks = vi.hoisted(() => ({
+  getPlans: vi.fn(),
+  showToast: vi.fn(),
+  route: { query: {} },
 }))
 
-// Mock utils
-vi.mock('@/utils', () => ({
-  showToast: vi.fn()
-}))
+vi.mock('@/utils/api', () => ({ getPlans: mocks.getPlans }))
+vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
+vi.mock('vue-router', () => ({ useRoute: () => mocks.route }))
 
-describe('PlansView', () => {
+describe('PlansView 套餐与授权', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    setActivePinia(createPinia())
+    mocks.route.query = {}
+    mocks.getPlans.mockResolvedValue([])
+    localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y15 体验包', plan_code: 'Y15' }))
   })
 
-  const globalStubs = {
-    'el-card': { template: '<div><slot /></div>' },
-    'el-tag': { template: '<span><slot /></span>' },
-    'el-button': { template: '<button><slot /></button>' }
-  }
+  it('显示套餐页面和当前授权，不暴露授权码前缀', async () => {
+    const wrapper = mount(PlansView)
+    await flushPromises()
 
-  describe('渲染测试', () => {
-    it('应该正确渲染页面标题', async () => {
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-      
-      await flushPromises()
-      
-      expect(wrapper.find('.page-title').exists()).toBe(true)
-      expect(wrapper.find('.page-title').text()).toBe('套餐价格')
-    })
-
-    it('套餐为空时应该显示空状态', async () => {
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-      
-      await flushPromises()
-      
-      expect(wrapper.find('.empty-state').exists()).toBe(true)
-      expect(wrapper.text()).toContain('暂无套餐信息')
-    })
+    expect(wrapper.find('.plans-header h2').text()).toBe('套餐与授权')
+    expect(wrapper.text()).toContain('Y15 体验包')
+    expect(wrapper.text()).not.toContain('授权码前缀')
   })
 
-  describe('推荐标签逻辑测试', () => {
-    it('isRecommended 函数应该根据价格判断推荐套餐', async () => {
-      const { getPlans } = await import('@/utils/api')
-      getPlans.mockResolvedValue([
-        { id: 1, name: '基础版', price: 49, duration_days: 7, features: '基础功能' },
-        { id: 2, name: '专业版', price: 199, duration_days: 30, features: '专业功能' },
-        { id: 3, name: '企业版', price: 999, duration_days: 90, features: '企业功能' }
-      ])
-
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-
-      await flushPromises()
-      
-      // 验证组件已挂载
-      expect(wrapper.vm.plans).toHaveLength(3)
-    })
-
-    it('isRecommended 函数应该优先使用 is_recommended 字段', async () => {
-      const { getPlans } = await import('@/utils/api')
-      getPlans.mockResolvedValue([
-        { id: 1, name: '基础版', price: 49, is_recommended: true, duration_days: 7, features: '基础功能' },
-        { id: 2, name: '专业版', price: 199, is_recommended: false, duration_days: 30, features: '专业功能' }
-      ])
-
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-
-      await flushPromises()
-      
-      // 调用 isRecommended 函数验证
-      expect(wrapper.vm.isRecommended(wrapper.vm.plans[0])).toBe(true)
-      expect(wrapper.vm.isRecommended(wrapper.vm.plans[1])).toBe(false)
-    })
+  it('套餐为空时显示空状态', async () => {
+    const wrapper = mount(PlansView)
+    await flushPromises()
+    expect(wrapper.find('.empty-state').text()).toContain('暂无套餐信息')
   })
 
-  describe('价格显示测试', () => {
-    it('应该正确显示套餐价格', async () => {
-      const { getPlans } = await import('@/utils/api')
-      getPlans.mockResolvedValue([
-        { id: 1, name: '测试套餐', price: 199, duration_days: 30, features: '测试功能' }
-      ])
+  it('只展示启用套餐并标出当前、主推和全程服务套餐', async () => {
+    mocks.getPlans.mockResolvedValue([
+      { id: 1, name: 'Y15 体验包', plan_code: 'Y15', price: 15, duration_days: 3, status: 'active', benefits: ['体验工具'] },
+      { id: 2, name: 'Y199 冲刺包', plan_code: 'Y199', price: 199, duration_days: 30, duration_label: '一个赛期', status: 'active', is_recommended: true, display_badge: '赛期主推', benefits: ['完整工具'] },
+      { id: 3, name: 'Y999 陪跑包', plan_code: 'Y999', price: 999, duration_days: 90, status: 'active', display_badge: '全程服务', benefits: ['全程陪跑'] },
+      { id: 4, name: '停用套餐', plan_code: 'Y0', price: 0, duration_days: 1, status: 'inactive' },
+    ])
+    const wrapper = mount(PlansView)
+    await flushPromises()
 
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-
-      await flushPromises()
-      
-      expect(wrapper.text()).toContain('¥199')
-    })
-
-    it('应该正确显示有效期', async () => {
-      const { getPlans } = await import('@/utils/api')
-      getPlans.mockResolvedValue([
-        { id: 1, name: '测试套餐', price: 199, duration_days: 30, features: '测试功能' }
-      ])
-
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-
-      await flushPromises()
-      
-      expect(wrapper.text()).toContain('30 天有效期')
-    })
+    expect(wrapper.findAll('.plan-card')).toHaveLength(3)
+    expect(wrapper.find('.plan-card.current').text()).toContain('当前使用')
+    expect(wrapper.find('.plan-card.featured').text()).toContain('赛期主推')
+    expect(wrapper.find('.plan-card.anchor').text()).toContain('全程服务')
   })
 
-  describe('功能列表测试', () => {
-    it('应该正确解析功能列表', () => {
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-      
-      const features = wrapper.vm.getFeatures('功能1\n功能2\n功能3')
-      expect(features).toHaveLength(3)
-      expect(features).toContain('功能1')
-      expect(features).toContain('功能2')
-      expect(features).toContain('功能3')
-    })
+  it('优先展示后端整理好的权益列表，并兼容旧 features 文本', async () => {
+    mocks.getPlans.mockResolvedValue([
+      { id: 1, name: 'Y15 体验包', plan_code: 'Y15', price: 15, duration_days: 3, status: 'active', benefits: ['权益 A', '权益 B'] },
+      { id: 2, name: 'Y199 冲刺包', plan_code: 'Y199', price: 199, duration_days: 30, status: 'active', features: '功能 1+功能 2' },
+    ])
+    const wrapper = mount(PlansView)
+    await flushPromises()
 
-    it('空功能应该返回默认值', () => {
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-      
-      const features = wrapper.vm.getFeatures('')
-      expect(features).toEqual(['基础功能'])
-    })
+    expect(wrapper.text()).toContain('权益 A')
+    expect(wrapper.text()).toContain('权益 B')
+    expect(wrapper.text()).toContain('功能 1')
+    expect(wrapper.text()).toContain('功能 2')
   })
 
-  describe('联系客服测试', () => {
-    it('点击联系客服应该调用 showToast', async () => {
-      const { showToast } = await import('@/utils')
-      
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-      
-      wrapper.vm.contactService()
-      
-      expect(showToast).toHaveBeenCalledWith('客服微信：AmazonToolbox_Support', 'info')
-    })
+  it('从锁定工具进入时显示升级说明', async () => {
+    mocks.route.query = { tool: 'listing' }
+    const wrapper = mount(PlansView)
+    await flushPromises()
+    expect(wrapper.find('.upgrade-notice').exists()).toBe(true)
+    expect(wrapper.text()).toContain('当前套餐暂未包含你选择的工具')
   })
 
-  describe('SVIP标识测试', () => {
-    it('有 code_prefix 的套餐应该显示 SVIP 标识', async () => {
-      const { getPlans } = await import('@/utils/api')
-      getPlans.mockResolvedValue([
-        { 
-          id: 1, 
-          name: 'SVIP套餐', 
-          price: 999, 
-          duration_days: 90, 
-          features: 'SVIP功能',
-          code_prefix: 'SVIP'
-        }
-      ])
+  it('购买按钮给出具体套餐的客服提示', async () => {
+    mocks.getPlans.mockResolvedValue([
+      { id: 2, name: 'Y199 冲刺包', plan_code: 'Y199', price: 199, duration_days: 30, status: 'active', benefits: ['完整工具'] },
+    ])
+    const wrapper = mount(PlansView)
+    await flushPromises()
+    await wrapper.find('.plan-card button').trigger('click')
 
-      const wrapper = mount(PlansView, {
-        global: { stubs: globalStubs }
-      })
-
-      await flushPromises()
-      
-      expect(wrapper.text()).toContain('SVIP')
-      expect(wrapper.text()).toContain('授权码前缀')
-    })
+    expect(mocks.showToast).toHaveBeenCalledWith('购买 冲刺包：请联系客服 AmazonToolbox_Support', 'info')
   })
 })
