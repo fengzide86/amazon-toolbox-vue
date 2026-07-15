@@ -5,7 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 Audience = Literal["all", "consumer", "business"]
 Category = Literal["system", "update", "activity", "maintenance"]
 Severity = Literal["info", "important", "critical"]
@@ -30,7 +29,7 @@ class AnnouncementWriteBase(BaseModel):
     expires_at: datetime | None = None
 
     @model_validator(mode="after")
-    def validate_business_rules(self) -> "AnnouncementWriteBase":
+    def validate_business_rules(self) -> AnnouncementWriteBase:
         if self.starts_at and self.expires_at and self.starts_at >= self.expires_at:
             raise ValueError("生效时间必须早于到期时间")
         if self.severity == "critical" and self.presentation not in (None, "modal"):

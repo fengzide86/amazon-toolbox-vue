@@ -10,7 +10,6 @@ from domains.announcements.schemas import AnnouncementCreate, AnnouncementUpdate
 from models import Announcement, AnnouncementReceipt
 from services.entitlement_service import resolve_product_access
 
-
 CATEGORY_DEFAULTS = {
     "system": ("important", "modal"),
     "maintenance": ("critical", "modal"),
@@ -19,7 +18,7 @@ CATEGORY_DEFAULTS = {
 }
 
 
-def serialize(announcement: Announcement, receipt: AnnouncementReceipt | None = None) -> dict:
+def serialize(announcement: Announcement, receipt: AnnouncementReceipt | None = None) -> dict[str, object]:
     return {
         "id": announcement.id,
         "title": announcement.title,
@@ -43,12 +42,12 @@ def serialize(announcement: Announcement, receipt: AnnouncementReceipt | None = 
     }
 
 
-def _normalized_values(data: AnnouncementCreate | AnnouncementUpdate, existing: Announcement | None = None) -> dict:
+def _normalized_values(data: AnnouncementCreate | AnnouncementUpdate, existing: Announcement | None = None) -> dict[str, object]:
     values = data.model_dump(exclude_unset=True)
     legacy_type = values.pop("type", None)
     if legacy_type and "category" not in values:
         values["category"] = legacy_type if legacy_type in CATEGORY_DEFAULTS else "system"
-    category = values.get("category") or getattr(existing, "category", None) or "system"
+    category = str(values.get("category") or getattr(existing, "category", None) or "system")
     if existing is None:
         default_severity, default_presentation = CATEGORY_DEFAULTS.get(category, ("info", "banner"))
         values.setdefault("severity", default_severity)
@@ -61,7 +60,7 @@ def _normalized_values(data: AnnouncementCreate | AnnouncementUpdate, existing: 
     return values
 
 
-async def list_admin(db: AsyncSession, status_filter: str | None = None) -> list[dict]:
+async def list_admin(db: AsyncSession, status_filter: str | None = None) -> list[dict[str, object]]:
     query = select(Announcement).order_by(desc(Announcement.priority), desc(Announcement.created_at))
     if status_filter:
         query = query.where(Announcement.status == status_filter)
@@ -69,7 +68,7 @@ async def list_admin(db: AsyncSession, status_filter: str | None = None) -> list
     return [serialize(item) for item in result.scalars().all()]
 
 
-async def list_legacy_active(db: AsyncSession) -> list[dict]:
+async def list_legacy_active(db: AsyncSession) -> list[dict[str, object]]:
     now = datetime.now()
     result = await db.execute(
         select(Announcement).where(
@@ -86,7 +85,7 @@ async def list_legacy_active(db: AsyncSession) -> list[dict]:
     } for item in result.scalars().all()]
 
 
-async def feed(db: AsyncSession, current_user: dict) -> list[dict]:
+async def feed(db: AsyncSession, current_user: dict[str, object]) -> list[dict[str, object]]:
     auth_code_id = current_user.get("auth_code_id")
     device_id = current_user.get("device_id")
     if not auth_code_id or not device_id:
@@ -113,7 +112,7 @@ async def feed(db: AsyncSession, current_user: dict) -> list[dict]:
     return [serialize(announcement, receipt) for announcement, receipt in result.all()]
 
 
-async def release_notes(db: AsyncSession, version: str) -> list[dict]:
+async def release_notes(db: AsyncSession, version: str) -> list[dict[str, object]]:
     result = await db.execute(
         select(Announcement).where(
             Announcement.status == "published",
@@ -148,7 +147,7 @@ async def update(db: AsyncSession, announcement_id: int, data: AnnouncementUpdat
     return announcement
 
 
-async def record_receipt(db: AsyncSession, announcement_id: int, current_user: dict, action: str) -> dict:
+async def record_receipt(db: AsyncSession, announcement_id: int, current_user: dict[str, object], action: str) -> dict[str, object]:
     auth_code_id = current_user.get("auth_code_id")
     device_id = current_user.get("device_id")
     if not auth_code_id or not device_id:

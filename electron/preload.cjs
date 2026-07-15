@@ -1,33 +1,21 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const crypto = require('crypto');
-const os = require('os');
 
-function readControlApiBase() {
-  const prefix = '--toolbox-control-api-base=';
+function readRuntimeArgument(name) {
+  const prefix = `--${name}=`;
   const argument = process.argv.find(value => value.startsWith(prefix));
-  return argument ? argument.slice(prefix.length).replace(/\/$/, '') : '';
+  return argument ? argument.slice(prefix.length) : '';
 }
 
-const controlApiBase = readControlApiBase();
-
-// Expose only a hash of machine attributes, never the raw home directory.
-function buildStableDeviceIdentity() {
-  const source = [os.hostname(), os.homedir(), os.platform(), os.arch()].join('|');
-  const digest = crypto.createHash('sha256').update(source).digest('hex').slice(0, 20).toUpperCase();
-  return {
-    deviceId: `DEV-${digest}`,
-    deviceName: os.hostname() || 'Windows 设备',
-  };
-}
-
-const stableDeviceIdentity = buildStableDeviceIdentity();
+const controlApiBase = readRuntimeArgument('toolbox-control-api-base').replace(/\/$/, '');
+const deviceId = readRuntimeArgument('toolbox-device-id');
+const deviceName = decodeURIComponent(readRuntimeArgument('toolbox-device-name'));
 
 // 暴露安全的 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
   runtime: {
     controlApiBase,
-    deviceId: stableDeviceIdentity.deviceId,
-    deviceName: stableDeviceIdentity.deviceName,
+    deviceId,
+    deviceName,
   },
   updates: {
     getState: () => ipcRenderer.invoke('updates:get-state'),

@@ -1,7 +1,10 @@
 const { app, BrowserWindow, Notification, dialog, ipcMain, safeStorage, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+const os = require('os');
 const { UpdateManager } = require('../dist-electron/electron/core/update-manager.cjs');
+const { registerAppProtocol, registerAppScheme } = require('../dist-electron/electron/core/app-protocol.cjs');
 const { spawn } = require('child_process');
 const { RunnerClient } = require('./automation/runner-client.cjs');
 const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
@@ -21,6 +24,16 @@ let updateManager = null;
 let singleRunActive = false;
 const embeddedBrowserHost = new EmbeddedBrowserHost();
 const batchBrowserHosts = new EmbeddedBrowserHostManager();
+
+registerAppScheme();
+
+function stableDeviceIdentity() {
+  const source = [os.hostname(), os.homedir(), os.platform(), os.arch()].join('|');
+  const digest = crypto.createHash('sha256').update(source).digest('hex').slice(0, 20).toUpperCase();
+  return { deviceId: `DEV-${digest}`, deviceName: os.hostname() || 'Windows 设备' };
+}
+
+const DEVICE_IDENTITY = stableDeviceIdentity();
 
 // Keep customer runtime data off the system drive by default. The environment
 // override remains available for deployments that need a different location.
@@ -501,9 +514,14 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
       webviewTag: true,
       preload: path.join(__dirname, 'preload.cjs'),
-      additionalArguments: [`--toolbox-control-api-base=${CONTROL_API_BASE}`],
+      additionalArguments: [
+        `--toolbox-control-api-base=${CONTROL_API_BASE}`,
+        `--toolbox-device-id=${DEVICE_IDENTITY.deviceId}`,
+        `--toolbox-device-name=${encodeURIComponent(DEVICE_IDENTITY.deviceName)}`,
+      ],
     },
     frame: true,
     show: false,
@@ -517,8 +535,8 @@ function createWindow() {
     // 开发模式打开 DevTools
     mainWindow.webContents.openDevTools();
   } else {
-    // 生产模式：加载打包后的静态文件
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // 生产模式：通过安全自定义协议加载，避免主界面使用 file://。
+    mainWindow.loadURL('app://toolbox/index.html');
   }
 
   // 页面加载完成后显示窗口（消除白屏闪烁）
@@ -574,6 +592,8 @@ app.whenReady().then(async () => {
   } else {
     console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }
+
+  if (!isDev) registerAppProtocol(path.join(__dirname, '../dist'));
 
   updateManager = new UpdateManager({
     ipcMain,
