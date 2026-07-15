@@ -396,18 +396,21 @@ onMounted(loadData)
 }
 
 .is-launching {
+  opacity: 1;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-focus-ring), var(--shadow-medium);
+  animation: launchCardConfirm var(--motion-signature) var(--ease-emphasized) both;
 }
 
 .launch-rail {
   position: absolute;
   top: 0;
-  left: -42%;
-  width: 42%;
-  height: 3px;
+  left: -58%;
+  width: 58%;
+  height: 4px;
   border-radius: 0 999px 999px 0;
-  background: linear-gradient(90deg, transparent, var(--color-primary), #8eace8);
+  background: linear-gradient(90deg, transparent 0%, #8eace8 54%, var(--color-primary) 78%, transparent 100%);
+  filter: drop-shadow(0 2px 4px rgba(45, 95, 202, .24));
   animation: launchRail var(--motion-signature) var(--ease-emphasized) both;
 }
 
@@ -454,6 +457,11 @@ onMounted(loadData)
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes shimmer { to { background-position: -200% 0; } }
 @keyframes launchRail { to { left: 100%; } }
+@keyframes launchCardConfirm {
+  0% { transform: scale(1); }
+  45% { transform: scale(.992); }
+  100% { transform: scale(1); }
+}
 
 @media (max-width: 620px) {
   .toolbox-header { flex-direction: column; gap: 12px; }
@@ -462,5 +470,6 @@ onMounted(loadData)
 
 @media (prefers-reduced-motion: reduce) {
   .launch-rail { display: none; }
+  .is-launching { animation: none; }
 }
 </style>

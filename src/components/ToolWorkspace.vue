@@ -392,6 +392,8 @@ onUnmounted(() => {
 
 <style scoped>
 .tool-workspace {
+  position: relative;
+  isolation: isolate;
   width: 100%;
   height: 100vh;
   display: flex;
@@ -400,6 +402,22 @@ onUnmounted(() => {
   color: var(--studio-text-main);
   background: var(--color-canvas);
   animation: workspaceTakeover var(--motion-signature) var(--ease-emphasized) both;
+}
+
+.tool-workspace::before {
+  content: '';
+  position: fixed;
+  z-index: 80;
+  top: 0;
+  left: 0;
+  width: 38vw;
+  height: 3px;
+  pointer-events: none;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, transparent 0%, #8eace8 42%, var(--color-primary) 72%, transparent 100%);
+  filter: drop-shadow(0 2px 5px rgba(45, 95, 202, .28));
+  transform: translateX(-105%);
+  animation: workspaceRail 460ms var(--ease-emphasized) both;
 }
 
 .workspace-topbar {
@@ -412,6 +430,7 @@ onUnmounted(() => {
   padding: 0 20px;
   border-bottom: 1px solid var(--studio-border);
   background: var(--studio-surface);
+  animation: workspaceHeaderIn 360ms var(--ease-emphasized) 40ms both;
 }
 
 .workspace-heading,
@@ -439,6 +458,10 @@ onUnmounted(() => {
 .tool-identity p { margin: 2px 0 0; color: var(--studio-text-muted); font-size: 11px; }
 
 .status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; color: var(--color-primary); background: var(--color-primary-soft); font-size: 12px; font-weight: 700; }
+.status-pill.is-running,
+.status-pill.is-preparing { position: relative; }
+.status-pill.is-running::after,
+.status-pill.is-preparing::after { content: ''; position: absolute; inset: -2px; pointer-events: none; border: 1px solid rgba(45,95,202,.22); border-radius: inherit; animation: statusBreath var(--motion-ambient) ease-in-out infinite; }
 .status-pill.is-completed { color: var(--color-success); background: var(--color-success-soft); }
 .status-pill.is-failed { color: var(--color-danger); background: var(--color-danger-soft); }
 .status-pill.is-cancelled { color: var(--studio-text-muted); background: var(--studio-bg-hover); }
@@ -450,7 +473,7 @@ onUnmounted(() => {
 .control-button:hover { border-color: var(--studio-accent-light); background: var(--studio-bg-hover); }
 .control-button.danger { color: var(--studio-danger); }
 
-.workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: 12px; padding: 12px; }
+.workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: 12px; padding: 12px; animation: workspaceBodyIn 400ms var(--ease-emphasized) 80ms both; }
 .browser-stage { min-width: 0; min-height: 0; }
 .browser-frame, .progress-panel { height: 100%; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-low); }
 .browser-frame { display: flex; flex-direction: column; }
@@ -481,7 +504,7 @@ onUnmounted(() => {
 .mock-table { margin-top: 18px; padding: 14px 18px; border: 1px solid var(--studio-border); border-radius: 9px; background: white; }
 .mock-table span { display: block; height: 9px; margin: 13px 0; border-radius: 5px; background: #e2e8f0; }
 
-.progress-panel { display: flex; flex-direction: column; padding: 22px; }
+.progress-panel { display: flex; flex-direction: column; padding: 22px; animation: workspacePanelIn 420ms var(--ease-emphasized) 130ms both; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--studio-border); }
 .panel-heading span { font-size: 17px; font-weight: 800; }
 .panel-heading strong { color: var(--color-primary); font-size: 11px; }
@@ -520,7 +543,12 @@ onUnmounted(() => {
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes ambientPulse { 50% { opacity: .42; transform: scale(.82); } }
-@keyframes workspaceTakeover { from { opacity: .7; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes workspaceTakeover { from { opacity: .82; transform: scale(.997); } to { opacity: 1; transform: none; } }
+@keyframes workspaceRail { to { transform: translateX(365%); } }
+@keyframes workspaceHeaderIn { from { opacity: .65; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes workspaceBodyIn { from { opacity: .55; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes workspacePanelIn { from { opacity: .6; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes statusBreath { 50% { opacity: .3; transform: scale(1.055); } }
 @keyframes userAttention { 50% { transform: translateY(-2px); box-shadow: 0 7px 18px rgba(183,121,31,.1); } }
 @keyframes resultConfirm { from { opacity: 0; transform: scale(.82); } to { opacity: 1; transform: scale(1); } }
 
@@ -539,7 +567,14 @@ onUnmounted(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .tool-workspace,
+  .workspace-topbar,
+  .workspace-body,
+  .progress-panel,
+  .status-pill.is-running::after,
+  .status-pill.is-preparing::after,
   .user-action-card,
   .success .result-icon { animation: none; }
+
+  .tool-workspace::before { display: none; }
 }
 </style>
