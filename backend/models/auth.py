@@ -103,6 +103,10 @@ class LaunchToken(Base):
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
     status = Column(String(20), default="pending", nullable=False)
+    execution_mode = Column(String(20), default="single", nullable=False)
+    client_batch_id = Column(String(100), nullable=True, index=True)
+    client_item_id = Column(String(100), nullable=True, index=True)
+    idempotency_key = Column(String(200), nullable=True, unique=True, index=True)
     created_at = Column(DateTime, server_default=func.now())
     
     __table_args__ = (

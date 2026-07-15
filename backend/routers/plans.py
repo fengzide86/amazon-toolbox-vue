@@ -22,7 +22,7 @@ async def get_plans(
 ):
     """获取套餐列表（所有用户可用）"""
     service = PlanService(db)
-    return await service.get_plans_list(status=status)
+    return await service.get_plans_list(status=status, product_type="consumer")
 
 
 @router.get("/admin")

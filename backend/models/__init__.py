@@ -38,6 +38,7 @@ from models.ai_chat import KnowledgeBase, ChatSession, ChatMessage, ChatConfig
 
 # 系统相关模型
 from models.system import Setting, Announcement, AuditLog
+from models.automation import AutomationBatch, AutomationBatchItem
 
 __all__ = [
     # Base
@@ -75,4 +76,6 @@ __all__ = [
     "Setting",
     "Announcement",
     "AuditLog",
+    "AutomationBatch",
+    "AutomationBatchItem",
 ]

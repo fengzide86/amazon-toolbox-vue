@@ -126,6 +126,8 @@ async def _migrate_sqlite():
         ("plans", "code_prefix", "VARCHAR(20)"),
         ("plans", "sort_order", "INTEGER DEFAULT 0"),
         ("plans", "updated_at", "DATETIME"),
+        ("plans", "product_type", "VARCHAR(20) DEFAULT 'consumer'"),
+        ("plans", "entitlements", "TEXT DEFAULT '{}'"),
         # orders 表
         ("orders", "updated_at", "DATETIME"),
         ("orders", "platform_key", "VARCHAR(50)"),
@@ -165,6 +167,10 @@ async def _migrate_sqlite():
         # chat_sessions 表 - 平台化字段
         ("chat_sessions", "platform_key", "VARCHAR(50)"),
         ("chat_sessions", "capability_key", "VARCHAR(100)"),
+        ("launch_tokens", "execution_mode", "VARCHAR(20) DEFAULT 'single'"),
+        ("launch_tokens", "client_batch_id", "VARCHAR(100)"),
+        ("launch_tokens", "client_item_id", "VARCHAR(100)"),
+        ("launch_tokens", "idempotency_key", "VARCHAR(200)"),
     ]
     
     for table, column, definition in migrations:
@@ -191,6 +197,8 @@ async def _migrate_mysql():
         ("plans", "code_prefix", "VARCHAR(20)"),
         ("plans", "sort_order", "INT DEFAULT 0"),
         ("plans", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
+        ("plans", "product_type", "VARCHAR(20) DEFAULT 'consumer'"),
+        ("plans", "entitlements", "TEXT"),
         # orders 表
         ("orders", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
         ("orders", "platform_key", "VARCHAR(50)"),
@@ -230,6 +238,10 @@ async def _migrate_mysql():
         # chat_sessions 表 - 平台化字段
         ("chat_sessions", "platform_key", "VARCHAR(50)"),
         ("chat_sessions", "capability_key", "VARCHAR(100)"),
+        ("launch_tokens", "execution_mode", "VARCHAR(20) DEFAULT 'single'"),
+        ("launch_tokens", "client_batch_id", "VARCHAR(100)"),
+        ("launch_tokens", "client_item_id", "VARCHAR(100)"),
+        ("launch_tokens", "idempotency_key", "VARCHAR(200)"),
     ]
     
     async with async_session_maker() as session:

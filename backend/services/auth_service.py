@@ -18,6 +18,7 @@ from core.config import settings
 from core.logging import get_logger
 from core.response import success_response, error_response, ErrorCodes
 from core.cache import cache, CacheKeys
+from services.entitlement_service import resolve_product_access
 
 logger = get_logger(__name__)
 
@@ -52,7 +53,7 @@ class AuthService:
         
         # 1. 查询授权码（同时 JOIN 获取 Plan 信息，避免后续重复查询）
         result = await self.db.execute(
-            select(AuthCode, Plan.name, Plan.duration_days)
+            select(AuthCode, Plan.name, Plan.duration_days, Plan.product_type, Plan.entitlements)
             .outerjoin(Plan, AuthCode.plan_id == Plan.id)
             .where(AuthCode.code == code)
         )
@@ -64,6 +65,7 @@ class AuthService:
         code_obj = row[0]
         plan_name = row[1] or "未知"
         plan_duration = row[2] or 30  # 默认30天
+        product_type = row[3] or "consumer"
         plan_match = re.search(r"Y\d+", plan_name, re.IGNORECASE)
         plan_code = plan_match.group(0).upper() if plan_match else None
         
@@ -286,6 +288,7 @@ class AuthService:
         platform_scope = code_obj.platform_scope or "amazon"
         platform_list = [p.strip() for p in platform_scope.split(",")]
         
+        access = await resolve_product_access(self.db, code_obj.id)
         return success_response(
             data={
                 "token": token,
@@ -302,6 +305,9 @@ class AuthService:
                 "seat_used": active_seats,
                 "max_devices": code_obj.max_devices or 1,
                 "device_used": device_count,
+                "product_type": product_type,
+                "entitlements": access["entitlements"],
+                "business_workspace_enabled": access["enabled"],
             },
             message="验证成功"
         )
@@ -364,6 +370,9 @@ class AuthService:
         
         # 获取套餐名称
         plan_name = "未知"
+        product_type = "consumer"
+        entitlements = {}
+        business_workspace_enabled = False
         if code_obj.plan_id:
             plan_result = await self.db.execute(
                 select(Plan.name).where(Plan.id == code_obj.plan_id)
@@ -406,10 +415,16 @@ class AuthService:
             
             if auth_code and auth_code.plan_id:
                 plan_result = await self.db.execute(
-                    select(Plan.name).where(Plan.id == auth_code.plan_id)
+                    select(Plan.name, Plan.product_type, Plan.entitlements).where(Plan.id == auth_code.plan_id)
                 )
-                plan_name = plan_result.scalar() or "未知"
+                plan_row = plan_result.first()
+                if plan_row:
+                    plan_name = plan_row[0] or "未知"
+                    product_type = plan_row[1] or "consumer"
                 expires_at = auth_code.expires_at.isoformat() if auth_code.expires_at else None
+                access = await resolve_product_access(self.db, auth_code.id)
+                entitlements = access["entitlements"]
+                business_workspace_enabled = access["enabled"]
         
         return success_response(data={
             "user_id": user.id,
@@ -419,6 +434,9 @@ class AuthService:
             "device_name": user.device_name,
             "plan_name": plan_name,
             "expires_at": expires_at,
+            "product_type": product_type,
+            "entitlements": entitlements,
+            "business_workspace_enabled": business_workspace_enabled,
         })
     
     async def refresh_token(self, user_id: int, role: str, auth_code_id: Optional[int], device_id: Optional[str] = None) -> Dict[str, Any]:

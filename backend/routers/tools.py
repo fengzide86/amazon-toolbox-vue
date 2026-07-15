@@ -13,12 +13,13 @@ import re
 import secrets
 
 from database import get_db
-from models import Setting, LaunchToken, AuthCode
+from models import Setting, LaunchToken, AuthCode, AutomationBatch
 from core.logging import get_logger
 from core.dependencies import get_current_admin, get_current_user
 from core.response import success_response, error_response, ErrorCodes
 from core.config import settings
 from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
+from services.entitlement_service import resolve_product_access
 
 logger = get_logger(__name__)
 
@@ -41,6 +42,7 @@ DEFAULT_TARGET_URLS = {
 
 VALID_RELEASE_STATUSES = {"available", "beta", "maintenance", "disabled"}
 VALID_TOOL_STATUSES = {"online", "maintenance", "offline"}
+SENSITIVE_BATCH_KEYS = {"password", "passwd", "pwd", "secret", "token", "cookie"}
 
 
 def _slugify(value: str) -> str:
@@ -104,7 +106,27 @@ def normalize_tool_config(tool: dict, index: int = 0) -> dict:
         "runner_api_version": int(normalized.get("runner_api_version") or 1),
         "sort_order": int(normalized.get("sort_order") or index + 1),
         "available_plans": normalized.get("available_plans") or [],
+        "capability_tags": [str(item).strip() for item in (normalized.get("capability_tags") or []) if str(item).strip()][:3],
+        "preparation_notes": [str(item).strip() for item in (normalized.get("preparation_notes") or []) if str(item).strip()],
+        "intervention_scenarios": [str(item).strip() for item in (normalized.get("intervention_scenarios") or []) if str(item).strip()],
+        "supports_batch": bool(normalized.get("supports_batch", False)),
+        "business_description": str(normalized.get("business_description") or "").strip(),
     })
+    batch_schema = []
+    for field in normalized.get("batch_input_schema") or []:
+        key = _slugify(str(field.get("key") or ""))
+        if key in SENSITIVE_BATCH_KEYS:
+            continue
+        batch_schema.append({
+            "key": key,
+            "label": str(field.get("label") or key).strip()[:80],
+            "type": "text",
+            "required": bool(field.get("required")),
+            "sensitive": bool(field.get("sensitive")),
+        })
+    if normalized["supports_batch"] and not any(item["key"] == "account_label" for item in batch_schema):
+        batch_schema.insert(0, {"key": "account_label", "label": "客户简称", "type": "text", "required": True, "sensitive": False})
+    normalized["batch_input_schema"] = batch_schema
     normalized["requires_signature"] = bool(normalized.get("requires_signature", True))
     if isinstance(normalized["available_plans"], str):
         normalized["available_plans"] = [
@@ -277,6 +299,10 @@ async def update_platforms(platforms: list, db: AsyncSession = Depends(get_db), 
 async def create_launch_token(
     tool_id: str,
     platform_key: str,
+    execution_mode: str = Query("single", pattern="^(single|batch)$"),
+    client_batch_id: Optional[str] = Query(None, max_length=100),
+    client_item_id: Optional[str] = Query(None, max_length=100),
+    idempotency_key: Optional[str] = Query(None, max_length=200),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -314,6 +340,27 @@ async def create_launch_token(
     
     if auth_code.expires_at and auth_code.expires_at < datetime.now():
         return error_response("授权码已过期", ErrorCodes.AUTH_CODE_EXPIRED)
+
+    batch = None
+    if execution_mode == "batch":
+        access = await resolve_product_access(db, auth_code_id)
+        if not (
+            access.get("enabled")
+            and access.get("product_type") == "business"
+            and access["entitlements"].get("batch_execution")
+            and access["entitlements"].get("multi_account_workspace")
+        ):
+            return error_response("当前授权不包含专业批量工作台", ErrorCodes.PERMISSION_DENIED)
+        if not client_batch_id or not client_item_id or not idempotency_key:
+            return error_response("批量启动上下文不完整", ErrorCodes.INVALID_PARAMS)
+        batch_result = await db.execute(select(AutomationBatch).where(
+            AutomationBatch.client_batch_id == client_batch_id,
+            AutomationBatch.auth_code_id == auth_code_id,
+            AutomationBatch.device_id == (device_id or ""),
+        ))
+        batch = batch_result.scalar_one_or_none()
+        if not batch or batch.status != "running":
+            return error_response("批次不存在或已经结束", ErrorCodes.RESOURCE_NOT_FOUND)
     
     # 2. 检查平台权限
     platform_scope = auth_code.platform_scope or "amazon"
@@ -356,6 +403,10 @@ async def create_launch_token(
             ErrorCodes.TOOL_UNAVAILABLE,
             {"reason": "tool_unavailable", "release_status": release_status},
         )
+    if execution_mode == "batch" and not target_tool.get("supports_batch"):
+        return error_response("该工具未开放批量执行", ErrorCodes.PERMISSION_DENIED)
+    if batch and batch.tool_id != tool_id:
+        return error_response("批次工具与启动工具不一致", ErrorCodes.INVALID_PARAMS)
     
     # 6. 检查套餐工具权限。新旧数据兼容：
     # - 工具配置 available_plans 是主权限来源；
@@ -468,23 +519,48 @@ async def create_launch_token(
         signature_required = bool(settings.TOOL_SIGNING_PRIVATE_KEY_B64 and settings.TOOL_SIGNING_PUBLIC_KEY_B64)
         signature = sign_manifest(manifest) if signature_required else None
         signing_key_id = settings.TOOL_SIGNING_KEY_ID if signature_required else None
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now() + timedelta(minutes=5)  # 5分钟有效期
-    
-    launch_token = LaunchToken(
-        token=token,
-        user_id=user_id,
-        auth_code_id=auth_code_id,
-        platform_key=platform_key,
-        tool_id=tool_id,
-        script_key=script_key,
-        device_id=device_id,
-        expires_at=expires_at,
-        status="pending"
-    )
-    
-    db.add(launch_token)
-    await db.commit()
+    existing_launch = None
+    if execution_mode == "batch" and idempotency_key:
+        existing_result = await db.execute(select(LaunchToken).where(LaunchToken.idempotency_key == idempotency_key))
+        existing_launch = existing_result.scalar_one_or_none()
+        if existing_launch and (
+            existing_launch.auth_code_id != auth_code_id
+            or existing_launch.tool_id != tool_id
+            or existing_launch.client_batch_id != client_batch_id
+            or existing_launch.client_item_id != client_item_id
+        ):
+            return error_response("启动幂等标识冲突", ErrorCodes.RESOURCE_ALREADY_EXISTS)
+
+    if existing_launch and existing_launch.status == "used":
+        return error_response("该批次项已经启动，不能重复执行", ErrorCodes.RESOURCE_ALREADY_EXISTS)
+    if existing_launch and existing_launch.status == "pending" and existing_launch.expires_at > datetime.now():
+        token = existing_launch.token
+        expires_at = existing_launch.expires_at
+    else:
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.now() + timedelta(minutes=5)  # 5分钟有效期
+        if existing_launch:
+            existing_launch.token = token
+            existing_launch.expires_at = expires_at
+            existing_launch.status = "pending"
+        else:
+            launch_token = LaunchToken(
+                token=token,
+                user_id=user_id,
+                auth_code_id=auth_code_id,
+                platform_key=platform_key,
+                tool_id=tool_id,
+                script_key=script_key,
+                device_id=device_id,
+                expires_at=expires_at,
+                status="pending",
+                execution_mode=execution_mode,
+                client_batch_id=client_batch_id,
+                client_item_id=client_item_id,
+                idempotency_key=idempotency_key,
+            )
+            db.add(launch_token)
+        await db.commit()
     
     logger.info(f"创建 launch token: user={user_id}, tool={tool_id}, platform={platform_key}")
     
@@ -509,6 +585,9 @@ async def create_launch_token(
             "tool_signature": signature,
             "signing_key_id": signing_key_id,
             "signature_required": signature_required,
+            "execution_mode": execution_mode,
+            "client_batch_id": client_batch_id,
+            "client_item_id": client_item_id,
         }
     })
 
@@ -552,5 +631,8 @@ async def verify_launch_token(
         "platform_key": launch_token.platform_key,
         "tool_id": launch_token.tool_id,
         "script_key": launch_token.script_key,
-        "device_id": launch_token.device_id
+        "device_id": launch_token.device_id,
+        "execution_mode": launch_token.execution_mode,
+        "client_batch_id": launch_token.client_batch_id,
+        "client_item_id": launch_token.client_item_id,
     })

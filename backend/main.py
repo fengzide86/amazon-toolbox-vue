@@ -52,6 +52,8 @@ from routers import (
     ai_chat,
     announcements,
     tool_releases,
+    business,
+    admin_action_center,
 )
 from routers import help as help_router  # 避免与内置 help 冲突
 
@@ -243,6 +245,8 @@ app.include_router(knowledge.router, prefix="/api/knowledge", tags=["知识库�
 app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["AI客服"])
 app.include_router(announcements.router, prefix="/api/announcements", tags=["公告管理"])
 app.include_router(tool_releases.router, prefix="/api/tool-releases", tags=["工具版本发布"])
+app.include_router(business.router, prefix="/api/business", tags=["专业批量工作台"])
+app.include_router(admin_action_center.router, prefix="/api/admin", tags=["管理行动中心"])
 app.include_router(help_router.router, prefix="/api/help", tags=["帮助查询"])
 
 

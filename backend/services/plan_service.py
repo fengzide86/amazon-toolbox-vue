@@ -13,6 +13,7 @@ from core.logging import get_logger
 from core.response import success_response, error_response, ErrorCodes
 from core.cache import cache, CacheKeys
 from core.pagination import PaginationParams, paginate
+from services.entitlement_service import normalize_entitlements, serialize_entitlements
 
 logger = get_logger(__name__)
 
@@ -26,7 +27,8 @@ class PlanService:
     async def get_plans_list(
         self,
         status: Optional[str] = None,
-        pagination: Optional[PaginationParams] = None
+        pagination: Optional[PaginationParams] = None,
+        product_type: Optional[str] = None,
     ) -> Dict[str, Any]:
         """获取套餐列表（带缓存）
         
@@ -43,6 +45,8 @@ class PlanService:
         
         # 构建查询
         query = select(Plan).order_by(Plan.sort_order, Plan.id)
+        if product_type:
+            query = query.where(Plan.product_type == product_type)
         if status:
             query = query.where(Plan.status == status)
         else:
@@ -101,6 +105,15 @@ class PlanService:
         if existing.scalars().first():
             return error_response("套餐名称已存在", ErrorCodes.RESOURCE_ALREADY_EXISTS)
         
+        product_type = str(data.get("product_type") or "consumer").lower()
+        if product_type not in {"consumer", "business"}:
+            return error_response("产品类型无效", ErrorCodes.INVALID_PARAMS)
+        entitlements = normalize_entitlements(data.get("entitlements"), product_type)
+        if product_type == "business" and not (
+            entitlements["batch_execution"] and entitlements["multi_account_workspace"]
+        ):
+            return error_response("专业批量版必须同时开启批量执行和多账号工作台", ErrorCodes.INVALID_PARAMS)
+
         plan = Plan(
             name=data["name"],
             price=data["price"],
@@ -109,6 +122,8 @@ class PlanService:
             status=data.get("status", "active"),
             code_prefix=data.get("code_prefix", ""),
             sort_order=data.get("sort_order", 0),
+            product_type=product_type,
+            entitlements=serialize_entitlements(entitlements, product_type),
         )
         self.db.add(plan)
         
@@ -142,10 +157,21 @@ class PlanService:
             if existing.scalars().first():
                 return error_response("套餐名称已存在", ErrorCodes.RESOURCE_ALREADY_EXISTS)
         
+        next_product_type = str(data.get("product_type", plan.product_type or "consumer")).lower()
+        if next_product_type not in {"consumer", "business"}:
+            return error_response("产品类型无效", ErrorCodes.INVALID_PARAMS)
+        next_entitlements = normalize_entitlements(data.get("entitlements", plan.entitlements), next_product_type)
+        if next_product_type == "business" and not (
+            next_entitlements["batch_execution"] and next_entitlements["multi_account_workspace"]
+        ):
+            return error_response("专业批量版必须同时开启批量执行和多账号工作台", ErrorCodes.INVALID_PARAMS)
+
         # 更新字段
         for field in ["name", "price", "duration_days", "features", "status", "code_prefix", "sort_order"]:
             if field in data:
                 setattr(plan, field, data[field])
+        plan.product_type = next_product_type
+        plan.entitlements = serialize_entitlements(next_entitlements, next_product_type)
         
         try:
             await self.db.commit()
@@ -277,6 +303,8 @@ class PlanService:
             "is_recommended": plan_code == "Y199",
             "display_badge": "赛期主推" if plan_code == "Y199" else ("全程服务" if plan_code == "Y999" else None),
             "features": plan.features,
+            "product_type": plan.product_type or "consumer",
+            "entitlements": normalize_entitlements(plan.entitlements, plan.product_type or "consumer"),
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
         }
         

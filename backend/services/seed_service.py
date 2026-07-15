@@ -34,6 +34,12 @@ DEFAULT_REGISTER_TOOL = {
     "description": "自动完成店铺注册准备、资料处理、信息核对和结果确认。",
     "available_plans": ["Y15", "Y49", "Y199", "Y999"],
     "sort_order": 1,
+    "capability_tags": ["资料处理", "页面核验", "结果确认"],
+    "preparation_notes": ["准备可正常登录的卖家账号", "按页面提示准备真实资料"],
+    "intervention_scenarios": ["登录", "验证码", "二次验证"],
+    "supports_batch": False,
+    "business_description": "",
+    "batch_input_schema": [],
 }
 
 
@@ -249,6 +255,14 @@ async def seed_initial_data():
                 description="管理员登录密码（bcrypt哈希）"
             ))
             logger.info("创建默认管理员密码")
+
+        result = await db.execute(select(Setting).where(Setting.key == "business_workspace_enabled"))
+        if not result.scalars().first():
+            db.add(Setting(
+                key="business_workspace_enabled",
+                value="false",
+                description="B 端专业批量工作台总开关",
+            ))
 
         # 默认分润比例
         result = await db.execute(select(Setting).where(Setting.key == "profit_ratios"))

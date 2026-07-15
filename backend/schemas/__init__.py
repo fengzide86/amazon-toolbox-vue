@@ -86,6 +86,7 @@ from schemas.ai_chat import (
     ChatConfigUpdate,
     ChatConfigResponse,
 )
+from schemas.business import BatchCreate, BatchUpdate, BatchItemUpdate, BatchFinish
 
 __all__ = [
     # 认证
@@ -136,4 +137,8 @@ __all__ = [
     "ChatMessageResponse",
     "ChatConfigUpdate",
     "ChatConfigResponse",
+    "BatchCreate",
+    "BatchUpdate",
+    "BatchItemUpdate",
+    "BatchFinish",
 ]

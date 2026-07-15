@@ -34,6 +34,8 @@ class Plan(Base):
     status = Column(String(20), default="active", index=True)  # active/disabled/deleted
     code_prefix = Column(String(20), nullable=True)  # 授权码前缀，如 "SVIP"
     sort_order = Column(Integer, default=0)  # 排序权重
+    product_type = Column(String(20), nullable=False, default="consumer", index=True)
+    entitlements = Column(Text, nullable=False, default="{}")  # 结构化产品权限 JSON
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
