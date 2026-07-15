@@ -80,7 +80,7 @@
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
@@ -90,18 +90,22 @@ import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
 import { Menu, Zap, Crown } from '@lucide/vue'
 import MessageCenter from '@/features/announcements/MessageCenter.vue'
 
-const props = defineProps({
-  isAdmin: {
-    type: Boolean,
-    default: false
-  },
-  isBusiness: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{ isAdmin?: boolean; isBusiness?: boolean }>(), {
+  isAdmin: false,
+  isBusiness: false,
 })
 
-const emit = defineEmits(['toggle-sidebar', 'platform-change'])
+const emit = defineEmits<{
+  'toggle-sidebar': []
+  'platform-change': [platformKey: string]
+}>()
+
+interface PlatformOption {
+  key: string
+  short_name: string
+  name: string
+  status: string
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -139,7 +143,7 @@ const availablePlatformsForUser = computed(() => {
   if (props.isAdmin) {
     // 管理员：头部插入"全部平台"选项
     const allOption = { key: 'all', short_name: '全部平台', name: '全部平台', status: 'available' }
-    const platforms = platformStore.availablePlatforms.filter(p => p.status === 'available')
+    const platforms = (platformStore.availablePlatforms as PlatformOption[]).filter(platform => platform.status === 'available')
     return [allOption, ...platforms]
   }
   const platformScope = getPlatformScope()
@@ -147,21 +151,21 @@ const availablePlatformsForUser = computed(() => {
 })
 
 // 检查用户是否有平台权限
-const hasPermission = (platformKey) => {
+const hasPermission = (platformKey: string): boolean => {
   if (props.isAdmin) return true
   const platformScope = getPlatformScope()
   return platformStore.hasPlatformPermission(platformScope, platformKey)
 }
 
 // 获取平台权限
-function getPlatformScope() {
+function getPlatformScope(): string | null {
   try {
     const scope = localStorage.getItem('toolbox_platform_scope')
     if (scope) {
       const parsed = JSON.parse(scope)
       if (Array.isArray(parsed)) return parsed.join(',')
     }
-  } catch (e) {}
+  } catch { /* Invalid legacy platform scope is ignored. */ }
   try {
     const authData = JSON.parse(localStorage.getItem('toolbox_auth') || '{}')
     if (authData.platform_scope) {
@@ -169,12 +173,12 @@ function getPlatformScope() {
         ? authData.platform_scope.join(',')
         : authData.platform_scope
     }
-  } catch (e) {}
+  } catch { /* Invalid legacy auth payload is ignored. */ }
   return null
 }
 
 // 处理平台选择
-const handlePlatformSelect = (platformKey) => {
+const handlePlatformSelect = (platformKey: string): void => {
   if (!hasPermission(platformKey)) return
   if (props.isAdmin) {
     platformStore.setAdminPlatform(platformKey)
@@ -185,7 +189,7 @@ const handlePlatformSelect = (platformKey) => {
 }
 
 // 处理下拉菜单命令
-const handleCommand = (command) => {
+const handleCommand = (command: string): void => {
   if (command === 'logout') {
     handleLogout()
   } else if (command === 'devices') {

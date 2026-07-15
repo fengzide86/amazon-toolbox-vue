@@ -10,8 +10,18 @@ export interface UpdateBridge {
   onState(callback: (state: UpdateSnapshot) => void): () => void
 }
 
+export interface BatchSnapshot {
+  status?: 'running' | 'completed' | 'cancelled' | 'interrupted' | string
+}
+
+export interface BatchBridge {
+  getSnapshot(): Promise<BatchSnapshot | null>
+  cancel(status?: string): Promise<unknown>
+}
+
 export interface ToolboxElectronApi {
   runtime?: { controlApiBase?: string; deviceId?: string; deviceName?: string }
   updates?: UpdateBridge
+  batch?: BatchBridge
   [key: string]: unknown
 }

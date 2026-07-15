@@ -57,7 +57,7 @@
   </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import {
   LayoutDashboard, Key, Receipt, Percent, Users, Wrench,
   BookOpen, MessageSquare, Megaphone, PackageCheck, Settings
