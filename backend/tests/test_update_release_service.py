@@ -30,6 +30,7 @@ async def test_stage_then_publish_places_manifest_last(tmp_path):
         upload("latest.yml", manifest),
     ])
     assert staged["version"] == "1.8.0"
+    assert staged["status"] == "staged"
     assert not (tmp_path / "updates" / "latest.yml").exists()
 
     published = service.publish("1.8.0")

@@ -171,6 +171,12 @@ const routes = [
         name: 'AdminAnnouncements',
         component: () => import('@/views/admin/AnnouncementsView.vue'),
         meta: { title: '公告管理', skeleton: 'table' }
+      },
+      {
+        path: 'updates',
+        name: 'AdminUpdates',
+        component: () => import('@/views/admin/UpdateReleasesView.vue'),
+        meta: { title: '应用更新', skeleton: 'table' }
       }
     ]
   }

@@ -99,6 +99,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 
 import { updateSnapshotSchema, type UpdateSnapshot } from '@/shared/ipc/update-contract'
+import { getVersionReleaseNotes } from '@/features/updates/release-api'
 
 const initialState: UpdateSnapshot = {
   status: 'idle',
@@ -112,6 +113,7 @@ const panelOpen = ref(false)
 const panelRef = ref<HTMLElement | null>(null)
 const supported = computed(() => Boolean(window.electronAPI?.updates))
 let removeStateListener: (() => void) | undefined
+const loadedReleaseNoteVersions = new Set<string>()
 
 const displayPercent = computed(() => Math.round(state.value.percent ?? 0))
 const showReleaseNotes = computed(() => state.value.releaseNotes.length > 0)
@@ -137,7 +139,22 @@ function applySnapshot(value: unknown): void {
   const parsed = updateSnapshotSchema.safeParse(value)
   if (!parsed.success) return
   state.value = parsed.data
+  void hydrateReleaseNotes(parsed.data)
   if (['available', 'downloaded', 'restart_deferred'].includes(parsed.data.status)) openPanel()
+}
+
+async function hydrateReleaseNotes(snapshot: UpdateSnapshot): Promise<void> {
+  const version = snapshot.availableVersion
+  if (!version || snapshot.releaseNotes.length || loadedReleaseNoteVersions.has(version)) return
+  loadedReleaseNoteVersions.add(version)
+  try {
+    const notes = await getVersionReleaseNotes(version)
+    if (state.value.availableVersion === version && state.value.releaseNotes.length === 0 && notes.length) {
+      state.value = { ...state.value, releaseNotes: notes }
+    }
+  } catch {
+    // The updater remains usable when the control plane has no matching notes.
+  }
 }
 
 async function openPanel(): Promise<void> {

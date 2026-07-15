@@ -109,6 +109,12 @@ export async function request(url, options = {}) {
         },
     };
 
+    // Let the browser add the multipart boundary. Sending FormData with the
+    // JSON content type produces an invalid upload body.
+    if (config.body instanceof FormData) {
+        delete config.headers['Content-Type'];
+    }
+
     // 如果有body且不是FormData，转为JSON
     if (config.body && !(config.body instanceof FormData)) {
         config.body = JSON.stringify(config.body);

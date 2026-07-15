@@ -44,6 +44,10 @@
         <Megaphone :size="14" class="menu-icon" />
         <span class="menu-label">公告管理</span>
       </router-link>
+      <router-link to="/admin/updates" class="menu-nav-item" active-class="is-active">
+        <PackageCheck :size="14" class="menu-icon" />
+        <span class="menu-label">应用更新</span>
+      </router-link>
       <router-link to="/admin/settings" class="menu-nav-item" active-class="is-active">
         <Settings :size="14" class="menu-icon" />
         <span class="menu-label">系统设置</span>
@@ -56,7 +60,7 @@
 <script setup>
 import {
   LayoutDashboard, Key, Receipt, Percent, Users, Wrench,
-  BookOpen, MessageSquare, Megaphone, Settings
+  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings
 } from '@lucide/vue'
 </script>
 

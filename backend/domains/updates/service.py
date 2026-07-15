@@ -57,7 +57,12 @@ class UpdateReleaseService:
             if not manifest_path or not installer:
                 raise HTTPException(400, "暂存发布必须同时包含 latest.yml 和 Windows 安装包")
             manifest = self._validate_manifest(manifest_path, version, staged)
-            metadata: dict[str, object] = {"version": version, "files": staged, "manifest": manifest}
+            metadata: dict[str, object] = {
+                "version": version,
+                "status": "staged",
+                "files": staged,
+                "manifest": manifest,
+            }
             (temp / "stage.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             if target.exists():
                 shutil.rmtree(target)

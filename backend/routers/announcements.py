@@ -39,8 +39,12 @@ async def get_announcement_feed(
 
 
 @router.get("/release-notes/{version}")
-async def get_release_notes(version: str, db: AsyncSession = Depends(get_db)) -> object:
-    return success_response(data=await service.release_notes(db, version))
+async def get_release_notes(
+    version: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict[str, object] = Depends(get_current_user),
+) -> object:
+    return success_response(data=await service.release_notes(db, version, current_user))
 
 
 @router.post("/{announcement_id}/read")

@@ -112,12 +112,25 @@ async def feed(db: AsyncSession, current_user: dict[str, object]) -> list[dict[s
     return [serialize(announcement, receipt) for announcement, receipt in result.all()]
 
 
-async def release_notes(db: AsyncSession, version: str) -> list[dict[str, object]]:
+async def release_notes(
+    db: AsyncSession,
+    version: str,
+    current_user: dict[str, object],
+) -> list[dict[str, object]]:
+    auth_code_id = current_user.get("auth_code_id")
+    audiences = ["all"]
+    if auth_code_id:
+        access = await resolve_product_access(db, auth_code_id)
+        audiences.append("business" if access.get("product_type") == "business" else "consumer")
+    now = datetime.now()
     result = await db.execute(
         select(Announcement).where(
             Announcement.status == "published",
             Announcement.category == "update",
             Announcement.app_version == version,
+            Announcement.audience.in_(audiences),
+            or_(Announcement.starts_at.is_(None), Announcement.starts_at <= now),
+            or_(Announcement.expires_at.is_(None), Announcement.expires_at > now),
         ).order_by(desc(Announcement.priority), desc(Announcement.published_at))
     )
     return [serialize(item) for item in result.scalars().all()]
