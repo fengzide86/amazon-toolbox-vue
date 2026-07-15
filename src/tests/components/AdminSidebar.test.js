@@ -78,7 +78,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const labels = wrapper.findAll('.menu-label').map(el => el.text())
-      expect(labels).toContain('数据总览')
+      expect(labels).toContain('行动中心')
       expect(labels).toContain('授权码管理')
       expect(labels).toContain('订单与套餐')
       expect(labels).toContain('分润管理')
@@ -102,7 +102,7 @@ describe('AdminSidebar', () => {
 
       const activeItems = wrapper.findAll('.menu-nav-item.is-active')
       expect(activeItems.length).toBe(1)
-      expect(activeItems[0].text()).toContain('数据总览')
+      expect(activeItems[0].text()).toContain('行动中心')
     })
 
     it('切换到不同路由时激活状态应该更新', async () => {

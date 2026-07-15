@@ -30,7 +30,10 @@ function mountView() {
   return mount(ToolsView, {
     global: {
       plugins: [pinia],
-      stubs: { RouterLink: { props: ['to'], template: '<a><slot /></a>' } },
+      stubs: {
+        RouterLink: { props: ['to'], template: '<a><slot /></a>' },
+        ElDrawer: { template: '<aside><slot name="header" /><slot /><slot name="footer" /></aside>' },
+      },
     },
   })
 }
@@ -118,5 +121,22 @@ describe('ToolsView 一键工具箱', () => {
     await flushPromises()
     expect(wrapper.exists()).toBe(true)
     expect(mocks.getTools).toHaveBeenCalledWith({ platform_key: 'amazon' })
+  })
+
+  it('只展示真实能力标签和说明入口，不向普通用户暴露批量能力', async () => {
+    mocks.getTools.mockResolvedValue([{
+      id: 'register', name: '注册工具', status: 'online', available_plans: ['Y15'],
+      capability_tags: ['自动填报', '页面核验', '结果确认'],
+      preparation_notes: ['准备可用邮箱'],
+      intervention_scenarios: ['遇到验证码时'],
+      supports_batch: true,
+    }])
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('自动填报')
+    expect(wrapper.text()).toContain('了解能力')
+    expect(wrapper.text()).not.toContain('批量')
+    expect(wrapper.text()).not.toContain('成功率')
   })
 })
