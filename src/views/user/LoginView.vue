@@ -357,7 +357,11 @@ function handleLogin() {
           localStorage.setItem('toolbox_platform_scope', JSON.stringify(res.data.platform_scope))
         }
         window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
-        Promise.resolve(router.push('/user/tools')).catch(() => {
+        const businessAccess = res.data.product_type === 'business'
+          && res.data.business_workspace_enabled === true
+          && res.data.entitlements?.batch_execution === true
+          && res.data.entitlements?.multi_account_workspace === true
+        Promise.resolve(router.push(businessAccess ? '/business/overview' : '/user/tools')).catch(() => {
           isLoading.value = false
           focusLoginInput()
         })

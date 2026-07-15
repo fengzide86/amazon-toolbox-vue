@@ -45,6 +45,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CircleAlert } from '@lucide/vue'
 import { Auth, getDeviceId } from '@/utils'
+import { authService } from '@/utils/auth'
 import { checkAuthStatus } from '@/utils/api'
 import { useAppStore } from '@/stores/app'
 import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
@@ -63,6 +64,7 @@ const sidebarRef = ref(null)
 let pollTimer = null
 let initialTimer = null
 let removeAfterEach = null
+let removeNotification = null
 
 function toggleSidebar() {
   showMobileSidebar.value = !showMobileSidebar.value
@@ -97,6 +99,8 @@ async function checkStatus() {
       kickoutMessage.value = response.message || '授权已失效，请重新登录'
       showKickout.value = true
       stopPolling()
+    } else if (response.data) {
+      authService.setUser({ ...(authService.getUser() || {}), ...response.data })
     }
   } catch (error) {
     console.warn('Auth status check failed:', error)
@@ -119,11 +123,16 @@ onMounted(() => {
   startPolling()
   window.addEventListener('keydown', handleKeydown)
   removeAfterEach = router.afterEach(closeSidebar)
+  removeNotification = window.electronAPI?.notifications?.onFocus?.(payload => {
+    if (payload?.mode !== 'single') return
+    router.push('/user/tools')
+  })
 })
 
 onUnmounted(() => {
   stopPolling()
   removeAfterEach?.()
+  removeNotification?.()
   document.body.style.overflow = ''
   window.removeEventListener('keydown', handleKeydown)
 })

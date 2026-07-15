@@ -249,6 +249,12 @@ export const api = {
             return result;
         });
     },
+    patch: (url, data = {}) => {
+        return request(url, { method: 'PATCH', body: data }).then(result => {
+            clearApiCache(url.split('/').slice(0, 3).join('/'));
+            return result?.data !== undefined ? result.data : result;
+        });
+    },
 
     delete: (url) => {
         return request(url, { method: 'DELETE' }).then(result => {
@@ -261,9 +267,9 @@ export const api = {
 // ===== 从子模块 re-export 所有业务函数 =====
 // 这样保持向后兼容，所有 `import { xxx } from '@/utils/api'` 仍然有效
 
-export { verifyAuthCode, adminLogin, checkAuthStatus } from './auth.js';
+export { verifyAuthCode, adminLogin, checkAuthStatus, getCurrentUser } from './auth.js';
 export { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode } from './auth-codes.js';
-export { getPlans } from './plans.js';
+export { getPlans, getPlansAdmin } from './plans.js';
 export { getOrders, exportOrders, createOrder, updateOrder, refundOrder } from './orders.js';
 export { getUsers, updateUser } from './users.js';
 export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices.js';
@@ -275,6 +281,7 @@ export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRel
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback.js';
 export { getLogs, exportLogs, getLogTools, createLog } from './logs.js';
 export { getDashboard, getDashboardCharts, getProfit, getProfitSummary } from './dashboard.js';
+export { getBusinessBootstrap, getBusinessTools, getBusinessBatches, getBusinessBatch, createBusinessBatch, updateBusinessBatch, updateBusinessBatchItem, finishBusinessBatch, getAdminActionCenter, getAdminBusinessBatch } from './business.js';
 export { getSettings, updateSetting } from './settings.js';
 
 // 导出 API_BASE 供其他模块使用

@@ -11,12 +11,12 @@
         >
           <Menu :size="16" />
         </button>
-        <router-link :to="isAdmin ? '/admin/dashboard' : '/user/tools'" class="logo-link">
+        <router-link :to="homePath" class="logo-link">
           <div class="logo-icon">
             <Zap :size="16" />
           </div>
           <div class="header-title">
-            <h1>{{ isAdmin ? '运营控制中心' : '自动化工具箱' }}</h1>
+            <h1>{{ isAdmin ? '运营控制中心' : isBusiness ? '专业批量工作台' : '自动化工具箱' }}</h1>
             <p>{{ currentPageTitle }}</p>
           </div>
         </router-link>
@@ -41,7 +41,7 @@
       </div>
 
       <div class="header-right">
-        <span v-if="!isAdmin && planBadge" class="badge-svip">{{ planBadge }}</span>
+        <span v-if="!isAdmin && planBadge" :class="['badge-svip', { business: isBusiness }]">{{ planBadge }}</span>
 
         <!-- 管理员标记 -->
         <span v-if="isAdmin" class="admin-badge">Owner</span>
@@ -56,7 +56,7 @@
           </div>
           <template #dropdown>
             <el-dropdown-menu>
-              <template v-if="!isAdmin">
+              <template v-if="!isAdmin && !isBusiness">
                 <el-dropdown-item command="devices" :icon="Monitor">
                   设备换绑
                 </el-dropdown-item>
@@ -64,6 +64,9 @@
                   续费中心
                 </el-dropdown-item>
               </template>
+              <el-dropdown-item v-else-if="isBusiness" command="business-license" :icon="PriceTag">
+                授权与席位
+              </el-dropdown-item>
               <el-dropdown-item divided command="logout" :icon="SwitchButton" class="logout-item">
                 退出系统
               </el-dropdown-item>
@@ -78,6 +81,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
@@ -87,7 +91,11 @@ const props = defineProps({
   isAdmin: {
     type: Boolean,
     default: false
-  }
+  },
+  isBusiness: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['toggle-sidebar', 'platform-change'])
@@ -96,6 +104,7 @@ const router = useRouter()
 const route = useRoute()
 const platformStore = usePlatformStore()
 const currentPageTitle = computed(() => route.meta?.title || (props.isAdmin ? '管理后台' : '跨境电商效率工具'))
+const homePath = computed(() => props.isAdmin ? '/admin/dashboard' : props.isBusiness ? '/business/overview' : '/user/tools')
 
 const showPlatformSwitcher = computed(() => availablePlatformsForUser.value.length > 1)
 
@@ -188,12 +197,15 @@ const handleCommand = (command) => {
     } else {
       router.push('/user/plans')
     }
+  } else if (command === 'business-license') {
+    router.push('/business/license')
   }
 }
 
 const planBadge = computed(() => {
   try {
     const user = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+    if (props.isBusiness) return '专业版'
     const code = user.plan_code || user.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase()
     if (code === 'Y999') return '陪跑包'
     if (code === 'Y199') return '冲刺包'
@@ -203,7 +215,22 @@ const planBadge = computed(() => {
   }
 })
 
-function handleLogout() {
+async function handleLogout() {
+  if (props.isBusiness) {
+    try {
+      const snapshot = await window.electronAPI?.batch?.getSnapshot?.()
+      if (snapshot?.status === 'running') {
+        await ElMessageBox.confirm(
+          '退出后将结束当前批次并关闭所有客户浏览器，导入数据会从本机内存清除。',
+          '退出专业批量工作台？',
+          { confirmButtonText: '结束并退出', cancelButtonText: '继续使用', type: 'warning' },
+        )
+        await window.electronAPI?.batch?.cancel?.('cancelled')
+      }
+    } catch (error) {
+      if (error === 'cancel' || error === 'close') return
+    }
+  }
   Auth.clear()
   localStorage.removeItem('toolbox_role')
   localStorage.removeItem('toolbox_user')
@@ -354,6 +381,12 @@ onMounted(() => {
   border-radius: 4px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+.badge-svip.business {
+  color: #8b6b3f;
+  background: #f1eadf;
+  border: 1px solid rgba(169, 133, 82, .22);
 }
 
 /* 管理员标记 */

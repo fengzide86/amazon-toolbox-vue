@@ -23,3 +23,7 @@ export function checkAuthStatus(code, deviceId) {
         device_name: ''
     });
 }
+
+export function getCurrentUser() {
+    return api.get('/api/auth/me', {}, { cache: false });
+}

@@ -74,6 +74,38 @@ const routes = [
       }
     ]
   },
+  {
+    path: '/business',
+    component: () => import('@/layouts/BusinessLayout.vue'),
+    redirect: { name: 'BusinessOverview' },
+    meta: { productType: 'business', entitlement: 'batch_execution' },
+    children: [
+      {
+        path: 'overview',
+        name: 'BusinessOverview',
+        component: () => import('@/views/business/OverviewView.vue'),
+        meta: { title: '工作概览', productType: 'business', entitlement: 'batch_execution' },
+      },
+      {
+        path: 'workspace',
+        name: 'BusinessWorkspace',
+        component: () => import('@/views/business/WorkspaceView.vue'),
+        meta: { title: '批量工作台', productType: 'business', entitlement: 'batch_execution' },
+      },
+      {
+        path: 'records',
+        name: 'BusinessRecords',
+        component: () => import('@/views/business/RecordsView.vue'),
+        meta: { title: '批量执行记录', productType: 'business', entitlement: 'batch_execution' },
+      },
+      {
+        path: 'license',
+        name: 'BusinessLicense',
+        component: () => import('@/views/business/LicenseView.vue'),
+        meta: { title: '授权与席位', productType: 'business', entitlement: 'batch_execution' },
+      },
+    ],
+  },
   // 管理后台路由
   {
     path: '/admin',
@@ -158,12 +190,18 @@ router.beforeEach((to, from, next) => {
   try {
     const isAuthenticated = authService.isAuthenticated()
     const isAdmin = authService.isAdmin()
+    const user = authService.getUser() || {}
+    const entitlements = user.entitlements || {}
+    const hasBusinessAccess = user.product_type === 'business'
+      && user.business_workspace_enabled === true
+      && entitlements.batch_execution === true
+      && entitlements.multi_account_workspace === true
     
     // 登录页不需要验证
     if (to.name === 'UserLogin' || to.name === 'AdminLogin' || to.name === 'UserTerms') {
       if (isAuthenticated) {
         // 已登录，根据角色跳转
-        next({ name: isAdmin ? 'AdminDashboard' : 'UserTools' })
+        next({ name: isAdmin ? 'AdminDashboard' : hasBusinessAccess ? 'BusinessOverview' : 'UserTools' })
       } else {
         next()
       }
@@ -183,10 +221,31 @@ router.beforeEach((to, from, next) => {
       next()
       return
     }
+
+    if (to.path.startsWith('/business')) {
+      if (!isAuthenticated) {
+        next({ name: 'UserLogin' })
+        return
+      }
+      if (isAdmin) {
+        next({ name: 'AdminDashboard' })
+        return
+      }
+      if (!hasBusinessAccess) {
+        next({ name: 'UserTools', query: { access: 'business-required' } })
+        return
+      }
+      next()
+      return
+    }
     
     // 用户端页面需要验证
     if (!isAuthenticated) {
       next({ name: 'UserLogin' })
+      return
+    }
+    if (!isAdmin && hasBusinessAccess && to.path.startsWith('/user')) {
+      next({ name: to.name === 'UserPlans' ? 'BusinessLicense' : 'BusinessOverview' })
       return
     }
     

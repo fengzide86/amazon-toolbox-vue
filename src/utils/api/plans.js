@@ -5,3 +5,7 @@ import { api } from './index.js';
 export function getPlans() {
     return api.get('/api/plans');
 }
+
+export function getPlansAdmin(params = {}) {
+    return api.get('/api/plans/admin', params, { cache: false });
+}
