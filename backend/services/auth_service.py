@@ -18,7 +18,7 @@ from core.config import settings
 from core.logging import get_logger
 from core.response import success_response, error_response, ErrorCodes
 from core.cache import cache, CacheKeys
-from services.entitlement_service import resolve_product_access
+from services.entitlement_service import normalize_entitlements, resolve_product_access
 
 logger = get_logger(__name__)
 
@@ -378,12 +378,26 @@ class AuthService:
                 select(Plan.name).where(Plan.id == code_obj.plan_id)
             )
             plan_name = plan_result.scalar() or "未知"
+            access = await resolve_product_access(self.db, code_obj.id)
+            product_type = access["product_type"]
+            entitlements = access["entitlements"]
+            business_workspace_enabled = access["enabled"]
+
+        active_seats = len([seat for seat in (code_obj.seats or []) if seat.status == "active"])
+        device_used = len(code_obj.devices or [])
         
         return success_response(
             data={
                 "role": "user",
                 "plan_name": plan_name,
                 "expires_at": code_obj.expires_at.isoformat() if code_obj.expires_at else None,
+                "product_type": product_type,
+                "entitlements": entitlements,
+                "business_workspace_enabled": business_workspace_enabled,
+                "seat_limit": code_obj.seat_limit or 1,
+                "seat_used": active_seats,
+                "max_devices": code_obj.max_devices or 1,
+                "device_used": device_used,
             },
             message="正常"
         )
@@ -407,6 +421,9 @@ class AuthService:
         # 查询授权码信息
         plan_name = "未知"
         expires_at = None
+        product_type = "consumer"
+        entitlements = normalize_entitlements({}, "consumer")
+        business_workspace_enabled = False
         if auth_code_id:
             auth_code_result = await self.db.execute(
                 select(AuthCode).where(AuthCode.id == auth_code_id)
