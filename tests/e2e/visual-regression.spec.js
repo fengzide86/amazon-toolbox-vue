@@ -1,13 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 const FRONTEND_URL = 'http://localhost:3000'
-const ADMIN_STATE_FILE = join(__dirname, '..', '..', 'test-results', 'admin-state.json')
 
 // E2E 专用测试授权码
 const TEST_E2E_AMZ = 'TEST-E2E-AMZ'
+let cachedAdminSession = null
 
 // Helper: clear auth state
 async function clearAuth(page) {
@@ -42,6 +39,44 @@ async function loginUser(page, authCode) {
 
   await expect(page.getByTestId('user-layout')).toBeVisible({ timeout: 15000 })
   await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
+}
+
+async function loginAdmin(page) {
+  await page.goto(`${FRONTEND_URL}/#/admin/login`)
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear() })
+  if (cachedAdminSession) {
+    await page.evaluate(entries => {
+      Object.entries(entries).forEach(([key, value]) => sessionStorage.setItem(key, value))
+    }, cachedAdminSession)
+    await page.goto(`${FRONTEND_URL}/#/admin/dashboard`)
+    await expect(page.locator('.studio-admin-sidebar')).toBeVisible({ timeout: 15000 })
+    return
+  }
+  await page.reload()
+  await page.locator('#adminPassword').fill('admin123')
+  const responsePromise = page.waitForResponse(
+    response => response.url().includes('/api/auth/admin-login') && response.request().method() === 'POST',
+    { timeout: 15000 }
+  )
+  await page.locator('button[type="submit"]').click()
+  expect((await responsePromise).status()).toBe(200)
+  await expect(page.locator('.studio-admin-sidebar')).toBeVisible({ timeout: 15000 })
+  cachedAdminSession = await page.evaluate(() => Object.fromEntries(
+    Array.from({ length: sessionStorage.length }, (_, index) => {
+      const key = sessionStorage.key(index)
+      return [key, sessionStorage.getItem(key)]
+    })
+  ))
+}
+
+async function distinctRowCounts(locator) {
+  const tops = await locator.evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().top)))
+  return [...new Set(tops)].map(top => tops.filter(value => value === top).length)
+}
+
+async function expectNoPageOverflow(page) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  expect(overflow).toBeLessThanOrEqual(1)
 }
 
 // ===========================
@@ -112,7 +147,7 @@ test.describe('视觉回归测试 - 用户端', () => {
 
   test('页面切换动画存在', async ({ page }) => {
     // 检查 Transition 组件是否正确包裹
-    const appDiv = page.locator('#app')
+    const appDiv = page.locator('#app[data-v-app]')
     await expect(appDiv).toBeVisible()
 
     // 导航到另一个页面，验证路由切换正常
@@ -125,10 +160,70 @@ test.describe('视觉回归测试 - 用户端', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
   })
+
+  test('套餐卡片按数量使用完整平衡栅格', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 768 })
+    await page.goto(`${FRONTEND_URL}/#/user/plans`)
+    const cards = page.locator('.plan-card')
+    await expect(cards.first()).toBeVisible({ timeout: 10000 })
+    const count = await cards.count()
+    expect(count).toBeGreaterThan(0)
+    const compactRows = await distinctRowCounts(cards)
+    if (count === 4) expect(compactRows).toEqual([2, 2])
+    else expect(compactRows).toEqual([count])
+    await expectNoPageOverflow(page)
+
+    await page.setViewportSize({ width: 700, height: 768 })
+    expect(await distinctRowCounts(cards)).toEqual(Array(count).fill(1))
+    await expectNoPageOverflow(page)
+  })
+})
+
+test.describe('视觉回归测试 - 登录响应式', () => {
+  test.beforeEach(async ({ page }) => clearAuth(page))
+
+  test('1024 宽度保持左右布局且六项能力同一行', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await page.goto(`${FRONTEND_URL}/#/user/login`)
+
+    const brandBox = await page.locator('.login-brand').boundingBox()
+    const formBox = await page.locator('.login-form-section').boundingBox()
+    expect(Math.abs(brandBox.y - formBox.y)).toBeLessThanOrEqual(1)
+    expect(formBox.x).toBeGreaterThan(brandBox.x + brandBox.width - 2)
+    expect(await distinctRowCounts(page.locator('.feature-tag'))).toEqual([6])
+    await expectNoPageOverflow(page)
+  })
+
+  test('窄屏能力标签形成完整 3x2 矩阵', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 768 })
+    await page.goto(`${FRONTEND_URL}/#/user/login`)
+    expect(await distinctRowCounts(page.locator('.feature-tag'))).toEqual([3, 3])
+    await expectNoPageOverflow(page)
+  })
+
+  test('授权成功后立即导航并播放跨路由光轨', async ({ page }) => {
+    await page.route('**/api/auth/verify', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { token: 'visual-track-token', platform_scope: ['amazon'] } }),
+    }))
+    await page.goto(`${FRONTEND_URL}/#/user/login`)
+    await page.evaluate(() => {
+      window.__routeTrackObserved = false
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('.route-track')) window.__routeTrackObserved = true
+      })
+      observer.observe(document.documentElement, { childList: true, subtree: true })
+    })
+    await page.locator('#authCode').fill('TRACK-DEMO-01')
+    await page.locator('button[type="submit"]').click()
+    await expect.poll(() => page.evaluate(() => window.__routeTrackObserved), { timeout: 3000 }).toBe(true)
+    await expect(page.getByTestId('user-layout')).toBeVisible({ timeout: 5000 })
+  })
 })
 
 test.describe('视觉回归测试 - 后台', () => {
-  test.use({ storageState: ADMIN_STATE_FILE })
+  test.beforeEach(async ({ page }) => loginAdmin(page))
 
   test('后台布局正确', async ({ page }) => {
     await page.goto(`${FRONTEND_URL}/#/admin/dashboard`)
@@ -177,5 +272,26 @@ test.describe('视觉回归测试 - 后台', () => {
 
     // --color-canvas: #F4F5F7
     expect(bgColor).toMatch(/rgb\(244, 245, 247\)/)
+  })
+
+  test('知识库统计卡使用 4列到2x2 的完整栅格', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await page.goto(`${FRONTEND_URL}/#/admin/knowledge`)
+    await expect(page.locator('.knowledge-stats .stat-card')).toHaveCount(4)
+    expect(await distinctRowCounts(page.locator('.knowledge-stats .stat-card'))).toEqual([4])
+    await expectNoPageOverflow(page)
+
+    await page.setViewportSize({ width: 768, height: 768 })
+    expect(await distinctRowCounts(page.locator('.knowledge-stats .stat-card'))).toEqual([2, 2])
+    await expectNoPageOverflow(page)
+  })
+
+  test('后台关键路由在紧凑宽度没有页面级横向溢出', async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 768 })
+    for (const route of ['authcodes', 'orders', 'users', 'feedback', 'announcements', 'knowledge']) {
+      await page.goto(`${FRONTEND_URL}/#/admin/${route}`)
+      await page.waitForLoadState('networkidle')
+      await expectNoPageOverflow(page)
+    }
   })
 })

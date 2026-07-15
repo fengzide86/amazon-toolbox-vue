@@ -1,33 +1,25 @@
 <template>
   <div>
-    <h2 class="page-title">订单管理</h2>
+    <PageHeader title="订单管理" description="创建订单并维护付款与退款状态" />
 
-    <el-row :gutter="16" style="margin-bottom: 1.5rem;">
-      <el-col :span="6">
-        <el-card class="stat-card">
+    <section class="order-stats" aria-label="订单统计">
+      <article class="stat-card">
           <div class="stat-label">总订单数</div>
           <div class="stat-value" style="color: var(--studio-accent);">{{ stats.total }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
+      </article>
+      <article class="stat-card">
           <div class="stat-label">已付款</div>
           <div class="stat-value">{{ stats.paid }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
+      </article>
+      <article class="stat-card">
           <div class="stat-label">待确认</div>
           <div class="stat-value" style="color: var(--studio-warning);">{{ stats.pending }}</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card">
+      </article>
+      <article class="stat-card">
           <div class="stat-label">已退款</div>
           <div class="stat-value" style="color: var(--studio-danger);">{{ stats.refunded }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+      </article>
+    </section>
 
     <!-- 创建订单 -->
     <el-card class="table-card" style="margin-bottom: 1.5rem;">
@@ -37,18 +29,11 @@
         </div>
       </template>
       <div class="form-row">
-        <el-select v-model="newOrder.plan_id" placeholder="选择套餐" style="width: 200px;">
-          <el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" />
-        </el-select>
-        <el-input v-model="newOrder.channel" placeholder="渠道（如微信/支付宝）" style="width: 200px;" />
-        <el-input v-model="newOrder.responsible" placeholder="负责人" style="width: 120px;" />
-        <el-select v-model="newOrder.status" style="width: 120px;">
-          <el-option label="待确认" value="pending" />
-          <el-option label="已付款" value="paid" />
-        </el-select>
-        <el-button type="primary" @click="createOrder" :loading="isLoading">
-          {{ isLoading ? '创建中...' : '创建订单' }}
-        </el-button>
+        <label class="order-field order-field--wide"><span>套餐</span><el-select v-model="newOrder.plan_id" placeholder="选择套餐"><el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" /></el-select></label>
+        <label class="order-field order-field--wide"><span>渠道</span><el-input v-model="newOrder.channel" placeholder="如微信/支付宝" /></label>
+        <label class="order-field"><span>负责人</span><el-input v-model="newOrder.responsible" placeholder="负责人" /></label>
+        <label class="order-field"><span>初始状态</span><el-select v-model="newOrder.status"><el-option label="待确认" value="pending" /><el-option label="已付款" value="paid" /></el-select></label>
+        <div class="order-submit"><el-button type="primary" @click="createOrder" :loading="isLoading">{{ isLoading ? '创建中...' : '创建订单' }}</el-button></div>
       </div>
     </el-card>
 
@@ -56,43 +41,44 @@
       <template #header>
         <div class="card-header">
           <h3>全部订单</h3>
-          <div class="filter-bar">
-            <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 120px;">
-              <el-option label="已付款" value="paid" />
-              <el-option label="待确认" value="pending" />
-              <el-option label="已退款" value="refunded" />
-            </el-select>
-            <el-button @click="exportOrdersData">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-              </svg>
-              导出 CSV
-            </el-button>
-          </div>
         </div>
       </template>
+      <DataToolbar label="订单筛选">
+        <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 150px;">
+          <el-option label="已付款" value="paid" />
+          <el-option label="待确认" value="pending" />
+          <el-option label="已退款" value="refunded" />
+        </el-select>
+        <template #summary>共 {{ filteredOrders.length }} 笔</template>
+        <template #actions>
+          <el-button @click="exportOrdersData">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            导出 CSV
+          </el-button>
+        </template>
+      </DataToolbar>
       <el-table :data="filteredOrders" style="width: 100%">
         <el-table-column label="订单号" min-width="140">
           <template #default="{ row }">
             <span style="font-family: monospace; font-size: 0.85rem;">{{ row.order_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="套餐" min-width="120">
+        <el-table-column v-if="!isCompact" label="套餐" min-width="120">
           <template #default="{ row }">
             {{ getPlanName(row.plan_id) }}
           </template>
         </el-table-column>
-        <el-table-column label="金额" width="100">
+        <el-table-column v-if="!isCompact" label="金额" width="100">
           <template #default="{ row }">
             ¥{{ row.amount }}
           </template>
         </el-table-column>
-        <el-table-column label="渠道" width="120">
+        <el-table-column v-if="!isCompact" label="渠道" width="120">
           <template #default="{ row }">
             {{ row.channel || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="负责人" width="120">
+        <el-table-column v-if="!isCompact" label="负责人" width="120">
           <template #default="{ row }">
             {{ row.responsible || '-' }}
           </template>
@@ -104,15 +90,22 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="140">
+        <el-table-column v-if="!isCompact" label="创建时间" width="140">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" :width="isCompact ? 136 : 220" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'pending'" size="small" @click="markPaid(row)">确认付款</el-button>
-            <el-button v-if="row.status === 'paid'" size="small" type="danger" @click="refund(row)">退款</el-button>
+            <el-button size="small" @click="openOrderDetail(row)">详情</el-button>
+            <el-dropdown v-if="isCompact && row.status !== 'refunded'" trigger="click" @command="command => handleOrderCommand(command, row)">
+              <el-button size="small">更多</el-button>
+              <template #dropdown><el-dropdown-menu><el-dropdown-item v-if="row.status === 'pending'" command="paid">确认付款</el-dropdown-item><el-dropdown-item v-if="row.status === 'paid'" command="refund">退款</el-dropdown-item></el-dropdown-menu></template>
+            </el-dropdown>
+            <template v-else-if="!isCompact">
+              <el-button v-if="row.status === 'pending'" size="small" @click="markPaid(row)">确认付款</el-button>
+              <el-button v-if="row.status === 'paid'" size="small" type="danger" @click="refund(row)">退款</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -120,6 +113,19 @@
         </template>
       </el-table>
     </el-card>
+
+    <AdminDetailDrawer v-model="showDetailDrawer" title="订单详情">
+      <div v-if="detailOrder" class="detail-list">
+        <div><span>订单号</span><strong class="mono">{{ detailOrder.order_no }}</strong></div>
+        <div><span>套餐</span><strong>{{ getPlanName(detailOrder.plan_id) }}</strong></div>
+        <div><span>金额</span><strong>¥{{ detailOrder.amount }}</strong></div>
+        <div><span>渠道</span><strong>{{ detailOrder.channel || '-' }}</strong></div>
+        <div><span>负责人</span><strong>{{ detailOrder.responsible || '-' }}</strong></div>
+        <div><span>状态</span><strong>{{ getStatusText(detailOrder.status) }}</strong></div>
+        <div><span>创建时间</span><strong>{{ formatTime(detailOrder.created_at) }}</strong></div>
+      </div>
+      <template #footer><el-button @click="showDetailDrawer = false">关闭</el-button></template>
+    </AdminDetailDrawer>
   </div>
 </template>
 
@@ -128,6 +134,10 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getOrders, createOrder as apiCreateOrder, updateOrder, refundOrder, getPlans, exportOrders, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { useCompactLayout } from '@/composables/useCompactLayout'
+import PageHeader from '@/components/PageHeader.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 
 const orders = ref([])
 const plans = ref([])
@@ -136,6 +146,9 @@ const filterStatus = ref('')
 const planNameMap = reactive({})
 
 const platformStore = usePlatformStore()
+const isCompact = useCompactLayout()
+const showDetailDrawer = ref(false)
+const detailOrder = ref(null)
 
 const newOrder = ref({ plan_id: null, amount: 0, channel: '', responsible: '', status: 'pending' })
 
@@ -225,6 +238,16 @@ async function refund(order) {
   }
 }
 
+function openOrderDetail(order) {
+  detailOrder.value = order
+  showDetailDrawer.value = true
+}
+
+function handleOrderCommand(command, order) {
+  if (command === 'paid') markPaid(order)
+  if (command === 'refund') refund(order)
+}
+
 // 选择套餐时自动填充金额
 watch(() => newOrder.value.plan_id, (id) => {
   const plan = plans.value.find(p => p.id === id)
@@ -252,17 +275,15 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--studio-text-main);
-  margin-bottom: 1.5rem;
+.stat-card {
+  padding: 18px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--studio-surface);
 }
 
-.stat-card {
-  text-align: center;
-}
+.order-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 1.5rem; }
 
 .stat-label {
   font-size: 0.85rem;
@@ -297,17 +318,22 @@ onMounted(loadData)
 }
 
 .form-row {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1.35fr 1.25fr .8fr .8fr auto;
+  gap: 14px;
+  align-items: end;
 }
 
-.filter-bar {
+.order-field {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
 }
+.order-field > span { color: var(--studio-text-muted); font-size: .85rem; }
+.order-field :deep(.el-select), .order-field :deep(.el-input) { width: 100%; }
+.order-submit { display: flex; justify-content: flex-end; }
+.data-toolbar-v6 { margin-bottom: 1rem; }
 
 .empty-state {
   padding: 2rem;
@@ -328,5 +354,22 @@ onMounted(loadData)
 
 :deep(.el-card__body) {
   padding: 1.25rem;
+}
+
+.detail-list { display: grid; gap: 12px; }
+.detail-list > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+.detail-list span { color: var(--studio-text-muted); font-size: 13px; }
+.detail-list strong { color: var(--studio-text-main); font-size: 14px; overflow-wrap: anywhere; }
+.mono { font-family: monospace; }
+
+@media (max-width: 1100px) {
+  .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .order-submit { grid-column: 1 / -1; }
+}
+@media (max-width: 899px) { .order-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .order-stats, .form-row { grid-template-columns: 1fr; }
+  .order-submit { grid-column: auto; }
+  .order-submit :deep(.el-button) { width: 100%; }
 }
 </style>

@@ -1,22 +1,22 @@
 <template>
   <div>
-    <h2 class="page-title">工单管理</h2>
+    <PageHeader title="工单管理" description="查看客户反馈并跟进处理状态" />
 
-    <div class="filter-bar">
+    <DataToolbar label="工单筛选">
       <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 160px;">
         <el-option label="全部状态" value="" />
         <el-option label="待处理" value="pending" />
         <el-option label="处理中" value="processing" />
         <el-option label="已解决" value="resolved" />
       </el-select>
-      <span class="filter-count">共 {{ filteredFeedbacks.length }} 个工单</span>
-    </div>
+      <template #summary>共 {{ filteredFeedbacks.length }} 个工单</template>
+    </DataToolbar>
 
     <el-card class="table-card" shadow="never">
       <el-table :data="filteredFeedbacks" stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column v-if="!isCompact" prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="user_id" label="用户ID" width="100" />
+        <el-table-column v-if="!isCompact" prop="user_id" label="用户ID" width="100" />
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
@@ -24,7 +24,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="160">
+        <el-table-column v-if="!isCompact" label="创建时间" width="160">
           <template #default="{ row }">
             <span class="time-text">{{ formatTime(row.created_at) }}</span>
           </template>
@@ -48,8 +48,8 @@
       </el-table>
     </el-card>
 
-    <!-- 查看详情弹窗 -->
-    <el-dialog v-model="showDetailModal" title="工单详情" width="600px">
+    <!-- 查看详情 -->
+    <AdminDetailDrawer v-model="showDetailModal" title="工单详情" size="min(600px, 92vw)">
       <div class="detail-content">
         <div class="detail-row">
           <span class="detail-label">标题：</span>
@@ -95,7 +95,7 @@
       <template #footer>
         <el-button @click="showDetailModal = false">关闭</el-button>
       </template>
-    </el-dialog>
+    </AdminDetailDrawer>
 
     <!-- 回复弹窗 -->
     <el-dialog 
@@ -138,9 +138,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { getFeedbacks, updateFeedback, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
+import DataToolbar from '@/components/DataToolbar.vue'
 import { usePlatformStore } from '@/stores/platform'
+import { useCompactLayout } from '@/composables/useCompactLayout'
+import PageHeader from '@/components/PageHeader.vue'
+import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 
 const platformStore = usePlatformStore()
+const isCompact = useCompactLayout()
 const feedbacks = ref([])
 const filterStatus = ref('')
 const showDetailModal = ref(false)
@@ -229,25 +234,7 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--studio-text-main);
-  margin-bottom: 1.5rem;
-}
-
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.filter-count {
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-}
+.data-toolbar-v6 { margin-bottom: 1rem; }
 
 .table-card {
   background: var(--studio-surface);

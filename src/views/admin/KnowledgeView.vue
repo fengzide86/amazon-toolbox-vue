@@ -1,46 +1,37 @@
 <template>
   <div>
-    <div class="page-header">
-      <h2 class="page-title">知识库管理</h2>
-      <div class="header-actions">
+    <PageHeader title="知识库管理" description="维护工具帮助内容与检索数据">
+      <template #actions>
         <el-button @click="openRetrievalTest">🔍 召回测试</el-button>
         <el-button @click="syncVector" :loading="syncing">
           {{ syncing ? '同步中...' : '🔄 同步向量库' }}
         </el-button>
         <el-button type="primary" @click="openCreate">+ 新建条目</el-button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- 统计 -->
-    <el-row :gutter="16" class="stats-row">
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="never">
+    <section class="knowledge-stats" aria-label="知识库统计">
+      <article class="stat-card">
           <div class="stat-value">{{ stats.total || 0 }}</div>
           <div class="stat-label">总条目</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="never">
+      </article>
+      <article class="stat-card">
           <div class="stat-value">{{ stats.active || 0 }}</div>
           <div class="stat-label">已启用</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="never">
+      </article>
+      <article class="stat-card">
           <div class="stat-value">{{ stats.categories || 0 }}</div>
           <div class="stat-label">分类数</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="stat-card" shadow="never">
+      </article>
+      <article class="stat-card">
           <div class="stat-value">{{ stats.vector_store?.total_vectors || 0 }}</div>
           <div class="stat-label">向量数</div>
-        </el-card>
-      </el-col>
-    </el-row>
+      </article>
+    </section>
 
     <!-- 筛选 -->
-    <div class="filter-bar">
+    <DataToolbar label="知识库筛选">
       <el-select v-model="filterCategory" placeholder="全部分类" clearable @change="loadData" style="width: 200px;">
         <el-option 
           v-for="cat in categories" 
@@ -60,16 +51,16 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <span class="filter-count">共 {{ total }} 条</span>
-    </div>
+      <template #summary>共 {{ total }} 条</template>
+    </DataToolbar>
 
     <!-- 列表 -->
     <el-card class="table-card" shadow="never">
       <el-table :data="list" stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="title" label="标题" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="category" label="分类" width="120" />
-        <el-table-column label="优先级" width="100">
+        <el-table-column v-if="!isCompact" prop="id" label="ID" width="80" />
+        <el-table-column v-if="!isCompact" prop="category" label="分类" width="120" />
+        <el-table-column v-if="!isCompact" label="优先级" width="100">
           <template #default="{ row }">
             <el-tag 
               :type="row.priority === 'high' ? 'danger' : row.priority === 'low' ? 'info' : 'warning'" 
@@ -86,11 +77,25 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="view_count" label="查看" width="80" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column v-if="!isCompact" prop="view_count" label="查看" width="80" />
+        <el-table-column label="操作" :width="isCompact ? 136 : 180" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <template v-if="isCompact">
+              <el-button size="small" @click="openKnowledgeDetail(row)">详情</el-button>
+              <el-dropdown trigger="click" @command="command => handleKnowledgeCommand(command, row)">
+                <el-button size="small">更多</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">编辑</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+            <template v-else>
+              <el-button size="small" @click="openEdit(row)">编辑</el-button>
+              <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -109,6 +114,18 @@
         @current-change="loadData"
       />
     </div>
+
+    <AdminDetailDrawer v-model="showDetailDrawer" title="知识条目详情">
+      <div v-if="detailItem" class="detail-list">
+        <div><span>标题</span><strong>{{ detailItem.title }}</strong></div>
+        <div><span>分类</span><strong>{{ detailItem.category || '-' }}</strong></div>
+        <div><span>状态</span><strong>{{ detailItem.status === 'active' ? '启用' : '停用' }}</strong></div>
+        <div><span>优先级</span><strong>{{ detailItem.priority || '-' }}</strong></div>
+        <div><span>查看次数</span><strong>{{ detailItem.view_count || 0 }}</strong></div>
+        <div class="detail-content"><span>内容</span><p>{{ detailItem.content }}</p></div>
+      </div>
+      <template #footer><el-button @click="showDetailDrawer = false">关闭</el-button></template>
+    </AdminDetailDrawer>
 
     <!-- 编辑弹窗 -->
     <el-dialog 
@@ -219,9 +236,14 @@ import { ref, onMounted, watch } from 'vue'
 import { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, createKnowledge, updateKnowledge, deleteKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { useCompactLayout } from '@/composables/useCompactLayout'
+import PageHeader from '@/components/PageHeader.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 import { Search } from '@element-plus/icons-vue'
 
 const platformStore = usePlatformStore()
+const isCompact = useCompactLayout()
 
 const list = ref([])
 const total = ref(0)
@@ -240,6 +262,8 @@ const showRetrievalTest = ref(false)
 const retrievalLoading = ref(false)
 const retrievalResult = ref(null)
 const retrievalForm = ref({ query: '', platform_key: '', capability_key: '', top_k: 5, min_score: 0.3 })
+const showDetailDrawer = ref(false)
+const detailItem = ref(null)
 
 const allCategories = ['安装教程', '授权说明', '使用教程', '报错处理', '套餐说明', '退款规则', '比赛须知', '其他']
 
@@ -352,6 +376,16 @@ async function syncVector() {
   }
 }
 
+function openKnowledgeDetail(item) {
+  detailItem.value = item
+  showDetailDrawer.value = true
+}
+
+function handleKnowledgeCommand(command, item) {
+  if (command === 'edit') openEdit(item)
+  if (command === 'delete') handleDelete(item)
+}
+
 function openRetrievalTest() {
   const platform = platformStore.adminPlatform
   retrievalForm.value.platform_key = platform && platform !== 'all' ? platform : ''
@@ -386,26 +420,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--studio-text-main);
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
 .retrieval-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -419,12 +433,12 @@ onMounted(() => {
 .retrieval-meta { margin: 6px 0; color: var(--studio-text-muted); font-size: 12px; }
 .retrieval-content { max-height: 120px; overflow: auto; white-space: pre-wrap; line-height: 1.5; }
 
-.stats-row {
-  margin-bottom: 1rem;
-}
+.knowledge-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 1rem; }
 
 .stat-card {
+  padding: 18px;
   background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
   border-radius: var(--radius-lg);
   text-align: center;
 }
@@ -441,18 +455,7 @@ onMounted(() => {
   margin-top: 0.25rem;
 }
 
-.filter-bar {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.filter-count {
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-}
+.data-toolbar-v6 { margin-bottom: 1rem; }
 
 .table-card {
   background: var(--studio-surface);
@@ -490,4 +493,14 @@ onMounted(() => {
   border-top: 1px solid var(--studio-border);
   padding-top: 1rem;
 }
+
+.detail-list { display: grid; gap: 12px; }
+.detail-list > div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--studio-border); }
+.detail-list span { color: var(--studio-text-muted); font-size: 13px; }
+.detail-list strong { color: var(--studio-text-main); font-size: 14px; overflow-wrap: anywhere; }
+.detail-content { grid-template-columns: 1fr !important; }
+.detail-content p { margin: 0; color: var(--studio-text-main); line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 899px) { .knowledge-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .knowledge-stats { grid-template-columns: 1fr; } .retrieval-options { grid-template-columns: 1fr; } }
 </style>

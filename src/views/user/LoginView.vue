@@ -80,12 +80,6 @@
           <span>{{ errorMessage }}</span>
         </div>
 
-        <!-- 成功消息 -->
-        <div class="success-message" :class="{ show: showSuccess }">
-          <CircleCheck :size="18" />
-          <span>授权成功！正在打开工具箱...</span>
-        </div>
-
         <!-- 连接状态 -->
         <div class="connection-status" :class="connectionStatusClass">
           <span class="status-dot"></span>
@@ -139,17 +133,14 @@
             <HelpCircle :size="14" />
             使用帮助
           </a>
-          <span class="footer-divider"></span>
           <a href="#" @click.prevent="showContact" class="footer-link">
             <Phone :size="14" />
             联系客服
           </a>
-          <span class="footer-divider"></span>
           <a href="#/user/terms" class="footer-link">
             <FileText :size="14" />
             服务条款
           </a>
-          <span class="footer-divider"></span>
           <a href="#/admin/login" class="footer-link admin-link">
             <Shield :size="14" />
             管理员登录
@@ -244,7 +235,7 @@ import { verifyAuthCode } from '@/utils/api'
 import { api } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
 import { saveRememberedUserCode } from '@/utils/credentialStore'
-import { Zap, Check, CircleAlert, CircleCheck, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
+import { Zap, Check, CircleAlert, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -253,7 +244,6 @@ const authCode = ref('')
 const authCodeInput = ref(null)
 const isLoading = ref(false)
 const showError = ref(false)
-const showSuccess = ref(false)
 const showHelpModal = ref(false)
 const showContactModal = ref(false)
 const copySuccess = ref(false)
@@ -338,7 +328,6 @@ function focusLoginInput() {
 
 function handleLogin() {
   showError.value = false
-  showSuccess.value = false
 
   const validation = validateAuthCode(authCode.value)
   if (!validation.valid) {
@@ -367,12 +356,11 @@ function handleLogin() {
         if (res.data.platform_scope) {
           localStorage.setItem('toolbox_platform_scope', JSON.stringify(res.data.platform_scope))
         }
-        showSuccess.value = true
-        showToast('授权成功！正在跳转...', 'success')
-        // 延迟跳转，让用户看到成功提示
-        setTimeout(() => {
-          router.push('/user/tools')
-        }, 800)
+        window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
+        router.push('/user/tools').catch(() => {
+          isLoading.value = false
+          focusLoginInput()
+        })
       } else {
         errorMessage.value = res.message
         showError.value = true
@@ -785,8 +773,8 @@ onUnmounted(() => {
 
 /* 功能标签 */
 .feature-tags {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.5rem;
 }
 
@@ -801,6 +789,9 @@ onUnmounted(() => {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.6);
   transition: all 0.3s ease;
+  justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .feature-tag:hover {
@@ -1168,12 +1159,12 @@ onUnmounted(() => {
 
 /* 底部链接 */
 .footer-links {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   margin-top: 1.5rem;
-  flex-wrap: wrap;
 }
 
 .footer-link {
@@ -1196,12 +1187,6 @@ onUnmounted(() => {
 .footer-link svg {
   width: 14px;
   height: 14px;
-}
-
-.footer-divider {
-  width: 1px;
-  height: 12px;
-  background: var(--studio-border);
 }
 
 .admin-link {
@@ -1598,15 +1583,60 @@ onUnmounted(() => {
 .modal-overlay { background: var(--color-overlay); backdrop-filter: blur(5px); }
 .modal { border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-overlay); }
 
-@media (max-width: 1024px) {
-  .login-brand { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); }
-  .login-form-section { padding: 40px 20px; }
+@media (max-width: 1024px) and (min-width: 900px) {
+  .login-page { flex-direction: row; }
+  .login-brand {
+    flex: .94;
+    min-width: 0;
+    min-height: 100vh;
+    padding: 36px 30px;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 0;
+  }
+  .login-form-section { flex: 1.06; min-width: 0; padding: 32px 24px; }
+  .brand-content { max-width: 460px; }
+  .brand-title { font-size: clamp(30px, 3.5vw, 38px); }
+  .brand-desc { margin-bottom: 24px; }
+  .brand-stats { gap: 16px; padding: 18px 0; margin-bottom: 18px; }
+  .stat-number { font-size: 30px; }
+  .stat-desc { font-size: 11px; }
+  .feature-tags { gap: 5px; }
+  .feature-tag { padding: 6px 4px; font-size: 10px; }
+  .login-form-card { padding: 30px 28px; }
 }
 
-@media (max-width: 640px) {
-  .login-brand { min-height: auto; padding: 32px 22px; }
-  .brand-stats { display: none; }
-  .brand-title { font-size: 28px; }
-  .login-form-card { padding: 26px 20px; }
+@media (max-width: 899px) {
+  .login-page {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    min-height: 100svh;
+    padding: 24px;
+  }
+  .login-brand {
+    min-height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .brand-content { width: min(100%, 460px); max-width: none; margin: 0 auto; }
+  .brand-logo, .brand-divider, .brand-desc, .brand-stats { display: none; }
+  .brand-title { margin-bottom: 6px; font-size: 28px; text-align: center; }
+  .brand-subtitle { margin-bottom: 14px; font-size: 12px; text-align: center; }
+  .feature-tags { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .feature-tag { padding: 6px 4px; font-size: 11px; background: var(--color-surface); }
+  .login-form-section { padding: 16px 0 0; background: transparent; }
+  .login-form-card { max-width: 460px; padding: 26px 28px; }
+  .login-footer { margin-top: 12px; }
+}
+
+@media (max-width: 520px) {
+  .login-page { align-content: start; padding: 18px 14px; }
+  .brand-title { font-size: 24px; }
+  .login-form-card { padding: 24px 18px; }
+  .footer-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .footer-link { justify-content: center; }
+  .login-footer p { line-height: 1.5; }
 }
 </style>

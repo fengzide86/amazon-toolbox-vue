@@ -9,7 +9,7 @@
       <LockKeyhole :size="17" />当前套餐暂未包含你选择的工具，可查看下面的可用套餐。
     </div>
 
-    <div v-if="plans.length" class="plans-grid">
+    <div v-if="plans.length" :class="['plans-grid', `plans-grid--count-${plans.length}`]">
       <article
         v-for="plan in plans"
         :key="plan.id"
@@ -93,7 +93,10 @@ onMounted(loadPlans)
 .current-plan span { color: var(--studio-text-muted); font-size: 10px; }
 .current-plan strong { grid-column: 2; color: var(--studio-text-main); font-size: 12px; }
 .upgrade-notice { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid rgba(183,121,31,.2); border-radius: var(--radius-md); color: var(--color-warning); background: var(--color-warning-soft); font-size: 12px; }
-.plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; align-items: stretch; }
+.plans-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.plans-grid--count-1 { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+.plans-grid--count-2, .plans-grid--count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 1060px) { .plans-grid--count-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .plan-card { position: relative; min-height: 390px; display: flex; flex-direction: column; padding: 20px; border: 1px solid var(--studio-border); border-radius: var(--radius-lg); background: white; box-shadow: var(--studio-shadow); }
 .plan-card.featured { transform: translateY(-4px); border-color: rgba(169,133,82,.48); box-shadow: 0 16px 36px rgba(169,133,82,.1); }
 .plan-card.current { border-color: var(--studio-accent-light); }
@@ -114,6 +117,6 @@ onMounted(loadPlans)
 .featured button, .anchor button { background: var(--color-primary); }
 .plan-card button:disabled { color: var(--studio-text-muted); background: var(--studio-bg-hover); cursor: default; }
 .empty-state { padding: 80px; color: var(--studio-text-muted); text-align: center; }
-@media (max-width: 1050px) { .plans-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .plan-card.featured { transform: none; } }
-@media (max-width: 620px) { .plans-header { flex-direction: column; } .plans-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1050px) { .plan-card.featured { transform: none; } }
+@media (max-width: 759px) { .plans-header { flex-direction: column; } .plans-grid { grid-template-columns: 1fr; } }
 </style>

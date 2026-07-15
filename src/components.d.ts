@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AdminDetailDrawer: typeof import('./components/AdminDetailDrawer.vue')['default']
     AdminSidebar: typeof import('./components/AdminSidebar.vue')['default']
     AnnouncementBanner: typeof import('./components/AnnouncementBanner.vue')['default']
     AppHeader: typeof import('./components/AppHeader.vue')['default']

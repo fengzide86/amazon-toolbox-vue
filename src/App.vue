@@ -2,9 +2,9 @@
   <div id="app">
     <ErrorBoundary>
       <router-view v-slot="{ Component }">
-        <Transition name="page" mode="out-in">
+        <AppTransition mode="out-in">
           <component :is="Component" />
-        </Transition>
+        </AppTransition>
       </router-view>
     </ErrorBoundary>
     <UpdateProgress />
@@ -14,6 +14,7 @@
 <script setup>
 import UpdateProgress from '@/components/UpdateProgress.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+import AppTransition from '@/components/AppTransition.vue'
 </script>
 
 <style>

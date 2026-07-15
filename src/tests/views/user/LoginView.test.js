@@ -143,6 +143,8 @@ describe('LoginView', () => {
 
   describe('登录流程测试', () => {
     it('登录成功应该保存信息并跳转', async () => {
+      const routeTrackListener = vi.fn()
+      window.addEventListener('toolbox:route-track', routeTrackListener, { once: true })
       const mockUserData = { token: 'jwt-token', name: 'TestUser' }
       mockVerifyAuthCode.mockResolvedValue({
         success: true,
@@ -159,11 +161,10 @@ describe('LoginView', () => {
 
       expect(sessionStorage.getItem('toolbox_role')).toBe('user')
       expect(sessionStorage.getItem('toolbox_token')).toBe('jwt-token')
-      expect(wrapper.find('.success-message').classes()).toContain('show')
-      expect(mockShowToast).toHaveBeenCalledWith('授权成功！正在跳转...', 'success')
-
-      vi.advanceTimersByTime(1200)
+      expect(wrapper.find('.success-message').exists()).toBe(false)
+      expect(routeTrackListener).toHaveBeenCalledOnce()
       expect(mockPush).toHaveBeenCalledWith('/user/tools')
+      expect(mockShowToast).not.toHaveBeenCalledWith(expect.stringContaining('正在跳转'), 'success')
     })
 
     it('登录失败应该显示错误信息', async () => {

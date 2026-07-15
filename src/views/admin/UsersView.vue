@@ -1,8 +1,8 @@
 <template>
   <div>
-    <h2 class="page-title">用户管理</h2>
+    <PageHeader title="用户管理" description="维护用户资料与设备席位信息" />
 
-    <div class="filter-bar">
+    <DataToolbar label="用户筛选">
       <el-input 
         v-model="searchText" 
         placeholder="搜索用户/设备..." 
@@ -13,16 +13,16 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
-      <span class="filter-count">共 {{ filteredUsers.length }} 个用户</span>
-    </div>
+      <template #summary>共 {{ filteredUsers.length }} 个用户</template>
+    </DataToolbar>
 
     <el-card class="table-card" shadow="never">
       <el-table :data="filteredUsers" stripe style="width: 100%">
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column v-if="!isCompact" prop="id" label="ID" width="80" />
         <el-table-column label="用户名" min-width="140">
           <template #default="{ row }">
             <el-input 
-              v-if="editingUser?.id === row.id" 
+              v-if="!isCompact && editingUser?.id === row.id"
               v-model="editingUser.name" 
               size="small"
               style="width: 120px;"
@@ -30,7 +30,7 @@
             <span v-else>{{ row.name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="手机号" width="140">
+        <el-table-column v-if="!isCompact" label="手机号" width="140">
           <template #default="{ row }">
             <el-input 
               v-if="editingUser?.id === row.id" 
@@ -42,12 +42,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="device_name" label="设备名" min-width="140" show-overflow-tooltip />
-        <el-table-column label="设备ID" min-width="160">
+        <el-table-column v-if="!isCompact" label="设备ID" min-width="160">
           <template #default="{ row }">
             <span class="mono-text">{{ row.device_id || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="席位数" width="100">
+        <el-table-column v-if="!isCompact" label="席位数" width="100">
           <template #default="{ row }">
             <el-input-number 
               v-if="editingUser?.id === row.id" 
@@ -59,7 +59,7 @@
             <span v-else>{{ row.total_seats }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="额外设备" width="100">
+        <el-table-column v-if="!isCompact" label="额外设备" width="100">
           <template #default="{ row }">
             <el-input-number 
               v-if="editingUser?.id === row.id" 
@@ -71,14 +71,18 @@
             <span v-else>{{ row.extra_devices }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="注册时间" width="160">
+        <el-table-column v-if="!isCompact" label="注册时间" width="160">
           <template #default="{ row }">
             <span class="time-text">{{ formatTime(row.created_at) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" :width="isCompact ? 136 : 160" fixed="right">
           <template #default="{ row }">
-            <template v-if="editingUser?.id === row.id">
+            <template v-if="isCompact">
+              <el-button size="small" @click="openUserDrawer(row, false)">详情</el-button>
+              <el-button size="small" @click="openUserDrawer(row, true)">编辑</el-button>
+            </template>
+            <template v-else-if="editingUser?.id === row.id">
               <el-button type="primary" size="small" @click="saveUser(row)">保存</el-button>
               <el-button size="small" @click="editingUser = null">取消</el-button>
             </template>
@@ -92,6 +96,22 @@
         </template>
       </el-table>
     </el-card>
+
+    <AdminDetailDrawer v-model="showUserDrawer" :title="drawerEditing ? '编辑用户' : '用户详情'">
+      <div v-if="detailUser" class="user-detail-list">
+        <label><span>用户名</span><el-input v-if="drawerEditing" v-model="detailUser.name" /><strong v-else>{{ detailUser.name || '-' }}</strong></label>
+        <label><span>手机号</span><el-input v-if="drawerEditing" v-model="detailUser.phone" /><strong v-else>{{ detailUser.phone || '-' }}</strong></label>
+        <label><span>设备名</span><strong>{{ detailUser.device_name || '-' }}</strong></label>
+        <label><span>设备 ID</span><strong class="mono-text">{{ detailUser.device_id || '-' }}</strong></label>
+        <label><span>席位数</span><el-input-number v-if="drawerEditing" v-model="detailUser.total_seats" :min="1" /><strong v-else>{{ detailUser.total_seats }}</strong></label>
+        <label><span>额外设备</span><el-input-number v-if="drawerEditing" v-model="detailUser.extra_devices" :min="0" /><strong v-else>{{ detailUser.extra_devices }}</strong></label>
+        <label><span>注册时间</span><strong>{{ formatTime(detailUser.created_at) }}</strong></label>
+      </div>
+      <template #footer>
+        <el-button @click="showUserDrawer = false">{{ drawerEditing ? '取消' : '关闭' }}</el-button>
+        <el-button v-if="drawerEditing" type="primary" @click="saveDrawerUser">保存</el-button>
+      </template>
+    </AdminDetailDrawer>
   </div>
 </template>
 
@@ -100,10 +120,18 @@ import { ref, computed, onMounted } from 'vue'
 import { getUsers, updateUser } from '@/utils/api'
 import { showToast } from '@/utils'
 import { Search } from '@element-plus/icons-vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import { useCompactLayout } from '@/composables/useCompactLayout'
 
 const users = ref([])
 const searchText = ref('')
 const editingUser = ref(null)
+const isCompact = useCompactLayout()
+const showUserDrawer = ref(false)
+const drawerEditing = ref(false)
+const detailUser = ref(null)
 
 const filteredUsers = computed(() => {
   if (!searchText.value) return users.value
@@ -142,6 +170,29 @@ async function saveUser(user) {
   }
 }
 
+function openUserDrawer(user, editing) {
+  detailUser.value = { ...user }
+  drawerEditing.value = editing
+  showUserDrawer.value = true
+}
+
+async function saveDrawerUser() {
+  if (!detailUser.value) return
+  try {
+    await updateUser(detailUser.value.id, {
+      name: detailUser.value.name,
+      phone: detailUser.value.phone,
+      total_seats: detailUser.value.total_seats,
+      extra_devices: detailUser.value.extra_devices,
+    })
+    showToast('用户信息已更新', 'success')
+    showUserDrawer.value = false
+    await loadData()
+  } catch (err) {
+    showToast('更新失败', 'error')
+  }
+}
+
 async function loadData() {
   try {
     users.value = (await getUsers() || []).filter(u => u !== null)
@@ -154,25 +205,7 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--studio-text-main);
-  margin-bottom: 1.5rem;
-}
-
-.filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.filter-count {
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-}
+.data-toolbar-v6 { margin-bottom: 1rem; }
 
 .table-card {
   background: var(--studio-surface);
@@ -205,4 +238,9 @@ onMounted(loadData)
 :deep(.el-input-number) {
   width: 100%;
 }
+
+.user-detail-list { display: grid; gap: 14px; }
+.user-detail-list label { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--studio-border); }
+.user-detail-list label > span { color: var(--studio-text-muted); font-size: 13px; }
+.user-detail-list strong { min-width: 0; color: var(--studio-text-main); overflow-wrap: anywhere; }
 </style>

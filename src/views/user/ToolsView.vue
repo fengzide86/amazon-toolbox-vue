@@ -276,6 +276,8 @@ onMounted(loadData)
   gap: 14px;
 }
 
+.tool-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
 .tool-card {
   position: relative;
   min-height: 176px;
@@ -466,6 +468,7 @@ onMounted(loadData)
 @media (max-width: 620px) {
   .toolbox-header { flex-direction: column; gap: 12px; }
   .tool-grid { grid-template-columns: 1fr; }
+  .tool-card:last-child:nth-child(odd) { grid-column: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

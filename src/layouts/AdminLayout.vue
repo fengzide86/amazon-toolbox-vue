@@ -194,7 +194,6 @@ onUnmounted(() => {
 .admin-content :deep(.table-header h3),
 .admin-content :deep(.chart-header h3) { color: var(--color-text); font-size: 14px; font-weight: 700; }
 .admin-content :deep(.filter-bar),
-.admin-content :deep(.generate-form),
 .admin-content :deep(.header-actions) { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .admin-content :deep(.filter-bar) { padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-soft); }
 .admin-content :deep(.setting-row) { padding: 16px 0; }

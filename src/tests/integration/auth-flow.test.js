@@ -76,16 +76,15 @@ describe('认证流程集成测试', () => {
         'Test-PC'
       )
 
-      // Step 5: 验证成功消息
-      expect(wrapper.find('.success-message').classes()).toContain('show')
-      expect(mockShowToast).toHaveBeenCalledWith('授权成功！正在跳转...', 'success')
+      // Step 5: 成功后直接导航，不显示重复成功提示
+      expect(wrapper.find('.success-message').exists()).toBe(false)
+      expect(mockShowToast).not.toHaveBeenCalledWith(expect.stringContaining('正在跳转'), 'success')
 
       // Step 6: 验证安全会话存储
       expect(sessionStorage.getItem('toolbox_role')).toBe('user')
       expect(sessionStorage.getItem('toolbox_token')).toBe('user-jwt-token')
 
       // Step 7: 验证跳转
-      vi.advanceTimersByTime(1200)
       expect(mockPush).toHaveBeenCalledWith('/user/tools')
     })
 
@@ -115,7 +114,8 @@ describe('认证流程集成测试', () => {
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.find('.success-message').classes()).toContain('show')
+      expect(wrapper.find('.success-message').exists()).toBe(false)
+      expect(mockPush).toHaveBeenCalledWith('/user/tools')
     })
   })
 

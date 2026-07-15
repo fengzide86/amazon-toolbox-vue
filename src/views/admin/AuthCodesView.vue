@@ -1,6 +1,6 @@
 ﻿<template>
   <div>
-    <h2 class="page-title">授权码管理</h2>
+    <PageHeader title="授权码管理" description="生成、检索并维护客户授权码" />
 
     <el-card class="table-card" style="margin-bottom: 1.5rem;">
       <template #header>
@@ -9,36 +9,46 @@
         </div>
       </template>
       <div class="generate-form">
-        <el-select v-model="selectedPlanId" placeholder="选择套餐" style="max-width: 200px;">
-          <el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" />
-        </el-select>
-        <el-select v-model="selectedPlatformScope" placeholder="平台权限" style="max-width: 160px;">
-          <el-option label="亚马逊" value="amazon" />
-          <el-option label="速卖通" value="aliexpress" />
-          <el-option label="双平台" value="amazon,aliexpress" />
-        </el-select>
-        <el-select v-model="selectedSceneType" placeholder="场景类型" style="max-width: 120px;">
-          <el-option label="比赛" value="competition" />
-          <el-option label="课程" value="course" />
-        </el-select>
-        <el-input-number v-model="generateCount" :min="1" :max="100" placeholder="数量" style="width: 120px;" />
-        <div class="device-input-group">
-          <label>席位数</label>
-          <el-input-number v-model="seatLimit" :min="1" :max="10" style="width: 100px;" />
+        <label class="generate-field generate-field--wide">
+          <span>套餐</span>
+          <el-select v-model="selectedPlanId" placeholder="选择套餐">
+            <el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" />
+          </el-select>
+        </label>
+        <label class="generate-field">
+          <span>平台权限</span>
+          <el-select v-model="selectedPlatformScope" placeholder="平台权限">
+            <el-option label="亚马逊" value="amazon" />
+            <el-option label="速卖通" value="aliexpress" />
+            <el-option label="双平台" value="amazon,aliexpress" />
+          </el-select>
+        </label>
+        <label class="generate-field">
+          <span>场景类型</span>
+          <el-select v-model="selectedSceneType" placeholder="场景类型">
+            <el-option label="比赛" value="competition" />
+            <el-option label="课程" value="course" />
+          </el-select>
+        </label>
+        <label class="generate-field">
+          <span>生成数量</span>
+          <el-input-number v-model="generateCount" :min="1" :max="100" />
+        </label>
+        <label class="generate-field">
+          <span>席位数</span>
+          <el-input-number v-model="seatLimit" :min="1" :max="10" />
+        </label>
+        <label class="generate-field">
+          <span>设备数</span>
+          <el-input-number v-model="maxDevices" :min="1" :max="10" />
+        </label>
+        <div class="generate-actions">
+          <el-button type="primary" @click="handleGenerate" :loading="isLoading">
+            {{ isLoading ? '生成中...' : '生成授权码' }}
+          </el-button>
+          <el-button v-if="generatedCodes.length" @click="copyCodes">📋 一键复制</el-button>
+          <span v-if="generatedCodes.length" class="generated-count">已生成 {{ generatedCodes.length }} 个</span>
         </div>
-        <div class="device-input-group">
-          <label>设备数</label>
-          <el-input-number v-model="maxDevices" :min="1" :max="10" style="width: 100px;" />
-        </div>
-        <el-button type="primary" @click="handleGenerate" :loading="isLoading">
-          {{ isLoading ? '生成中...' : '生成授权码' }}
-        </el-button>
-        <el-button v-if="generatedCodes.length" @click="copyCodes">
-          📋 一键复制
-        </el-button>
-        <span v-if="generatedCodes.length" class="generated-count">
-          已生成 {{ generatedCodes.length }} 个
-        </span>
       </div>
       <div v-if="generatedCodes.length" class="generated-codes">
         <el-tag v-for="code in generatedCodes" :key="code" type="primary" effect="dark" class="code-tag">
@@ -51,30 +61,30 @@
       <template #header>
         <div class="card-header">
           <h3>授权码列表</h3>
-          <div class="filter-bar">
-            <el-input v-model="searchText" placeholder="搜索授权码/设备..." style="width: 200px;" clearable />
-            <el-select v-model="filterStatus" placeholder="全部状态" clearable>
-              <el-option label="未使用" value="unused" />
-              <el-option label="已激活" value="active" />
-              <el-option label="已冻结" value="frozen" />
-              <el-option label="已过期" value="expired" />
-            </el-select>
-          </div>
         </div>
       </template>
-      <div class="table-info">共 {{ filteredCodes.length }} 个</div>
+      <DataToolbar label="授权码筛选">
+        <el-input v-model="searchText" placeholder="搜索授权码/设备..." style="width: 220px;" clearable />
+        <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 150px;">
+          <el-option label="未使用" value="unused" />
+          <el-option label="已激活" value="active" />
+          <el-option label="已冻结" value="frozen" />
+          <el-option label="已过期" value="expired" />
+        </el-select>
+        <template #summary>共 {{ filteredCodes.length }} 个</template>
+      </DataToolbar>
       <el-table :data="filteredCodes" style="width: 100%" v-loading="isLoading">
         <el-table-column label="授权码" min-width="180">
           <template #default="{ row }">
             <a href="#" @click.prevent="openDetail(row)" class="code-link">{{ row.code }}</a>
           </template>
         </el-table-column>
-        <el-table-column label="套餐" min-width="120">
+        <el-table-column v-if="!isCompact" label="套餐" min-width="120">
           <template #default="{ row }">
             {{ row.plan_name || getPlanName(row.plan_id) }}
           </template>
         </el-table-column>
-        <el-table-column label="平台权限" min-width="140">
+        <el-table-column v-if="!isCompact" label="平台权限" min-width="140">
           <template #default="{ row }">
             <el-tag v-for="p in (row.platform_scope || ['amazon'])" :key="p" 
                     :type="p === 'amazon' ? 'warning' : 'danger'" size="small" class="platform-tag">
@@ -89,7 +99,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="席位" width="80">
+        <el-table-column v-if="!isCompact" label="席位" width="80">
           <template #default="{ row }">
             <span v-if="row.seat_limit" class="seat-badge">
               {{ row.seat_used || 0 }}/{{ row.seat_limit }}
@@ -97,7 +107,7 @@
             <span v-else class="text-muted">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="设备数" width="100">
+        <el-table-column v-if="!isCompact" label="设备数" width="100">
           <template #default="{ row }">
             <el-tag :type="getDeviceType(row)" size="small" class="device-badge" 
                     @click="editMaxDevices(row)" style="cursor: pointer;">
@@ -105,19 +115,29 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="过期时间" width="120">
+        <el-table-column v-if="!isCompact" label="过期时间" width="120">
           <template #default="{ row }">
             <span class="text-small">{{ formatDate(row.expires_at) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" :width="isCompact ? 136 : 280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openDetail(row)">详情</el-button>
-            <el-button size="small" @click="toggleFreeze(row)" :disabled="row.status === 'expired'">
-              {{ row.status === 'frozen' ? '解冻' : '冻结' }}
-            </el-button>
-            <el-button size="small" @click="openExtend(row)" :disabled="row.status === 'deleted'">延期</el-button>
-            <el-button size="small" type="danger" @click="deleteCode(row.id)" :disabled="row.status === 'deleted'">删除</el-button>
+            <el-dropdown v-if="isCompact" trigger="click" @command="command => handleCodeCommand(command, row)">
+              <el-button size="small">更多</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="freeze" :disabled="row.status === 'expired'">{{ row.status === 'frozen' ? '解冻' : '冻结' }}</el-dropdown-item>
+                  <el-dropdown-item command="extend" :disabled="row.status === 'deleted'">延期</el-dropdown-item>
+                  <el-dropdown-item command="delete" :disabled="row.status === 'deleted'" divided>删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <template v-else>
+              <el-button size="small" @click="toggleFreeze(row)" :disabled="row.status === 'expired'">{{ row.status === 'frozen' ? '解冻' : '冻结' }}</el-button>
+              <el-button size="small" @click="openExtend(row)" :disabled="row.status === 'deleted'">延期</el-button>
+              <el-button size="small" type="danger" @click="deleteCode(row.id)" :disabled="row.status === 'deleted'">删除</el-button>
+            </template>
           </template>
         </el-table-column>
         <template #empty>
@@ -153,8 +173,8 @@
       </template>
     </el-dialog>
 
-    <!-- 授权码详情弹窗 -->
-    <el-dialog v-model="showDetailModal" title="授权码详情" width="520px">
+    <!-- 授权码详情 -->
+    <AdminDetailDrawer v-model="showDetailModal" title="授权码详情" size="min(520px, 92vw)">
       <div v-if="detailData" class="detail-grid">
         <div class="detail-row">
           <span class="detail-label">授权码</span>
@@ -210,10 +230,8 @@
         </div>
       </div>
       <div v-else class="empty-state">加载中...</div>
-      <template #footer>
-        <el-button @click="showDetailModal = false">关闭</el-button>
-      </template>
-    </el-dialog>
+      <template #footer><el-button @click="showDetailModal = false">关闭</el-button></template>
+    </AdminDetailDrawer>
   </div>
 </template>
 
@@ -222,6 +240,10 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlans, api } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { useCompactLayout } from '@/composables/useCompactLayout'
+import PageHeader from '@/components/PageHeader.vue'
+import DataToolbar from '@/components/DataToolbar.vue'
+import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 
 const authCodes = ref([])
 const plans = ref([])
@@ -238,6 +260,7 @@ const searchText = ref('')
 const planNameMap = reactive({})
 
 const platformStore = usePlatformStore()
+const isCompact = useCompactLayout()
 
 // 设备数弹窗
 const showDeviceModal = ref(false)
@@ -379,6 +402,12 @@ function openExtend(code) {
   showExtendModal.value = true
 }
 
+function handleCodeCommand(command, code) {
+  if (command === 'freeze') toggleFreeze(code)
+  if (command === 'extend') openExtend(code)
+  if (command === 'delete') deleteCode(code.id)
+}
+
 async function confirmExtend() {
   if (!extendDays.value || extendDays.value < 1) {
     showToast('请输入有效天数', 'error')
@@ -440,14 +469,6 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.page-title {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--studio-text-main);
-  margin-bottom: 1.5rem;
-}
-
 .table-card {
   background: var(--studio-surface);
   border: 1px solid var(--color-border);
@@ -469,23 +490,36 @@ onMounted(loadData)
 }
 
 .generate-form {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(180px, 1.35fr) repeat(5, minmax(112px, 1fr));
+  align-items: end;
+  gap: 14px;
   padding: 1rem 0;
 }
 
-.device-input-group {
+.generate-field {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
 }
 
-.device-input-group label {
+.generate-field > span {
   font-size: 0.85rem;
   color: var(--studio-text-muted);
   white-space: nowrap;
+}
+
+.generate-field :deep(.el-select),
+.generate-field :deep(.el-input-number) { width: 100%; }
+
+.generate-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-height: 34px;
 }
 
 .generated-count {
@@ -494,16 +528,7 @@ onMounted(loadData)
   font-weight: 600;
 }
 
-.filter-bar {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.table-info {
-  padding: 0.75rem 0;
-  font-size: 0.85rem;
-  color: var(--studio-text-muted);
-}
+.data-toolbar-v6 { margin-bottom: 1rem; }
 
 .code-link {
   font-family: monospace;
@@ -643,5 +668,22 @@ onMounted(loadData)
 
 :deep(.el-card__body) {
   padding: 1.25rem;
+}
+
+@media (max-width: 1180px) {
+  .generate-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .generate-field--wide { grid-column: span 1; }
+}
+
+@media (max-width: 900px) {
+  .generate-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 680px) {
+  .generate-form { grid-template-columns: 1fr; }
+  .generate-actions { grid-column: auto; display: grid; grid-template-columns: 1fr; }
+  .generate-actions :deep(.el-button) { width: 100%; margin-left: 0; }
+  .generated-count { text-align: center; }
+  .detail-row { align-items: flex-start; }
 }
 </style>
