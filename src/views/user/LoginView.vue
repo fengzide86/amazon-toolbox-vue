@@ -1541,7 +1541,13 @@ onUnmounted(() => {
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
 }
-.stat-number { color: var(--color-text); text-shadow: none; }
+.stat-number {
+  color: var(--color-text);
+  background: none;
+  text-shadow: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: var(--color-text);
+}
 .stat-unit { color: var(--color-premium); }
 .stat-line { background: var(--color-border); }
 .stat-desc { color: var(--color-text-secondary); }

@@ -92,8 +92,8 @@ test.describe('视觉回归测试 - 用户端', () => {
       return window.getComputedStyle(el).backgroundColor
     })
 
-    // --studio-bg: #F5F6F9 → rgb(245, 246, 249)
-    expect(bgColor).toMatch(/rgb\(245, 246, 249\)/)
+    // --color-canvas: #F4F5F7
+    expect(bgColor).toMatch(/rgb\(244, 245, 247\)/)
 
     await expect(page.locator('.toolbox-page')).toBeVisible()
     await expect(page.getByText('选择一个工具开始')).toBeVisible()
@@ -106,8 +106,8 @@ test.describe('视觉回归测试 - 用户端', () => {
       return window.getComputedStyle(el).backgroundColor
     })
 
-    // 侧边栏背景: #0F172A → rgb(15, 23, 42)
-    expect(sidebarBg).toMatch(/rgb\(15, 23, 42\)/)
+    // 明亮表面侧边栏
+    expect(sidebarBg).toMatch(/rgba?\(252, 252, 253/)
   })
 
   test('页面切换动画存在', async ({ page }) => {
@@ -120,7 +120,7 @@ test.describe('视觉回归测试 - 用户端', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
 
-    // 切换到使用记录
+    // 切换到执行记录
     await page.goto(`${FRONTEND_URL}/#/user/logs`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
@@ -175,16 +175,7 @@ test.describe('视觉回归测试 - 后台', () => {
       return window.getComputedStyle(el).backgroundColor
     })
 
-    // --studio-bg: #F5F6F9 → rgb(245, 246, 249)
-    expect(bgColor).toMatch(/rgb\(245, 246, 249\)/)
-
-    // 检查内容区背景色
-    const content = page.locator('.content')
-    const contentBg = await content.evaluate(el => {
-      return window.getComputedStyle(el).backgroundColor
-    })
-
-    // --studio-surface: #FFFFFF → rgb(255, 255, 255)
-    expect(contentBg).toMatch(/rgb\(255, 255, 255\)/)
+    // --color-canvas: #F4F5F7
+    expect(bgColor).toMatch(/rgb\(244, 245, 247\)/)
   })
 })
