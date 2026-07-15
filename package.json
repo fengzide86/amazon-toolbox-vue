@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test",
+    "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.js",
     "test:embedded-browser": "electron scripts/embedded-browser-smoke.cjs",
     "security:audit": "python scripts/audit_secrets.py",
     "security:audit-history": "python scripts/audit_secrets.py --history",
