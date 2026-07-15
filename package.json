@@ -73,6 +73,11 @@
     "vitest": "^4.1.10",
     "vue-tsc": "^3.3.7"
   },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  },
   "build": {
     "appId": "com.amazon.toolbox",
     "productName": "跨境电商赛训效率工具箱",
