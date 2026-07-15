@@ -37,7 +37,7 @@ from models.feedback import Feedback, RunLog
 from models.ai_chat import KnowledgeBase, ChatSession, ChatMessage, ChatConfig
 
 # 系统相关模型
-from models.system import Setting, Announcement, AuditLog
+from models.system import Setting, Announcement, AnnouncementReceipt, AuditLog
 from models.automation import AutomationBatch, AutomationBatchItem
 
 __all__ = [
@@ -75,6 +75,7 @@ __all__ = [
     # 系统相关
     "Setting",
     "Announcement",
+    "AnnouncementReceipt",
     "AuditLog",
     "AutomationBatch",
     "AutomationBatchItem",

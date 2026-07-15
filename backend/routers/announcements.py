@@ -1,127 +1,98 @@
-"""
-公告管理路由
-"""
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, desc
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
-from typing import Optional
+"""公告管理与用户消息中心路由。"""
+from __future__ import annotations
 
-from database import get_db
-from core.dependencies import get_current_admin
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.dependencies import get_current_admin, get_current_user
 from core.response import success_response
-from models import Announcement, AnnouncementStatus
-from schemas import AnnouncementCreate, AnnouncementUpdate, AnnouncementOut
+from database import get_db
+from domains.announcements import service
+from domains.announcements.schemas import AnnouncementCreate, AnnouncementUpdate
+from models import Announcement
+
 
 router = APIRouter()
 
 
 @router.get("")
 async def list_announcements(
-    status: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _admin: dict = Depends(get_current_admin),
 ):
-    """获取公告列表（管理端）"""
-    query = select(Announcement).order_by(desc(Announcement.priority), desc(Announcement.created_at))
-    if status:
-        query = query.where(Announcement.status == status)
-    result = await db.execute(query)
-    items = result.scalars().all()
-    return success_response(data=[
-        {
-            "id": a.id,
-            "title": a.title,
-            "content": a.content,
-            "type": a.type,
-            "status": a.status,
-            "priority": a.priority,
-            "expires_at": a.expires_at.isoformat() if a.expires_at else None,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        }
-        for a in items
-    ])
+    return success_response(data=await service.list_admin(db, status))
 
 
 @router.get("/active")
 async def get_active_announcements(db: AsyncSession = Depends(get_db)):
-    """获取已发布的公告（用户端）"""
-    now = datetime.now()
-    query = (
-        select(Announcement)
-        .where(
-            Announcement.status == AnnouncementStatus.PUBLISHED,
-            (Announcement.expires_at.is_(None)) | (Announcement.expires_at > now)
-        )
-        .order_by(desc(Announcement.priority), desc(Announcement.created_at))
-    )
-    result = await db.execute(query)
-    items = result.scalars().all()
-    return success_response(data=[
-        {
-            "id": a.id,
-            "title": a.title,
-            "content": a.content,
-            "type": a.type,
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-        }
-        for a in items
-    ])
+    """兼容旧客户端：只返回面向所有人的有效公告。"""
+    return success_response(data=await service.list_legacy_active(db))
+
+
+@router.get("/feed")
+async def get_announcement_feed(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return success_response(data=await service.feed(db, current_user))
+
+
+@router.get("/release-notes/{version}")
+async def get_release_notes(version: str, db: AsyncSession = Depends(get_db)):
+    return success_response(data=await service.release_notes(db, version))
+
+
+@router.post("/{announcement_id}/read")
+async def mark_announcement_read(
+    announcement_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return success_response(data=await service.record_receipt(db, announcement_id, current_user, "read"))
+
+
+@router.post("/{announcement_id}/dismiss")
+async def dismiss_announcement(
+    announcement_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return success_response(data=await service.record_receipt(db, announcement_id, current_user, "dismiss"))
 
 
 @router.post("")
 async def create_announcement(
     data: AnnouncementCreate,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
 ):
-    """创建公告"""
-    ann = Announcement(
-        title=data.title,
-        content=data.content,
-        type=data.type or "info",
-        status=data.status or "draft",
-        priority=data.priority or 0,
-        expires_at=data.expires_at,
-    )
-    db.add(ann)
-    await db.commit()
-    await db.refresh(ann)
-    return success_response(data={"id": ann.id}, message="公告已创建")
+    announcement = await service.create(db, data)
+    return success_response(data=service.serialize(announcement), message="公告已创建")
 
 
-@router.put("/{ann_id}")
+@router.put("/{announcement_id}")
 async def update_announcement(
-    ann_id: int,
+    announcement_id: int,
     data: AnnouncementUpdate,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
 ):
-    """更新公告"""
-    result = await db.execute(select(Announcement).where(Announcement.id == ann_id))
-    ann = result.scalar_one_or_none()
-    if not ann:
-        raise HTTPException(status_code=404, detail="公告不存在")
-
-    for field, value in data.model_dump(exclude_unset=True).items():
-        setattr(ann, field, value)
-
-    await db.commit()
-    await db.refresh(ann)
-    return success_response(message="公告已更新")
+    announcement = await service.update(db, announcement_id, data)
+    return success_response(data=service.serialize(announcement), message="公告已更新")
 
 
-@router.delete("/{ann_id}")
+@router.delete("/{announcement_id}")
 async def delete_announcement(
-    ann_id: int,
+    announcement_id: int,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_admin)
+    _admin: dict = Depends(get_current_admin),
 ):
-    """删除公告"""
-    result = await db.execute(select(Announcement).where(Announcement.id == ann_id))
-    ann = result.scalar_one_or_none()
-    if not ann:
+    result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
+    announcement = result.scalar_one_or_none()
+    if not announcement:
         raise HTTPException(status_code=404, detail="公告不存在")
-
-    await db.delete(ann)
+    await db.delete(announcement)
     await db.commit()
     return success_response(message="公告已删除")

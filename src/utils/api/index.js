@@ -275,7 +275,7 @@ export { getUsers, updateUser } from './users.js';
 export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices.js';
 export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from './knowledge.js';
 export { createChatSession, getChatSession, sendChatMessage, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats, debugAIChat } from './ai-chat.js';
-export { getAnnouncements, getActiveAnnouncements, createAnnouncement, updateAnnouncement, deleteAnnouncement } from './announcements.js';
+export { getAnnouncements, getActiveAnnouncements, getAnnouncementFeed, markAnnouncementRead, dismissAnnouncement, createAnnouncement, updateAnnouncement, deleteAnnouncement } from './announcements.js';
 export { getTools, getToolCategories, updateTools, updateToolCategories, createToolLaunchGrant } from './tools.js';
 export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases.js';
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback.js';

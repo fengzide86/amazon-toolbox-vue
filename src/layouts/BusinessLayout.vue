@@ -4,6 +4,7 @@
     <div v-if="showSidebar" class="sidebar-overlay" @click="showSidebar = false"></div>
     <BusinessSidebar :class="{ 'mobile-open': showSidebar }" />
     <main :class="['business-content', { 'is-workspace': route.name === 'BusinessWorkspace' }]">
+      <AnnouncementBanner :hide-banner="route.name === 'BusinessWorkspace'" />
       <router-view v-slot="{ Component }">
         <Suspense><component :is="Component" /></Suspense>
       </router-view>
@@ -16,6 +17,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import BusinessSidebar from '@/components/BusinessSidebar.vue'
+import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { getCurrentUser } from '@/utils/api'
 import { authService } from '@/utils/auth'

@@ -10,6 +10,18 @@ export function getActiveAnnouncements() {
     return api.get('/api/announcements/active');
 }
 
+export function getAnnouncementFeed() {
+    return api.get('/api/announcements/feed', {}, { cache: false });
+}
+
+export function markAnnouncementRead(id) {
+    return api.post(`/api/announcements/${id}/read`);
+}
+
+export function dismissAnnouncement(id) {
+    return api.post(`/api/announcements/${id}/dismiss`);
+}
+
 export function createAnnouncement(data) {
     return api.post('/api/announcements', data);
 }

@@ -43,6 +43,8 @@
       <div class="header-right">
         <span v-if="!isAdmin && planBadge" :class="['badge-svip', { business: isBusiness }]">{{ planBadge }}</span>
 
+        <MessageCenter v-if="!isAdmin" />
+
         <!-- 管理员标记 -->
         <span v-if="isAdmin" class="admin-badge">Owner</span>
 
@@ -86,6 +88,7 @@ import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
 import { Menu, Zap, Crown } from '@lucide/vue'
+import MessageCenter from '@/features/announcements/MessageCenter.vue'
 
 const props = defineProps({
   isAdmin: {

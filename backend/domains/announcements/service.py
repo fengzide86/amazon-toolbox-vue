@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from fastapi import HTTPException, status
+from sqlalchemy import desc, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from domains.announcements.schemas import AnnouncementCreate, AnnouncementUpdate
+from models import Announcement, AnnouncementReceipt
+from services.entitlement_service import resolve_product_access
+
+
+CATEGORY_DEFAULTS = {
+    "system": ("important", "modal"),
+    "maintenance": ("critical", "modal"),
+    "update": ("info", "banner"),
+    "activity": ("info", "banner"),
+}
+
+
+def serialize(announcement: Announcement, receipt: AnnouncementReceipt | None = None) -> dict:
+    return {
+        "id": announcement.id,
+        "title": announcement.title,
+        "content": announcement.content,
+        "type": announcement.category or announcement.type,
+        "audience": announcement.audience,
+        "category": announcement.category,
+        "severity": announcement.severity,
+        "presentation": announcement.presentation,
+        "app_version": announcement.app_version,
+        "status": announcement.status,
+        "priority": announcement.priority,
+        "starts_at": announcement.starts_at.isoformat() if announcement.starts_at else None,
+        "expires_at": announcement.expires_at.isoformat() if announcement.expires_at else None,
+        "published_at": announcement.published_at.isoformat() if announcement.published_at else None,
+        "revision": announcement.revision,
+        "created_at": announcement.created_at.isoformat() if announcement.created_at else None,
+        "updated_at": announcement.updated_at.isoformat() if announcement.updated_at else None,
+        "is_read": bool(receipt and receipt.read_at),
+        "is_dismissed": bool(receipt and receipt.dismissed_at),
+    }
+
+
+def _normalized_values(data: AnnouncementCreate | AnnouncementUpdate, existing: Announcement | None = None) -> dict:
+    values = data.model_dump(exclude_unset=True)
+    legacy_type = values.pop("type", None)
+    if legacy_type and "category" not in values:
+        values["category"] = legacy_type if legacy_type in CATEGORY_DEFAULTS else "system"
+    category = values.get("category") or getattr(existing, "category", None) or "system"
+    if existing is None:
+        default_severity, default_presentation = CATEGORY_DEFAULTS.get(category, ("info", "banner"))
+        values.setdefault("severity", default_severity)
+        values.setdefault("presentation", default_presentation)
+    if values.get("severity") == "critical":
+        values["presentation"] = "modal"
+    values["type"] = category
+    if values.get("status") == "published" and not getattr(existing, "published_at", None):
+        values["published_at"] = datetime.now()
+    return values
+
+
+async def list_admin(db: AsyncSession, status_filter: str | None = None) -> list[dict]:
+    query = select(Announcement).order_by(desc(Announcement.priority), desc(Announcement.created_at))
+    if status_filter:
+        query = query.where(Announcement.status == status_filter)
+    result = await db.execute(query)
+    return [serialize(item) for item in result.scalars().all()]
+
+
+async def list_legacy_active(db: AsyncSession) -> list[dict]:
+    now = datetime.now()
+    result = await db.execute(
+        select(Announcement).where(
+            Announcement.status == "published",
+            Announcement.audience == "all",
+            or_(Announcement.starts_at.is_(None), Announcement.starts_at <= now),
+            or_(Announcement.expires_at.is_(None), Announcement.expires_at > now),
+        ).order_by(desc(Announcement.priority), desc(Announcement.created_at))
+    )
+    return [{
+        "id": item.id, "title": item.title, "content": item.content,
+        "type": item.category or item.type,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+    } for item in result.scalars().all()]
+
+
+async def feed(db: AsyncSession, current_user: dict) -> list[dict]:
+    auth_code_id = current_user.get("auth_code_id")
+    device_id = current_user.get("device_id")
+    if not auth_code_id or not device_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="当前设备身份不完整")
+    access = await resolve_product_access(db, auth_code_id)
+    audience = "business" if access.get("product_type") == "business" else "consumer"
+    now = datetime.now()
+    result = await db.execute(
+        select(Announcement, AnnouncementReceipt)
+        .outerjoin(AnnouncementReceipt, (
+            (AnnouncementReceipt.announcement_id == Announcement.id)
+            & (AnnouncementReceipt.auth_code_id == auth_code_id)
+            & (AnnouncementReceipt.device_id == device_id)
+            & (AnnouncementReceipt.revision == Announcement.revision)
+        ))
+        .where(
+            Announcement.status == "published",
+            Announcement.audience.in_(["all", audience]),
+            or_(Announcement.starts_at.is_(None), Announcement.starts_at <= now),
+            or_(Announcement.expires_at.is_(None), Announcement.expires_at > now),
+        )
+        .order_by(desc(Announcement.priority), desc(Announcement.published_at), desc(Announcement.created_at))
+    )
+    return [serialize(announcement, receipt) for announcement, receipt in result.all()]
+
+
+async def release_notes(db: AsyncSession, version: str) -> list[dict]:
+    result = await db.execute(
+        select(Announcement).where(
+            Announcement.status == "published",
+            Announcement.category == "update",
+            Announcement.app_version == version,
+        ).order_by(desc(Announcement.priority), desc(Announcement.published_at))
+    )
+    return [serialize(item) for item in result.scalars().all()]
+
+
+async def create(db: AsyncSession, data: AnnouncementCreate) -> Announcement:
+    announcement = Announcement(**_normalized_values(data))
+    db.add(announcement)
+    await db.commit()
+    await db.refresh(announcement)
+    return announcement
+
+
+async def update(db: AsyncSession, announcement_id: int, data: AnnouncementUpdate) -> Announcement:
+    result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
+    announcement = result.scalar_one_or_none()
+    if not announcement:
+        raise HTTPException(status_code=404, detail="公告不存在")
+    values = _normalized_values(data, announcement)
+    meaningful = {"title", "content", "audience", "category", "severity", "presentation", "app_version", "starts_at", "expires_at"}
+    if any(key in values and values[key] != getattr(announcement, key) for key in meaningful):
+        announcement.revision = (announcement.revision or 1) + 1
+    for key, value in values.items():
+        setattr(announcement, key, value)
+    await db.commit()
+    await db.refresh(announcement)
+    return announcement
+
+
+async def record_receipt(db: AsyncSession, announcement_id: int, current_user: dict, action: str) -> dict:
+    auth_code_id = current_user.get("auth_code_id")
+    device_id = current_user.get("device_id")
+    if not auth_code_id or not device_id:
+        raise HTTPException(status_code=403, detail="当前设备身份不完整")
+    result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
+    announcement = result.scalar_one_or_none()
+    if not announcement:
+        raise HTTPException(status_code=404, detail="公告不存在")
+    result = await db.execute(select(AnnouncementReceipt).where(
+        AnnouncementReceipt.announcement_id == announcement_id,
+        AnnouncementReceipt.auth_code_id == auth_code_id,
+        AnnouncementReceipt.device_id == device_id,
+        AnnouncementReceipt.revision == announcement.revision,
+    ))
+    receipt = result.scalar_one_or_none()
+    if not receipt:
+        receipt = AnnouncementReceipt(
+            announcement_id=announcement_id, auth_code_id=auth_code_id,
+            device_id=device_id, revision=announcement.revision,
+        )
+        db.add(receipt)
+    now = datetime.now()
+    receipt.read_at = receipt.read_at or now
+    if action == "dismiss":
+        receipt.dismissed_at = now
+    await db.commit()
+    return {"announcement_id": announcement_id, "revision": announcement.revision, "action": action}
