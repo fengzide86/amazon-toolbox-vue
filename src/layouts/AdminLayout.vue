@@ -11,7 +11,7 @@
     
     <div class="layout">
       <AdminSidebar :class="{ 'mobile-open': showMobileSidebar }" />
-      <main class="content">
+      <main class="content admin-content">
         <Breadcrumb />
         <router-view :key="platformKey" v-slot="{ Component }">
           <Suspense>
@@ -141,5 +141,74 @@ onUnmounted(() => {
   .content {
     padding: var(--spacing-md, 1rem);
   }
+}
+
+/* 后台统一信息密度与视觉骨架 */
+.admin-content :deep(> *) { width: min(var(--content-max-width), 100%); }
+.admin-content :deep(.page-title),
+.admin-content :deep(> div > h2:first-child) {
+  margin: 0 0 22px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  color: var(--color-text) !important;
+  font-size: var(--font-page-title) !important;
+  line-height: 1.25 !important;
+  letter-spacing: -.03em !important;
+}
+.admin-content :deep(.page-header) {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.admin-content :deep(.page-header .page-title) { margin-bottom: 0 !important; }
+.admin-content :deep(.stats-row) { gap: 14px; margin-bottom: 18px; }
+.admin-content :deep(.stat-card) {
+  min-height: 112px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-low);
+}
+.admin-content :deep(.stat-card:hover) { transform: none; border-color: var(--color-border-strong); box-shadow: var(--shadow-medium); }
+.admin-content :deep(.stat-icon) { width: 42px; height: 42px; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft) !important; }
+.admin-content :deep(.stat-label) { color: var(--color-text-secondary); font-size: 11px; }
+.admin-content :deep(.stat-value) { color: var(--color-text) !important; font-size: 25px; letter-spacing: -.03em; }
+.admin-content :deep(.table-card),
+.admin-content :deep(.form-card),
+.admin-content :deep(.settings-card),
+.admin-content :deep(.chart-card),
+.admin-content :deep(.panel-section) {
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--color-surface) !important;
+  box-shadow: var(--shadow-low) !important;
+}
+.admin-content :deep(.table-card) { padding: 18px; }
+.admin-content :deep(.chart-card) { padding: 20px; }
+.admin-content :deep(.card-header),
+.admin-content :deep(.table-header) { min-height: 42px; gap: 12px; }
+.admin-content :deep(.card-header h3),
+.admin-content :deep(.table-header h3),
+.admin-content :deep(.chart-header h3) { color: var(--color-text); font-size: 14px; font-weight: 700; }
+.admin-content :deep(.filter-bar),
+.admin-content :deep(.generate-form),
+.admin-content :deep(.header-actions) { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.admin-content :deep(.filter-bar) { padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-soft); }
+.admin-content :deep(.setting-row) { padding: 16px 0; }
+.admin-content :deep(.empty-state) { color: var(--color-text-secondary); }
+.admin-content :deep(.mono-text),
+.admin-content :deep(.code-link) { color: var(--color-primary); }
+
+@media (max-width: 900px) {
+  .admin-content :deep(.stats-row) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-content :deep(.charts-grid) { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .admin-content :deep(.stats-row) { grid-template-columns: 1fr; }
+  .admin-content :deep(.page-header) { flex-direction: column; }
 }
 </style>

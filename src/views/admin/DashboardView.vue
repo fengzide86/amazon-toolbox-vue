@@ -1,13 +1,13 @@
 <template>
   <div>
-    <h2 style="font-family: var(--font-heading); font-size: 1.875rem; font-weight: 700; color: var(--color-primary); margin-bottom: 1.5rem;">
+    <h2 class="page-title">
       数据总览
     </h2>
 
     <!-- 统计卡片 -->
     <section class="stats-row">
       <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(14,165,233,0.1);">
+        <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
         <div class="stat-content">
@@ -17,7 +17,7 @@
         </div>
       </article>
       <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(16,185,129,0.1);">
+        <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         </div>
         <div class="stat-content">
@@ -27,7 +27,7 @@
         </div>
       </article>
       <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(245,158,11,0.1);">
+        <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         </div>
         <div class="stat-content">
@@ -37,7 +37,7 @@
         </div>
       </article>
       <article class="stat-card">
-        <div class="stat-icon" style="background: rgba(6,182,212,0.1);">
+        <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
         <div class="stat-content">
@@ -159,8 +159,8 @@ const lineChartData = computed(() => {
     datasets: [{
       label: '收入 (¥)',
       data: chartsData.value.revenue_trend.map(d => d.amount),
-      borderColor: '#0EA5E9',
-      backgroundColor: 'rgba(14,165,233,0.1)',
+      borderColor: '#2D5FCA',
+      backgroundColor: 'rgba(45,95,202,0.08)',
       fill: true,
       tension: 0.4,
       pointRadius: 4,
@@ -181,7 +181,7 @@ const lineChartOptions = {
 
 const doughnutChartData = computed(() => {
   if (!chartsData.value) return { labels: [], datasets: [] }
-  const colors = ['#0EA5E9', '#FF9900', '#10B981', '#EF4444', '#8B5CF6', '#06B6D4']
+  const colors = ['#2D5FCA', '#A98552', '#168A63', '#C33D49', '#6F63B6', '#4776D7']
   return {
     labels: chartsData.value.plan_distribution.map(d => d.name),
     datasets: [{

@@ -18,6 +18,7 @@ declare module 'vue' {
     AppSurface: typeof import('./components/AppSurface.vue')['default']
     AppTransition: typeof import('./components/AppTransition.vue')['default']
     Breadcrumb: typeof import('./components/Breadcrumb.vue')['default']
+    DataToolbar: typeof import('./components/DataToolbar.vue')['default']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']

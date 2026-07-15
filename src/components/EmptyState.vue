@@ -32,25 +32,26 @@ defineProps({
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  min-height: 260px;
   padding: 3rem 1rem;
   text-align: center;
 }
 
 .empty-state-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--studio-bg-hover);
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--color-primary-soft);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--studio-text-muted);
+  color: var(--color-primary);
   margin-bottom: 1rem;
 }
 
 .empty-state-title {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--studio-text-main);
   margin: 0 0 0.5rem;
 }
