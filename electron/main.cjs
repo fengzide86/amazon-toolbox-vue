@@ -1,10 +1,13 @@
-const { app, BrowserWindow, Notification, dialog, ipcMain, safeStorage, webContents } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
 const { UpdateManager } = require('../dist-electron/electron/core/update-manager.cjs');
 const { registerAppProtocol, registerAppScheme } = require('../dist-electron/electron/core/app-protocol.cjs');
+const { BackendProcessManager } = require('../dist-electron/electron/core/backend-process-manager.cjs');
+const { CredentialManager } = require('../dist-electron/electron/core/credential-manager.cjs');
+const { NotificationManager } = require('../dist-electron/electron/core/notification-manager.cjs');
 const { spawn } = require('child_process');
 const { RunnerClient } = require('./automation/runner-client.cjs');
 const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
@@ -51,6 +54,12 @@ function configureRuntimeRoot() {
 }
 
 const RUNTIME_ROOT = configureRuntimeRoot();
+const backendManager = new BackendProcessManager({ runtimeRoot: RUNTIME_ROOT, resourcesPath: () => process.resourcesPath });
+const credentialManager = new CredentialManager({ ipcMain, getWindow: () => mainWindow });
+const notificationManager = new NotificationManager({
+  getWindow: () => mainWindow,
+  getSelectedBatchItemId: () => selectedBatchItemId,
+});
 
 // ===== 单实例锁 =====
 const gotTheLock = app.requestSingleInstanceLock();
@@ -150,22 +159,6 @@ ipcMain.on('launch-tool', async (event, data) => {
 });
 
 // ===== 安全凭据存储 =====
-function credentialFilePath() {
-  return path.join(app.getPath('userData'), 'user-credential.bin');
-}
-
-ipcMain.handle('credential-save-user-code', async (_event, code) => {
-  if (typeof code !== 'string' || !code.trim() || !safeStorage.isEncryptionAvailable()) {
-    return false;
-  }
-  const target = credentialFilePath();
-  const temp = `${target}.tmp`;
-  fs.writeFileSync(temp, safeStorage.encryptString(code.trim()));
-  if (fs.existsSync(target)) fs.unlinkSync(target);
-  fs.renameSync(temp, target);
-  return true;
-});
-
 // ===== 本地 Node Automation Runner =====
 function getAutomationRunner() {
   if (automationRunner) return automationRunner;
@@ -186,7 +179,7 @@ function getAutomationRunner() {
         mainWindow.webContents.send('automation:event', event);
       }
       if (event?.type === 'user.action_required') {
-        showActionNotification({
+        notificationManager.show({
           title: '自动处理需要你的操作',
           body: event.action?.title || '请返回工具箱完成页面操作',
           focus: { mode: 'single' },
@@ -239,28 +232,13 @@ function getBatchCoordinator() {
       updateManager?.activityChanged();
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('batch:event', event);
     },
-    onNotify: ({ itemId, accountLabelMasked, type }) => showActionNotification({
+    onNotify: ({ itemId, accountLabelMasked, type }) => notificationManager.show({
       title: `${accountLabelMasked || '一个客户账号'}需要操作`,
       body: ({ login: '请完成账号登录', captcha: '请完成页面验证码', two_factor: '请完成二次验证' }[type] || '请完成页面提示的操作'),
       focus: { mode: 'batch', itemId },
     }),
   });
   return batchCoordinator;
-}
-
-function showActionNotification({ title, body, focus }) {
-  if (!Notification.isSupported()) return;
-  if (mainWindow?.isFocused() && focus?.mode === 'single') return;
-  if (mainWindow?.isFocused() && focus?.mode === 'batch' && focus?.itemId === selectedBatchItemId) return;
-  const notification = new Notification({ title, body, silent: false });
-  notification.on('click', () => {
-    if (!mainWindow || mainWindow.isDestroyed()) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-    mainWindow.webContents.send('toolbox:notification-focus', focus || {});
-  });
-  notification.show();
 }
 
 ipcMain.handle('batch:select-import-file', async (_event, options = {}) => {
@@ -324,28 +302,6 @@ function cleanupAutomationRunner() {
   automationRunner = null;
   runner.stop().catch(error => console.error('[AutomationRunner] 关闭失败:', error.message));
 }
-
-ipcMain.handle('credential-load-user-code', async () => {
-  try {
-    const target = credentialFilePath();
-    if (!safeStorage.isEncryptionAvailable() || !fs.existsSync(target)) return null;
-    return safeStorage.decryptString(fs.readFileSync(target));
-  } catch (err) {
-    console.error('[CredentialStore] 读取凭据失败:', err.message);
-    return null;
-  }
-});
-
-ipcMain.handle('credential-clear-user-code', async () => {
-  try {
-    const target = credentialFilePath();
-    if (fs.existsSync(target)) fs.unlinkSync(target);
-    return true;
-  } catch (err) {
-    console.error('[CredentialStore] 清理凭据失败:', err.message);
-    return false;
-  }
-});
 
 // ===== 后端进程管理 =====
 
@@ -580,6 +536,7 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   console.log('[INFO] App ready');
+  credentialManager.register();
 
   // 检测开发模式
   const isDev = process.env.NODE_ENV === 'development' 
@@ -588,7 +545,7 @@ app.whenReady().then(async () => {
   // 仅兼容期的 localhost 配置启动旧 Python 后端；远程控制面模式不再携带服务端进程。
   if (!isDev && USE_BUNDLED_BACKEND) {
     // 等待后端就绪再加载窗口，避免前端请求全部 ERR_CONNECTION_REFUSED
-    await ensureBackend();
+    await backendManager.ensure();
   } else {
     console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }
@@ -600,7 +557,7 @@ app.whenReady().then(async () => {
     getWindow: () => mainWindow,
     hasActiveWork: () => singleRunActive || batchCoordinator?.snapshot()?.status === 'running',
     beforeInstall: () => {
-      cleanupBackend();
+      backendManager.cleanup();
       cleanupAutomationRunner();
     },
   });
@@ -610,7 +567,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  cleanupBackend();
+  backendManager.cleanup();
   cleanupAutomationRunner();
   if (process.platform !== 'darwin') {
     app.quit();
@@ -618,6 +575,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  cleanupBackend();
+  credentialManager.dispose();
+  backendManager.cleanup();
   cleanupAutomationRunner();
 });

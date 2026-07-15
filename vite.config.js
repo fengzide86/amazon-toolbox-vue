@@ -122,10 +122,12 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           // 手动分割 chunk
-          manualChunks: {
-            'vendor-vue': ['vue', 'vue-router', 'pinia'],
-            'vendor-chart': ['chart.js', 'vue-chartjs'],
-            ...(mode === 'production' ? { 'vendor-sentry': ['@sentry/vue'] } : {}),
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (/[\\/]node_modules[\\/](vue|vue-router|pinia)[\\/]/.test(id)) return 'vendor-vue'
+            if (/[\\/]node_modules[\\/](chart\.js|vue-chartjs)[\\/]/.test(id)) return 'vendor-chart'
+            if (mode === 'production' && /[\\/]node_modules[\\/]@sentry[\\/]/.test(id)) return 'vendor-sentry'
+            return undefined
           },
           // 减小 chunk 大小警告阈值
           chunkFileNames: 'assets/js/[name]-[hash].js',
