@@ -139,9 +139,7 @@ describe('认证流程集成测试', () => {
       expect(mockAdminLogin).toHaveBeenCalledWith('admin123')
       expect(sessionStorage.getItem('toolbox_role')).toBe('admin')
       expect(sessionStorage.getItem('toolbox_token')).toBe('admin-jwt-token')
-      expect(wrapper.find('.success-message').classes()).toContain('show')
-
-      vi.advanceTimersByTime(1000)
+      expect(wrapper.find('.success-message').exists()).toBe(false)
       expect(mockPush).toHaveBeenCalledWith('/admin/dashboard')
     })
 
@@ -170,7 +168,8 @@ describe('认证流程集成测试', () => {
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
-      expect(wrapper.find('.success-message').classes()).toContain('show')
+      expect(wrapper.find('.success-message').exists()).toBe(false)
+      expect(mockPush).toHaveBeenCalledWith('/admin/dashboard')
     })
   })
 

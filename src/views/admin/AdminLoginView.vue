@@ -1,6 +1,28 @@
 <template>
   <main class="login-container">
-    <div class="login-card">
+    <section class="admin-login-shell" aria-label="管理员登录">
+      <aside class="admin-context" aria-label="管理端说明">
+        <div class="context-brand">
+          <div class="context-mark">AMZ</div>
+          <span>Automation Suite</span>
+        </div>
+        <div class="context-copy">
+          <p class="context-eyebrow">OPERATIONS CONSOLE</p>
+          <h2>运营控制中心</h2>
+          <p>集中处理授权、订单、服务配置与客户支持，让运营信息保持清晰可控。</p>
+        </div>
+        <ul class="context-capabilities" aria-label="管理能力">
+          <li><span></span>授权与设备管理</li>
+          <li><span></span>订单与套餐配置</li>
+          <li><span></span>工具与服务运营</li>
+        </ul>
+        <div class="context-security">
+          <span class="security-dot"></span>
+          管理端独立验证入口
+        </div>
+      </aside>
+
+      <div class="login-card">
       <div class="logo-section">
         <div class="logo-icon">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -16,13 +38,6 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
         <span>{{ errorMessage }}</span>
-      </div>
-
-      <div class="success-message" :class="{ show: showSuccess }" role="status">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span>登录成功！正在跳转到管理后台...</span>
       </div>
 
       <form @submit.prevent="handleLogin">
@@ -67,7 +82,8 @@
       <nav class="footer-links" aria-label="其他操作">
         <a href="#" @click.prevent="goToUserLogin" aria-label="返回用户登录">← 返回用户登录</a>
       </nav>
-    </div>
+      </div>
+    </section>
   </main>
 </template>
 
@@ -85,7 +101,6 @@ const passwordInput = ref(null)
 const showPassword = ref(false)
 const isLoading = ref(false)
 const showError = ref(false)
-const showSuccess = ref(false)
 const errorMessage = ref('')
 
 function focusPasswordInput() {
@@ -105,7 +120,6 @@ function togglePasswordVisibility() {
 
 function handleLogin() {
   showError.value = false
-  showSuccess.value = false
 
   if (!password.value.trim()) {
     showToast('请输入密码', 'error')
@@ -129,11 +143,11 @@ function handleLogin() {
         // 保持 Auth 工具类的兼容性
         Auth.set('admin')
         
-        showSuccess.value = true
-        showToast('登录成功！', 'success')
-        setTimeout(() => {
-          router.push('/admin/dashboard')
-        }, 1000)
+        window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
+        Promise.resolve(router.push('/admin/dashboard')).catch(() => {
+          isLoading.value = false
+          focusPasswordInput()
+        })
       } else {
         errorMessage.value = res.message
         showError.value = true
@@ -169,6 +183,86 @@ onMounted(focusPasswordInput)
   padding: 2rem;
   margin: 0 auto;
 }
+
+.admin-login-shell {
+  width: min(920px, 100%);
+  min-height: 520px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(380px, .92fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 28px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
+}
+
+.admin-context {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 46px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255, 255, 255, .16), transparent 30%),
+    linear-gradient(145deg, #173b88 0%, #2d5fca 62%, #4776d7 100%);
+}
+
+.admin-context::after {
+  content: '';
+  position: absolute;
+  right: -90px;
+  bottom: -110px;
+  width: 310px;
+  height: 310px;
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 50%;
+  box-shadow: 0 0 0 48px rgba(255, 255, 255, .035), 0 0 0 96px rgba(255, 255, 255, .025);
+}
+
+.context-brand,
+.context-security {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.context-brand { gap: 11px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.context-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .12);
+  font-size: 10px;
+  letter-spacing: .06em;
+}
+
+.context-copy { position: relative; z-index: 1; margin-top: auto; }
+.context-eyebrow { margin: 0 0 14px; color: rgba(255,255,255,.64); font-size: 10px; font-weight: 700; letter-spacing: .18em; }
+.context-copy h2 { margin: 0 0 16px; color: #fff; font-size: clamp(30px, 3.1vw, 40px); line-height: 1.15; letter-spacing: -.04em; }
+.context-copy > p:last-child { max-width: 380px; margin: 0; color: rgba(255,255,255,.74); font-size: 14px; line-height: 1.8; }
+
+.context-capabilities {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 18px;
+  margin: 32px 0 34px;
+  padding: 0;
+  list-style: none;
+  color: rgba(255,255,255,.84);
+  font-size: 12px;
+}
+
+.context-capabilities li { display: flex; align-items: center; gap: 8px; }
+.context-capabilities li span { width: 5px; height: 5px; border-radius: 50%; background: #d8c39d; box-shadow: 0 0 0 4px rgba(216,195,157,.12); }
+.context-security { gap: 9px; color: rgba(255,255,255,.65); font-size: 11px; }
+.security-dot { width: 7px; height: 7px; border-radius: 50%; background: #8ce1be; box-shadow: 0 0 0 5px rgba(140,225,190,.11); }
 
 .login-card {
   background: white;
@@ -380,23 +474,6 @@ onMounted(focusPasswordInput)
   flex-shrink: 0;
 }
 
-.success-message {
-  display: none;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: rgba(14,165,233,0.08);
-  border: 1px solid rgba(14,165,233,0.2);
-  border-radius: 10px;
-  margin-bottom: 1.5rem;
-  font-size: 0.85rem;
-  color: var(--studio-accent);
-}
-
-.success-message.show {
-  display: flex;
-}
-
 .footer-links {
   text-align: center;
   margin-top: 2rem;
@@ -451,12 +528,13 @@ onMounted(focusPasswordInput)
     var(--color-canvas);
 }
 .login-card {
-  width: min(430px, 100%);
-  padding: 42px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
+  width: 100%;
+  padding: 48px 42px;
+  border: 0;
+  border-radius: 0;
   background: var(--color-surface);
-  box-shadow: var(--shadow-medium);
+  box-shadow: none;
+  align-self: center;
 }
 .logo-section .logo-icon { background: var(--color-primary); box-shadow: 0 10px 24px rgba(45, 95, 202, .18); }
 .logo-section h1 { color: var(--color-text); letter-spacing: -.025em; }
@@ -475,12 +553,26 @@ onMounted(focusPasswordInput)
 .btn-login { border-radius: var(--radius-md); background: var(--color-primary); box-shadow: 0 8px 20px rgba(45, 95, 202, .18); }
 .btn-login:hover:not(:disabled) { background: var(--color-primary-hover); box-shadow: 0 11px 26px rgba(45, 95, 202, .24); transform: translateY(-1px); }
 .error-message { color: var(--color-danger); border-color: rgba(195, 61, 73, .18); background: var(--color-danger-soft); }
-.success-message { color: var(--color-success); border-color: rgba(22, 138, 99, .18); background: var(--color-success-soft); }
 .footer-links a { color: var(--color-text-secondary); }
 .footer-links a:hover { color: var(--color-primary); }
 
+@media (max-width: 760px) {
+  .admin-login-shell { min-height: 0; grid-template-columns: 1fr; border-radius: var(--radius-xl); }
+  .admin-context { padding: 24px 28px; }
+  .context-copy { margin-top: 24px; }
+  .context-copy h2 { margin-bottom: 8px; font-size: 25px; }
+  .context-copy > p:last-child,
+  .context-capabilities { display: none; }
+  .context-security { margin-top: 20px; }
+  .login-card { padding: 34px 30px; }
+  .logo-section { margin-bottom: 28px; }
+  .logo-section .logo-icon { width: 52px; height: 52px; border-radius: 15px; }
+}
+
 @media (max-width: 480px) {
   .login-container { padding: 16px; }
+  .admin-context { padding: 20px 22px; }
+  .context-brand span { font-size: 11px; }
   .login-card { padding: 30px 22px; }
 }
 </style>

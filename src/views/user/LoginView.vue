@@ -357,7 +357,7 @@ function handleLogin() {
           localStorage.setItem('toolbox_platform_scope', JSON.stringify(res.data.platform_scope))
         }
         window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
-        router.push('/user/tools').catch(() => {
+        Promise.resolve(router.push('/user/tools')).catch(() => {
           isLoading.value = false
           focusLoginInput()
         })

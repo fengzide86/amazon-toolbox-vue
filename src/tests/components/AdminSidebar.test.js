@@ -68,8 +68,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      // 10 个菜单项 + 1 个退出按钮
-      expect(menuItems.length).toBe(11)
+      expect(menuItems.length).toBe(10)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -89,7 +88,7 @@ describe('AdminSidebar', () => {
       expect(labels).toContain('AI 客服管理')
       expect(labels).toContain('公告管理')
       expect(labels).toContain('系统设置')
-      expect(labels).toContain('退出登录')
+      expect(labels).not.toContain('退出登录')
     })
 
     it('当前路由对应的菜单项应该有 is-active 类', async () => {
@@ -140,61 +139,43 @@ describe('AdminSidebar', () => {
     })
   })
 
-  describe('退出登录', () => {
-    it('退出按钮应该有 logout-item 类', async () => {
+  describe('账号操作', () => {
+    it('侧栏不应重复提供退出入口', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.logout-item').exists()).toBe(true)
+      expect(wrapper.find('.logout-item').exists()).toBe(false)
     })
 
-    it('点击退出按钮应弹出确认框', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-
+    it('侧栏不应保留空的账号操作区', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      await wrapper.find('.logout-item').trigger('click')
-
-      expect(confirmSpy).toHaveBeenCalledWith('确定要退出登录吗？')
-      confirmSpy.mockRestore()
+      expect(wrapper.find('.sidebar-footer-zone').exists()).toBe(false)
     })
 
-    it('确认退出后应调用 Auth.clear', async () => {
+    it('侧栏菜单项应全部用于页面导航', async () => {
+      const wrapper = mount(AdminSidebar, {
+        global: { plugins: [createPinia(), mockRouter] }
+      })
+      await flushPromises()
+
+      expect(wrapper.findAll('.menu-nav-item')).toHaveLength(wrapper.findAll('a.menu-nav-item').length)
+    })
+
+    it('侧栏不应直接清理登录状态', async () => {
       const { Auth } = await import('@/utils')
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      await wrapper.find('.logout-item').trigger('click')
-      await flushPromises()
-
-      expect(Auth.clear).toHaveBeenCalled()
-      confirmSpy.mockRestore()
-    })
-
-    it('取消退出不应该调用 Auth.clear', async () => {
-      const { Auth } = await import('@/utils')
-      Auth.clear.mockClear()
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-
-      const wrapper = mount(AdminSidebar, {
-        global: { plugins: [createPinia(), mockRouter] }
-      })
-      await flushPromises()
-
-      await wrapper.find('.logout-item').trigger('click')
-      await flushPromises()
-
+      await wrapper.find('.sidebar-menu-nav').trigger('click')
       expect(Auth.clear).not.toHaveBeenCalled()
-      confirmSpy.mockRestore()
     })
   })
 

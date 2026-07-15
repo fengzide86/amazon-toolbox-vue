@@ -66,8 +66,7 @@ describe('UserSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      // 5 个核心菜单项 + 1 个退出按钮
-      expect(menuItems.length).toBe(6)
+      expect(menuItems.length).toBe(5)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -82,7 +81,7 @@ describe('UserSidebar', () => {
       expect(labels).toContain('套餐与授权')
       expect(labels).toContain('设备授权')
       expect(labels).toContain('AI 客服')
-      expect(labels).toContain('退出登录')
+      expect(labels).not.toContain('退出登录')
       expect(labels).not.toContain('首页总览')
       expect(labels).not.toContain('设备管理')
     })
@@ -125,28 +124,23 @@ describe('UserSidebar', () => {
     })
   })
 
-  describe('退出登录', () => {
-    it('退出按钮应该有 logout-item 类', async () => {
+  describe('账号操作', () => {
+    it('侧栏不应重复提供退出入口', async () => {
       const wrapper = mount(UserSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.logout-item').exists()).toBe(true)
+      expect(wrapper.find('.logout-item').exists()).toBe(false)
     })
 
-    it('点击退出按钮应弹出确认框', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-
+    it('侧栏不应保留空的账号操作区', async () => {
       const wrapper = mount(UserSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      await wrapper.find('.logout-item').trigger('click')
-
-      expect(confirmSpy).toHaveBeenCalledWith('确定要退出登录吗？')
-      confirmSpy.mockRestore()
+      expect(wrapper.find('.sidebar-footer-zone').exists()).toBe(false)
     })
   })
 

@@ -127,12 +127,9 @@ describe('AdminLoginView', () => {
       expect(sessionStorage.getItem('toolbox_role')).toBe('admin')
       expect(sessionStorage.getItem('toolbox_token')).toBe('test-jwt-token')
       
-      // 检查成功消息
-      expect(wrapper.find('.success-message').classes()).toContain('show')
-      expect(mockShowToast).toHaveBeenCalledWith('登录成功！', 'success')
-
-      // 快进 1 秒后应该跳转
-      vi.advanceTimersByTime(1000)
+      // 成功后立即导航，由全局光轨承担一次克制确认
+      expect(wrapper.find('.success-message').exists()).toBe(false)
+      expect(mockShowToast).not.toHaveBeenCalledWith('登录成功！', 'success')
       expect(mockPush).toHaveBeenCalledWith('/admin/dashboard')
     })
 
@@ -251,10 +248,10 @@ describe('AdminLoginView', () => {
       expect(errorMsg.attributes('role')).toBe('alert')
     })
 
-    it('成功消息应该有 role="status"', () => {
+    it('不应渲染重复的成功消息', () => {
       const wrapper = mountWithPinia(AdminLoginView)
       const successMsg = wrapper.find('.success-message')
-      expect(successMsg.attributes('role')).toBe('status')
+      expect(successMsg.exists()).toBe(false)
     })
 
     it('登录按钮应该在加载时设置 aria-busy', async () => {

@@ -32,36 +32,19 @@
       </router-link>
     </nav>
 
-    <!-- 底部退出 -->
-    <div class="sidebar-footer-zone">
-      <button class="menu-nav-item logout-item" @click="handleLogout" aria-label="退出登录">
-        <LogOut :size="14" class="menu-icon" />
-        <span class="menu-label">退出登录</span>
-      </button>
-    </div>
   </aside>
 </template>
 
 <script setup>
-import { useRouter, useRoute } from 'vue-router'
-import { Auth, showToast } from '@/utils'
-import { Zap, ClipboardList, ShieldCheck, Monitor, MessageCircle, LogOut } from '@lucide/vue'
+import { useRoute } from 'vue-router'
+import { Zap, ClipboardList, ShieldCheck, Monitor, MessageCircle } from '@lucide/vue'
 
-const router = useRouter()
 const route = useRoute()
 
 function isActive(path) {
   return route.path === path
 }
 
-function handleLogout() {
-  if (!confirm('确定要退出登录吗？')) return
-  Auth.clear()
-  localStorage.removeItem('toolbox_role')
-  localStorage.removeItem('toolbox_user')
-  showToast('已退出登录', 'success')
-  router.push('/user/login')
-}
 </script>
 
 <style scoped>
@@ -178,17 +161,6 @@ function handleLogout() {
   background: var(--color-primary);
   border-radius: 0 3px 3px 0;
 }
-
-.sidebar-footer-zone {
-  padding: 12px;
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.logout-item:hover { background: var(--color-danger-soft) !important; }
-
-.logout-item:hover .menu-icon,
-.logout-item:hover .menu-label { color: var(--color-danger) !important; }
 
 @media (max-width: 1024px) {
   .studio-user-sidebar {
