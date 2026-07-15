@@ -1512,4 +1512,95 @@ onUnmounted(() => {
     gap: 0.3rem;
   }
 }
+
+/* v6 明亮精密主题：保留承诺内容，移除深色赛博装饰 */
+.login-page { background: var(--color-canvas); }
+.login-brand {
+  flex: 1.08;
+  padding: clamp(40px, 6vw, 88px);
+  color: var(--color-text);
+  background: var(--color-surface-premium);
+  border-right: 1px solid var(--color-border);
+}
+.grid-bg,
+.brand-shapes,
+.scan-line { display: none; }
+.brand-content { max-width: 540px; animation-duration: var(--motion-signature); }
+.logo-mark,
+.login-form-card .logo-icon {
+  background: var(--color-primary);
+  box-shadow: 0 10px 24px rgba(45, 95, 202, .18);
+}
+.brand-title { color: var(--color-text); font-size: clamp(32px, 3.2vw, 48px); letter-spacing: -.045em; }
+.brand-subtitle { color: var(--color-premium); font-weight: 700; letter-spacing: .12em; }
+.brand-desc { color: var(--color-text-secondary); }
+.brand-divider .divider-line { background: var(--color-border-strong); }
+.brand-divider .divider-dot { background: var(--color-premium); box-shadow: none; }
+.brand-stats {
+  padding: 22px 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.stat-number { color: var(--color-text); text-shadow: none; }
+.stat-unit { color: var(--color-premium); }
+.stat-line { background: var(--color-border); }
+.stat-desc { color: var(--color-text-secondary); }
+.feature-tag {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: rgba(252, 252, 253, .72);
+  box-shadow: none;
+}
+.feature-tag svg { color: var(--color-success); }
+.login-form-section { flex: .92; padding: clamp(32px, 5vw, 72px); background: var(--color-canvas); }
+.login-form-card {
+  max-width: 460px;
+  padding: clamp(28px, 4vw, 44px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-medium);
+}
+.card-accent { height: 3px; background: linear-gradient(90deg, var(--color-primary), var(--color-premium)); }
+.logo-section h2 { color: var(--color-text); letter-spacing: -.02em; }
+.logo-section p,
+.login-footer { color: var(--color-text-secondary); }
+.connection-status { border-color: var(--color-border); background: var(--color-surface-soft); }
+.connection-status.online { color: var(--color-success); }
+.form-group label { color: var(--color-text); font-weight: 700; }
+.input-wrapper input {
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  caret-color: var(--color-primary);
+}
+.input-wrapper input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-focus-ring); }
+.input-icon { color: var(--color-text-tertiary); }
+.device-info { color: var(--color-text-secondary); background: var(--color-surface-soft); }
+.device-info svg { color: var(--color-primary); }
+.btn-login {
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  box-shadow: 0 8px 20px rgba(45, 95, 202, .18);
+}
+.btn-login:hover:not(:disabled) { background: var(--color-primary-hover); box-shadow: 0 11px 26px rgba(45, 95, 202, .24); }
+.error-message { color: var(--color-danger); border-color: rgba(195, 61, 73, .18); background: var(--color-danger-soft); }
+.success-message { color: var(--color-success); border-color: rgba(22, 138, 99, .18); background: var(--color-success-soft); }
+.footer-link { color: var(--color-text-secondary); }
+.footer-link:hover { color: var(--color-primary); }
+.modal-overlay { background: var(--color-overlay); backdrop-filter: blur(5px); }
+.modal { border: 1px solid var(--color-border); border-radius: var(--radius-xl); box-shadow: var(--shadow-overlay); }
+
+@media (max-width: 1024px) {
+  .login-brand { min-height: auto; border-right: 0; border-bottom: 1px solid var(--color-border); }
+  .login-form-section { padding: 40px 20px; }
+}
+
+@media (max-width: 640px) {
+  .login-brand { min-height: auto; padding: 32px 22px; }
+  .brand-stats { display: none; }
+  .brand-title { font-size: 28px; }
+  .login-form-card { padding: 26px 20px; }
+}
 </style>

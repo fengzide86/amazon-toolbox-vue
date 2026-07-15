@@ -2,7 +2,7 @@
   <main class="login-container">
     <div class="login-card">
       <div class="logo-section">
-        <div class="logo-icon" style="background: linear-gradient(135deg, #0EA5E9, #0284C7);">
+        <div class="logo-icon">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
           </svg>
@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <button type="submit" class="btn-login" :disabled="isLoading" :aria-busy="isLoading" style="background: linear-gradient(135deg, #0EA5E9, #0284C7);">
+        <button type="submit" class="btn-login" :disabled="isLoading" :aria-busy="isLoading">
           <svg v-if="isLoading" class="btn-spinner" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
           </svg>
@@ -440,5 +440,47 @@ onMounted(focusPasswordInput)
   .login-container {
     padding: 1rem;
   }
+}
+
+/* v6 管理端登录 */
+.login-container {
+  max-width: none;
+  padding: 32px;
+  background:
+    radial-gradient(circle at 16% 18%, rgba(45, 95, 202, .07), transparent 28%),
+    var(--color-canvas);
+}
+.login-card {
+  width: min(430px, 100%);
+  padding: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-medium);
+}
+.logo-section .logo-icon { background: var(--color-primary); box-shadow: 0 10px 24px rgba(45, 95, 202, .18); }
+.logo-section h1 { color: var(--color-text); letter-spacing: -.025em; }
+.logo-section p { color: var(--color-text-secondary); }
+.input-wrapper input {
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  background: var(--color-surface);
+  caret-color: var(--color-primary);
+}
+.input-wrapper input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-focus-ring); }
+.input-icon,
+.toggle-password { color: var(--color-text-tertiary); }
+.toggle-password:hover { color: var(--color-primary); background: var(--color-primary-soft); }
+.btn-login { border-radius: var(--radius-md); background: var(--color-primary); box-shadow: 0 8px 20px rgba(45, 95, 202, .18); }
+.btn-login:hover:not(:disabled) { background: var(--color-primary-hover); box-shadow: 0 11px 26px rgba(45, 95, 202, .24); transform: translateY(-1px); }
+.error-message { color: var(--color-danger); border-color: rgba(195, 61, 73, .18); background: var(--color-danger-soft); }
+.success-message { color: var(--color-success); border-color: rgba(22, 138, 99, .18); background: var(--color-success-soft); }
+.footer-links a { color: var(--color-text-secondary); }
+.footer-links a:hover { color: var(--color-primary); }
+
+@media (max-width: 480px) {
+  .login-container { padding: 16px; }
+  .login-card { padding: 30px 22px; }
 }
 </style>

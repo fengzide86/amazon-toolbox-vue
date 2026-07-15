@@ -135,7 +135,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
 }
 
 .app-layout :deep(.studio-header) {
@@ -145,13 +145,14 @@ onUnmounted(() => {
 .main-container {
   min-height: calc(100vh - var(--header-height));
   display: flex;
+  width: 100%;
 }
 
 .content-studio {
   min-width: 0;
   flex: 1;
   margin-left: var(--sidebar-width);
-  padding: var(--spacing-lg);
+  padding: 24px clamp(18px, 3vw, 42px) 48px;
   overflow-y: auto;
 }
 
@@ -159,8 +160,8 @@ onUnmounted(() => {
   position: fixed;
   inset: 0;
   z-index: 998;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(4px);
+  background: var(--color-overlay);
+  backdrop-filter: blur(5px);
 }
 
 .kickout-overlay {
@@ -171,7 +172,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(15, 23, 42, 0.72);
+  background: var(--color-overlay);
   backdrop-filter: blur(8px);
 }
 
@@ -214,7 +215,7 @@ onUnmounted(() => {
   }
 
   .content-studio {
-    padding: var(--spacing-md);
+    padding: 18px 16px 36px;
   }
 }
 </style>

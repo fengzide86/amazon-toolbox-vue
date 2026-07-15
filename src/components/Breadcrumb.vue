@@ -1,11 +1,11 @@
 <template>
   <nav class="breadcrumb" aria-label="面包屑导航">
-    <router-link :to="homePath" class="breadcrumb-item">
-      <Home :size="14" />
+    <router-link :to="homePath" class="breadcrumb-item" aria-label="返回首页">
+      <Home :size="13" />
       首页
     </router-link>
     <span class="breadcrumb-separator">/</span>
-    <span class="breadcrumb-item active">{{ currentTitle }}</span>
+    <span class="breadcrumb-item active" aria-current="page">{{ currentTitle }}</span>
   </nav>
 </template>
 
@@ -30,9 +30,10 @@ const currentTitle = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 0;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
+  min-height: 30px;
+  padding: 0;
+  margin-bottom: 14px;
+  font-size: 11px;
   color: var(--color-muted);
 }
 
@@ -43,18 +44,18 @@ const currentTitle = computed(() => {
   color: var(--color-muted);
   text-decoration: none;
   transition: color 0.2s;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
+  padding: 4px 6px;
+  border-radius: 7px;
 }
 
 .breadcrumb-item:hover {
   color: var(--color-accent);
-  background: rgba(14, 165, 233, 0.06);
+  background: var(--color-primary-soft);
 }
 
 .breadcrumb-item.active {
   color: var(--color-primary);
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .breadcrumb-item svg {
@@ -62,7 +63,7 @@ const currentTitle = computed(() => {
 }
 
 .breadcrumb-separator {
-  color: var(--color-border);
+  color: var(--color-text-tertiary);
   font-size: 0.8rem;
 }
 </style>

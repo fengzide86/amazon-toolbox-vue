@@ -16,7 +16,8 @@
             <Zap :size="16" />
           </div>
           <div class="header-title">
-            <h1>赛训工具箱</h1>
+            <h1>{{ isAdmin ? '运营控制中心' : '自动化工具箱' }}</h1>
+            <p>{{ currentPageTitle }}</p>
           </div>
         </router-link>
       </div>
@@ -76,7 +77,7 @@
 
 <script setup>
 import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Monitor, PriceTag, SwitchButton } from '@element-plus/icons-vue'
@@ -92,7 +93,9 @@ const props = defineProps({
 const emit = defineEmits(['toggle-sidebar', 'platform-change'])
 
 const router = useRouter()
+const route = useRoute()
 const platformStore = usePlatformStore()
+const currentPageTitle = computed(() => route.meta?.title || (props.isAdmin ? '管理后台' : '跨境电商效率工具'))
 
 const showPlatformSwitcher = computed(() => availablePlatformsForUser.value.length > 1)
 
@@ -416,5 +419,46 @@ onMounted(() => {
   .header-title h1 {
     font-size: 0.85rem;
   }
+}
+
+/* v6 明亮应用顶栏 */
+.studio-header {
+  height: var(--header-height);
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(252, 252, 253, .9);
+  box-shadow: none;
+  z-index: var(--z-header);
+}
+.header-inner { padding: 0 24px; }
+.logo-link { gap: 11px; }
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--color-primary);
+  box-shadow: 0 6px 14px rgba(45, 95, 202, .15);
+}
+.header-title h1 { color: var(--color-text); font-size: 13px; letter-spacing: -.01em; }
+.header-title p { margin-top: 1px; color: var(--color-text-tertiary); font-size: 10px; }
+.hamburger-btn { border-color: var(--color-border); color: var(--color-text-secondary); }
+.hamburger-btn:hover { color: var(--color-primary); background: var(--color-primary-soft); }
+:deep(.platform-select .el-select__wrapper),
+:deep(.platform-select .el-input__wrapper) { min-height: 34px; background: var(--color-surface-soft) !important; box-shadow: 0 0 0 1px var(--color-border) inset !important; }
+.badge-svip {
+  padding: 4px 8px;
+  border: 1px solid rgba(169, 133, 82, .2);
+  border-radius: 999px;
+  color: var(--color-premium);
+  background: var(--color-premium-soft);
+  letter-spacing: .04em;
+}
+.admin-badge { border-color: rgba(45, 95, 202, .16); border-radius: 999px; color: var(--color-primary); background: var(--color-primary-soft); }
+.avatar-circle { width: 32px; height: 32px; border: 1px solid var(--color-border); color: var(--color-text-secondary); background: var(--color-surface-soft); }
+.avatar-circle:hover { border-color: var(--color-border-strong); color: var(--color-text); background: var(--color-surface); }
+.avatar-circle.admin-avatar { border-color: var(--color-primary); background: var(--color-primary); }
+
+@media (max-width: 640px) {
+  .header-inner { padding: 0 14px; }
+  .header-title p { display: none; }
 }
 </style>

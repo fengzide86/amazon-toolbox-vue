@@ -48,13 +48,13 @@ describe('UserSidebar', () => {
       expect(wrapper.find('.brand-badge svg').exists()).toBe(true)
     })
 
-    it('应该显示"工具箱"品牌文字', async () => {
+    it('应该显示"自动化工具箱"品牌文字', async () => {
       const wrapper = mount(UserSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-text').text()).toBe('工具箱')
+      expect(wrapper.find('.brand-text').text()).toBe('自动化工具箱')
     })
   })
 
@@ -66,8 +66,8 @@ describe('UserSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      // 4 个核心菜单项 + 1 个退出按钮
-      expect(menuItems.length).toBe(5)
+      // 5 个核心菜单项 + 1 个退出按钮
+      expect(menuItems.length).toBe(6)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -80,6 +80,7 @@ describe('UserSidebar', () => {
       expect(labels).toContain('工具箱')
       expect(labels).toContain('使用记录')
       expect(labels).toContain('套餐与授权')
+      expect(labels).toContain('设备授权')
       expect(labels).toContain('AI 客服')
       expect(labels).toContain('退出登录')
       expect(labels).not.toContain('首页总览')

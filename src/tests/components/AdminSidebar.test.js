@@ -50,13 +50,13 @@ describe('AdminSidebar', () => {
       expect(wrapper.find('.brand-badge').text()).toBe('管')
     })
 
-    it('应该显示"控制中心"品牌文字', async () => {
+    it('应该显示"运营控制中心"品牌文字', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-text').text()).toBe('控制中心')
+      expect(wrapper.find('.brand-text').text()).toBe('运营控制中心')
     })
   })
 

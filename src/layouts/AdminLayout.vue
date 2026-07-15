@@ -71,7 +71,7 @@ onUnmounted(() => {
 <style scoped>
 .app-layout {
   min-height: 100vh;
-  background: var(--studio-bg, #F1F5F9);
+  background: var(--color-canvas);
   display: flex;
   flex-direction: column;
 }
@@ -86,13 +86,18 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   min-height: calc(100vh - var(--header-height, 56px));
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  gap: 0;
 }
 
 /* 主内容区左侧留空，为固定侧边栏让位 */
 .content {
   flex: 1;
   min-width: 0;
-  padding: var(--spacing-lg, 1.5rem);
+  padding: 24px clamp(18px, 3vw, 42px) 48px;
   overflow-y: auto;
   overflow-x: hidden;
   margin-left: var(--sidebar-width, 200px);
@@ -121,7 +126,7 @@ onUnmounted(() => {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
   z-index: 998;
 }

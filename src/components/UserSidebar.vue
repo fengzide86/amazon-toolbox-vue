@@ -3,9 +3,9 @@
     <!-- 品牌区 -->
     <div class="sidebar-brand-zone">
       <div class="brand-badge">
-        <Zap :size="12" />
+        <Zap :size="15" />
       </div>
-      <span class="brand-text">工具箱</span>
+      <span class="brand-text">自动化工具箱</span>
     </div>
 
     <!-- 导航菜单 -->
@@ -21,6 +21,10 @@
       <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
         <ShieldCheck :size="14" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">套餐与授权</span>
+      </router-link>
+      <router-link to="/user/devices" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/devices') ? 'page' : undefined">
+        <Monitor :size="16" class="menu-icon" aria-hidden="true" />
+        <span class="menu-label">设备授权</span>
       </router-link>
       <router-link to="/user/ai-chat" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
         <MessageCircle :size="14" class="menu-icon" aria-hidden="true" />
@@ -41,7 +45,7 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
 import { Auth, showToast } from '@/utils'
-import { Zap, ClipboardList, ShieldCheck, MessageCircle, LogOut } from '@lucide/vue'
+import { Zap, ClipboardList, ShieldCheck, Monitor, MessageCircle, LogOut } from '@lucide/vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -61,79 +65,72 @@ function handleLogout() {
 </script>
 
 <style scoped>
-/* 全高骨架侧边栏 - 桌面端固定悬浮 */
 .studio-user-sidebar {
-  width: var(--sidebar-width, 200px);
+  width: var(--sidebar-width);
   height: 100vh;
-  background-color: var(--studio-frame, #0F172A);
+  background: rgba(252, 252, 253, .97);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   user-select: none;
   flex-shrink: 0;
-  /* 桌面端固定悬浮在左侧 */
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 99;
+  z-index: var(--z-sidebar);
+  backdrop-filter: blur(18px);
 }
 
-/* 品牌区 */
 .sidebar-brand-zone {
-  height: var(--header-height, 48px);
+  height: var(--header-height);
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  gap: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 0 20px;
+  gap: 11px;
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
 .brand-badge {
-  background: linear-gradient(135deg, var(--studio-accent, #4F46E5), var(--studio-accent-light, #818CF8));
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.brand-badge svg {
-  width: 12px;
-  height: 12px;
-  color: white;
+  border-radius: 9px;
+  color: #fff;
+  background: var(--color-primary);
+  box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
 }
 
 .brand-text {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--studio-text-on-dark-muted, #94A3B8);
-  letter-spacing: 0.5px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -.01em;
 }
 
-/* 导航菜单 */
 .sidebar-menu-nav {
   flex-grow: 1;
-  padding: 14px 8px;
+  padding: 20px 12px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
   overflow-y: auto;
 }
 
-/* 菜单项 */
 .menu-nav-item {
-  height: 34px;
+  min-height: 42px;
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  gap: 10px;
-  border-radius: 6px;
+  padding: 0 13px;
+  gap: 11px;
+  border-radius: 10px;
   cursor: pointer;
   position: relative;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color var(--motion-fast), background var(--motion-fast), transform var(--motion-press);
   text-decoration: none;
   border: none;
   background: transparent;
@@ -142,82 +139,68 @@ function handleLogout() {
 }
 
 .menu-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--studio-icon-on-dark, #94A3B8);
-  stroke-width: 1.75px;
-  transition: color 0.2s;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-tertiary);
+  stroke-width: 1.8px;
+  transition: color var(--motion-fast);
   flex-shrink: 0;
 }
 
 .menu-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--studio-text-on-dark-muted, #94A3B8);
-  transition: color 0.2s;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  transition: color var(--motion-fast);
   white-space: nowrap;
 }
 
-/* Hover */
-.menu-nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.04);
-}
+.menu-nav-item:hover { background: #f2f4f7; }
 
 .menu-nav-item:hover .menu-icon,
-.menu-nav-item:hover .menu-label {
-  color: var(--studio-text-on-dark, #F8FAFC);
-}
+.menu-nav-item:hover .menu-label { color: var(--color-text); }
 
-/* Active - 3px 左侧高亮蓝条 */
-.menu-nav-item.is-active {
-  background-color: rgba(14, 165, 233, 0.15);
-}
+.menu-nav-item.is-active { background: var(--color-primary-soft); }
 
 .menu-nav-item.is-active .menu-icon,
 .menu-nav-item.is-active .menu-label {
-  color: var(--studio-text-on-dark, #FFFFFF);
-  font-weight: 600;
+  color: var(--color-primary);
+  font-weight: 700;
 }
 
 .menu-nav-item.is-active::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 10px;
+  bottom: 10px;
   width: 3px;
-  background-color: var(--studio-accent, #4F46E5);
-  border-radius: 0 2px 2px 0;
+  background: var(--color-primary);
+  border-radius: 0 3px 3px 0;
 }
 
-/* 底部退出区 */
 .sidebar-footer-zone {
-  padding: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 12px;
+  border-top: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
-.logout-item:hover {
-  background-color: rgba(239, 68, 68, 0.1) !important;
-}
+.logout-item:hover { background: var(--color-danger-soft) !important; }
 
 .logout-item:hover .menu-icon,
-.logout-item:hover .menu-label {
-  color: var(--studio-danger, #EF4444) !important;
-}
+.logout-item:hover .menu-label { color: var(--color-danger) !important; }
 
-/* 移动端适配 */
 @media (max-width: 1024px) {
   .studio-user-sidebar {
     position: fixed;
     top: 0;
     left: 0;
     bottom: 0;
-    width: 220px;
-    z-index: 999;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+    width: min(280px, 86vw);
+    z-index: var(--z-sidebar);
+    box-shadow: var(--shadow-overlay);
     transform: translateX(-100%);
-    transition: transform 0.3s ease;
+    transition: transform var(--motion-slow) var(--ease-emphasized);
   }
 
   .studio-user-sidebar.mobile-open {
