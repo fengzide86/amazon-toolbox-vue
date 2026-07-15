@@ -1,4 +1,4 @@
-/* ===== AmazonToolbox Design System v5 - Studio Milk & Slate ===== */
+/* ===== AmazonToolbox Design System v6 - Mist & Mineral ===== */
 /* 模块化 CSS 入口文件 */
 
 /* === Base: 变量、重置、Element Plus 覆盖、排版 === */
@@ -19,6 +19,7 @@
 @import './components/tables.css';
 @import './components/badges.css';
 @import './components/misc.css';
+@import './components/foundation.css';
 
 /* === Themes: 暗色模式 === */
 @import './themes/dark.css';

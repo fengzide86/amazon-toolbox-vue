@@ -1,0 +1,160 @@
+/* Shared premium-light primitives and application states */
+.app-page {
+  width: min(var(--content-max-width), 100%);
+  margin: 0 auto;
+}
+
+.app-page--reading { max-width: 880px; }
+.app-page--compact { max-width: 1120px; }
+
+.page-header-v6 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.page-header-v6__eyebrow {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.page-header-v6 h1,
+.page-header-v6 h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-page-title);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+
+.page-header-v6 p {
+  max-width: 680px;
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.app-surface {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.app-surface--soft { background: var(--color-surface-soft); }
+.app-surface--premium { background: var(--color-surface-premium); }
+.app-surface--raised { box-shadow: var(--shadow-low); }
+.app-surface--padded { padding: var(--space-6); }
+
+.status-badge-v6 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-soft);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-badge-v6::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.status-badge-v6--available,
+.status-badge-v6--running,
+.status-badge-v6--preparing { color: var(--color-primary); background: var(--color-primary-soft); }
+.status-badge-v6--success,
+.status-badge-v6--completed { color: var(--color-success); background: var(--color-success-soft); }
+.status-badge-v6--warning,
+.status-badge-v6--waiting_user,
+.status-badge-v6--locked { color: var(--color-warning); background: var(--color-warning-soft); }
+.status-badge-v6--danger,
+.status-badge-v6--failed { color: var(--color-danger); background: var(--color-danger-soft); }
+
+.empty-state-v6 {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.empty-state-v6__icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-2);
+  border-radius: 15px;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.empty-state-v6 h3 { margin: 0; color: var(--color-text); font-size: 16px; }
+.empty-state-v6 p { max-width: 440px; margin: 0; font-size: 13px; line-height: 1.65; }
+
+.data-toolbar-v6 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
+}
+
+.primary-action-v6 {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  color: #fff;
+  background: var(--color-primary);
+  box-shadow: 0 5px 14px rgba(45, 95, 202, 0.16);
+  font: 700 13px/1 var(--font-family);
+  cursor: pointer;
+  transition: transform var(--motion-press) var(--ease-standard), background var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.primary-action-v6:hover:not(:disabled) { background: var(--color-primary-hover); box-shadow: 0 8px 20px rgba(45, 95, 202, 0.22); }
+.primary-action-v6:active:not(:disabled) { transform: scale(.98); }
+.primary-action-v6:disabled { opacity: .52; cursor: not-allowed; box-shadow: none; }
+
+.app-fade-enter-active,
+.app-fade-leave-active { transition: opacity var(--motion-normal), transform var(--motion-normal) var(--ease-emphasized); }
+.app-fade-enter-from,
+.app-fade-leave-to { opacity: 0; transform: translateY(6px); }
+
+@media (max-width: 640px) {
+  .page-header-v6 { flex-direction: column; gap: var(--space-3); }
+  .page-header-v6 h1,
+  .page-header-v6 h2 { font-size: 24px; }
+  .app-surface--padded { padding: var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-fade-enter-from,
+  .app-fade-leave-to { transform: none; }
+}
