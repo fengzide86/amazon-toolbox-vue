@@ -17,6 +17,7 @@ backend/.env.local
 
 # ===== 构建产物 =====
 dist/
+dist-electron/
 release/
 dist-release/
 amazon-toolbox/

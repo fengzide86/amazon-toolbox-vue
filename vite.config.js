@@ -8,6 +8,7 @@ import { visualizer } from 'rollup-plugin-visualizer'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig(({ mode }) => {
+  const desktopBuild = process.env.TOOLBOX_BUILD_TARGET === 'electron'
   return {
     plugins: [
       vue(),
@@ -22,8 +23,8 @@ export default defineConfig(({ mode }) => {
         resolvers: [ElementPlusResolver()],
         dts: 'src/components.d.ts',
       }),
-      // PWA 支持
-      VitePWA({
+      // Service Worker 只属于明确的 Web 构建，桌面壳使用自身更新与缓存策略。
+      !desktopBuild && VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         manifest: {

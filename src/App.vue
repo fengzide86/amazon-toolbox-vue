@@ -11,7 +11,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import UpdateProgress from '@/components/UpdateProgress.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AppTransition from '@/components/AppTransition.vue'

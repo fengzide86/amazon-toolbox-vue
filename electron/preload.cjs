@@ -22,23 +22,6 @@ function buildStableDeviceIdentity() {
 
 const stableDeviceIdentity = buildStableDeviceIdentity();
 
-// 将 IPC 事件桥接到 window 事件，供 Vue 组件监听
-ipcRenderer.on('update-download-progress', (event, data) => {
-  window.dispatchEvent(new CustomEvent('update-download-progress', { detail: data }));
-});
-
-ipcRenderer.on('update-downloaded', (event, data) => {
-  window.dispatchEvent(new CustomEvent('update-downloaded', { detail: data }));
-});
-
-ipcRenderer.on('update-available', (event, data) => {
-  window.dispatchEvent(new CustomEvent('update-available', { detail: data }));
-});
-
-ipcRenderer.on('update-error', (event, data) => {
-  window.dispatchEvent(new CustomEvent('update-error', { detail: data }));
-});
-
 // 暴露安全的 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
   runtime: {
@@ -46,16 +29,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deviceId: stableDeviceIdentity.deviceId,
     deviceName: stableDeviceIdentity.deviceName,
   },
-  startDownloadUpdate: () => ipcRenderer.send('start-download-update'),
-  installUpdate: () => ipcRenderer.send('install-update'),
-  pauseDownload: () => ipcRenderer.send('pause-download'),
-  resumeDownload: () => ipcRenderer.send('resume-download'),
-  cancelDownload: () => ipcRenderer.send('cancel-download'),
-  onUpdateProgress: (callback) => {
-    ipcRenderer.on('update-download-progress', (event, data) => callback(data));
-  },
-  onUpdateDownloaded: (callback) => {
-    ipcRenderer.on('update-downloaded', (event, data) => callback(data));
+  updates: {
+    getState: () => ipcRenderer.invoke('updates:get-state'),
+    check: () => ipcRenderer.invoke('updates:check'),
+    startDownload: () => ipcRenderer.invoke('updates:start-download'),
+    cancelDownload: () => ipcRenderer.invoke('updates:cancel-download'),
+    install: () => ipcRenderer.invoke('updates:install'),
+    defer: () => ipcRenderer.invoke('updates:defer'),
+    onState: (callback) => {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on('updates:state', listener);
+      return () => ipcRenderer.removeListener('updates:state', listener);
+    },
   },
   // 普通用户授权码由主进程使用操作系统能力加密保存
   credentialStore: {

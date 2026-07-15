@@ -1,7 +1,7 @@
 const { app, BrowserWindow, Notification, dialog, ipcMain, safeStorage, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { autoUpdater } = require('electron-updater');
+const { UpdateManager } = require('../dist-electron/electron/core/update-manager.cjs');
 const { spawn } = require('child_process');
 const { RunnerClient } = require('./automation/runner-client.cjs');
 const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
@@ -17,6 +17,8 @@ let batchCoordinator = null;
 let selectedBatchImportPath = null;
 let selectedBatchItemId = null;
 let allowWindowClose = false;
+let updateManager = null;
+let singleRunActive = false;
 const embeddedBrowserHost = new EmbeddedBrowserHost();
 const batchBrowserHosts = new EmbeddedBrowserHostManager();
 
@@ -50,161 +52,11 @@ if (!gotTheLock) {
   });
 }
 
-// ===== 自动更新功能 =====
-// 更新服务器地址（优先从环境变量读取，默认值仅供开发使用）
-const UPDATE_SERVER_URL = process.env.ELECTRON_UPDATE_URL || 'http://8.130.113.104:8000/updates/';
 // 云端控制面地址。配置为远程 HTTPS 后，桌面端不会再启动打包的 Python 后端。
 const CONTROL_API_BASE = (process.env.TOOLBOX_CONTROL_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const USE_BUNDLED_BACKEND = process.env.TOOLBOX_USE_BUNDLED_BACKEND
   ? process.env.TOOLBOX_USE_BUNDLED_BACKEND === 'true'
   : CONTROL_API_BASE === 'http://localhost:8000';
-
-// 配置自动更新
-autoUpdater.autoDownload = false; // 不自动下载，先通知用户
-autoUpdater.autoInstallOnAppQuit = true; // 退出时自动安装
-
-// 配置更新源（必须设置，否则无法检测更新）
-autoUpdater.setFeedURL({
-  provider: 'generic',
-  url: UPDATE_SERVER_URL
-});
-
-// 检查更新
-function checkForUpdates() {
-  console.log('[Updater] 检查更新中...');
-  autoUpdater.checkForUpdates().catch(err => {
-    console.log('[Updater] 检查更新失败:', err.message);
-  });
-}
-
-// 更新可用时通知用户
-autoUpdater.on('update-available', (info) => {
-  console.log('[Updater] 发现新版本:', info.version);
-  if (mainWindow) {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '发现新版本',
-      message: `发现新版本 ${info.version}，是否立即更新？`,
-      buttons: ['稍后再说', '立即更新'],
-      defaultId: 1,
-      cancelId: 0
-    }).then(result => {
-      if (result.response === 1) {
-        // 用户点击"立即更新"，开始下载
-        console.log('[Updater] 用户选择立即更新，开始下载...');
-        autoUpdater.downloadUpdate().catch(err => {
-          console.error('[Updater] 下载失败:', err.message);
-          if (mainWindow) {
-            dialog.showMessageBox(mainWindow, {
-              type: 'error',
-              title: '更新下载失败',
-              message: '无法下载更新文件，请检查网络连接后重试。\n\n错误信息：' + err.message,
-              buttons: ['确定']
-            });
-          }
-        });
-      } else {
-        console.log('[Updater] 用户选择稍后再说');
-      }
-    }).catch(err => {
-      console.error('[Updater] 显示对话框失败:', err.message);
-    });
-  }
-});
-
-// 更新不可用时
-autoUpdater.on('update-not-available', (info) => {
-  console.log('[Updater] 当前已是最新版本');
-});
-
-// 下载进度
-autoUpdater.on('download-progress', (progressObj) => {
-  const percent = Math.round(progressObj.percent);
-  const speed = (progressObj.bytesPerSecond / 1024 / 1024).toFixed(2);
-  const transferred = (progressObj.transferred.total / 1024 / 1024).toFixed(1);
-  const total = (progressObj.total / 1024 / 1024).toFixed(1);
-  console.log('[Updater] 下载进度:', percent + '%');
-  if (mainWindow) {
-    mainWindow.webContents.send('update-download-progress', {
-      percent,
-      speed,
-      transferred,
-      total
-    });
-  }
-});
-
-// 下载完成
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('[Updater] 下载完成，准备安装');
-  if (mainWindow) {
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '更新已就绪',
-      message: '新版本已下载完成，是否立即重启安装？',
-      buttons: ['稍后重启', '立即重启'],
-      defaultId: 1,
-      cancelId: 0
-    }).then(result => {
-      if (result.response === 1) {
-        // 用户点击"立即重启"，安装更新
-        console.log('[Updater] 用户选择立即重启，安装更新...');
-        autoUpdater.quitAndInstall();
-      } else {
-        console.log('[Updater] 用户选择稍后重启，将在退出时自动安装');
-      }
-    }).catch(err => {
-      console.error('[Updater] 显示对话框失败:', err.message);
-    });
-  }
-});
-
-// 更新错误 - 通知用户
-autoUpdater.on('error', (err) => {
-  console.error('[Updater] 更新错误:', err.message);
-  if (mainWindow) {
-    dialog.showMessageBox(mainWindow, {
-      type: 'error',
-      title: '更新失败',
-      message: '检查或下载更新时出错，请稍后重试。\n\n错误信息：' + err.message,
-      buttons: ['确定']
-    });
-  }
-});
-
-// 监听来自渲染进程的更新指令
-ipcMain.on('start-download-update', () => {
-  console.log('[Updater] 开始下载更新...');
-  autoUpdater.downloadUpdate().catch(err => {
-    console.error('[Updater] 下载失败:', err.message);
-  });
-});
-
-ipcMain.on('install-update', () => {
-  console.log('[Updater] 安装更新，即将重启...');
-  cleanupBackend();
-  cleanupAutomationRunner();
-  autoUpdater.quitAndInstall();
-});
-
-// 暂停/继续下载
-ipcMain.on('pause-download', () => {
-  console.log('[Updater] 暂停下载');
-  autoUpdater.autoDownload = false;
-});
-
-ipcMain.on('resume-download', () => {
-  console.log('[Updater] 继续下载');
-  autoUpdater.autoDownload = true;
-  autoUpdater.downloadUpdate().catch(err => {
-    console.error('[Updater] 继续下载失败:', err.message);
-  });
-});
-
-ipcMain.on('cancel-download', () => {
-  console.log('[Updater] 取消下载');
-  // electron-updater 不支持直接取消，重新设置 feed URL 来重置
-});
 
 // ===== 分屏模式：在系统浏览器中打开外部链接 =====
 ipcMain.handle('open-external', async (event, url) => {
@@ -314,6 +166,9 @@ function getAutomationRunner() {
       TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64: process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || toolSigningConfig.publicKeyB64,
     },
     onEvent: event => {
+      if (event?.type === 'run.started' || event?.type === 'run.preparing') singleRunActive = true;
+      if (['run.completed', 'run.failed', 'run.cancelled'].includes(event?.type)) singleRunActive = false;
+      updateManager?.activityChanged();
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('automation:event', event);
       }
@@ -368,6 +223,7 @@ function getBatchCoordinator() {
     env: runnerEnvironment(),
     hostManager: batchBrowserHosts,
     onEvent: event => {
+      updateManager?.activityChanged();
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('batch:event', event);
     },
     onNotify: ({ itemId, accountLabelMasked, type }) => showActionNotification({
@@ -702,8 +558,6 @@ function createWindow() {
     });
   });
 
-  // 应用启动后 5 秒检查更新
-  setTimeout(checkForUpdates, 5000);
 }
 
 app.whenReady().then(async () => {
@@ -721,8 +575,18 @@ app.whenReady().then(async () => {
     console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }
 
+  updateManager = new UpdateManager({
+    ipcMain,
+    getWindow: () => mainWindow,
+    hasActiveWork: () => singleRunActive || batchCoordinator?.snapshot()?.status === 'running',
+    beforeInstall: () => {
+      cleanupBackend();
+      cleanupAutomationRunner();
+    },
+  });
   // 创建窗口
   createWindow();
+  setTimeout(() => updateManager?.check(), 5000);
 });
 
 app.on('window-all-closed', () => {

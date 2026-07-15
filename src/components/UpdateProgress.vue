@@ -1,493 +1,243 @@
-﻿<template>
-  <div class="update-overlay" v-if="showProgress">
-    <div class="update-card">
-      <!-- 头部：应用信息 -->
-      <div class="update-header">
-        <div class="app-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
-        </div>
-        <div class="version-info">
-          <h3>亚马逊工具箱</h3>
-          <div class="version-badge">
-            <span class="old-version">v{{ currentVersion }}</span>
-            <svg class="arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="5" y1="12" x2="19" y2="12"/>
-              <polyline points="12 5 19 12 12 19"/>
-            </svg>
-            <span class="new-version">v{{ newVersion }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 进度条 -->
-      <div class="progress-section">
-        <div class="progress-bar-container">
-          <div class="progress-bar" :style="{ width: progress.percent + '%' }">
-            <div class="progress-shimmer"></div>
-          </div>
-        </div>
-        <div class="progress-stats">
-          <div class="stat-item">
-            <span class="stat-label">进度</span>
-            <span class="stat-value">{{ progress.percent }}%</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">已下载</span>
-            <span class="stat-value">{{ progress.transferred }}MB / {{ progress.total }}MB</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">速度</span>
-            <span class="stat-value">{{ progress.speed }}MB/s</span>
-          </div>
-          <div class="stat-item">
-            <span class="stat-label">剩余</span>
-            <span class="stat-value">{{ remainingTime }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 更新内容 -->
-      <div class="changelog-section" v-if="changelog.length > 0">
-        <h4>📦 更新内容</h4>
-        <ul class="changelog-list">
-          <li v-for="(item, index) in changelog" :key="index">
-            {{ item }}
-          </li>
-        </ul>
-      </div>
-
-      <!-- 操作按钮 -->
-      <div class="action-buttons">
-        <button class="btn-secondary" @click="pauseDownload" v-if="!isPaused">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="6" y="4" width="4" height="16"/>
-            <rect x="14" y="4" width="4" height="16"/>
-          </svg>
-          暂停
-        </button>
-        <button class="btn-secondary" @click="resumeDownload" v-else>
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-          继续
-        </button>
-        <button class="btn-secondary" @click="minimizeToBackground">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          后台下载
-        </button>
-        <button class="btn-danger" @click="cancelDownload">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-          取消
-        </button>
-      </div>
-
-      <!-- 状态提示 -->
-      <div class="status-hint" v-if="statusMessage">
-        {{ statusMessage }}
-      </div>
+<template>
+  <div v-if="supported" class="update-center" aria-live="polite">
+    <div v-if="state.status === 'downloading'" class="download-rail">
+      <span class="download-rail__fill" :style="{ width: `${state.percent ?? 0}%` }" />
     </div>
+
+    <button
+      class="update-entry"
+      :class="`is-${state.status}`"
+      type="button"
+      :aria-expanded="panelOpen"
+      aria-controls="application-update-panel"
+      @click="handleEntryClick"
+    >
+      <span class="update-entry__mark" aria-hidden="true">↑</span>
+      <span>{{ entryLabel }}</span>
+      <span v-if="state.status === 'downloading'" class="update-entry__percent">{{ displayPercent }}%</span>
+    </button>
+
+    <Transition name="update-fade">
+      <div v-if="panelOpen" class="update-backdrop" @mousedown.self="handleBackdrop">
+        <section
+          id="application-update-panel"
+          ref="panelRef"
+          class="update-panel"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="update-title"
+          tabindex="-1"
+          @keydown.esc="handleEscape"
+        >
+          <header class="update-panel__header">
+            <div class="update-emblem" aria-hidden="true">
+              <span />
+            </div>
+            <div>
+              <p class="update-eyebrow">APPLICATION UPDATE</p>
+              <h2 id="update-title">{{ panelTitle }}</h2>
+            </div>
+            <button class="icon-button" type="button" aria-label="关闭更新面板" @click="closePanel">×</button>
+          </header>
+
+          <div class="version-track">
+            <span>v{{ state.currentVersion }}</span>
+            <i aria-hidden="true" />
+            <strong>{{ state.availableVersion ? `v${state.availableVersion}` : '检查新版本' }}</strong>
+          </div>
+
+          <div v-if="state.status === 'downloading'" class="progress-block">
+            <div class="progress-copy">
+              <span>正在后台下载</span>
+              <strong>{{ displayPercent }}%</strong>
+            </div>
+            <div class="progress-track" role="progressbar" :aria-valuenow="displayPercent" aria-valuemin="0" aria-valuemax="100">
+              <span :style="{ width: `${state.percent ?? 0}%` }" />
+            </div>
+            <p>{{ transferredLabel }}</p>
+          </div>
+
+          <div v-else-if="state.status === 'restart_deferred'" class="notice notice--amber">
+            <strong>更新已经准备好</strong>
+            <span>当前仍有自动处理或批次在运行。系统不会打断工作，结束后即可安全重启。</span>
+          </div>
+
+          <div v-else-if="state.status === 'error'" class="notice notice--danger">
+            <strong>本次更新未能完成</strong>
+            <span>请检查网络后重新尝试。错误编号：{{ state.errorCode || 'UPDATE_ERROR' }}</span>
+          </div>
+
+          <div v-if="showReleaseNotes" class="release-notes">
+            <h3>本次更新</h3>
+            <ul>
+              <li v-for="note in state.releaseNotes" :key="note">{{ note }}</li>
+            </ul>
+          </div>
+          <p v-else-if="state.availableVersion" class="empty-notes">该版本未提供更新说明。</p>
+
+          <footer class="update-actions">
+            <button v-if="state.status === 'available'" class="button button--ghost" type="button" @click="deferUpdate">稍后下载</button>
+            <button v-if="state.status === 'available'" class="button button--primary" type="button" @click="startDownload">下载更新</button>
+
+            <button v-if="state.status === 'downloading'" class="button button--ghost" type="button" @click="closePanel">后台下载</button>
+            <button v-if="state.status === 'downloading'" class="button button--danger" type="button" @click="cancelDownload">取消下载</button>
+
+            <button v-if="state.status === 'downloaded'" class="button button--ghost" type="button" @click="deferUpdate">退出时安装</button>
+            <button v-if="state.status === 'downloaded'" class="button button--primary" type="button" :disabled="!state.canRestart" @click="installUpdate">立即重启</button>
+
+            <button v-if="state.status === 'restart_deferred'" class="button button--primary" type="button" @click="closePanel">知道了</button>
+            <button v-if="state.status === 'error' || state.status === 'cancelled' || state.status === 'idle'" class="button button--primary" type="button" @click="checkForUpdates">重新检查</button>
+          </footer>
+        </section>
+      </div>
+    </Transition>
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 
-const showProgress = ref(false)
-const isPaused = ref(false)
-const statusMessage = ref('')
+import { updateSnapshotSchema, type UpdateSnapshot } from '@/shared/ipc/update-contract'
 
-const progress = ref({
-  percent: 0,
-  speed: '0',
-  transferred: '0',
-  total: '0'
+const initialState: UpdateSnapshot = {
+  status: 'idle',
+  currentVersion: '—',
+  releaseNotes: [],
+  canRestart: false,
+}
+
+const state = ref<UpdateSnapshot>(initialState)
+const panelOpen = ref(false)
+const panelRef = ref<HTMLElement | null>(null)
+const supported = computed(() => Boolean(window.electronAPI?.updates))
+let removeStateListener: (() => void) | undefined
+
+const displayPercent = computed(() => Math.round(state.value.percent ?? 0))
+const showReleaseNotes = computed(() => state.value.releaseNotes.length > 0)
+const entryLabel = computed(() => ({
+  idle: '检查更新', checking: '正在检查', available: '发现新版本', downloading: '后台下载',
+  downloaded: '更新已就绪', restart_deferred: '更新待重启', installing: '正在重启', cancelled: '下载已取消', error: '更新异常',
+}[state.value.status]))
+const panelTitle = computed(() => ({
+  idle: '检查应用更新', checking: '正在检查更新', available: '新版本已经准备发布', downloading: '正在获取新版本',
+  downloaded: '更新已下载完成', restart_deferred: '完成当前工作后重启', installing: '正在安全重启', cancelled: '更新下载已取消', error: '更新遇到问题',
+}[state.value.status]))
+const transferredLabel = computed(() => {
+  if (state.value.transferredBytes == null || state.value.totalBytes == null) return '正在获取下载信息'
+  return `${formatBytes(state.value.transferredBytes)} / ${formatBytes(state.value.totalBytes)}`
 })
 
-const currentVersion = ref('1.5.0')
-const newVersion = ref('1.6.0')
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
 
-const changelog = ref([
-  '新增 AI 客服功能，支持智能问答',
-  '优化启动速度，提升 30%',
-  '修复已知问题，提升稳定性'
-])
+function applySnapshot(value: unknown): void {
+  const parsed = updateSnapshotSchema.safeParse(value)
+  if (!parsed.success) return
+  state.value = parsed.data
+  if (['available', 'downloaded', 'restart_deferred'].includes(parsed.data.status)) openPanel()
+}
 
-// 计算剩余时间
-const remainingTime = computed(() => {
-  const transferred = parseFloat(progress.value.transferred)
-  const total = parseFloat(progress.value.total)
-  const speed = parseFloat(progress.value.speed)
-  
-  if (speed === 0 || transferred === 0) return '计算中...'
-  
-  const remaining = total - transferred
-  const seconds = Math.ceil(remaining / speed)
-  
-  if (seconds < 60) return `${seconds}秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${minutes}分${secs}秒`
+async function openPanel(): Promise<void> {
+  panelOpen.value = true
+  await nextTick()
+  panelRef.value?.focus()
+}
+
+function closePanel(): void { panelOpen.value = false }
+function handleBackdrop(): void { if (state.value.status !== 'downloaded') closePanel() }
+function handleEscape(): void { if (state.value.status !== 'downloaded') closePanel() }
+
+async function handleEntryClick(): Promise<void> {
+  if (state.value.status === 'idle') await checkForUpdates()
+  else await openPanel()
+}
+
+async function checkForUpdates(): Promise<void> {
+  openPanel()
+  applySnapshot(await window.electronAPI?.updates?.check())
+}
+
+async function startDownload(): Promise<void> {
+  applySnapshot(await window.electronAPI?.updates?.startDownload())
+}
+
+async function deferUpdate(): Promise<void> {
+  applySnapshot(await window.electronAPI?.updates?.defer())
+  closePanel()
+}
+
+async function installUpdate(): Promise<void> {
+  applySnapshot(await window.electronAPI?.updates?.install())
+}
+
+async function cancelDownload(): Promise<void> {
+  try {
+    await ElMessageBox.confirm('取消后可以稍后重新下载，不会影响当前版本。', '取消更新下载？', {
+      confirmButtonText: '取消下载', cancelButtonText: '继续下载', type: 'warning',
+    })
+    applySnapshot(await window.electronAPI?.updates?.cancelDownload())
+  } catch { /* 用户继续下载 */ }
+}
+
+onMounted(async () => {
+  const bridge = window.electronAPI?.updates
+  if (!bridge) return
+  removeStateListener = bridge.onState(applySnapshot)
+  applySnapshot(await bridge.getState())
 })
 
-function handleProgress(event) {
-  const data = event.detail || event
-  progress.value = {
-    percent: data.percent || 0,
-    speed: data.speed || '0',
-    transferred: data.transferred || '0',
-    total: data.total || '0'
-  }
-  showProgress.value = true
-  isPaused.value = false
-  statusMessage.value = ''
-  
-  // 下载完成后显示提示
-  if (data.percent >= 100) {
-    statusMessage.value = '✅ 下载完成，即将开始安装...'
-    setTimeout(() => {
-      showProgress.value = false
-    }, 2000)
-  }
-}
-
-function pauseDownload() {
-  isPaused.value = true
-  statusMessage.value = '⏸️ 下载已暂停'
-  // 调用 Electron API 暂停下载
-  window.electronAPI?.pauseDownload()
-}
-
-function resumeDownload() {
-  isPaused.value = false
-  statusMessage.value = '▶️ 继续下载...'
-  // 调用 Electron API 继续下载
-  window.electronAPI?.resumeDownload()
-}
-
-function minimizeToBackground() {
-  showProgress.value = false
-  statusMessage.value = '📥 正在后台下载...'
-}
-
-function cancelDownload() {
-  if (confirm('确定要取消更新吗？')) {
-    showProgress.value = false
-    statusMessage.value = ''
-    // 调用 Electron API 取消下载
-    window.electronAPI?.cancelDownload()
-  }
-}
-
-onMounted(() => {
-  // 监听 Electron IPC 事件（通过 window 事件中转）
-  window.addEventListener('update-download-progress', handleProgress)
-  
-  // 也监听自定义事件（用于 Web 环境测试）
-  window.addEventListener('update-progress', handleProgress)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('update-download-progress', handleProgress)
-  window.removeEventListener('update-progress', handleProgress)
-})
+onUnmounted(() => removeStateListener?.())
 </script>
 
 <style scoped>
-.update-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(12px);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.update-card {
-  background: linear-gradient(135deg, #ffffff 0%, var(--studio-bg) 100%);
-  border-radius: 24px;
-  padding: 2rem;
-  max-width: 480px;
-  width: 90%;
-  box-shadow: 
-    0 25px 50px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
-  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* 头部样式 */
-.update-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.app-icon {
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, var(--studio-accent) 0%, #8b5cf6 100%);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.3);
-}
-
-.app-icon svg {
-  width: 32px;
-  height: 32px;
-  color: white;
-}
-
-.version-info {
-  flex: 1;
-}
-
-.version-info h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--studio-text-main);
-  margin: 0 0 0.25rem 0;
-}
-
-.version-badge {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.old-version {
-  color: var(--studio-text-muted);
-  text-decoration: line-through;
-}
-
-.arrow {
-  width: 16px;
-  height: 16px;
-  color: var(--studio-accent);
-}
-
-.new-version {
-  color: var(--studio-accent);
-  font-weight: 600;
-  background: rgba(14, 165, 233, 0.1);
-  padding: 0.125rem 0.5rem;
-  border-radius: 4px;
-}
-
-/* 进度条样式 */
-.progress-section {
-  margin-bottom: 1.5rem;
-}
-
-.progress-bar-container {
-  width: 100%;
-  height: 16px;
-  background: var(--studio-border);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, var(--studio-accent) 0%, #8b5cf6 50%, #a78bfa 100%);
-  border-radius: 8px;
-  transition: width 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-shimmer {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.4),
-    transparent
-  );
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(100%); }
-}
-
-.progress-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.75rem;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 0.5rem;
-  background: var(--studio-bg);
-  border-radius: 8px;
-}
-
-.stat-label {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--studio-text-muted);
-  margin-bottom: 0.25rem;
-}
-
-.stat-value {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--studio-text-main);
-}
-
-/* 更新内容样式 */
-.changelog-section {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: var(--studio-bg);
-  border-radius: 12px;
-}
-
-.changelog-section h4 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--studio-text-main);
-  margin: 0 0 0.5rem 0;
-}
-
-.changelog-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.changelog-list li {
-  font-size: 0.875rem;
-  color: var(--el-text-color-regular);
-  padding: 0.25rem 0;
-  padding-left: 1.25rem;
-  position: relative;
-}
-
-.changelog-list li::before {
-  content: '•';
-  position: absolute;
-  left: 0;
-  color: var(--studio-accent);
-  font-weight: bold;
-}
-
-/* 按钮样式 */
-.action-buttons {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.action-buttons button {
-  flex: 1;
-  min-width: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  padding: 0.625rem 1rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.action-buttons button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.btn-secondary {
-  background: var(--studio-bg-hover);
-  color: var(--el-text-color-regular);
-}
-
-.btn-secondary:hover {
-  background: var(--studio-border);
-  transform: translateY(-1px);
-}
-
-.btn-danger {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--studio-danger-hover);
-}
-
-.btn-danger:hover {
-  background: rgba(239, 68, 68, 0.15);
-  transform: translateY(-1px);
-}
-
-/* 状态提示 */
-.status-hint {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: rgba(16, 185, 129, 0.05);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  border-radius: 8px;
-  font-size: 0.875rem;
-  color: var(--studio-success);
-  text-align: center;
-  animation: fadeIn 0.3s ease;
-}
-
-/* 响应式设计 */
-@media (max-width: 480px) {
-  .update-card {
-    padding: 1.5rem;
-  }
-  
-  .progress-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-  }
-  
-  .action-buttons button {
-    width: 100%;
-  }
-}
+.update-center { position: relative; z-index: 3200; }
+.download-rail { position: fixed; top: 0; left: 0; right: 0; height: 2px; background: #eaf0ff; z-index: 3201; }
+.download-rail__fill { display: block; height: 100%; background: #2d5fca; transition: width 180ms ease; }
+.update-entry { position: fixed; top: 14px; right: 78px; z-index: 3100; display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 12px; border: 1px solid #e1e5eb; border-radius: 10px; background: rgba(252,252,253,.96); color: #667085; box-shadow: 0 6px 18px rgba(24,32,51,.06); font: inherit; font-size: 12px; cursor: pointer; }
+.update-entry:hover { color: #2d5fca; border-color: #b8c8ee; transform: translateY(-1px); }
+.update-entry__mark { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 7px; background: #eaf0ff; color: #2d5fca; font-weight: 800; }
+.update-entry__percent { color: #2d5fca; font-variant-numeric: tabular-nums; }
+.is-available .update-entry__mark, .is-downloaded .update-entry__mark { background: #2d5fca; color: white; }
+.is-error .update-entry__mark { background: #fcebed; color: #c33d49; }
+.update-backdrop { position: fixed; inset: 0; z-index: 3199; display: grid; place-items: center; padding: 20px; background: rgba(24,32,51,.26); backdrop-filter: blur(5px); }
+.update-panel { width: min(480px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 24px; border: 1px solid rgba(225,229,235,.9); border-radius: 18px; outline: none; background: #fcfcfd; color: #182033; box-shadow: 0 24px 70px rgba(24,32,51,.18); }
+.update-panel__header { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 14px; }
+.update-panel__header h2 { margin: 2px 0 0; font-size: 20px; line-height: 1.3; }
+.update-eyebrow { margin: 0; color: #a98552; font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.update-emblem { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #eaf0ff; }
+.update-emblem span { width: 18px; height: 18px; border: 2px solid #2d5fca; border-top-color: transparent; border-radius: 50%; transform: rotate(35deg); }
+.icon-button { align-self: start; width: 32px; height: 32px; border: 0; border-radius: 9px; background: transparent; color: #667085; font-size: 22px; cursor: pointer; }
+.icon-button:hover { background: #f4f5f7; color: #182033; }
+.version-track { display: flex; align-items: center; gap: 12px; margin: 24px 0 18px; padding: 13px 14px; border: 1px solid #e1e5eb; border-radius: 12px; background: #f8f7f4; color: #667085; font-size: 13px; }
+.version-track i { flex: 1; height: 1px; background: linear-gradient(90deg,#d5d9e0,#2d5fca); position: relative; }
+.version-track strong { color: #2d5fca; }
+.progress-block { margin: 18px 0; }
+.progress-copy { display: flex; justify-content: space-between; margin-bottom: 9px; font-size: 13px; }
+.progress-track { height: 8px; overflow: hidden; border-radius: 99px; background: #eaf0ff; }
+.progress-track span { display: block; height: 100%; border-radius: inherit; background: #2d5fca; transition: width 180ms ease; }
+.progress-block p { margin: 8px 0 0; color: #667085; font-size: 12px; text-align: right; }
+.release-notes { margin-top: 18px; }
+.release-notes h3 { margin: 0 0 10px; font-size: 13px; }
+.release-notes ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.release-notes li { position: relative; padding-left: 16px; color: #475467; font-size: 13px; line-height: 1.55; }
+.release-notes li::before { content: ''; position: absolute; left: 1px; top: .62em; width: 5px; height: 5px; border-radius: 50%; background: #a98552; }
+.empty-notes { margin: 18px 0 0; color: #98a2b3; font-size: 13px; }
+.notice { display: grid; gap: 5px; margin: 18px 0; padding: 13px 14px; border-radius: 11px; font-size: 13px; line-height: 1.5; }
+.notice--amber { background: #fff8e8; color: #855912; }
+.notice--danger { background: #fcebed; color: #a52e3a; }
+.update-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+.button { min-height: 38px; padding: 0 16px; border: 1px solid transparent; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.button--ghost { border-color: #d5d9e0; background: #fcfcfd; color: #475467; }
+.button--primary { background: #2d5fca; color: white; }
+.button--danger { border-color: #efc7cc; background: #fff; color: #c33d49; }
+.button:disabled { opacity: .45; cursor: not-allowed; }
+.update-fade-enter-active,.update-fade-leave-active { transition: opacity 180ms ease; }
+.update-fade-enter-active .update-panel,.update-fade-leave-active .update-panel { transition: transform 220ms ease, opacity 180ms ease; }
+.update-fade-enter-from,.update-fade-leave-to { opacity: 0; }
+.update-fade-enter-from .update-panel,.update-fade-leave-to .update-panel { opacity: 0; transform: translateY(10px) scale(.985); }
+@media (max-width: 900px) { .update-entry { right: 16px; top: 10px; } }
+@media (prefers-reduced-motion: reduce) { .download-rail__fill,.progress-track span,.update-entry,.update-fade-enter-active,.update-fade-leave-active,.update-fade-enter-active .update-panel,.update-fade-leave-active .update-panel { transition: none; } }
 </style>
