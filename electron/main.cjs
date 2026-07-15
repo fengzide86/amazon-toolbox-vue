@@ -1,16 +1,24 @@
-const { app, BrowserWindow, dialog, ipcMain, safeStorage, webContents } = require('electron');
+const { app, BrowserWindow, Notification, dialog, ipcMain, safeStorage, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const { spawn } = require('child_process');
 const { RunnerClient } = require('./automation/runner-client.cjs');
 const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
+const { EmbeddedBrowserHostManager } = require('./automation/embedded-browser-host-manager.cjs');
+const { BatchCoordinator } = require('./automation/batch-coordinator.cjs');
+const { parseBatchFile, writeBatchErrors } = require('./automation/batch-importer.cjs');
 const toolSigningConfig = require('./tool-signing-config.cjs');
 
 let mainWindow;
 let backendProcess = null;
 let automationRunner = null;
+let batchCoordinator = null;
+let selectedBatchImportPath = null;
+let selectedBatchItemId = null;
+let allowWindowClose = false;
 const embeddedBrowserHost = new EmbeddedBrowserHost();
+const batchBrowserHosts = new EmbeddedBrowserHostManager();
 
 // Keep customer runtime data off the system drive by default. The environment
 // override remains available for deployments that need a different location.
@@ -309,6 +317,13 @@ function getAutomationRunner() {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('automation:event', event);
       }
+      if (event?.type === 'user.action_required') {
+        showActionNotification({
+          title: '自动处理需要你的操作',
+          body: event.action?.title || '请返回工具箱完成页面操作',
+          focus: { mode: 'single' },
+        });
+      }
     },
     onHostRequest: (action, payload) => embeddedBrowserHost.request(action, payload),
   });
@@ -336,8 +351,105 @@ ipcMain.handle('automation:register-browser', (event, webContentsId) => {
 });
 ipcMain.handle('automation:unregister-browser', () => embeddedBrowserHost.release());
 
+function runnerEnvironment() {
+  return {
+    TOOLBOX_CONTROL_API_URL: CONTROL_API_BASE,
+    TOOLBOX_PROFILE_ROOT: path.join(app.getPath('userData'), 'automation-profiles'),
+    TOOLBOX_ARTIFACT_ROOT: path.join(app.getPath('userData'), 'automation-artifacts'),
+    PLAYWRIGHT_BROWSERS_PATH: path.join(RUNTIME_ROOT, 'playwright-browsers'),
+    TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64: process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || toolSigningConfig.publicKeyB64,
+  };
+}
+
+function getBatchCoordinator() {
+  if (batchCoordinator) return batchCoordinator;
+  batchCoordinator = new BatchCoordinator({
+    scriptPath: path.join(__dirname, 'automation-runner.cjs'),
+    env: runnerEnvironment(),
+    hostManager: batchBrowserHosts,
+    onEvent: event => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('batch:event', event);
+    },
+    onNotify: ({ itemId, accountLabelMasked, type }) => showActionNotification({
+      title: `${accountLabelMasked || '一个客户账号'}需要操作`,
+      body: ({ login: '请完成账号登录', captcha: '请完成页面验证码', two_factor: '请完成二次验证' }[type] || '请完成页面提示的操作'),
+      focus: { mode: 'batch', itemId },
+    }),
+  });
+  return batchCoordinator;
+}
+
+function showActionNotification({ title, body, focus }) {
+  if (!Notification.isSupported()) return;
+  if (mainWindow?.isFocused() && focus?.mode === 'single') return;
+  if (mainWindow?.isFocused() && focus?.mode === 'batch' && focus?.itemId === selectedBatchItemId) return;
+  const notification = new Notification({ title, body, silent: false });
+  notification.on('click', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    mainWindow.webContents.send('toolbox:notification-focus', focus || {});
+  });
+  notification.show();
+}
+
+ipcMain.handle('batch:select-import-file', async (_event, options = {}) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择批量数据文件',
+    properties: ['openFile'],
+    filters: [{ name: '批量数据', extensions: ['xlsx', 'csv'] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  selectedBatchImportPath = result.filePaths[0];
+  const parsed = await parseBatchFile(selectedBatchImportPath, options.schema || [], Number(options.maxRows) || 50);
+  return getBatchCoordinator().storeImport(parsed);
+});
+ipcMain.handle('batch:parse-import-file', async (_event, options = {}) => {
+  if (!selectedBatchImportPath) throw new Error('请先选择批量数据文件');
+  const parsed = await parseBatchFile(selectedBatchImportPath, options.schema || [], Number(options.maxRows) || 50);
+  return getBatchCoordinator().storeImport(parsed);
+});
+ipcMain.handle('batch:export-import-errors', async (_event, errors = []) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出导入问题',
+    defaultPath: '批量导入问题.csv',
+    filters: [{ name: 'CSV 文件', extensions: ['csv'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+  return writeBatchErrors(result.filePath, errors);
+});
+ipcMain.handle('batch:create', (_event, payload) => getBatchCoordinator().create(payload));
+ipcMain.handle('batch:start', (_event, payload) => getBatchCoordinator().startItem(payload.itemId, payload.tool));
+ipcMain.handle('batch:fail-item', (_event, payload) => getBatchCoordinator().failProvision(payload.itemId, payload.message));
+ipcMain.handle('batch:complete-user-action', (_event, itemId) => getBatchCoordinator().completeUserAction(itemId));
+ipcMain.handle('batch:restart-item', (_event, itemId) => getBatchCoordinator().restartItem(itemId));
+ipcMain.handle('batch:cancel', async (_event, status) => {
+  selectedBatchItemId = null;
+  return getBatchCoordinator().cancel(status || 'cancelled');
+});
+ipcMain.handle('batch:get-snapshot', () => getBatchCoordinator().snapshot());
+ipcMain.handle('batch:select-item', (_event, itemId) => {
+  selectedBatchItemId = itemId;
+  return { itemId, snapshot: getBatchCoordinator().snapshot() };
+});
+ipcMain.handle('batch:register-browser', (event, itemId, webContentsId) => {
+  const guest = webContents.fromId(Number(webContentsId));
+  if (!guest || guest.getType?.() !== 'webview') throw new Error('无法注册批量工作区浏览器');
+  if (guest.hostWebContents && guest.hostWebContents.id !== event.sender.id) throw new Error('批量浏览器归属校验失败');
+  return getBatchCoordinator().registerBrowser(itemId, guest);
+});
+ipcMain.handle('batch:unregister-browser', (_event, itemId) => getBatchCoordinator().unregisterBrowser(itemId));
+
 function cleanupAutomationRunner() {
   embeddedBrowserHost.release();
+  if (batchCoordinator) {
+    selectedBatchItemId = null;
+    const coordinator = batchCoordinator;
+    batchCoordinator = null;
+    coordinator.cancel('interrupted').catch(error => console.error('[BatchCoordinator] 清理失败:', error.message));
+  }
+  batchBrowserHosts.releaseAll();
   if (!automationRunner) return;
   const runner = automationRunner;
   automationRunner = null;
@@ -569,6 +681,25 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  mainWindow.on('close', event => {
+    const snapshot = batchCoordinator?.snapshot();
+    if (allowWindowClose || !snapshot || snapshot.status !== 'running') return;
+    event.preventDefault();
+    dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: '结束当前批次？',
+      message: '仍有账号正在处理或等待操作。关闭后浏览器现场会被清理，不能从通用检查点继续。',
+      buttons: ['继续使用', '结束并关闭'],
+      defaultId: 0,
+      cancelId: 0,
+    }).then(async result => {
+      if (result.response !== 1) return;
+      allowWindowClose = true;
+      await batchCoordinator?.cancel('interrupted').catch(() => {});
+      mainWindow?.close();
+    });
   });
 
   // 应用启动后 5 秒检查更新

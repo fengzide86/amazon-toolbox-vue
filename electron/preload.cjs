@@ -77,6 +77,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return () => ipcRenderer.removeListener('automation:event', listener);
     },
   },
+  batch: {
+    selectImportFile: (options) => ipcRenderer.invoke('batch:select-import-file', options),
+    parseImportFile: (options) => ipcRenderer.invoke('batch:parse-import-file', options),
+    exportImportErrors: (errors) => ipcRenderer.invoke('batch:export-import-errors', errors),
+    create: (payload) => ipcRenderer.invoke('batch:create', payload),
+    start: (payload) => ipcRenderer.invoke('batch:start', payload),
+    failItem: (payload) => ipcRenderer.invoke('batch:fail-item', payload),
+    selectItem: (itemId) => ipcRenderer.invoke('batch:select-item', itemId),
+    completeUserAction: (itemId) => ipcRenderer.invoke('batch:complete-user-action', itemId),
+    restartItem: (itemId) => ipcRenderer.invoke('batch:restart-item', itemId),
+    cancel: (status) => ipcRenderer.invoke('batch:cancel', status),
+    getSnapshot: () => ipcRenderer.invoke('batch:get-snapshot'),
+    registerBrowser: (itemId, webContentsId) => ipcRenderer.invoke('batch:register-browser', itemId, webContentsId),
+    unregisterBrowser: (itemId) => ipcRenderer.invoke('batch:unregister-browser', itemId),
+    onEvent: (callback) => {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on('batch:event', listener);
+      return () => ipcRenderer.removeListener('batch:event', listener);
+    },
+  },
+  notifications: {
+    onFocus: (callback) => {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on('toolbox:notification-focus', listener);
+      return () => ipcRenderer.removeListener('toolbox:notification-focus', listener);
+    },
+  },
   // 工具启动控制
   launchTool: (data) => ipcRenderer.send('launch-tool', data),
   onLaunchToolError: (callback) => {

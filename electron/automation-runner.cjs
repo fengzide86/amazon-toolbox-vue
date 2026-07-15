@@ -267,6 +267,14 @@ class AutomationRuntime {
         if (body.data.tool_id !== this.tool.id) {
           throw this.runnerError('GRANT_TOOL_MISMATCH', '启动授权与当前工具不匹配');
         }
+        const execution = this.tool.executionContext;
+        if (execution?.mode === 'batch' && (
+          body.data.execution_mode !== 'batch'
+          || body.data.client_batch_id !== execution.batchId
+          || body.data.client_item_id !== execution.itemId
+        )) {
+          throw this.runnerError('GRANT_BATCH_MISMATCH', '启动授权与当前批次账号不匹配');
+        }
         return { ...body.data, signatureVerified: signature.verified };
       } catch (error) {
         lastError = error;

@@ -67,13 +67,17 @@ function findBrowserExecutables(env = process.env) {
 
 function safeProfileName(tool = {}) {
   const platform = String(tool.platformKey || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
-  return platform.slice(0, 50) || 'default';
+  const session = String(tool.executionContext?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${platform}${session ? `_${session}` : ''}`.slice(0, 90) || 'default';
 }
 
 function publicTool(tool = {}) {
   const grant = tool.launchGrant || {};
+  const executionContext = tool.executionContext || {};
+  const { input: _privateInput, ...publicExecutionContext } = executionContext;
   return {
     ...tool,
+    executionContext: Object.keys(publicExecutionContext).length ? publicExecutionContext : undefined,
     launchGrant: {
       expiresAt: grant.expiresAt,
       expiresIn: grant.expiresIn,
