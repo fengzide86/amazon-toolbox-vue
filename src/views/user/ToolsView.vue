@@ -2,8 +2,9 @@
   <div class="toolbox-page">
     <header class="toolbox-header">
       <div>
+        <span class="toolbox-eyebrow">自动化工作台</span>
         <h2>选择一个工具开始</h2>
-        <p>点击后系统会自动打开并处理，请不要重复点击。</p>
+        <p>选择需要完成的业务，点击后系统会自动打开并处理。</p>
       </div>
       <router-link class="plan-chip" to="/user/plans">
         <ShieldCheck :size="15" />
@@ -25,6 +26,7 @@
         :data-testid="'tool-card-' + tool.name"
         @click="handleToolClick(tool)"
       >
+        <span v-if="launchingToolId === tool.id" class="launch-rail" aria-hidden="true"></span>
         <span class="tool-card-top">
           <span class="tool-icon"><component :is="toolIcon(tool)" :size="21" /></span>
           <span v-if="toolState(tool) === 'locked'" class="state-badge locked"><LockKeyhole :size="12" /> 当前套餐未包含</span>
@@ -212,24 +214,34 @@ onMounted(loadData)
 
 <style scoped>
 .toolbox-page {
-  width: min(1180px, 100%);
+  width: min(1120px, 100%);
   margin: 0 auto;
 }
 
 .toolbox-header {
-  min-height: 74px;
+  min-height: 78px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
+}
+
+.toolbox-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .12em;
 }
 
 .toolbox-header h2 {
   margin: 0;
   color: var(--studio-text-main);
-  font-size: 26px;
+  font-size: var(--font-page-title);
   line-height: 1.3;
+  letter-spacing: -.03em;
 }
 
 .toolbox-header p {
@@ -244,10 +256,10 @@ onMounted(loadData)
   align-items: center;
   gap: 7px;
   padding: 0 12px;
-  border: 1px solid var(--studio-border);
+  border: 1px solid rgba(169, 133, 82, .22);
   border-radius: 999px;
-  color: var(--studio-text-muted);
-  background: var(--studio-surface);
+  color: var(--color-premium);
+  background: var(--color-premium-soft);
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
@@ -260,16 +272,17 @@ onMounted(loadData)
 
 .tool-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .tool-card {
-  min-height: 190px;
+  position: relative;
+  min-height: 176px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 20px;
+  padding: 22px;
   border: 1px solid var(--studio-border);
   border-radius: var(--radius-lg);
   color: var(--studio-text-main);
@@ -277,17 +290,18 @@ onMounted(loadData)
   box-shadow: var(--studio-shadow);
   text-align: left;
   cursor: pointer;
-  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+  overflow: hidden;
+  transition: transform var(--motion-normal) var(--ease-emphasized), border-color var(--motion-fast), box-shadow var(--motion-normal);
 }
 
 .tool-card:not(:disabled):hover {
-  transform: translateY(-2px);
-  border-color: var(--studio-accent-light);
+  transform: translateY(-3px);
+  border-color: #bdcbe8;
   box-shadow: var(--studio-shadow-hover);
 }
 
 .tool-card:focus-visible {
-  outline: 3px solid rgba(14, 165, 233, 0.22);
+  outline: 3px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -304,11 +318,11 @@ onMounted(loadData)
 }
 
 .tool-icon {
-  width: 38px;
-  height: 38px;
+  width: 42px;
+  height: 42px;
   display: grid;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--studio-accent);
   background: var(--studio-accent-bg);
 }
@@ -336,7 +350,7 @@ onMounted(loadData)
 .tool-copy {
   display: block;
   flex: 1;
-  padding: 16px 0 18px;
+  padding: 18px 0 16px;
 }
 
 .tool-copy strong,
@@ -346,7 +360,8 @@ onMounted(loadData)
 
 .tool-copy strong {
   margin-bottom: 8px;
-  font-size: 16px;
+  font-size: 17px;
+  letter-spacing: -.015em;
   line-height: 1.35;
 }
 
@@ -359,7 +374,7 @@ onMounted(loadData)
 .tool-action {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
   color: var(--studio-accent);
   font-size: 12px;
@@ -368,8 +383,8 @@ onMounted(loadData)
 
 .is-locked .tool-icon,
 .is-locked .tool-action {
-  color: #b45309;
-  background-color: rgba(255, 153, 0, 0.1);
+  color: var(--color-warning);
+  background-color: var(--color-warning-soft);
 }
 
 .is-maintenance {
@@ -381,12 +396,24 @@ onMounted(loadData)
 }
 
 .is-launching {
-  border-color: var(--studio-accent-light);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring), var(--shadow-medium);
+}
+
+.launch-rail {
+  position: absolute;
+  top: 0;
+  left: -42%;
+  width: 42%;
+  height: 3px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, transparent, var(--color-primary), #8eace8);
+  animation: launchRail var(--motion-signature) var(--ease-emphasized) both;
 }
 
 .is-focused {
   border-color: var(--studio-accent);
-  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12), var(--studio-shadow-hover);
+  box-shadow: 0 0 0 3px var(--color-focus-ring), var(--studio-shadow-hover);
 }
 
 .spin {
@@ -426,13 +453,14 @@ onMounted(loadData)
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes shimmer { to { background-position: -200% 0; } }
-
-@media (max-width: 980px) {
-  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+@keyframes launchRail { to { left: 100%; } }
 
 @media (max-width: 620px) {
   .toolbox-header { flex-direction: column; gap: 12px; }
   .tool-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launch-rail { display: none; }
 }
 </style>
