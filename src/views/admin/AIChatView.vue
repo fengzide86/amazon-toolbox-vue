@@ -175,11 +175,31 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats, debugAIChat } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import {
+  aiConfigSchema,
+  aiDebugResultSchema,
+  aiStatsSchema,
+  chatHistorySchema,
+  chatSessionDetailSchema,
+  chatSessionSummarySchema,
+  errorMessage,
+  type AiDebugResult,
+  type ChatSessionDetail,
+  type ChatSessionSummary,
+  type SandboxMessage,
+} from '@/features/ai/model'
+
+interface TransferRules {
+  refund_direct_transfer: boolean
+  complaint_direct_transfer: boolean
+  auto_transfer_after_retries: boolean
+  account_direct_transfer: boolean
+}
 
 const platformStore = usePlatformStore()
 
@@ -201,35 +221,35 @@ const transferRules = ref({
 const saving = ref(false)
 
 // 对话记录
-const sessions = ref([])
+const sessions = ref<ChatSessionSummary[]>([])
 const sessionFilter = ref('')
 const currentPage = ref(1)
 const pageSize = 20
 const totalSessions = ref(0)
 const showDetail = ref(false)
-const currentSession = ref(null)
+const currentSession = ref<ChatSessionDetail | null>(null)
 
 // 统计
-const stats = ref({})
+const stats = ref(aiStatsSchema.parse({}))
 
 // 沙盒测试
 const testMessage = ref('')
-const sandboxMessages = ref([])
+const sandboxMessages = ref<SandboxMessage[]>([])
 const sendingTest = ref(false)
-const lastDebug = ref(null)
+const lastDebug = ref<AiDebugResult | null>(null)
 const debugPlatform = ref(platformStore.adminPlatform === 'all' ? 'amazon' : platformStore.adminPlatform)
 
-function getStatusTagType(status) {
-  const map = { active: '', resolved: 'success', transferred: 'warning' }
-  return map[status] || 'info'
+function getStatusTagType(status?: string | null): 'primary' | 'success' | 'warning' | 'info' {
+  const map: Record<string, 'primary' | 'success' | 'warning'> = { active: 'primary', resolved: 'success', transferred: 'warning' }
+  return status ? map[status] ?? 'info' : 'info'
 }
 
-function getStatusText(status) {
-  const map = { active: '进行中', resolved: '已解决', transferred: '已转人工' }
-  return map[status] || status
+function getStatusText(status?: string | null) {
+  const map: Record<string, string> = { active: '进行中', resolved: '已解决', transferred: '已转人工' }
+  return status ? map[status] || status : '-'
 }
 
-function formatTime(timeStr) {
+function formatTime(timeStr?: string | null) {
   if (!timeStr) return ''
   const d = new Date(timeStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
@@ -237,15 +257,18 @@ function formatTime(timeStr) {
 
 async function loadConfig() {
   try {
-    const res = await getAIChatConfig()
+    const res = aiConfigSchema.parse(await getAIChatConfig())
     config.value = res
     try {
-      suggestedQuestions.value = JSON.parse(res.suggested_questions || '[]')
+      const parsed: unknown = JSON.parse(res.suggested_questions || '[]')
+      suggestedQuestions.value = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : ['']
     } catch {
       suggestedQuestions.value = ['']
     }
     try {
-      transferRules.value = JSON.parse(res.transfer_rules || '{}')
+      const parsed: unknown = JSON.parse(res.transfer_rules || '{}')
+      if (typeof parsed !== 'object' || parsed === null) throw new Error('invalid transfer rules')
+      transferRules.value = { ...transferRules.value, ...parsed as Partial<TransferRules> }
     } catch {
       transferRules.value = {
         refund_direct_transfer: true,
@@ -279,22 +302,23 @@ async function saveConfig() {
 
 async function loadSessions() {
   try {
-    const res = await getAdminChatSessions({
+    const res = chatHistorySchema.parse(await getAdminChatSessions({
       status: sessionFilter.value || undefined,
       page: currentPage.value,
       page_size: pageSize
-    })
-    sessions.value = res.items || []
-    totalSessions.value = res.total || 0
+    }))
+    sessions.value = res.items
+    totalSessions.value = res.total
   } catch (err) {
     showToast('加载对话记录失败', 'error')
   }
 }
 
-async function viewSession(session) {
+async function viewSession(rawSession: unknown) {
+  const session = chatSessionSummarySchema.parse(rawSession)
   try {
-    const res = await getAdminChatSession(session.session_id)
-    currentSession.value = { ...session, messages: res.messages || [] }
+    const res = chatSessionDetailSchema.parse(await getAdminChatSession(session.session_id))
+    currentSession.value = { ...session, ...res }
     showDetail.value = true
   } catch (err) {
     showToast('加载会话详情失败', 'error')
@@ -303,7 +327,7 @@ async function viewSession(session) {
 
 async function loadStats() {
   try {
-    stats.value = await getAIChatStats()
+    stats.value = aiStatsSchema.parse(await getAIChatStats())
   } catch (err) {
     showToast('加载统计数据失败', 'error')
   }
@@ -313,7 +337,7 @@ async function loadStats() {
 async function sendTest() {
   if (!testMessage.value.trim()) return
   
-  const userMsg = {
+  const userMsg: SandboxMessage = {
     role: 'user',
     content: testMessage.value.trim(),
     time: new Date().toISOString()
@@ -323,12 +347,12 @@ async function sendTest() {
   sendingTest.value = true
   
   try {
-    const result = await debugAIChat({
+    const result = aiDebugResultSchema.parse(await debugAIChat({
       message: userMsg.content,
       platform_key: debugPlatform.value,
       top_k: 5,
       min_score: 0.3,
-    })
+    }))
     lastDebug.value = result
     sandboxMessages.value.push({
       role: 'ai',
@@ -336,8 +360,8 @@ async function sendTest() {
       refs: result.knowledge_refs || [],
       time: new Date().toISOString()
     })
-  } catch (err) {
-    showToast(err.message || '调试失败', 'error')
+  } catch (error) {
+    showToast(errorMessage(error, '调试失败'), 'error')
   } finally {
     sendingTest.value = false
   }

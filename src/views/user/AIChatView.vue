@@ -102,17 +102,26 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
 import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, getChatHistory } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { confirmAction } from '@/shared/ui/confirm'
+import {
+  chatHistorySchema,
+  chatReplySchema,
+  chatSessionCreatedSchema,
+  chatSessionDetailSchema,
+  parseJsonRecord,
+  type ChatMessage,
+  type ChatSessionSummary,
+} from '@/features/ai/model'
 
 const platformStore = usePlatformStore()
 
-const sessionId = ref(null)
-const messages = ref([])
+const sessionId = ref<string | null>(null)
+const messages = ref<ChatMessage[]>([])
 const inputMessage = ref('')
 const isLoading = ref(false)
 const showActions = ref(false)
@@ -120,22 +129,22 @@ const showRating = ref(false)
 const rating = ref(0)
 const sessionResolved = ref(false)
 const sessionTransferred = ref(false)
-const lastAiMessage = ref(null)
-const messagesContainer = ref(null)
+const lastAiMessage = ref<string | null>(null)
+const messagesContainer = ref<HTMLElement | null>(null)
 const showHistory = ref(false)
-const historySessions = ref([])
+const historySessions = ref<ChatSessionSummary[]>([])
 let nextMsgId = 0
 const quickQuestions = ['授权码无法使用', '工具一直没有反应', '本次操作未完成', '需要更换设备', '联系人工客服']
 
-function formatTime(timeStr) {
+function formatTime(timeStr?: string | null) {
   if (!timeStr) return ''
   const d = new Date(timeStr)
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function getStatusText(status) {
-  const map = { active: '进行中', resolved: '已解决', transferred: '已转人工' }
-  return map[status] || status
+function getStatusText(status?: string | null) {
+  const map: Record<string, string> = { active: '进行中', resolved: '已解决', transferred: '已转人工' }
+  return status ? map[status] || status : '-'
 }
 
 function scrollToBottom() {
@@ -148,7 +157,7 @@ function scrollToBottom() {
 
 async function startNewSession() {
   try {
-    const res = await createChatSession({ platform_key: platformStore.currentPlatform })
+    const res = chatSessionCreatedSchema.parse(await createChatSession({ platform_key: platformStore.currentPlatform }))
     sessionId.value = res.session_id
     nextMsgId = 1
     messages.value = [{
@@ -169,7 +178,7 @@ async function startNewSession() {
   }
 }
 
-function askQuickQuestion(question) {
+function askQuickQuestion(question: string) {
   if (question === '联系人工客服') {
     transferToHuman()
     return
@@ -181,6 +190,8 @@ function askQuickQuestion(question) {
 async function sendMessage() {
   const text = inputMessage.value.trim()
   if (!text || isLoading.value) return
+  if (!sessionId.value && !await startNewSession()) return
+  if (!sessionId.value) return
 
   messages.value.push({
     id: nextMsgId++,
@@ -194,7 +205,7 @@ async function sendMessage() {
   scrollToBottom()
 
   try {
-    const res = await sendChatMessage(sessionId.value, text, { platform_key: platformStore.currentPlatform })
+    const res = chatReplySchema.parse(await sendChatMessage(sessionId.value, text, { platform_key: platformStore.currentPlatform }))
     messages.value.push({
       id: nextMsgId++,
       role: 'ai',
@@ -223,7 +234,8 @@ async function markResolved() {
   showRating.value = true
 }
 
-async function submitRating(star) {
+async function submitRating(star: number) {
+  if (!sessionId.value) return
   rating.value = star
   try {
     await resolveChatSession(sessionId.value, star)
@@ -236,6 +248,7 @@ async function submitRating(star) {
 }
 
 async function transferToHuman() {
+  if (!sessionId.value) return
   if (!await confirmAction({
     title: '转接人工支持？',
     message: '系统会把当前问题整理成待处理工单，方便工作人员继续跟进。',
@@ -260,16 +273,16 @@ async function transferToHuman() {
 
 async function loadHistory() {
   try {
-    const res = await getChatHistory(1, 20)
-    historySessions.value = res.items || []
+    const res = chatHistorySchema.parse(await getChatHistory(1, 20))
+    historySessions.value = res.items
   } catch (err) {
     showToast('加载历史失败', 'error')
   }
 }
 
-async function loadSession(sid) {
+async function loadSession(sid: string) {
   try {
-    const res = await getChatSession(sid)
+    const res = chatSessionDetailSchema.parse(await getChatSession(sid))
     sessionId.value = sid
     messages.value = (res.messages || []).map(message => ({ ...message, id: nextMsgId++ }))
     sessionResolved.value = res.status === 'resolved'
@@ -287,11 +300,13 @@ onMounted(async () => {
   const started = await startNewSession()
   if (!started) return
   try {
-    const context = JSON.parse(localStorage.getItem('toolbox_support_context') || 'null')
+    const context = parseJsonRecord(localStorage.getItem('toolbox_support_context'))
     if (context) {
       localStorage.removeItem('toolbox_support_context')
-      const problem = context.problem_code ? `，问题编号 ${context.problem_code}` : ''
-      inputMessage.value = `${context.tool_name || '工具'}本次操作未完成${problem}，请帮我处理。`
+      const problemCode = typeof context.problem_code === 'string' ? context.problem_code : ''
+      const toolName = typeof context.tool_name === 'string' ? context.tool_name : '工具'
+      const problem = problemCode ? `，问题编号 ${problemCode}` : ''
+      inputMessage.value = `${toolName}本次操作未完成${problem}，请帮我处理。`
       await sendMessage()
     }
   } catch {
