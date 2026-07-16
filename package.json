@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test",
-    "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.js",
+    "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.ts",
     "test:embedded-browser": "electron scripts/embedded-browser-smoke.cjs",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"tests/**/*.ts\" \"*.config.ts\"",

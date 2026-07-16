@@ -5,10 +5,8 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "noEmit": true,
-    "allowJs": true,
-    "checkJs": false,
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["*.config.ts", "*.config.js", "scripts/**/*.ts"]
+  "include": ["*.config.ts", "scripts/**/*.ts"]
 }

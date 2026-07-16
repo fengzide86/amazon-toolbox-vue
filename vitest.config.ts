@@ -32,12 +32,11 @@ export default defineConfig({
     // Windows 默认线程池在完整套件中会残留 worker；单 fork 更稳定且当前套件更快。
     pool: 'forks',
     maxWorkers: 1,
-    minWorkers: 1,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/**/*.{js,vue}'],
-      exclude: ['src/tests/**', 'src/main.js']
+      include: ['src/**/*.{ts,vue}'],
+      exclude: ['src/tests/**', 'src/main.ts']
     }
   }
 })

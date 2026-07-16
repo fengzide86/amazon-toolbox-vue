@@ -9,7 +9,7 @@ export default {
     process.env.NODE_ENV === 'production' && purgecss({
       content: [
         './src/**/*.vue',
-        './src/**/*.js',
+        './src/**/*.ts',
         './src/**/*.jsx',
         './index.html',
       ],
