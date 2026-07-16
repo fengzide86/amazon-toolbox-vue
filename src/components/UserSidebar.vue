@@ -28,7 +28,7 @@
       </router-link>
       <router-link to="/user/ai-chat" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
         <MessageCircle :size="14" class="menu-icon" aria-hidden="true" />
-        <span class="menu-label">AI 客服</span>
+        <span class="menu-label">工具帮助</span>
       </router-link>
     </nav>
 

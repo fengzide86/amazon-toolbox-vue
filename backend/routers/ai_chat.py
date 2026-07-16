@@ -102,9 +102,16 @@ async def send_message(
 ):
     """发送消息（非流式，返回完整回答）"""
     await _require_session_owner(db, session_id, current_user)
-    return await ai_chat_service.send_message(
+    result = await ai_chat_service.send_message(
         db, session_id, req.message, req.platform_key, req.capability_key
     )
+    # 用户端只消费解决问题所需的信息。检索耗时、模型、供应商和
+    # fallback 原因属于运营诊断，不能暴露成客户需要理解的指标。
+    return {
+        "session_id": result["session_id"],
+        "reply": result["reply"],
+        "knowledge_refs": result.get("knowledge_refs", []),
+    }
 
 
 @router.post("/session/{session_id}/message/stream")

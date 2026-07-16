@@ -1,10 +1,12 @@
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from sqlalchemy import func, select
 
 from core.security import create_access_token
+from domains.knowledge import chat_service as ai_chat_service
+from domains.knowledge import faq_service
 from models import ChatSession, Feedback, KnowledgeBase, User
-from domains.knowledge import chat_service as ai_chat_service, faq_service
 
 
 @pytest.mark.asyncio
@@ -86,6 +88,41 @@ async def test_user_cannot_read_another_users_session(client, db_session):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_user_message_response_hides_internal_ai_diagnostics(client, db_session):
+    user = User(name="message-owner", auth_code_id=7)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    session = await ai_chat_service.create_session(db_session, user.id)
+    token = create_access_token({"user_id": user.id, "role": "user", "auth_code_id": 7})
+    internal_result = {
+        "session_id": session["session_id"],
+        "reply": "请重新登录后再试。",
+        "knowledge_refs": [],
+        "answer_mode": "fallback",
+        "fallback_reason": "no_api_key",
+        "diagnostics": {"provider": "qwen", "total_ms": 12},
+    }
+
+    with patch(
+        "domains.knowledge.chat_service.send_message",
+        new=AsyncMock(return_value=internal_result),
+    ):
+        response = await client.post(
+            f"/api/ai-chat/session/{session['session_id']}/message",
+            json={"message": "登录失败怎么办"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "session_id": session["session_id"],
+        "reply": "请重新登录后再试。",
+        "knowledge_refs": [],
+    }
 
 
 @pytest.mark.asyncio
