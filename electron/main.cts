@@ -16,6 +16,8 @@ const { BatchCoordinator } = require('./automation/batch-coordinator.cjs');
 const { parseBatchFile, writeBatchErrors } = require('./automation/batch-importer.cjs');
 const toolSigningConfig = require('./tool-signing-config.cjs');
 
+process.env.TOOLBOX_CLIENT_VERSION = app.getVersion();
+
 let mainWindow;
 let automationRunner = null;
 let batchCoordinator = null;

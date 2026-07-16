@@ -3,17 +3,22 @@ AI 客服对话服务
 处理会话管理、消息收发、向量检索、流式响应等
 """
 import json
-import uuid
 import time
-from typing import List, Optional, Dict, Any, AsyncGenerator
+import uuid
+from collections.abc import AsyncGenerator
 from datetime import datetime
-from sqlalchemy import select, func, update as sql_update
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import ChatSession, ChatMessage, ChatConfig, Feedback, User
-from services import ai_provider, vector_store, faq_service
 from core.config import settings
 from core.logging import get_logger
+from models import ChatConfig, ChatMessage, ChatSession, Feedback, User
+
+from . import faq_service, vector_store
+from . import provider as ai_provider
 
 logger = get_logger(__name__)
 
@@ -64,7 +69,7 @@ DEFAULT_CONFIG = {
 }
 
 
-async def get_config(db: AsyncSession) -> Dict[str, Any]:
+async def get_config(db: AsyncSession) -> dict[str, Any]:
     """获取AI客服配置"""
     result = await db.execute(select(ChatConfig))
     configs = result.scalars().all()
@@ -81,7 +86,7 @@ async def get_config(db: AsyncSession) -> Dict[str, Any]:
     return merged
 
 
-async def update_config(db: AsyncSession, updates: Dict[str, Any]) -> Dict:
+async def update_config(db: AsyncSession, updates: dict[str, Any]) -> dict[str, Any]:
     """更新AI客服配置"""
     for key, value in updates.items():
         if key not in DEFAULT_CONFIG:
@@ -99,7 +104,7 @@ async def update_config(db: AsyncSession, updates: Dict[str, Any]) -> Dict:
     return await get_config(db)
 
 
-async def create_session(db: AsyncSession, user_id: int = None) -> Dict:
+async def create_session(db: AsyncSession, user_id: int | None = None) -> dict[str, Any]:
     """创建新会话"""
     session_id = str(uuid.uuid4())[:12]
 
@@ -130,7 +135,7 @@ async def create_session(db: AsyncSession, user_id: int = None) -> Dict:
     }
 
 
-async def get_session(db: AsyncSession, session_id: str) -> Optional[Dict]:
+async def get_session(db: AsyncSession, session_id: str) -> dict[str, Any] | None:
     """获取会话详情"""
     result = await db.execute(
         select(ChatSession).where(ChatSession.session_id == session_id)
@@ -159,14 +164,14 @@ async def get_session(db: AsyncSession, session_id: str) -> Optional[Dict]:
     }
 
 
-async def get_session_owner(db: AsyncSession, session_id: str) -> Optional[int]:
+async def get_session_owner(db: AsyncSession, session_id: str) -> int | None:
     result = await db.execute(
         select(ChatSession.user_id).where(ChatSession.session_id == session_id)
     )
     return result.scalar_one_or_none()
 
 
-async def get_session_record(db: AsyncSession, session_id: str) -> Optional[ChatSession]:
+async def get_session_record(db: AsyncSession, session_id: str) -> ChatSession | None:
     result = await db.execute(select(ChatSession).where(ChatSession.session_id == session_id))
     return result.scalar_one_or_none()
 
@@ -174,12 +179,12 @@ async def get_session_record(db: AsyncSession, session_id: str) -> Optional[Chat
 async def answer_question(
     db: AsyncSession,
     user_message: str,
-    platform_key: str = None,
-    capability_key: str = None,
-    session_id: str = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+    session_id: str | None = None,
     top_k: int = 5,
     min_score: float = 0.3,
-) -> Dict:
+) -> dict[str, Any]:
     """FAQ 优先、RAG 兜底的统一回答内核；本函数本身不写会话。"""
     started = time.perf_counter()
     faq = await faq_service.match_faq(db, user_message, platform_key, capability_key)
@@ -251,7 +256,7 @@ async def answer_question(
 
     answer_mode = "rag" if ai_reply else "fallback"
     if not ai_reply:
-        ai_reply = FALLBACK_REPLIES.get(error_type, FALLBACK_REPLIES["unknown_error"])
+        ai_reply = FALLBACK_REPLIES.get(error_type or "unknown_error", FALLBACK_REPLIES["unknown_error"])
     generation_ms = round((time.perf_counter() - generation_started) * 1000, 2)
     return {
         "reply": ai_reply, "answer_mode": answer_mode, "ai_used": answer_mode == "rag",
@@ -268,9 +273,9 @@ async def send_message(
     db: AsyncSession,
     session_id: str,
     user_message: str,
-    platform_key: str = None,
-    capability_key: str = None,
-) -> Dict:
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+) -> dict[str, Any]:
     """发送消息并持久化 FAQ/RAG 的统一回答。"""
     user_msg = ChatMessage(
         session_id=session_id,
@@ -312,7 +317,7 @@ async def send_message_stream(
     db: AsyncSession,
     session_id: str,
     user_message: str,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[str]:
     """发送消息（流式返回）"""
     # 保存用户消息
     user_msg = ChatMessage(
@@ -382,7 +387,7 @@ async def send_message_stream(
         yield f"data: {refs_data}\n\n"
 
 
-async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int = None) -> bool:
+async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int | None = None) -> bool:
     """标记会话已解决"""
     result = await db.execute(
         select(ChatSession).where(ChatSession.session_id == session_id)
@@ -401,7 +406,7 @@ async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int =
     return True
 
 
-async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int = None) -> Optional[int]:
+async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | None = None) -> int | None:
     """转人工 - 自动创建工单"""
     session = await get_session_record(db, session_id)
     if not session:
@@ -422,7 +427,7 @@ async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int = No
         chat_history.append(f"[{role_label}] {m.content}")
 
     title = f"AI客服转人工 - 会话 {session_id}"
-    content = f"用户通过 AI 客服咨询后转人工。\n\n对话记录：\n" + "\n".join(chat_history)
+    content = "用户通过 AI 客服咨询后转人工。\n\n对话记录：\n" + "\n".join(chat_history)
 
     # 创建工单
     feedback = Feedback(
@@ -457,7 +462,7 @@ async def rate_session(db: AsyncSession, session_id: str, satisfaction: int) -> 
     return True
 
 
-async def get_user_history(db: AsyncSession, user_id: int, page: int = 1, page_size: int = 10) -> Dict:
+async def get_user_history(db: AsyncSession, user_id: int, page: int = 1, page_size: int = 10) -> dict[str, Any]:
     """获取用户对话历史"""
     count_query = select(func.count(ChatSession.id)).where(ChatSession.user_id == user_id)
     total_result = await db.execute(count_query)
@@ -487,7 +492,7 @@ async def get_user_history(db: AsyncSession, user_id: int, page: int = 1, page_s
     }
 
 
-async def get_admin_sessions(db: AsyncSession, status: str = None, page: int = 1, page_size: int = 20) -> Dict:
+async def get_admin_sessions(db: AsyncSession, status: str | None = None, page: int = 1, page_size: int = 20) -> dict[str, Any]:
     """管理员获取所有对话记录"""
     query = select(ChatSession)
     count_query = select(func.count(ChatSession.id))
@@ -534,7 +539,7 @@ async def get_admin_sessions(db: AsyncSession, status: str = None, page: int = 1
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
-async def get_admin_stats(db: AsyncSession) -> Dict:
+async def get_admin_stats(db: AsyncSession) -> dict[str, Any]:
     """管理员统计数据"""
     # 总对话数
     total_result = await db.execute(select(func.count(ChatSession.id)))
@@ -584,11 +589,11 @@ async def get_admin_stats(db: AsyncSession) -> Dict:
 
 async def _build_ai_messages(
     db: AsyncSession,
-    session_id: Optional[str],
+    session_id: str | None,
     user_message: str,
-    knowledge_results: List[Dict],
-    config: Dict,
-) -> List[dict]:
+    knowledge_results: list[dict[str, Any]],
+    config: dict[str, Any],
+) -> list[dict[str, Any]]:
     """构建发送给 AI 的消息列表"""
     messages = []
 
@@ -651,7 +656,7 @@ async def _build_ai_messages(
     return messages
 
 
-def _message_to_dict(msg: ChatMessage) -> Dict:
+def _message_to_dict(msg: ChatMessage) -> dict[str, Any]:
     """消息转字典"""
     knowledge_ids = []
     if msg.knowledge_ids:

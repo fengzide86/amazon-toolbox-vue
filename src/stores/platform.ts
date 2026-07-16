@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
 
 export interface PlatformInfo {
   key: string
@@ -59,7 +60,7 @@ export const usePlatformStore = defineStore('platform', () => {
     loading.value = true
     try {
       const apiBase = getApiBase()
-      const response = await fetch(`${apiBase}/api/tools/platforms`)
+      const response = await fetch(`${apiBase}/api/tools/platforms`, { headers: toolboxVersionHeaders() })
       const data: unknown = await response.json()
       // API 可能返回数组或 {success, data} 格式
       if (Array.isArray(data)) {

@@ -3,7 +3,7 @@ AI 提供商测试
 """
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
-from services import ai_provider
+from domains.knowledge import provider as ai_provider
 
 
 class TestAIProvider:
@@ -16,7 +16,7 @@ class TestAIProvider:
             "choices": [{"message": {"content": "测试回复"}}]
         }
         
-        with patch('services.ai_provider._get_http_client') as mock_client:
+        with patch('domains.knowledge.provider._get_http_client') as mock_client:
             mock_resp = MagicMock()
             mock_resp.json.return_value = mock_response
             mock_resp.raise_for_status = MagicMock()  # 同步方法
@@ -36,7 +36,7 @@ class TestAIProvider:
             "data": [{"embedding": [0.1, 0.2, 0.3]}]
         }
         
-        with patch('services.ai_provider._get_http_client') as mock_client:
+        with patch('domains.knowledge.provider._get_http_client') as mock_client:
             mock_resp = MagicMock()
             mock_resp.json.return_value = mock_response
             mock_resp.raise_for_status = MagicMock()  # 同步方法
@@ -52,7 +52,7 @@ class TestAIProvider:
     @pytest.mark.asyncio
     async def test_qwen_chat_error(self):
         """测试通义千问对话错误处理"""
-        with patch('services.ai_provider._get_http_client') as mock_client:
+        with patch('domains.knowledge.provider._get_http_client') as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post = AsyncMock(side_effect=Exception("网络错误"))
             mock_client.return_value = mock_client_instance
@@ -65,7 +65,7 @@ class TestAIProvider:
     @pytest.mark.asyncio
     async def test_qwen_embedding_error(self):
         """测试通义千问 Embedding 错误处理"""
-        with patch('services.ai_provider._get_http_client') as mock_client:
+        with patch('domains.knowledge.provider._get_http_client') as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post = AsyncMock(side_effect=Exception("网络错误"))
             mock_client.return_value = mock_client_instance
@@ -79,7 +79,7 @@ class TestAIProvider:
         """测试指定模型参数"""
         mock_response = {"choices": [{"message": {"content": "回复"}}]}
         
-        with patch('services.ai_provider._get_http_client') as mock_client:
+        with patch('domains.knowledge.provider._get_http_client') as mock_client:
             mock_resp = MagicMock()
             mock_resp.json.return_value = mock_response
             mock_resp.raise_for_status = MagicMock()
@@ -99,7 +99,7 @@ class TestAIProvider:
         """测试 Embedding 长文本截断"""
         mock_response = {"data": [{"embedding": [0.1]}]}
         
-        with patch('services.ai_provider._get_http_client') as mock_client:
+        with patch('domains.knowledge.provider._get_http_client') as mock_client:
             mock_resp = MagicMock()
             mock_resp.json.return_value = mock_response
             mock_resp.raise_for_status = MagicMock()

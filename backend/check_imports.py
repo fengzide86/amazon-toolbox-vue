@@ -66,11 +66,11 @@ except Exception as e:
 
 # 4. 服务层
 try:
-    from services.auth_service import AuthService
-    print("[OK] services.auth_service")
+    from domains.auth.service import AuthService
+    print("[OK] domains.auth.service")
 except Exception as e:
-    errors.append(f"services.auth_service: {e}")
-    print(f"[FAIL] services.auth_service: {e}")
+    errors.append(f"domains.auth.service: {e}")
+    print(f"[FAIL] domains.auth.service: {e}")
 
 try:
     from services.plan_service import PlanService

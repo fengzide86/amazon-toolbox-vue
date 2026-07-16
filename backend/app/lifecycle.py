@@ -12,7 +12,7 @@ from core.logging import get_logger, setup_logging
 from core.tasks import task_manager
 from core.token_blacklist import logout_manager, token_blacklist
 from database import engine, init_db
-from services.seed_service import seed_initial_data
+from domains.catalog import seed_initial_data
 
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"), json_format=os.getenv("LOG_FORMAT", "") == "json")
 logger = get_logger(__name__)

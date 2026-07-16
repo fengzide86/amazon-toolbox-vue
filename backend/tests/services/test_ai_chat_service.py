@@ -3,7 +3,7 @@ AI 对话服务测试
 """
 import pytest
 from unittest.mock import patch, AsyncMock
-from services import ai_chat_service
+from domains.knowledge import chat_service as ai_chat_service
 
 
 class TestAIChatService:

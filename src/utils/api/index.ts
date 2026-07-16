@@ -1,5 +1,6 @@
 import { generateCacheKey, getCache, setCache } from '../cache'
 import { authService } from '../auth'
+import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
 
 const CACHE_ENABLED = true
 const CACHE_TTL = 5 * 60 * 1000
@@ -92,7 +93,7 @@ function errorMessage(value: unknown, fallback: string): string {
 }
 
 function createRequestInit(options: ApiRequestOptions, token: string | null): RequestInit {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = toolboxVersionHeaders({ 'Content-Type': 'application/json' })
   if (token) headers.Authorization = `Bearer ${token}`
   if (options.headers) {
     new Headers(options.headers).forEach((value, key) => {

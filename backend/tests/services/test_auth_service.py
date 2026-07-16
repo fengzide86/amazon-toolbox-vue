@@ -3,7 +3,7 @@
 """
 import pytest
 from datetime import datetime, timedelta, timezone
-from services.auth_service import AuthService
+from domains.auth import AuthService
 from core.security import create_access_token, verify_token, hash_password, verify_password
 from models import User
 

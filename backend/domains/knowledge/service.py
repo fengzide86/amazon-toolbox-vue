@@ -3,27 +3,30 @@
 处理知识库 CRUD、向量同步等业务逻辑
 """
 import json
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, func, delete as sql_delete
+from typing import Any
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import KnowledgeBase
-from services import vector_store, ai_provider
 from core.logging import get_logger
+from models import KnowledgeBase
+
+from . import provider as ai_provider
+from . import vector_store
 
 logger = get_logger(__name__)
 
 
 async def get_list(
     db: AsyncSession,
-    category: str = None,
-    status: str = None,
-    keyword: str = None,
-    platform_key: str = None,
-    capability_key: str = None,
+    category: str | None = None,
+    status: str | None = None,
+    keyword: str | None = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
     page: int = 1,
     page_size: int = 20
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """获取知识库列表（分页）"""
     query = select(KnowledgeBase)
     count_query = select(func.count(KnowledgeBase.id))
@@ -85,7 +88,7 @@ async def get_list(
     }
 
 
-async def get_by_id(db: AsyncSession, knowledge_id: int) -> Optional[Dict]:
+async def get_by_id(db: AsyncSession, knowledge_id: int) -> dict[str, Any] | None:
     """根据ID获取知识条目"""
     result = await db.execute(
         select(KnowledgeBase).where(KnowledgeBase.id == knowledge_id)
@@ -106,11 +109,11 @@ async def create(
     category: str,
     title: str,
     content: str,
-    keywords: List[str] = None,
+    keywords: list[str] | None = None,
     priority: str = "medium",
-    platform_key: str = None,
-    capability_key: str = None,
-) -> Dict:
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+) -> dict[str, Any]:
     """创建知识条目"""
     item = KnowledgeBase(
         category=category,
@@ -153,15 +156,15 @@ async def create(
 async def update(
     db: AsyncSession,
     knowledge_id: int,
-    category: str = None,
-    title: str = None,
-    content: str = None,
-    keywords: List[str] = None,
-    priority: str = None,
-    status: str = None,
-    platform_key: str = None,
-    capability_key: str = None,
-) -> Optional[Dict]:
+    category: str | None = None,
+    title: str | None = None,
+    content: str | None = None,
+    keywords: list[str] | None = None,
+    priority: str | None = None,
+    status: str | None = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+) -> dict[str, Any] | None:
     """更新知识条目"""
     result = await db.execute(
         select(KnowledgeBase).where(KnowledgeBase.id == knowledge_id)
@@ -249,7 +252,7 @@ async def delete(db: AsyncSession, knowledge_id: int) -> bool:
     return True
 
 
-async def batch_import(db: AsyncSession, items: List[Dict]) -> Dict:
+async def batch_import(db: AsyncSession, items: list[dict[str, Any]]) -> dict[str, Any]:
     """批量导入知识条目"""
     success = 0
     failed = 0
@@ -274,7 +277,7 @@ async def batch_import(db: AsyncSession, items: List[Dict]) -> Dict:
     return {"success": success, "failed": failed, "errors": errors}
 
 
-async def get_categories(db: AsyncSession) -> List[Dict]:
+async def get_categories(db: AsyncSession) -> list[dict[str, Any]]:
     """获取分类列表及数量"""
     result = await db.execute(
         select(
@@ -287,7 +290,7 @@ async def get_categories(db: AsyncSession) -> List[Dict]:
     return [{"name": row[0], "count": row[1]} for row in result.all()]
 
 
-async def get_stats(db: AsyncSession) -> Dict:
+async def get_stats(db: AsyncSession) -> dict[str, Any]:
     """获取知识库统计"""
     total_result = await db.execute(select(func.count(KnowledgeBase.id)))
     total = total_result.scalar() or 0
@@ -312,7 +315,7 @@ async def get_stats(db: AsyncSession) -> Dict:
     }
 
 
-async def sync_all_to_vector(db: AsyncSession) -> Dict:
+async def sync_all_to_vector(db: AsyncSession) -> dict[str, Any]:
     """全量同步知识库到向量库"""
     if not ai_provider.has_api_key():
         raise RuntimeError("当前 AI 提供商未配置 API Key，无法重建向量库")
@@ -344,7 +347,7 @@ async def sync_all_to_vector(db: AsyncSession) -> Dict:
     return {"synced": len(items)}
 
 
-def _knowledge_to_dict(item: KnowledgeBase) -> Dict:
+def _knowledge_to_dict(item: KnowledgeBase) -> dict[str, Any]:
     """知识条目转字典"""
     keywords = []
     if item.keywords:

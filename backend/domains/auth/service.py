@@ -2,22 +2,21 @@
 认证服务模块
 包含授权码验证、管理员登录、Token 管理等业务逻辑
 """
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
 import re
-from sqlalchemy import select, func
+from datetime import datetime, timedelta
+from typing import Any
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import AuthCode, User, Device, Plan, Setting, AuthSeat
-from schemas import VerifyRequest, VerifyResponse
-from core.security import (
-    verify_password_fallback, hash_password,
-    create_access_token, verify_token, extract_token_from_header
-)
-from core.config import settings
 from core.logging import get_logger
-from core.response import success_response, error_response, ErrorCodes
-from core.cache import cache, CacheKeys
+from core.response import ErrorCodes, error_response, success_response
+from core.security import (
+    create_access_token,
+    hash_password,
+    verify_password_fallback,
+)
+from models import AuthCode, AuthSeat, Device, Plan, Setting, User
 from services.entitlement_service import normalize_entitlements, resolve_product_access
 
 logger = get_logger(__name__)
@@ -34,8 +33,8 @@ class AuthService:
         code: str,
         device_id: str,
         device_name: str,
-        platform_key: Optional[str] = None
-    ) -> Dict[str, Any]:
+        platform_key: str | None = None
+    ) -> dict[str, Any]:
         """授权码验证（用户登录）
         
         流程:
@@ -312,7 +311,7 @@ class AuthService:
             message="验证成功"
         )
     
-    async def admin_login(self, password: str) -> Dict[str, Any]:
+    async def admin_login(self, password: str) -> dict[str, Any]:
         """管理员登录
         
         支持旧版明文密码的自动升级
@@ -346,7 +345,7 @@ class AuthService:
         logger.warning("管理员登录失败: 密码错误")
         return error_response("密码错误", ErrorCodes.UNAUTHORIZED)
     
-    async def check_auth_status(self, auth_code_id: Optional[int]) -> Dict[str, Any]:
+    async def check_auth_status(self, auth_code_id: int | None) -> dict[str, Any]:
         """检查授权码状态（用于踢人检测）"""
         if not auth_code_id:
             return success_response(data={"role": "admin"}, message="管理员")
@@ -402,7 +401,7 @@ class AuthService:
             message="正常"
         )
     
-    async def get_user_info(self, user_id: int, auth_code_id: Optional[int], role: str) -> Dict[str, Any]:
+    async def get_user_info(self, user_id: int, auth_code_id: int | None, role: str) -> dict[str, Any]:
         """获取当前用户信息"""
         if role == "admin":
             return success_response(data={
@@ -456,7 +455,7 @@ class AuthService:
             "business_workspace_enabled": business_workspace_enabled,
         })
     
-    async def refresh_token(self, user_id: int, role: str, auth_code_id: Optional[int], device_id: Optional[str] = None) -> Dict[str, Any]:
+    async def refresh_token(self, user_id: int, role: str, auth_code_id: int | None, device_id: str | None = None) -> dict[str, Any]:
         """刷新 Token"""
         new_token = create_access_token(data={
             "user_id": user_id,

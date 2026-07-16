@@ -6,9 +6,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const FRONTEND_URL = 'http://localhost:3000'
 const ADMIN_STATE_FILE = join(__dirname, '..', '..', 'test-results', 'admin-state.json')
 
-// E2E 专用测试授权码（由 backend/test_data_e2e.py 创建）
-const TEST_E2E_AMZ = 'TEST-E2E-AMZ'
-const TEST_E2E_AE = 'TEST-E2E-AE'
+// 测试授权由隔离测试环境提供，不再通过脚本修改本机客户数据库。
+const TEST_E2E_AMZ = process.env.TOOLBOX_E2E_AMAZON_CODE || 'TEST-E2E-AMZ'
+const TEST_E2E_AE = process.env.TOOLBOX_E2E_ALIEXPRESS_CODE || 'TEST-E2E-AE'
 
 // Helper: clear auth state
 async function clearAuth(page: Page): Promise<void> {

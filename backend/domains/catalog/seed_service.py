@@ -2,14 +2,16 @@
 种子数据服务模块
 负责初始化默认数据（管理员密码、套餐、工具配置等）
 """
-from sqlalchemy import select
 import json
+from typing import Any
 
-from models import Setting, Plan
-from database import async_session_maker
+from sqlalchemy import select
+
 from core.config import settings
-from core.security import hash_password
 from core.logging import get_logger
+from core.security import hash_password
+from database import async_session_maker
+from models import Plan, Setting
 
 logger = get_logger(__name__)
 
@@ -43,7 +45,7 @@ DEFAULT_REGISTER_TOOL = {
 }
 
 
-def default_tool_configs() -> list[dict]:
+def default_tool_configs() -> list[dict[str, Any]]:
     return [
         dict(DEFAULT_REGISTER_TOOL),
         {
@@ -166,13 +168,13 @@ def default_tool_configs() -> list[dict]:
     ]
 
 
-def default_tool_configs_by_name() -> dict[str, dict]:
+def default_tool_configs_by_name() -> dict[str, dict[str, Any]]:
     mapping = {tool["name"]: tool for tool in default_tool_configs()}
     mapping["亚马逊注册页面巡检"] = DEFAULT_REGISTER_TOOL
     return mapping
 
 
-def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
+def ensure_tool_runtime_fields(tools: list[dict[str, Any]]) -> bool:
     """为旧工具配置补齐本地 runner 所需字段，返回是否发生修改。"""
     changed = False
     for tool in tools:
@@ -191,7 +193,7 @@ def ensure_tool_runtime_fields(tools: list[dict]) -> bool:
     return changed
 
 
-def upgrade_default_tool_configs(tools: list[dict]) -> bool:
+def upgrade_default_tool_configs(tools: list[dict[str, Any]]) -> bool:
     """补齐旧默认工具配置；避免覆盖管理员自定义工具。"""
     changed = False
     defaults_by_name = default_tool_configs_by_name()
@@ -203,7 +205,8 @@ def upgrade_default_tool_configs(tools: list[dict]) -> bool:
         DEFAULT_REGISTER_TOOL["description"],
     }
     for tool in tools:
-        default_tool = defaults_by_name.get(tool.get("name"))
+        raw_name = tool.get("name")
+        default_tool = defaults_by_name.get(str(raw_name)) if raw_name else None
         if default_tool and (
             not tool.get("id")
             or tool.get("id") == "tool_tool"
@@ -234,7 +237,7 @@ def upgrade_default_tool_configs(tools: list[dict]) -> bool:
     return changed
 
 
-async def seed_initial_data():
+async def seed_initial_data() -> None:
     """初始化默认数据
     
     包括:

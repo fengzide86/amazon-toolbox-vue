@@ -1,4 +1,5 @@
 import { onCLS, onINP, onLCP, onFCP, onTTFB } from 'web-vitals'
+import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
 
 export type PerformanceMetricName = 'CLS' | 'INP' | 'LCP' | 'FCP' | 'TTFB'
 export type PerformanceRating = 'good' | 'needs-improvement' | 'poor' | 'unknown'
@@ -31,7 +32,7 @@ function sendToAnalytics(name: PerformanceMetricName, value: number): void {
   if (!import.meta.env.PROD) return
   void fetch(`${getApiBase()}/api/analytics/performance`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: toolboxVersionHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ metric: name, value, timestamp: Date.now(), url: window.location.href }),
     keepalive: true,
   }).catch(error => console.warn('[Performance] Failed to send analytics:', error))

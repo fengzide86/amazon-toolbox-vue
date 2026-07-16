@@ -9,6 +9,10 @@ import { usePlatformStore } from '@/stores/platform'
 globalThis.fetch = vi.fn()
 const mockedFetch = vi.mocked(globalThis.fetch)
 
+function jsonResponse(data: unknown): Response {
+  return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } })
+}
+
 // Mock localStorage
 const localStorageMock = {
   store: {},
@@ -181,12 +185,10 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 成功响应
-      mockedFetch.mockResolvedValueOnce({
-        json: async () => [
+      mockedFetch.mockResolvedValueOnce(jsonResponse([
           { key: 'amazon', name: '亚马逊', status: 'available', sort_order: 1 },
           { key: 'aliexpress', name: '速卖通', status: 'available', sort_order: 2 }
-        ]
-      })
+      ]))
       
       await store.loadPlatforms()
       
@@ -198,14 +200,12 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 标准响应格式
-      mockedFetch.mockResolvedValueOnce({
-        json: async () => ({
+      mockedFetch.mockResolvedValueOnce(jsonResponse({
           success: true,
           data: [
             { key: 'amazon', name: '亚马逊', status: 'available' }
           ]
-        })
-      })
+      }))
       
       await store.loadPlatforms()
       expect(store.availablePlatforms).toHaveLength(1)
@@ -229,9 +229,7 @@ describe('Platform Store', () => {
       
       // Mock 慢速响应
       mockedFetch.mockImplementation(() => new Promise(resolve => {
-        setTimeout(() => resolve({
-          json: async () => []
-        }), 100)
+        setTimeout(() => resolve(jsonResponse([])), 100)
       }))
       
       // 并发调用两次
@@ -248,9 +246,7 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 空响应
-      mockedFetch.mockResolvedValueOnce({
-        json: async () => []
-      })
+      mockedFetch.mockResolvedValueOnce(jsonResponse([]))
       
       await store.loadPlatforms()
       

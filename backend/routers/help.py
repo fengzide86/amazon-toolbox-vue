@@ -2,18 +2,18 @@
 帮助查询路由模块
 实现 FAQ 优先 + AI 兜底的智能问答逻辑
 """
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, or_, and_
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 import json
 
-from database import get_db
-from models import KnowledgeBase
-from core.logging import get_logger
+from fastapi import APIRouter, Depends
+from sqlalchemy import and_, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.dependencies import get_current_user
-from core.response import success_response, error_response
-from services import faq_service
+from core.logging import get_logger
+from core.response import error_response, success_response
+from database import get_db
+from domains.knowledge import faq_service
+from models import KnowledgeBase
 
 logger = get_logger(__name__)
 
@@ -82,9 +82,9 @@ async def query_help(
 async def _match_faq(
     db: AsyncSession,
     platform_key: str,
-    capability_key: Optional[str],
+    capability_key: str | None,
     question: str
-) -> Optional[dict]:
+) -> dict | None:
     """
     匹配 FAQ
     
@@ -159,7 +159,7 @@ async def _match_faq(
                     for faq_kw in faq_keywords:
                         if keyword in faq_kw.lower() or faq_kw.lower() in keyword:
                             score += 3
-            except:
+            except (TypeError, ValueError, json.JSONDecodeError):
                 pass
         
         # 优先级加权
@@ -185,9 +185,9 @@ async def _match_faq(
 
 @router.get("/faq/list")
 async def get_faq_list(
-    platform_key: Optional[str] = None,
-    capability_key: Optional[str] = None,
-    category: Optional[str] = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+    category: str | None = None,
     db: AsyncSession = Depends(get_db)
 ):
     """

@@ -1,11 +1,12 @@
 """公告管理与用户消息中心路由。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin, get_current_user
+from core.deprecation import log_deprecated_api_call
 from core.response import success_response
 from database import get_db
 from domains.announcements import service
@@ -25,8 +26,9 @@ async def list_announcements(
 
 
 @router.get("/active")
-async def get_active_announcements(db: AsyncSession = Depends(get_db)) -> object:
+async def get_active_announcements(request: Request, db: AsyncSession = Depends(get_db)) -> object:
     """兼容旧客户端：只返回面向所有人的有效公告。"""
+    log_deprecated_api_call(request, "/api/announcements/active")
     return success_response(data=await service.list_legacy_active(db))
 
 

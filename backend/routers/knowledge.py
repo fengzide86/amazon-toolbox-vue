@@ -2,17 +2,18 @@
 知识库管理路由模块
 提供知识库 CRUD、批量导入、向量同步等 API
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List
-from pydantic import BaseModel, Field
 import time
 
-from database import get_db
-from core.dependencies import get_current_admin
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.audit import log_admin_action
-from services import knowledge_service
-from services import ai_provider, vector_store
+from core.dependencies import get_current_admin
+from database import get_db
+from domains.knowledge import provider as ai_provider
+from domains.knowledge import service as knowledge_service
+from domains.knowledge import vector_store
 
 router = APIRouter()
 
@@ -23,35 +24,35 @@ class KnowledgeCreate(BaseModel):
     category: str
     title: str
     content: str
-    keywords: Optional[List[str]] = None
-    priority: Optional[str] = "medium"
-    platform_key: Optional[str] = None
-    capability_key: Optional[str] = None
+    keywords: list[str] | None = None
+    priority: str | None = "medium"
+    platform_key: str | None = None
+    capability_key: str | None = None
 
 
 class KnowledgeUpdate(BaseModel):
-    category: Optional[str] = None
-    title: Optional[str] = None
-    content: Optional[str] = None
-    keywords: Optional[List[str]] = None
-    priority: Optional[str] = None
-    status: Optional[str] = None
-    platform_key: Optional[str] = None
-    capability_key: Optional[str] = None
+    category: str | None = None
+    title: str | None = None
+    content: str | None = None
+    keywords: list[str] | None = None
+    priority: str | None = None
+    status: str | None = None
+    platform_key: str | None = None
+    capability_key: str | None = None
 
 
 class BatchImportItem(BaseModel):
     category: str
     title: str
     content: str
-    keywords: Optional[List[str]] = None
-    priority: Optional[str] = "medium"
+    keywords: list[str] | None = None
+    priority: str | None = "medium"
 
 
 class RetrievalTestRequest(BaseModel):
     query: str = Field(min_length=1, max_length=2000)
-    platform_key: Optional[str] = None
-    capability_key: Optional[str] = None
+    platform_key: str | None = None
+    capability_key: str | None = None
     top_k: int = Field(default=5, ge=1, le=20)
     min_score: float = Field(default=0.3, ge=-1, le=1)
 
@@ -85,11 +86,11 @@ async def retrieval_test(
 
 @router.get("")
 async def get_knowledge_list(
-    category: Optional[str] = Query(None, description="分类过滤"),
-    status: Optional[str] = Query(None, description="状态过滤"),
-    keyword: Optional[str] = Query(None, description="关键词搜索"),
-    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
-    capability_key: Optional[str] = Query(None, description="功能标识"),
+    category: str | None = Query(None, description="分类过滤"),
+    status: str | None = Query(None, description="状态过滤"),
+    keyword: str | None = Query(None, description="关键词搜索"),
+    platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
+    capability_key: str | None = Query(None, description="功能标识"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -242,7 +243,7 @@ async def delete_knowledge(
 
 @router.post("/batch-import")
 async def batch_import(
-    items: List[BatchImportItem],
+    items: list[BatchImportItem],
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):

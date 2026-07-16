@@ -1,4 +1,4 @@
-from services.seed_service import (
+from domains.catalog.seed_service import (
     DEFAULT_REGISTER_TOOL,
     default_tool_configs,
     ensure_tool_runtime_fields,

@@ -6,6 +6,9 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { VitePWA } from 'vite-plugin-pwa'
+import { readFileSync } from 'node:fs'
+
+const packageMetadata = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
 
 export default defineConfig(({ mode }) => {
   const desktopBuild = process.env.TOOLBOX_BUILD_TARGET === 'electron'
@@ -98,6 +101,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))
       }
+    },
+    define: {
+      'import.meta.env.VITE_APP_VERSION': JSON.stringify(packageMetadata.version),
     },
     base: './',
     server: {

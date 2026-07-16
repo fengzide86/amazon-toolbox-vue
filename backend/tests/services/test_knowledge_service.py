@@ -3,7 +3,7 @@
 """
 import pytest
 from unittest.mock import patch, AsyncMock
-from services import knowledge_service
+from domains.knowledge import service as knowledge_service
 
 
 class TestKnowledgeService:
@@ -19,10 +19,10 @@ class TestKnowledgeService:
     @pytest.mark.asyncio
     async def test_create_knowledge(self, db_session):
         """测试创建知识条目"""
-        with patch('services.knowledge_service.ai_provider') as mock_ai:
+        with patch('domains.knowledge.service.ai_provider') as mock_ai:
             mock_ai.get_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
             
-            with patch('services.knowledge_service.vector_store') as mock_vs:
+            with patch('domains.knowledge.service.vector_store') as mock_vs:
                 mock_vs.add_knowledge = AsyncMock(return_value="knowledge_1")
                 
                 result = await knowledge_service.create(
@@ -42,9 +42,9 @@ class TestKnowledgeService:
     async def test_get_list_with_filter(self, db_session):
         """测试带筛选条件获取列表"""
         # 先创建一些测试数据
-        with patch('services.knowledge_service.ai_provider') as mock_ai:
+        with patch('domains.knowledge.service.ai_provider') as mock_ai:
             mock_ai.get_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
-            with patch('services.knowledge_service.vector_store') as mock_vs:
+            with patch('domains.knowledge.service.vector_store') as mock_vs:
                 mock_vs.add_knowledge = AsyncMock(return_value="knowledge_1")
                 
                 await knowledge_service.create(
@@ -68,9 +68,9 @@ class TestKnowledgeService:
     @pytest.mark.asyncio
     async def test_get_categories(self, db_session):
         """测试获取分类列表"""
-        with patch('services.knowledge_service.ai_provider') as mock_ai:
+        with patch('domains.knowledge.service.ai_provider') as mock_ai:
             mock_ai.get_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
-            with patch('services.knowledge_service.vector_store') as mock_vs:
+            with patch('domains.knowledge.service.vector_store') as mock_vs:
                 mock_vs.add_knowledge = AsyncMock(return_value="knowledge_1")
                 
                 await knowledge_service.create(
@@ -101,9 +101,9 @@ class TestKnowledgeService:
     @pytest.mark.asyncio
     async def test_delete_knowledge(self, db_session):
         """测试删除知识条目"""
-        with patch('services.knowledge_service.ai_provider') as mock_ai:
+        with patch('domains.knowledge.service.ai_provider') as mock_ai:
             mock_ai.get_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
-            with patch('services.knowledge_service.vector_store') as mock_vs:
+            with patch('domains.knowledge.service.vector_store') as mock_vs:
                 mock_vs.add_knowledge = AsyncMock(return_value="knowledge_1")
                 mock_vs.delete_knowledge = AsyncMock(return_value=True)
                 
@@ -127,9 +127,9 @@ class TestKnowledgeService:
     @pytest.mark.asyncio
     async def test_batch_import(self, db_session):
         """测试批量导入"""
-        with patch('services.knowledge_service.ai_provider') as mock_ai:
+        with patch('domains.knowledge.service.ai_provider') as mock_ai:
             mock_ai.get_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
-            with patch('services.knowledge_service.vector_store') as mock_vs:
+            with patch('domains.knowledge.service.vector_store') as mock_vs:
                 mock_vs.add_knowledge = AsyncMock(return_value="knowledge_1")
                 
                 items = [
@@ -144,9 +144,9 @@ class TestKnowledgeService:
     @pytest.mark.asyncio
     async def test_get_stats(self, db_session):
         """测试获取统计信息"""
-        with patch('services.knowledge_service.ai_provider') as mock_ai:
+        with patch('domains.knowledge.service.ai_provider') as mock_ai:
             mock_ai.get_embedding = AsyncMock(return_value=[0.1, 0.2, 0.3])
-            with patch('services.knowledge_service.vector_store') as mock_vs:
+            with patch('domains.knowledge.service.vector_store') as mock_vs:
                 mock_vs.add_knowledge = AsyncMock(return_value="knowledge_1")
                 mock_vs.get_stats = AsyncMock(return_value={"total_vectors": 0, "status": "ok"})
                 

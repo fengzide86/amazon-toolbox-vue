@@ -3,148 +3,36 @@
 包含工具配置的查询、更新等接口
 支持工具分类和搜索功能
 """
-from fastapi import APIRouter, Depends, Query, Body
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List
-from datetime import datetime, timedelta
 import json
-import re
 import secrets
+from datetime import datetime, timedelta
 
-from database import get_db
-from models import Setting, LaunchToken, AuthCode, AutomationBatch
-from core.logging import get_logger
-from core.dependencies import get_current_admin, get_current_user
-from core.response import success_response, error_response, ErrorCodes
+from fastapi import APIRouter, Body, Depends, Query, Request
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.config import settings
-from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
+from core.dependencies import get_current_admin, get_current_user
+from core.deprecation import log_deprecated_api_call
+from core.logging import get_logger
+from core.response import ErrorCodes, error_response, success_response
+from database import get_db
+from domains.catalog import (
+    DEFAULT_CATEGORIES,
+    normalize_tool_config,
+    normalize_tool_configs,
+    resolve_tool_runtime,
+)
+from domains.catalog import (
+    plan_code as _plan_code,
+)
+from models import AuthCode, AutomationBatch, LaunchToken, Setting
 from services.entitlement_service import resolve_product_access
+from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
 
 logger = get_logger(__name__)
 
 router = APIRouter()
-
-
-# 默认工具分类
-DEFAULT_CATEGORIES = [
-    {"id": "all", "name": "全部工具", "sort_order": 0},
-    {"id": "data", "name": "数据分析", "sort_order": 1},
-    {"id": "operation", "name": "运营工具", "sort_order": 2},
-    {"id": "automation", "name": "自动化工具", "sort_order": 3},
-    {"id": "other", "name": "其他工具", "sort_order": 4},
-]
-
-DEFAULT_TARGET_URLS = {
-    "amazon": "https://sellercentral.amazon.com/",
-    "aliexpress": "https://sellercenter.aliexpress.com/",
-}
-
-VALID_RELEASE_STATUSES = {"available", "beta", "maintenance", "disabled"}
-VALID_TOOL_STATUSES = {"online", "maintenance", "offline"}
-SENSITIVE_BATCH_KEYS = {"password", "passwd", "pwd", "secret", "token", "cookie"}
-
-
-def _slugify(value: str) -> str:
-    value = (value or "").strip().lower()
-    value = re.sub(r"[^a-z0-9_]+", "_", value)
-    value = re.sub(r"_+", "_", value).strip("_")
-    return value or "tool"
-
-
-def _plan_code(plan_name: str) -> str | None:
-    match = re.search(r"Y\d+", plan_name or "", re.IGNORECASE)
-    return match.group(0).upper() if match else None
-
-
-def normalize_tool_config(tool: dict, index: int = 0) -> dict:
-    """补齐并收敛后台工具配置，保持 Setting JSON 可长期运营。"""
-    normalized = dict(tool or {})
-    platform_key = (normalized.get("platform_key") or "amazon").strip()
-    capability_key = (
-        normalized.get("capability_key")
-        or normalized.get("id")
-        or normalized.get("module")
-        or normalized.get("name")
-        or f"tool_{index + 1}"
-    )
-    capability_key = _slugify(str(capability_key))
-    tool_id = normalized.get("id") or f"tool_{capability_key}"
-    tool_id = _slugify(str(tool_id))
-
-    release_status = normalized.get("release_status") or "available"
-    if release_status not in VALID_RELEASE_STATUSES:
-        release_status = "maintenance"
-
-    status = normalized.get("status") or ("online" if release_status in {"available", "beta"} else "maintenance")
-    if status not in VALID_TOOL_STATUSES:
-        status = "online" if release_status in {"available", "beta"} else "maintenance"
-
-    script_key, target_url = resolve_tool_runtime(
-        {
-            **normalized,
-            "id": tool_id,
-            "platform_key": platform_key,
-            "capability_key": capability_key,
-        },
-        platform_key,
-    )
-
-    normalized.update({
-        "id": tool_id,
-        "name": (normalized.get("name") or "未命名工具").strip(),
-        "module": (normalized.get("module") or "未分类").strip(),
-        "category": normalized.get("category") or "automation",
-        "platform_key": platform_key,
-        "capability_key": capability_key,
-        "release_status": release_status,
-        "status": status,
-        "description": normalized.get("description") or "",
-        "script_key": normalized.get("script_key") or script_key,
-        "target_url": normalized.get("target_url") or target_url,
-        "tool_version": str(normalized.get("tool_version") or "1.0.0"),
-        "runner_api_version": int(normalized.get("runner_api_version") or 1),
-        "sort_order": int(normalized.get("sort_order") or index + 1),
-        "available_plans": normalized.get("available_plans") or [],
-        "capability_tags": [str(item).strip() for item in (normalized.get("capability_tags") or []) if str(item).strip()][:3],
-        "preparation_notes": [str(item).strip() for item in (normalized.get("preparation_notes") or []) if str(item).strip()],
-        "intervention_scenarios": [str(item).strip() for item in (normalized.get("intervention_scenarios") or []) if str(item).strip()],
-        "supports_batch": bool(normalized.get("supports_batch", False)),
-        "business_description": str(normalized.get("business_description") or "").strip(),
-    })
-    batch_schema = []
-    for field in normalized.get("batch_input_schema") or []:
-        key = _slugify(str(field.get("key") or ""))
-        if key in SENSITIVE_BATCH_KEYS:
-            continue
-        batch_schema.append({
-            "key": key,
-            "label": str(field.get("label") or key).strip()[:80],
-            "type": "text",
-            "required": bool(field.get("required")),
-            "sensitive": bool(field.get("sensitive")),
-        })
-    if normalized["supports_batch"] and not any(item["key"] == "account_label" for item in batch_schema):
-        batch_schema.insert(0, {"key": "account_label", "label": "客户简称", "type": "text", "required": True, "sensitive": False})
-    normalized["batch_input_schema"] = batch_schema
-    normalized["requires_signature"] = bool(normalized.get("requires_signature", True))
-    if isinstance(normalized["available_plans"], str):
-        normalized["available_plans"] = [
-            item.strip() for item in normalized["available_plans"].split(",") if item.strip()
-        ]
-    return normalized
-
-
-def normalize_tool_configs(tools: list[dict]) -> list[dict]:
-    return [normalize_tool_config(tool, index) for index, tool in enumerate(tools or [])]
-
-
-def resolve_tool_runtime(tool: dict, platform_key: str) -> tuple[str, str]:
-    """补齐旧工具配置缺少的本地运行入口，避免启动授权写入空 script_key。"""
-    capability_key = tool.get("capability_key") or tool.get("id") or "unknown"
-    script_key = tool.get("script_key") or f"{platform_key}.{capability_key}.v1"
-    target_url = tool.get("target_url") or DEFAULT_TARGET_URLS.get(platform_key, "")
-    return script_key, target_url
 
 
 @router.get("/categories")
@@ -159,9 +47,9 @@ async def get_tool_categories(db: AsyncSession = Depends(get_db)):
 
 @router.get("")
 async def get_tools(
-    category: Optional[str] = Query(None, description="分类ID"),
-    search: Optional[str] = Query(None, description="搜索关键词"),
-    platform_key: Optional[str] = Query(None, description="平台: amazon / aliexpress"),
+    category: str | None = Query(None, description="分类ID"),
+    search: str | None = Query(None, description="搜索关键词"),
+    platform_key: str | None = Query(None, description="平台: amazon / aliexpress"),
     db: AsyncSession = Depends(get_db)
 ):
     """获取工具配置列表，支持分类、搜索和平台筛选"""
@@ -198,7 +86,7 @@ async def get_tools(
 
 @router.put("")
 async def update_tools(
-    tools: List[dict] = Body(...),
+    tools: list[dict] = Body(...),
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
@@ -297,12 +185,13 @@ async def update_platforms(platforms: list, db: AsyncSession = Depends(get_db), 
 @router.post("/{tool_id}/launch-grant")
 @router.post("/{tool_id}/launch-token")
 async def create_launch_token(
+    request: Request,
     tool_id: str,
     platform_key: str,
     execution_mode: str = Query("single", pattern="^(single|batch)$"),
-    client_batch_id: Optional[str] = Query(None, max_length=100),
-    client_item_id: Optional[str] = Query(None, max_length=100),
-    idempotency_key: Optional[str] = Query(None, max_length=200),
+    client_batch_id: str | None = Query(None, max_length=100),
+    client_item_id: str | None = Query(None, max_length=100),
+    idempotency_key: str | None = Query(None, max_length=200),
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
@@ -319,6 +208,8 @@ async def create_launch_token(
     7. 当前用户 seat 有效
     8. 当前设备未超限
     """
+    if request.url.path.endswith("/launch-token"):
+        log_deprecated_api_call(request, "/api/tools/{tool_id}/launch-token")
     user_id = current_user.get("user_id")
     auth_code_id = current_user.get("auth_code_id")
     device_id = current_user.get("device_id")
@@ -462,8 +353,7 @@ async def create_launch_token(
     active_seats = seat_result.scalars().all()
     if not active_seats:
         return error_response("当前授权席位无效，请重新登录或联系管理员", 403)
-    active_seat = active_seats[0]
-    
+
     # 8. 检查设备限制
     from models import Device
     device_result = await db.execute(
@@ -591,10 +481,10 @@ async def create_launch_token(
         }
     })
 
-
 @router.post("/launch-grant/verify")
 @router.post("/launch-token/verify")
 async def verify_launch_token(
+    request: Request,
     token: str,
     db: AsyncSession = Depends(get_db)
 ):
@@ -603,6 +493,8 @@ async def verify_launch_token(
     
     返回工具启动所需信息
     """
+    if request.url.path.endswith("/launch-token/verify"):
+        log_deprecated_api_call(request, "/api/tools/launch-token/verify")
     result = await db.execute(
         select(LaunchToken).where(LaunchToken.token == token)
     )

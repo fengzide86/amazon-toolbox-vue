@@ -1,7 +1,7 @@
 """无需调用大模型的 FAQ 本地匹配服务。"""
 import json
 import re
-from typing import Dict, Optional, Set
+from typing import Any
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,7 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^\w\u4e00-\u9fff]+", "", (text or "").lower())
 
 
-def _tokens(text: str) -> Set[str]:
+def _tokens(text: str) -> set[str]:
     normalized = _normalize(text)
     latin = set(re.findall(r"[a-z0-9_-]{2,}", (text or "").lower()))
     chinese = "".join(re.findall(r"[\u4e00-\u9fff]", normalized))
@@ -24,9 +24,9 @@ def _tokens(text: str) -> Set[str]:
 async def match_faq(
     db: AsyncSession,
     question: str,
-    platform_key: str = None,
-    capability_key: str = None,
-) -> Optional[Dict]:
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+) -> dict[str, Any] | None:
     """按平台/功能过滤后使用标题、配置关键词和中文二元组匹配 FAQ。"""
     question_normalized = _normalize(question)
     if not question_normalized:

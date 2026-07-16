@@ -3,15 +3,15 @@ AI 客服对话路由模块
 提供会话管理、消息收发（SSE 流式）、转人工等 API
 """
 import json
-from fastapi import APIRouter, Depends, Query, HTTPException
-from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
-from pydantic import BaseModel, Field
 
-from database import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.dependencies import get_current_admin, get_current_user
-from services import ai_chat_service
+from database import get_db
+from domains.knowledge import chat_service as ai_chat_service
 
 router = APIRouter()
 
@@ -20,13 +20,13 @@ router = APIRouter()
 
 class SendMessage(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-    platform_key: Optional[str] = None
-    capability_key: Optional[str] = None
+    platform_key: str | None = None
+    capability_key: str | None = None
 
 
 class CreateSession(BaseModel):
-    platform_key: Optional[str] = None
-    capability_key: Optional[str] = None
+    platform_key: str | None = None
+    capability_key: str | None = None
 
 
 class DebugChatRequest(SendMessage):
@@ -35,7 +35,7 @@ class DebugChatRequest(SendMessage):
 
 
 class ResolveSession(BaseModel):
-    satisfaction: Optional[int] = None
+    satisfaction: int | None = None
 
 
 class RateSession(BaseModel):
@@ -43,19 +43,19 @@ class RateSession(BaseModel):
 
 
 class UpdateConfig(BaseModel):
-    welcome_message: Optional[str] = None
-    suggested_questions: Optional[list] = None
-    ai_model: Optional[str] = None
-    reply_style: Optional[str] = None
-    max_retries: Optional[int] = None
-    transfer_rules: Optional[dict] = None
+    welcome_message: str | None = None
+    suggested_questions: list | None = None
+    ai_model: str | None = None
+    reply_style: str | None = None
+    max_retries: int | None = None
+    transfer_rules: dict | None = None
 
 
 # ===== 用户端路由 =====
 
 @router.post("/session")
 async def create_session(
-    req: Optional[CreateSession] = None,
+    req: CreateSession | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -228,7 +228,7 @@ async def update_config(
 
 @router.get("/admin/sessions")
 async def get_admin_sessions(
-    status: Optional[str] = Query(None, description="状态过滤"),
+    status: str | None = Query(None, description="状态过滤"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),

@@ -5,28 +5,30 @@
 import asyncio
 import json
 import os
-from typing import List, Optional, Dict, Any
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 from core.config import settings
 from core.logging import get_logger
 
 logger = get_logger(__name__)
 
 # ChromaDB 客户端（延迟初始化）
-_client = None
-_collection = None
+_client: Any = None
+_collection: Any = None
 GLOBAL_SCOPE = "__all__"
 
 
-def _scope_value(value: Optional[str]) -> str:
+def _scope_value(value: str | None) -> str:
     return value or GLOBAL_SCOPE
 
 
-def _get_client():
+def _get_client() -> Any:
     """获取 ChromaDB 客户端（单例）"""
     global _client
     if _client is None:
-        import chromadb
-        from chromadb.config import Settings as ChromaSettings
+        import chromadb  # type: ignore[import-not-found]
+        from chromadb.config import Settings as ChromaSettings  # type: ignore[import-not-found]
         
         persist_dir = settings.CHROMA_PERSIST_DIR
         os.makedirs(persist_dir, exist_ok=True)
@@ -40,7 +42,7 @@ def _get_client():
     return _client
 
 
-def _get_collection():
+def _get_collection() -> Any:
     """获取知识库集合（单例）"""
     global _collection
     if _collection is None:
@@ -59,11 +61,11 @@ async def add_knowledge(
     title: str,
     content: str,
     category: str,
-    keywords: List[str] = None,
+    keywords: list[str] | None = None,
     priority: str = "medium",
-    embedding: List[float] = None,
-    platform_key: str = None,
-    capability_key: str = None,
+    embedding: list[float] | None = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
 ) -> str:
     """添加知识条目到向量库
     
@@ -117,14 +119,14 @@ async def add_knowledge(
 
 async def update_knowledge(
     knowledge_id: int,
-    title: str = None,
-    content: str = None,
-    category: str = None,
-    keywords: List[str] = None,
-    priority: str = None,
-    embedding: List[float] = None,
-    platform_key: str = None,
-    capability_key: str = None,
+    title: str | None = None,
+    content: str | None = None,
+    category: str | None = None,
+    keywords: list[str] | None = None,
+    priority: str | None = None,
+    embedding: list[float] | None = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
 ) -> bool:
     """更新知识条目向量"""
     collection = _get_collection()
@@ -188,13 +190,13 @@ async def delete_knowledge(knowledge_id: int) -> bool:
 
 
 async def search_knowledge(
-    query_embedding: List[float],
+    query_embedding: list[float],
     top_k: int = 5,
-    category: str = None,
+    category: str | None = None,
     min_score: float = 0.5,
-    platform_key: str = None,
-    capability_key: str = None,
-) -> List[Dict[str, Any]]:
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+) -> list[dict[str, Any]]:
     """搜索相似知识
     
     Args:
@@ -212,7 +214,7 @@ async def search_knowledge(
         return []
     
     try:
-        filters = [{"status": "active"}]
+        filters: list[dict[str, Any]] = [{"status": "active"}]
         if category:
             filters.append({"category": category})
         if platform_key:
@@ -237,7 +239,7 @@ async def search_knowledge(
         
         matched = []
         if results and results['ids'] and results['ids'][0]:
-            for i, vid in enumerate(results['ids'][0]):
+            for i, _vid in enumerate(results['ids'][0]):
                 # ChromaDB 返回的是距离（越小越相似），转换为相似度分数
                 distance = results['distances'][0][i] if results['distances'] else 0
                 score = 1 - distance  # cosine距离转相似度
@@ -264,7 +266,7 @@ async def search_knowledge(
         return []
 
 
-async def get_stats() -> Dict[str, Any]:
+async def get_stats() -> dict[str, Any]:
     """获取向量库统计信息"""
     collection = _get_collection()
     
@@ -283,7 +285,10 @@ async def get_stats() -> Dict[str, Any]:
         }
 
 
-async def sync_all(knowledge_items: List[Dict], embed_fn=None):
+async def sync_all(
+    knowledge_items: list[dict[str, Any]],
+    embed_fn: Callable[[str], Awaitable[list[float] | None]] | None = None,
+) -> None:
     """全量同步知识库到向量库
     
     Args:

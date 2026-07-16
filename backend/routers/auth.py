@@ -2,26 +2,25 @@
 认证路由模块（优化版）
 使用服务层 + 统一响应格式
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from datetime import datetime
 
-from database import get_db
-from models import AuthCode
-from schemas import VerifyRequest, AdminLoginRequest
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.dependencies import get_current_user
-from core.security import verify_token, create_access_token
+from core.security import create_access_token, verify_token
 from core.token_blacklist import is_token_blacklisted
-from services.auth_service import AuthService
+from database import get_db
+from domains.auth import AuthService
+from models import AuthCode
+from schemas import AdminLoginRequest, VerifyRequest
 
 router = APIRouter()
 
-
-# ===== 登录接口限流（防暴力破解）=====
-from slowapi.util import get_remote_address
-from slowapi import Limiter
 
 auth_limiter = Limiter(key_func=get_remote_address)
 

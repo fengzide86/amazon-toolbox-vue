@@ -28,6 +28,7 @@
 <script setup>
 import { ref, onErrorCaptured } from 'vue'
 import { useRouter } from 'vue-router'
+import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
 
 const props = defineProps({
   showDetails: {
@@ -81,9 +82,7 @@ function sendErrorToAnalytics(err, instance, info) {
   // 也可以发送到后端 API
   fetch('/api/analytics/error', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: toolboxVersionHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       error: err.message,
       stack: err.stack,

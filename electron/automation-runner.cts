@@ -259,7 +259,10 @@ class AutomationRuntime {
     let lastError;
     for (const endpoint of endpoints) {
       try {
-        const response = await fetch(`${CONTROL_API_BASE}${endpoint}?token=${encodedToken}`, { method: 'POST' });
+        const response = await fetch(`${CONTROL_API_BASE}${endpoint}?token=${encodedToken}`, {
+          method: 'POST',
+          headers: { 'X-Toolbox-Version': process.env.TOOLBOX_CLIENT_VERSION || 'unknown' },
+        });
         const body = await response.json();
         if (response.status === 404 && endpoint.includes('launch-grant')) continue;
         if (!response.ok || !body?.success || !body?.data?.valid) {

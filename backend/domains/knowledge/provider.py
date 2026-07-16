@@ -3,8 +3,11 @@ AI 提供商适配层
 支持通义千问(默认)、OpenAI、本地Ollama
 """
 import json
-from typing import List, Optional, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import httpx
+
 from core.config import settings
 from core.logging import get_logger
 
@@ -25,7 +28,7 @@ def _get_http_client() -> httpx.AsyncClient:
 
 QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
-async def qwen_chat(messages: List[dict], model: str = None) -> str:
+async def qwen_chat(messages: list[dict[str, Any]], model: str | None = None) -> str:
     """通义千问对话（非流式）"""
     model = model or settings.QWEN_MODEL
     client = _get_http_client()
@@ -52,7 +55,7 @@ async def qwen_chat(messages: List[dict], model: str = None) -> str:
         raise
 
 
-async def qwen_chat_stream(messages: List[dict], model: str = None) -> AsyncGenerator[str, None]:
+async def qwen_chat_stream(messages: list[dict[str, Any]], model: str | None = None) -> AsyncGenerator[str]:
     """通义千问对话（流式）"""
     model = model or settings.QWEN_MODEL
     client = _get_http_client()
@@ -92,7 +95,7 @@ async def qwen_chat_stream(messages: List[dict], model: str = None) -> AsyncGene
         raise
 
 
-async def qwen_embedding(text: str, model: str = None) -> Optional[List[float]]:
+async def qwen_embedding(text: str, model: str | None = None) -> list[float] | None:
     """通义千问文本向量化"""
     model = model or settings.QWEN_EMBEDDING_MODEL
     client = _get_http_client()
@@ -119,7 +122,7 @@ async def qwen_embedding(text: str, model: str = None) -> Optional[List[float]]:
 
 # ===== OpenAI =====
 
-async def openai_chat(messages: List[dict], model: str = None) -> str:
+async def openai_chat(messages: list[dict[str, Any]], model: str | None = None) -> str:
     """OpenAI对话（非流式）"""
     api_key = settings.OPENAI_API_KEY
     model = model or settings.OPENAI_MODEL
@@ -147,7 +150,7 @@ async def openai_chat(messages: List[dict], model: str = None) -> str:
         raise
 
 
-async def openai_chat_stream(messages: List[dict], model: str = None) -> AsyncGenerator[str, None]:
+async def openai_chat_stream(messages: list[dict[str, Any]], model: str | None = None) -> AsyncGenerator[str]:
     """OpenAI对话（流式）"""
     api_key = settings.OPENAI_API_KEY
     model = model or settings.OPENAI_MODEL
@@ -188,7 +191,7 @@ async def openai_chat_stream(messages: List[dict], model: str = None) -> AsyncGe
         raise
 
 
-async def openai_embedding(text: str, model: str = None) -> Optional[List[float]]:
+async def openai_embedding(text: str, model: str | None = None) -> list[float] | None:
     """OpenAI文本向量化"""
     api_key = settings.OPENAI_API_KEY
     model = model or settings.OPENAI_EMBEDDING_MODEL
@@ -220,7 +223,7 @@ def has_api_key() -> bool:
     return bool(settings.OPENAI_API_KEY if settings.AI_PROVIDER == "openai" else settings.QWEN_API_KEY)
 
 
-async def chat_completion(messages: List[dict], model: str = None) -> str:
+async def chat_completion(messages: list[dict[str, Any]], model: str | None = None) -> str:
     """统一对话接口（非流式）"""
     provider = settings.AI_PROVIDER
     
@@ -230,7 +233,7 @@ async def chat_completion(messages: List[dict], model: str = None) -> str:
         return await qwen_chat(messages, model=model)
 
 
-async def chat_completion_stream(messages: List[dict], model: str = None) -> AsyncGenerator[str, None]:
+async def chat_completion_stream(messages: list[dict[str, Any]], model: str | None = None) -> AsyncGenerator[str]:
     """统一对话接口（流式）"""
     provider = settings.AI_PROVIDER
     
@@ -242,7 +245,7 @@ async def chat_completion_stream(messages: List[dict], model: str = None) -> Asy
             yield chunk
 
 
-async def get_embedding(text: str) -> Optional[List[float]]:
+async def get_embedding(text: str) -> list[float] | None:
     """统一Embedding接口"""
     provider = settings.AI_PROVIDER
     
@@ -252,7 +255,7 @@ async def get_embedding(text: str) -> Optional[List[float]]:
         return await qwen_embedding(text)
 
 
-async def close():
+async def close() -> None:
     """关闭HTTP客户端"""
     global _http_client
     if _http_client and not _http_client.is_closed:

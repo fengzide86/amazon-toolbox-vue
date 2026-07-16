@@ -1,5 +1,6 @@
 import { api, API_BASE, type ApiQueryParams } from './index'
 import { authService } from '../auth'
+import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
 
 type EntityId = string | number
 
@@ -17,7 +18,7 @@ export const getLogs = (userIdOrParams: number | ApiQueryParams = {}): Promise<u
 export async function exportLogs(params: ApiQueryParams = {}): Promise<Blob> {
   const query = queryString(params)
   const token = authService.getAuth()?.token || localStorage.getItem('toolbox_token')
-  const headers = token ? { Authorization: `Bearer ${token}` } : undefined
+  const headers = toolboxVersionHeaders(token ? { Authorization: `Bearer ${token}` } : {})
   const response = await fetch(`${API_BASE}/api/logs/export${query ? `?${query}` : ''}`, { headers })
   return response.blob()
 }

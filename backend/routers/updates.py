@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.staticfiles import StaticFiles
 
 from core.dependencies import get_current_admin
+from core.deprecation import log_deprecated_api_call
 from core.response import success_response
 from domains.updates.service import UpdateReleaseService
 
@@ -45,8 +46,13 @@ async def delete_staged_release(version: str, _admin: dict[str, object] = Depend
 
 
 @router.post("/upload")
-async def upload_update(file: UploadFile = File(...), _admin: dict[str, object] = Depends(get_current_admin)) -> object:
+async def upload_update(
+    request: Request,
+    file: UploadFile = File(...),
+    _admin: dict[str, object] = Depends(get_current_admin),
+) -> object:
     """旧管理员客户端兼容入口；新界面不再使用。"""
+    log_deprecated_api_call(request, "/api/updates/upload")
     return success_response(data=await release_service.legacy_upload(file))
 
 

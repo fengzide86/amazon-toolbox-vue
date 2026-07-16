@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 
 from core.security import create_access_token
 from models import ChatSession, Feedback, KnowledgeBase, User
-from services import ai_chat_service, faq_service
+from domains.knowledge import chat_service as ai_chat_service, faq_service
 
 
 @pytest.mark.asyncio
@@ -15,8 +15,8 @@ async def test_faq_hit_skips_embedding_and_model(db_session):
     ))
     await db_session.commit()
 
-    with patch("services.ai_chat_service.ai_provider.get_embedding", new=AsyncMock()) as embedding, \
-         patch("services.ai_chat_service.ai_provider.chat_completion", new=AsyncMock()) as chat:
+    with patch("domains.knowledge.chat_service.ai_provider.get_embedding", new=AsyncMock()) as embedding, \
+         patch("domains.knowledge.chat_service.ai_provider.chat_completion", new=AsyncMock()) as chat:
         result = await ai_chat_service.answer_question(db_session, "工具箱如何安装？", "amazon")
 
     assert result["answer_mode"] == "faq"
@@ -28,10 +28,10 @@ async def test_faq_hit_skips_embedding_and_model(db_session):
 
 @pytest.mark.asyncio
 async def test_rag_miss_calls_embedding_and_model_once(db_session):
-    with patch("services.ai_chat_service.ai_provider.has_api_key", return_value=True), \
-         patch("services.ai_chat_service.ai_provider.get_embedding", new=AsyncMock(return_value=[0.1, 0.2])) as embedding, \
-         patch("services.ai_chat_service.vector_store.search_knowledge", new=AsyncMock(return_value=[])) as search, \
-         patch("services.ai_chat_service.ai_provider.chat_completion", new=AsyncMock(return_value="AI 回答")) as chat:
+    with patch("domains.knowledge.chat_service.ai_provider.has_api_key", return_value=True), \
+         patch("domains.knowledge.chat_service.ai_provider.get_embedding", new=AsyncMock(return_value=[0.1, 0.2])) as embedding, \
+         patch("domains.knowledge.chat_service.vector_store.search_knowledge", new=AsyncMock(return_value=[])) as search, \
+         patch("domains.knowledge.chat_service.ai_provider.chat_completion", new=AsyncMock(return_value="AI 回答")) as chat:
         result = await ai_chat_service.answer_question(db_session, "一个未收录的问题", "amazon")
 
     assert result["answer_mode"] == "rag"
@@ -60,7 +60,7 @@ async def test_admin_debug_does_not_create_session(client, db_session, admin_tok
         "reply": "测试", "answer_mode": "faq", "ai_used": False,
         "knowledge_refs": [], "fallback_reason": None, "diagnostics": {"total_ms": 1},
     }
-    with patch("services.ai_chat_service.answer_question", new=AsyncMock(return_value=fake)):
+    with patch("domains.knowledge.chat_service.answer_question", new=AsyncMock(return_value=fake)):
         response = await client.post(
             "/api/ai-chat/admin/debug", json={"message": "测试"},
             headers={"Authorization": f"Bearer {admin_token}"},
