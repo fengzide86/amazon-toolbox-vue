@@ -8,7 +8,7 @@ import re
 import shutil
 import threading
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
 
@@ -68,7 +68,7 @@ class UpdateReleaseService:
                 "status": "staged",
                 "files": staged,
                 "manifest": manifest,
-                "staged_at": datetime.now(UTC).isoformat(),
+                "staged_at": datetime.now(timezone.utc).isoformat(),
             }
             (temp / "stage.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             if target.exists():
@@ -109,7 +109,7 @@ class UpdateReleaseService:
         manifest_temp = self.releases_dir / ".latest.yml.tmp"
         shutil.copy2(source / manifest_name, manifest_temp)
         os.replace(manifest_temp, self.releases_dir / "latest.yml")
-        published_at = datetime.now(UTC).isoformat()
+        published_at = datetime.now(timezone.utc).isoformat()
         (source / "published.json").write_text(
             json.dumps({"version": version, "published_at": published_at}, ensure_ascii=False), encoding="utf-8"
         )
