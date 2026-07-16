@@ -44,6 +44,27 @@ export interface LoginPayload {
   user?: AuthenticatedUser | null
 }
 
+export const publicSettingsSchema = z.array(z.object({
+  key: z.string(),
+  value: z.string().nullable().optional(),
+}).passthrough())
+
+export const licenseLoginResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().default('登录失败'),
+  data: authenticatedUserSchema.extend({
+    token: z.string(),
+    user_id: z.union([z.string(), z.number()]).optional(),
+    code: z.string().optional(),
+    plan_name: z.string().optional(),
+    plan_code: z.string().nullable().optional(),
+    platform_scope: z.array(z.string()).optional(),
+    product_type: z.enum(['consumer', 'business']).default('consumer'),
+    business_workspace_enabled: z.boolean().default(false),
+    entitlements: entitlementsSchema.default({}),
+  }).passthrough().optional(),
+}).passthrough()
+
 export function parseStoredUser(raw: string | null): AuthenticatedUser | null {
   if (!raw) return null
   try {

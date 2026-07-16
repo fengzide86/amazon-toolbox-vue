@@ -227,7 +227,7 @@
   </main>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Auth, showToast, getDeviceId, getDeviceName } from '@/utils'
@@ -236,12 +236,13 @@ import { api } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
 import { saveRememberedUserCode } from '@/utils/credentialStore'
 import { Zap, Check, CircleAlert, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
+import { licenseLoginResponseSchema, publicSettingsSchema } from '@/features/auth/model'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const authCode = ref('')
-const authCodeInput = ref(null)
+const authCodeInput = ref<HTMLInputElement | null>(null)
 const isLoading = ref(false)
 const showError = ref(false)
 const showHelpModal = ref(false)
@@ -297,8 +298,8 @@ function checkOnlineStatus() {
 
 async function loadWechatId() {
   try {
-    const settings = await api.get('/api/settings/public')
-    const wxSetting = settings.find(s => s.key === 'wechat_id' || s.key === 'service_wechat')
+    const settings = publicSettingsSchema.parse(await api.get('/api/settings/public'))
+    const wxSetting = settings.find((setting) => setting.key === 'wechat_id' || setting.key === 'service_wechat')
     if (wxSetting && wxSetting.value) {
       wechatId.value = wxSetting.value
     }
@@ -308,7 +309,7 @@ async function loadWechatId() {
   }
 }
 
-function validateAuthCode(code) {
+function validateAuthCode(code: string): { valid: true } | { valid: false; message: string } {
   const trimmed = code.trim()
   if (!trimmed) return { valid: false, message: '请输入授权码' }
   if (trimmed.length < 4) return { valid: false, message: '授权码格式不正确，请检查后重试' }
@@ -341,8 +342,10 @@ function handleLogin() {
   isLoading.value = true
 
   verifyAuthCode(authCode.value.trim(), deviceId.value, deviceName.value)
-    .then((res) => {
+    .then((response) => {
+      const res = licenseLoginResponseSchema.parse(response)
       if (res.success) {
+        if (!res.data) throw new Error('授权登录响应缺少用户信息')
         userStore.setLogin({
           token: res.data.token,
           role: 'user',
@@ -373,7 +376,7 @@ function handleLogin() {
         focusLoginInput()
       }
     })
-    .catch((err) => {
+    .catch(() => {
       errorMessage.value = '网络连接失败，请检查后端服务'
       showError.value = true
       isOnline.value = false
