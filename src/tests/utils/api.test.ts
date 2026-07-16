@@ -6,6 +6,7 @@ import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getAuthCo
 
 // Mock fetch
 global.fetch = vi.fn()
+const mockedFetch = global.fetch as ReturnType<typeof vi.fn>
 
 describe('API Utils', () => {
   beforeEach(() => {
@@ -17,7 +18,7 @@ describe('API Utils', () => {
   describe('api.get', () => {
     it('应该发送 GET 请求', async () => {
       const mockResponse = { success: true, data: ['item1', 'item2'] }
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockResponse)
       })
@@ -34,36 +35,36 @@ describe('API Utils', () => {
     })
 
     it('应该正确处理查询参数', async () => {
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
 
       await api.get('/api/test', { page: 1, size: 10 })
 
-      const calledUrl = global.fetch.mock.calls[0][0]
+      const calledUrl = mockedFetch.mock.calls[0][0]
       expect(calledUrl).toContain('page=1')
       expect(calledUrl).toContain('size=10')
     })
 
     it('应该自动添加 Token 到请求头', async () => {
       localStorage.setItem('toolbox_token', 'test-token-123')
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
 
       await api.get('/api/test')
 
-      const calledConfig = global.fetch.mock.calls[0][1]
-      expect(calledConfig.headers.Authorization).toBe('Bearer test-token-123')
+      const calledConfig = mockedFetch.mock.calls[0][1]
+      expect((calledConfig.headers as Record<string, string>).Authorization).toBe('Bearer test-token-123')
     })
   })
 
   describe('api.post', () => {
     it('应该发送 POST 请求', async () => {
       const mockData = { success: true }
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockData)
       })
@@ -84,28 +85,28 @@ describe('API Utils', () => {
 
   describe('api.put', () => {
     it('应该发送 PUT 请求', async () => {
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
 
       await api.put('/api/test/1', { name: 'updated' })
 
-      const calledConfig = global.fetch.mock.calls[0][1]
+      const calledConfig = mockedFetch.mock.calls[0][1]
       expect(calledConfig.method).toBe('PUT')
     })
   })
 
   describe('api.delete', () => {
     it('应该发送 DELETE 请求', async () => {
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({})
       })
 
       await api.delete('/api/test/1')
 
-      const calledConfig = global.fetch.mock.calls[0][1]
+      const calledConfig = mockedFetch.mock.calls[0][1]
       expect(calledConfig.method).toBe('DELETE')
     })
   })
@@ -121,7 +122,7 @@ describe('API Utils', () => {
     })
 
     it('4xx 请求不应重试并保留状态码', async () => {
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: false, status: 403,
         json: () => Promise.resolve({ detail: '禁止访问' })
       })
@@ -135,7 +136,7 @@ describe('API Utils', () => {
       sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'user-token' }))
       sessionStorage.setItem('toolbox_token', 'user-token')
       sessionStorage.setItem('toolbox_role', 'user')
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: false, status: 403,
         json: () => Promise.resolve({ message: '当前套餐暂未包含该工具', error_code: 3006 })
       })
@@ -148,7 +149,7 @@ describe('API Utils', () => {
     })
 
     it('POST 服务端错误不应自动重试', async () => {
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         ok: false, status: 500,
         json: () => Promise.resolve({ detail: '服务异常' })
       })
@@ -159,7 +160,7 @@ describe('API Utils', () => {
 
   describe('业务 API 函数', () => {
     beforeEach(() => {
-      global.fetch.mockResolvedValue({
+      mockedFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true, data: {} })
       })
@@ -213,12 +214,12 @@ describe('API Utils', () => {
 
     it('授权码更新和删除应把真实 ID 放进请求路径', async () => {
       await updateAuthCode(42, { note: 'updated' })
-      expect(global.fetch.mock.calls[0][0]).toContain('/api/auth-codes/42')
+      expect(mockedFetch.mock.calls[0][0]).toContain('/api/auth-codes/42')
 
       vi.clearAllMocks()
-      global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
+      mockedFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
       await deleteAuthCode('CODE-9')
-      expect(global.fetch.mock.calls[0][0]).toContain('/api/auth-codes/CODE-9')
+      expect(mockedFetch.mock.calls[0][0]).toContain('/api/auth-codes/CODE-9')
     })
 
     it('getOrders 应该调用正确的接口', async () => {
@@ -251,7 +252,7 @@ describe('API Utils', () => {
     it('getLogs 应该支持 user_id 参数', async () => {
       await getLogs(42)
 
-      const calledUrl = global.fetch.mock.calls[0][0]
+      const calledUrl = mockedFetch.mock.calls[0][0]
       expect(calledUrl).toContain('user_id=42')
     })
 

@@ -18,7 +18,27 @@ const EVENTS = Object.freeze({
   ARTIFACT_CREATED: 'artifact.created',
 });
 
-function createSteps(tool = {}) {
+interface LaunchGrant {
+  expiresAt?: string
+  expiresIn?: number
+  scriptKey?: string
+  runnerApiVersion?: number
+  toolVersion?: string
+}
+
+interface ExecutionContext extends Record<string, unknown> {
+  sessionId?: string
+  input?: unknown
+}
+
+interface AutomationTool extends Record<string, unknown> {
+  platformKey?: string
+  targetUrl?: string
+  launchGrant?: LaunchGrant
+  executionContext?: ExecutionContext
+}
+
+function createSteps(tool: AutomationTool = {}) {
   const platformName = tool.platformKey === 'aliexpress' ? '速卖通' : '亚马逊';
   const scriptKey = tool.launchGrant?.scriptKey || '';
   const isRegisterFlow = scriptKey.includes('register');
@@ -37,8 +57,8 @@ function createSteps(tool = {}) {
   ];
 }
 
-function browserCandidates(env = process.env) {
-  const candidates = [env.TOOLBOX_BROWSER_EXECUTABLE];
+function browserCandidates(env: NodeJS.ProcessEnv = process.env): string[] {
+  const candidates: Array<string | undefined> = [env.TOOLBOX_BROWSER_EXECUTABLE];
   if (process.platform === 'win32') {
     candidates.push(
       env.PROGRAMFILES && path.join(env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
@@ -54,24 +74,24 @@ function browserCandidates(env = process.env) {
   } else {
     candidates.push('/usr/bin/google-chrome', '/usr/bin/microsoft-edge', '/usr/bin/chromium');
   }
-  return candidates.filter(Boolean);
+  return candidates.filter((candidate): candidate is string => Boolean(candidate));
 }
 
-function findBrowserExecutable(env = process.env) {
+function findBrowserExecutable(env: NodeJS.ProcessEnv = process.env): string | null {
   return browserCandidates(env).find(candidate => fs.existsSync(candidate)) || null;
 }
 
-function findBrowserExecutables(env = process.env) {
+function findBrowserExecutables(env: NodeJS.ProcessEnv = process.env): string[] {
   return [...new Set(browserCandidates(env).filter(candidate => fs.existsSync(candidate)))];
 }
 
-function safeProfileName(tool = {}) {
+function safeProfileName(tool: AutomationTool = {}): string {
   const platform = String(tool.platformKey || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
   const session = String(tool.executionContext?.sessionId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
   return `${platform}${session ? `_${session}` : ''}`.slice(0, 90) || 'default';
 }
 
-function publicTool(tool = {}) {
+function publicTool(tool: AutomationTool = {}): AutomationTool {
   const grant = tool.launchGrant || {};
   const executionContext = tool.executionContext || {};
   const { input: _privateInput, ...publicExecutionContext } = executionContext;

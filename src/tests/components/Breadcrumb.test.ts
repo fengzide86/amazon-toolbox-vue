@@ -7,7 +7,7 @@ import { mount, RouterLinkStub } from '@vue/test-utils'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 // Mock vue-router
-const mockRoute = { 
+const mockRoute: { meta: { title?: string } } = {
   meta: { title: '数据总览' }
 }
 

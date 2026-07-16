@@ -3,10 +3,10 @@ import { EventEmitter } from 'node:events'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { EmbeddedBrowserHost } = require('../../../electron/automation/embedded-browser-host.cjs')
+const { EmbeddedBrowserHost } = require('../../../dist-electron/electron/automation/embedded-browser-host.cjs')
 
 function createGuest() {
-  const guest = new EventEmitter()
+  const guest = new EventEmitter() as EventEmitter & Record<string, unknown>
   let url = 'https://example.com/'
   let attached = false
   guest.id = 42
@@ -26,7 +26,7 @@ function createGuest() {
     isAttached: () => attached,
     attach: vi.fn(() => { attached = true }),
     detach: vi.fn(() => { attached = false }),
-    sendCommand: vi.fn(async (command, payload) => {
+    sendCommand: vi.fn(async (_command, _payload) => {
       return {}
     }),
   }

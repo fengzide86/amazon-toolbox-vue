@@ -59,7 +59,7 @@ describe('DevicesView', () => {
   describe('设备列表', () => {
     it('应该渲染设备卡片', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([
+      vi.mocked(getMyDevices).mockResolvedValue([
         {
           id: 1,
           device_name: '我的电脑',
@@ -79,7 +79,7 @@ describe('DevicesView', () => {
 
     it('应该显示绑定时间', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([
+      vi.mocked(getMyDevices).mockResolvedValue([
         {
           id: 1,
           device_name: '我的电脑',
@@ -98,7 +98,7 @@ describe('DevicesView', () => {
 
     it('应该显示解绑按钮', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([
+      vi.mocked(getMyDevices).mockResolvedValue([
         {
           id: 1,
           device_name: '我的电脑',
@@ -119,7 +119,7 @@ describe('DevicesView', () => {
 
     it('只有一个设备时解绑按钮应该禁用', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([
+      vi.mocked(getMyDevices).mockResolvedValue([
         {
           id: 1,
           device_name: '我的电脑',
@@ -140,7 +140,7 @@ describe('DevicesView', () => {
 
     it('多个设备时解绑按钮应该可用', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([
+      vi.mocked(getMyDevices).mockResolvedValue([
         {
           id: 1,
           device_name: '电脑1',
@@ -169,7 +169,7 @@ describe('DevicesView', () => {
   describe('空状态', () => {
     it('没有设备时应该显示空状态', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([])
+      vi.mocked(getMyDevices).mockResolvedValue([])
 
       const wrapper = mount(DevicesView, {
         global: { plugins: [createPinia()] }
@@ -184,7 +184,7 @@ describe('DevicesView', () => {
   describe('解绑操作', () => {
     it('点击解绑应该弹出确认框', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockResolvedValue([
+      vi.mocked(getMyDevices).mockResolvedValue([
         {
           id: 1,
           device_name: '电脑1',
@@ -217,11 +217,11 @@ describe('DevicesView', () => {
   describe('错误处理', () => {
     it('API 失败时应该显示错误提示', async () => {
       const { getMyDevices } = await import('@/utils/api')
-      getMyDevices.mockRejectedValue(new Error('Network error'))
+      vi.mocked(getMyDevices).mockRejectedValue(new Error('Network error'))
 
       const { showToast } = await import('@/utils')
 
-      const wrapper = mount(DevicesView, {
+      mount(DevicesView, {
         global: { plugins: [createPinia()] }
       })
       await flushPromises()

@@ -110,8 +110,6 @@ export default defineConfig(({ mode }) => {
         'vue',
         'vue-router',
         'pinia',
-        'chart.js',
-        'vue-chartjs',
       ],
       exclude: [
         // Sentry 体积大，不预构建
@@ -125,7 +123,6 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             if (!id.includes('node_modules')) return undefined
             if (/[\\/]node_modules[\\/](vue|vue-router|pinia)[\\/]/.test(id)) return 'vendor-vue'
-            if (/[\\/]node_modules[\\/](chart\.js|vue-chartjs)[\\/]/.test(id)) return 'vendor-chart'
             if (mode === 'production' && /[\\/]node_modules[\\/]@sentry[\\/]/.test(id)) return 'vendor-sentry'
             return undefined
           },

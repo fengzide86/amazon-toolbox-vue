@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const { EmbeddedBrowserHostManager } = require('../../../electron/automation/embedded-browser-host-manager.cjs')
+const { EmbeddedBrowserHostManager } = require('../../../dist-electron/electron/automation/embedded-browser-host-manager.cjs')
 
 function guest(id) {
   return {

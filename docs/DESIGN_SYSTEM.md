@@ -70,13 +70,11 @@
 
 ## 组件与布局
 
-- `AppPage`：页面宽度与阅读宽度。
 - `PageHeader`：标题、说明和操作区。
 - `AppSurface`：default/soft/premium 表面与两级高度。
 - `StatusBadge`：由业务状态映射颜色。
 - `EmptyState`：统一空、错误和无权限状态。
 - `DataToolbar`：后台筛选与操作。
-- `PrimaryAction`：用户核心动作。
 - `AppTransition`：统一进入离开并支持 reduced motion。
 
 用户端侧栏 224px、顶部栏 60px，均采用明亮表面。后台共享 Token，但采用紧凑表格密度。1024px 以下侧栏变为抽屉，页面不得产生横向滚动。

@@ -12,6 +12,10 @@ export interface ToolLaunchGrantOptions {
   idempotencyKey?: string
 }
 
+export interface ToolLaunchGrantResult extends Record<string, unknown> {
+  launch_data?: { token?: string; script_key?: string; [key: string]: unknown }
+}
+
 export const getTools = (params: Record<string, QueryValue> = {}): Promise<unknown> => api.get('/api/tools', params)
 export const getToolCategories = (): Promise<unknown> => api.get('/api/tools/categories')
 export const updateTools = (tools: unknown): Promise<unknown> => api.put('/api/tools', tools)
@@ -27,7 +31,7 @@ export async function createToolLaunchGrant(
     clientItemId,
     idempotencyKey,
   }: ToolLaunchGrantOptions = {},
-): Promise<unknown> {
+): Promise<ToolLaunchGrantResult> {
   const params = new URLSearchParams({ platform_key: platformKey || '' })
   const payload: Record<string, unknown> = { platform_key: platformKey, device_id: deviceId }
   if (executionMode === 'batch') {
@@ -39,7 +43,7 @@ export async function createToolLaunchGrant(
   if (idempotencyKey) params.set('idempotency_key', idempotencyKey)
 
   const response = await api.post(`/api/tools/${encodeURIComponent(toolId)}/launch-grant?${params}`, payload)
-  if (typeof response !== 'object' || response === null) return response
+  if (typeof response !== 'object' || response === null) throw new Error('工具启动响应格式无效')
   const record = response as Record<string, unknown>
   if (record.success === false) {
     const error = new Error(typeof record.message === 'string' ? record.message : '工具启动失败') as Error & {
@@ -50,5 +54,7 @@ export async function createToolLaunchGrant(
     error.data = record.detail
     throw error
   }
-  return record.data ?? response
+  const result = record.data ?? response
+  if (typeof result !== 'object' || result === null) throw new Error('工具启动数据格式无效')
+  return result as ToolLaunchGrantResult
 }

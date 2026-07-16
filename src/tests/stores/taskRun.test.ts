@@ -98,7 +98,10 @@ describe('taskRun store', () => {
       start: vi.fn(() => Promise.resolve({ runId: 'local_run_1' })),
       pause: vi.fn(),
       resume: vi.fn(),
+      completeUserAction: vi.fn(),
       cancel: vi.fn(),
+      registerBrowser: vi.fn(),
+      unregisterBrowser: vi.fn(),
     }
     window.electronAPI = { automation }
     const store = useTaskRunStore()

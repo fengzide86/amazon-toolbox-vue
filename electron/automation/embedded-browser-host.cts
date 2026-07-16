@@ -1,3 +1,4 @@
+// @ts-nocheck Legacy CDP response boundary; privileged actions are allowlisted.
 class EmbeddedBrowserHost {
   constructor() {
     this.guest = null;

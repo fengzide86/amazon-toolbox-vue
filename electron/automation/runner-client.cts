@@ -1,0 +1,145 @@
+import { fork, type ChildProcess } from 'node:child_process'
+
+type UnknownRecord = Record<string, unknown>
+type RunnerEvent = UnknownRecord & { type?: string }
+type HostRequest = { type: 'host-request'; id: string; action: string; payload?: UnknownRecord }
+type RunnerResponse = {
+  type: 'response'
+  id: string
+  ok: boolean
+  data?: unknown
+  error?: { code?: string; message?: string }
+}
+type RunnerMessage = { type: 'event'; event: RunnerEvent } | HostRequest | RunnerResponse
+type ForkRunner = typeof fork
+
+interface PendingCommand {
+  resolve: (value: unknown) => void
+  reject: (reason?: unknown) => void
+  timer: NodeJS.Timeout
+}
+
+interface RunnerClientOptions {
+  scriptPath: string
+  env?: NodeJS.ProcessEnv
+  onEvent?: (event: RunnerEvent) => void
+  onHostRequest?: ((action: string, payload: UnknownRecord) => Promise<unknown> | unknown) | null
+  forkFn?: ForkRunner
+  timeoutMs?: number
+}
+
+function errorDetails(error: unknown): { code: string; message: string } {
+  if (error instanceof Error) {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : 'BROWSER_HOST_ERROR'
+    return { code, message: error.message }
+  }
+  return { code: 'BROWSER_HOST_ERROR', message: 'Browser host request failed' }
+}
+
+export class RunnerClient {
+  private readonly scriptPath: string
+  private readonly env: NodeJS.ProcessEnv
+  private readonly onEvent: (event: RunnerEvent) => void
+  private readonly onHostRequest: RunnerClientOptions['onHostRequest']
+  private readonly forkFn: ForkRunner
+  private readonly timeoutMs: number
+  private child: ChildProcess | null = null
+  private readonly pending = new Map<string, PendingCommand>()
+  private sequence = 0
+
+  constructor({ scriptPath, env = {}, onEvent = () => undefined, onHostRequest = null, forkFn = fork, timeoutMs = 15000 }: RunnerClientOptions) {
+    this.scriptPath = scriptPath
+    this.env = env
+    this.onEvent = onEvent
+    this.onHostRequest = onHostRequest
+    this.forkFn = forkFn
+    this.timeoutMs = timeoutMs
+  }
+
+  private ensureStarted(): void {
+    if (this.child?.connected) return
+    const options = {
+      env: { ...process.env, ...this.env, ELECTRON_RUN_AS_NODE: '1' },
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+      windowsHide: true,
+    } as Parameters<ForkRunner>[2]
+    const child = this.forkFn(this.scriptPath, [], options)
+    this.child = child
+    child.on('message', message => this.handleMessage(message))
+    child.on('exit', (code, signal) => this.handleExit(code, signal))
+    child.on('error', error => this.handleExit(null, null, error))
+    child.stdout?.on('data', data => console.log('[AutomationRunner]', String(data).trim()))
+    child.stderr?.on('data', data => console.error('[AutomationRunner]', String(data).trim()))
+  }
+
+  private handleMessage(rawMessage: unknown): void {
+    if (!rawMessage || typeof rawMessage !== 'object' || !('type' in rawMessage)) return
+    const message = rawMessage as RunnerMessage
+    if (message.type === 'event') {
+      this.onEvent(message.event)
+      return
+    }
+    if (message.type === 'host-request') {
+      void this.handleHostRequest(message)
+      return
+    }
+    if (message.type !== 'response') return
+    const pending = this.pending.get(message.id)
+    if (!pending) return
+    clearTimeout(pending.timer)
+    this.pending.delete(message.id)
+    if (message.ok) pending.resolve(message.data)
+    else pending.reject(Object.assign(new Error(message.error?.message || 'Runner command failed'), message.error))
+  }
+
+  private async handleHostRequest(message: HostRequest): Promise<void> {
+    const child = this.child
+    if (!child?.connected) return
+    try {
+      if (!this.onHostRequest) throw Object.assign(new Error('Browser host is unavailable'), { code: 'BROWSER_HOST_UNAVAILABLE' })
+      const data = await this.onHostRequest(message.action, message.payload || {})
+      child.send?.({ type: 'host-response', id: message.id, ok: true, data })
+    } catch (error) {
+      child.send?.({ type: 'host-response', id: message.id, ok: false, error: errorDetails(error) })
+    }
+  }
+
+  private handleExit(code: number | null, signal: NodeJS.Signals | null, error?: Error): void {
+    const message = error?.message || `Runner exited (code=${code}, signal=${signal || 'none'})`
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timer)
+      pending.reject(new Error(message))
+    }
+    this.pending.clear()
+    this.child = null
+  }
+
+  command(command: string, payload: UnknownRecord = {}): Promise<unknown> {
+    this.ensureStarted()
+    this.sequence += 1
+    const id = `cmd_${Date.now()}_${this.sequence}`
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id)
+        reject(new Error(`Runner command timed out: ${command}`))
+      }, this.timeoutMs)
+      this.pending.set(id, { resolve, reject, timer })
+      this.child?.send?.({ type: 'command', id, command, payload })
+    })
+  }
+
+  start(tool: UnknownRecord): Promise<unknown> { return this.command('start', { tool }) }
+  pause(): Promise<unknown> { return this.command('pause') }
+  resume(): Promise<unknown> { return this.command('resume') }
+  completeUserAction(): Promise<unknown> { return this.command('complete-user-action') }
+  cancel(): Promise<unknown> { return this.command('cancel') }
+
+  async stop(): Promise<void> {
+    if (!this.child) return
+    const child = this.child
+    try { await this.command('shutdown') } catch { /* Runner may already be gone. */ }
+    if (child.connected) child.disconnect()
+    child.kill()
+    this.child = null
+  }
+}

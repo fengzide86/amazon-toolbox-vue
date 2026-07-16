@@ -4,7 +4,7 @@ import { ref, computed } from 'vue'
 export interface PlatformInfo {
   key: string
   name: string
-  short_name: string
+  short_name?: string
   status: string
   sort_order?: number
 }

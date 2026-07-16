@@ -3,7 +3,7 @@
  * 测试 Auth、authService、userStore 三者协同工作
  * 防止格式不一致导致的认证问题
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { Auth } from '@/utils'
 import { authService } from '@/utils/auth'
 import { setActivePinia, createPinia } from 'pinia'

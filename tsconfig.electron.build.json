@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": false,
-    "sourceMap": true
+    "sourceMap": false
   },
   "exclude": ["electron/**/*.spec.ts", "electron/**/*.test.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]
 }

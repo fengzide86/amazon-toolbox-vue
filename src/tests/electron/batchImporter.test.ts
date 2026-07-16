@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const { parseBatchFile, writeBatchErrors } = require('../../../electron/automation/batch-importer.cjs')
+const { parseBatchFile, writeBatchErrors } = require('../../../dist-electron/electron/automation/batch-importer.cjs')
 const temporaryDirectories = []
 
 async function tempFile(name, content) {

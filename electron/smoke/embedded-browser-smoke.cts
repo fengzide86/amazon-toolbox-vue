@@ -1,10 +1,11 @@
+// @ts-nocheck Runtime-only Electron smoke harness.
 const { app, BrowserWindow } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { EmbeddedBrowserHost } = require('../electron/automation/embedded-browser-host.cjs');
-const { RunnerClient } = require('../electron/automation/runner-client.cjs');
+const { EmbeddedBrowserHost } = require('../automation/embedded-browser-host.cjs');
+const { RunnerClient } = require('../automation/runner-client.cjs');
 
 let runner;
 let grantServer;
@@ -48,7 +49,7 @@ app.whenReady().then(async () => {
       host.register(guest);
       const completed = new Promise((resolve, reject) => {
         runner = new RunnerClient({
-          scriptPath: path.resolve(__dirname, '../electron/automation-runner.cjs'),
+          scriptPath: path.resolve(__dirname, '../automation-runner.cjs'),
           env: {
             TOOLBOX_CONTROL_API_URL: `http://127.0.0.1:${grantPort}`,
             TOOLBOX_ARTIFACT_ROOT: artifactRoot,

@@ -1,6 +1,8 @@
 {
   "name": "amazon-toolbox",
   "version": "1.7.2",
+  "description": "面向跨境电商业务的桌面自动化效率工具箱",
+  "author": "Amazon Toolbox Team",
   "private": true,
   "type": "module",
   "main": "dist-electron/electron/desktop-main.cjs",
@@ -16,39 +18,35 @@
     "release:validate": "tsx scripts/validate-release-env.ts",
     "electron:release": "npm run release:validate && npm run backend:build && npm run electron:compile && npm run build:desktop && set \"ELECTRON_CACHE=D:\\AmazonToolboxData\\electron-cache\"&& set \"ELECTRON_BUILDER_CACHE=D:\\AmazonToolboxData\\electron-builder-cache\"&& set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win nsis \"-c.publish.url=%ELECTRON_UPDATE_URL%\"",
     "electron:preview": "npm run electron:compile && electron .",
-    "test": "vitest run",
-    "test:run": "vitest run",
+    "test": "npm run electron:compile && vitest run",
+    "test:run": "npm run electron:compile && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test",
     "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.ts",
-    "test:embedded-browser": "electron scripts/embedded-browser-smoke.cjs",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
+    "test:embedded-browser": "npm run electron:compile && electron dist-electron/electron/smoke/embedded-browser-smoke.cjs",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"tests/**/*.ts\" \"*.config.ts\"",
     "security:audit": "python scripts/audit_secrets.py",
     "security:audit-history": "python scripts/audit_secrets.py --history",
-    "build:verify": "npm run build && tsx scripts/verify-build.ts"
+    "deadcode": "tsx scripts/audit-dead-code.ts",
+    "build:verify": "npm run build && tsx scripts/verify-build.ts",
+    "verify:backend": "python -m pytest backend --rootdir=backend -q && python -m ruff check backend && python -m mypy --config-file backend/pyproject.toml backend/app backend/domains",
+    "verify": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run deadcode && npm test && npm run electron:compile && npm run build:desktop && npm run verify:backend"
   },
   "dependencies": {
-    "@element-plus/icons-vue": "^2.3.2",
-    "@lucide/vue": "^1.21.0",
-    "@sentry/vue": "^10.57.0",
-    "chart.js": "^4.5.1",
     "electron-updater": "^6.8.3",
-    "element-plus": "^2.14.2",
     "exceljs": "^4.4.0",
-    "pinia": "^3.0.4",
     "playwright-core": "^1.61.1",
-    "vue": "^3.4.21",
-    "vue-chartjs": "^5.3.3",
-    "vue-router": "^4.3.0",
-    "web-vitals": "^5.3.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "@eslint/js": "^10.0.1",
     "@fullhuman/postcss-purgecss": "^8.0.0",
+    "@lucide/vue": "^1.21.0",
     "@playwright/test": "^1.61.0",
+    "@sentry/vue": "^10.57.0",
     "@types/node": "^26.1.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/coverage-v8": "^4.1.10",
@@ -56,11 +54,13 @@
     "autoprefixer": "^10.5.0",
     "electron": "^42.4.1",
     "electron-builder": "^26.8.1",
+    "element-plus": "^2.14.2",
     "eslint": "^10.7.0",
     "eslint-plugin-vue": "^10.9.2",
     "globals": "^17.7.0",
     "happy-dom": "^20.10.2",
     "jsdom": "^29.1.1",
+    "pinia": "^3.0.4",
     "rollup-plugin-visualizer": "^7.0.1",
     "terser": "^5.48.0",
     "tsx": "^4.23.1",
@@ -71,7 +71,10 @@
     "vite": "^8.1.4",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.10",
-    "vue-tsc": "^3.3.7"
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "vue-tsc": "^3.3.7",
+    "web-vitals": "^5.3.0"
   },
   "overrides": {
     "exceljs": {
@@ -90,22 +93,23 @@
       {
         "from": "electron/toolbox-backend.exe",
         "to": "toolbox-backend.exe"
-      },
-      {
-        "from": "electron/start-backend.bat",
-        "to": "start-backend.bat"
       }
     ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "electron/**/*",
-      "!electron/toolbox-backend.exe"
+      "!**/*.map",
+      "!**/*.ts",
+      "!**/*.cts",
+      "!**/test/**",
+      "!**/tests/**",
+      "!**/*.md"
     ],
     "asarUnpack": [
       "node_modules/playwright-core/**/*"
     ],
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]

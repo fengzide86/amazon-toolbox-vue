@@ -1,13 +1,14 @@
+// @ts-nocheck Legacy composition boundary; typed IPC modules are migrated independently.
 const { app, BrowserWindow, dialog, ipcMain, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const os = require('os');
-const { UpdateManager } = require('../dist-electron/electron/core/update-manager.cjs');
-const { registerAppProtocol, registerAppScheme } = require('../dist-electron/electron/core/app-protocol.cjs');
-const { BackendProcessManager } = require('../dist-electron/electron/core/backend-process-manager.cjs');
-const { CredentialManager } = require('../dist-electron/electron/core/credential-manager.cjs');
-const { NotificationManager } = require('../dist-electron/electron/core/notification-manager.cjs');
+const { UpdateManager } = require('./core/update-manager.cjs');
+const { registerAppProtocol, registerAppScheme } = require('./core/app-protocol.cjs');
+const { BackendProcessManager } = require('./core/backend-process-manager.cjs');
+const { CredentialManager } = require('./core/credential-manager.cjs');
+const { NotificationManager } = require('./core/notification-manager.cjs');
 const { RunnerClient } = require('./automation/runner-client.cjs');
 const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
 const { EmbeddedBrowserHostManager } = require('./automation/embedded-browser-host-manager.cjs');
@@ -303,60 +304,22 @@ function cleanupAutomationRunner() {
 
 // ===== 后端进程管理 =====
 
-// 等待后端就绪（轮询健康检查接口）
-function waitForBackend(maxWaitMs = 15000) {
-  const http = require('http');
-  const startTime = Date.now();
-  const pollInterval = 500; // 每 500ms 检查一次
-
-  return new Promise((resolve) => {
-    function poll() {
-      const elapsed = Date.now() - startTime;
-      if (elapsed > maxWaitMs) {
-        console.log('[Backend] 健康检查超时（' + maxWaitMs + 'ms），继续加载窗口');
-        resolve(false);
-        return;
-      }
-
-      const req = http.get('http://localhost:8000/api/health', (res) => {
-        if (res.statusCode === 200) {
-          console.log('[Backend] 健康检查通过，后端已就绪 (' + elapsed + 'ms)');
-          resolve(true);
-        } else {
-          setTimeout(poll, pollInterval);
-        }
-        res.resume(); // 消费响应数据，避免内存泄漏
-      });
-      req.on('error', () => {
-        // 连接被拒绝 = 后端还没启动好，继续等
-        setTimeout(poll, pollInterval);
-      });
-      req.setTimeout(1000, () => {
-        req.destroy();
-        setTimeout(poll, pollInterval);
-      });
-    }
-    poll();
-  });
-}
-
 function createWindow() {
   // 检测开发模式：环境变量或 dist 目录不存在
   const isDev = process.env.NODE_ENV === 'development' 
-    || !require('fs').existsSync(path.join(__dirname, '../dist'));
+    || !require('fs').existsSync(path.join(__dirname, '../../dist'));
   
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    icon: path.join(__dirname, 'icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
       webviewTag: true,
-      preload: path.join(__dirname, '../dist-electron/electron/preload.cjs'),
+      preload: path.join(__dirname, 'preload.cjs'),
       additionalArguments: [
         `--toolbox-control-api-base=${CONTROL_API_BASE}`,
         `--toolbox-device-id=${DEVICE_IDENTITY.deviceId}`,
@@ -424,7 +387,7 @@ app.whenReady().then(async () => {
 
   // 检测开发模式
   const isDev = process.env.NODE_ENV === 'development' 
-    || !require('fs').existsSync(path.join(__dirname, '../dist'));
+    || !require('fs').existsSync(path.join(__dirname, '../../dist'));
 
   // 仅兼容期的 localhost 配置启动旧 Python 后端；远程控制面模式不再携带服务端进程。
   if (!isDev && USE_BUNDLED_BACKEND) {
@@ -434,7 +397,7 @@ app.whenReady().then(async () => {
     console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }
 
-  if (!isDev) registerAppProtocol(path.join(__dirname, '../dist'));
+  if (!isDev) registerAppProtocol(path.join(__dirname, '../../dist'));
 
   updateManager = new UpdateManager({
     ipcMain,

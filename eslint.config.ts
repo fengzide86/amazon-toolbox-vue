@@ -16,8 +16,19 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'vue/multi-word-component-names': 'off',
       'vue/require-default-prop': 'off',
+    },
+  },
+  {
+    files: ['electron/**/*.cts'],
+    rules: {
+      // .cts deliberately emits CommonJS for Electron and may load optional runtime modules.
+      '@typescript-eslint/no-require-imports': 'off',
+      // Legacy runtime boundaries are isolated while their typed replacements land vertically.
+      '@typescript-eslint/ban-ts-comment': ['error', { 'ts-nocheck': false }],
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 )

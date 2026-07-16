@@ -3,8 +3,14 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { RunnerClient } = require('../../../electron/automation/runner-client.cjs')
-const { createSteps, safeProfileName } = require('../../../electron/automation/runtime.cjs')
+const { RunnerClient } = require('../../../dist-electron/electron/automation/runner-client.cjs')
+const { createSteps, safeProfileName } = require('../../../dist-electron/electron/automation/runtime.cjs')
+
+interface RunnerEvent extends Record<string, unknown> {
+  type: string
+  result: { runner?: string }
+  tool: { launchGrant: { token?: string } }
+}
 
 describe('Node Automation Runner', () => {
   let client
@@ -15,11 +21,11 @@ describe('Node Automation Runner', () => {
   })
 
   it('使用独立进程按统一协议完成一轮任务', async () => {
-    const events = []
-    let resolveCompleted
-    const completed = new Promise(resolve => { resolveCompleted = resolve })
+    const events: RunnerEvent[] = []
+    let resolveCompleted: (event: RunnerEvent) => void = () => undefined
+    const completed = new Promise<RunnerEvent>(resolve => { resolveCompleted = resolve })
     client = new RunnerClient({
-      scriptPath: path.resolve(process.cwd(), 'electron/automation-runner.cjs'),
+      scriptPath: path.resolve(process.cwd(), 'dist-electron/electron/automation-runner.cjs'),
       env: { TOOLBOX_RUNNER_MOCK: 'true' },
       onEvent: event => {
         events.push(event)
@@ -64,11 +70,11 @@ describe('Node Automation Runner', () => {
   })
 
   it('把嵌入浏览器动作双向转发给 Electron Browser Host', async () => {
-    const actions = []
-    let resolveCompleted
-    const completed = new Promise(resolve => { resolveCompleted = resolve })
+    const actions: string[] = []
+    let resolveCompleted: (event: RunnerEvent) => void = () => undefined
+    const completed = new Promise<RunnerEvent>(resolve => { resolveCompleted = resolve })
     client = new RunnerClient({
-      scriptPath: path.resolve(process.cwd(), 'electron/automation-runner.cjs'),
+      scriptPath: path.resolve(process.cwd(), 'dist-electron/electron/automation-runner.cjs'),
       env: { TOOLBOX_RUNNER_MOCK: 'true' },
       onHostRequest: async (action, payload) => {
         actions.push(action)

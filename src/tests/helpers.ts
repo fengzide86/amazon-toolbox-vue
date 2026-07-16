@@ -3,6 +3,8 @@
  * 提供带 Pinia 的组件挂载函数
  */
 import { mount } from '@vue/test-utils'
+import type { Component } from 'vue'
+import type { MountingOptions } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 /**
@@ -11,7 +13,7 @@ import { createPinia, setActivePinia } from 'pinia'
  * @param {Object} options - mount 选项
  * @returns {Object} wrapper
  */
-export function mountWithPinia(component, options = {}) {
+export function mountWithPinia(component: Component, options: MountingOptions<Record<string, unknown>> = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   

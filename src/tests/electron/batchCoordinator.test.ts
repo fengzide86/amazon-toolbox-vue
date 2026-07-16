@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const { BatchCoordinator } = require('../../../electron/automation/batch-coordinator.cjs')
+const { BatchCoordinator } = require('../../../dist-electron/electron/automation/batch-coordinator.cjs')
 
 function createHarness() {
   const ready = new Set()

@@ -6,6 +6,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { usePlatformStore } from '@/stores/platform'
 
+globalThis.fetch = vi.fn()
+const mockedFetch = vi.mocked(globalThis.fetch)
+
 // Mock localStorage
 const localStorageMock = {
   store: {},
@@ -19,9 +22,6 @@ const localStorageMock = {
     this.store = {}
   }
 }
-
-// Mock fetch API
-global.fetch = vi.fn()
 
 describe('Platform Store', () => {
   beforeEach(() => {
@@ -181,7 +181,7 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 成功响应
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         json: async () => [
           { key: 'amazon', name: '亚马逊', status: 'available', sort_order: 1 },
           { key: 'aliexpress', name: '速卖通', status: 'available', sort_order: 2 }
@@ -198,7 +198,7 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 标准响应格式
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         json: async () => ({
           success: true,
           data: [
@@ -215,7 +215,7 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 失败响应
-      global.fetch.mockRejectedValueOnce(new Error('Network error'))
+      mockedFetch.mockRejectedValueOnce(new Error('Network error'))
       
       await store.loadPlatforms()
       
@@ -228,7 +228,7 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 慢速响应
-      global.fetch.mockImplementation(() => new Promise(resolve => {
+      mockedFetch.mockImplementation(() => new Promise(resolve => {
         setTimeout(() => resolve({
           json: async () => []
         }), 100)
@@ -248,7 +248,7 @@ describe('Platform Store', () => {
       const store = usePlatformStore()
       
       // Mock 空响应
-      global.fetch.mockResolvedValueOnce({
+      mockedFetch.mockResolvedValueOnce({
         json: async () => []
       })
       

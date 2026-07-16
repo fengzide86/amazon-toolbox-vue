@@ -2,22 +2,46 @@ const crypto = require('crypto');
 
 const ED25519_SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 
-function canonicalize(value) {
+type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+
+interface ToolManifest extends Record<string, unknown> {
+  toolId?: string | number;
+  scriptKey?: string;
+  version?: string;
+  runnerApiVersion?: number;
+}
+
+interface ManifestGrant {
+  signatureRequired?: boolean;
+  toolManifest?: ToolManifest;
+  toolSignature?: string;
+  scriptKey?: string;
+  toolVersion?: string;
+  runnerApiVersion?: number;
+  signingKeyId?: string;
+}
+
+interface SignedTool {
+  id?: string | number;
+  launchGrant?: ManifestGrant;
+}
+
+function canonicalize(value: JsonValue): JsonValue {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === 'object') {
-    return Object.keys(value).sort().reduce((result, key) => {
-      result[key] = canonicalize(value[key]);
+    return Object.keys(value).sort().reduce<Record<string, JsonValue>>((result, key) => {
+      result[key] = canonicalize(value[key] as JsonValue);
       return result;
     }, {});
   }
   return value;
 }
 
-function canonicalManifest(manifest) {
-  return Buffer.from(JSON.stringify(canonicalize(manifest)), 'utf8');
+function canonicalManifest(manifest: ToolManifest): Buffer {
+  return Buffer.from(JSON.stringify(canonicalize(manifest as { [key: string]: JsonValue })), 'utf8');
 }
 
-function verifyToolManifest(tool, publicKeyB64) {
+function verifyToolManifest(tool: SignedTool, publicKeyB64: string) {
   const grant = tool.launchGrant || {};
   if (!grant.signatureRequired) return { verified: false, legacy: true };
   if (!grant.toolManifest || !grant.toolSignature) {
@@ -54,7 +78,7 @@ function verifyToolManifest(tool, publicKeyB64) {
   return { verified: true, legacy: false, keyId: grant.signingKeyId };
 }
 
-function manifestError(code, message) {
+function manifestError(code: string, message: string): Error & { code: string } {
   return Object.assign(new Error(message), { code });
 }
 

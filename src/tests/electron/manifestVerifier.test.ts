@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { canonicalManifest, verifyToolManifest } = require('../../../electron/automation/manifest-verifier.cjs')
+const { canonicalManifest, verifyToolManifest } = require('../../../dist-electron/electron/automation/manifest-verifier.cjs')
 
 function signedTool() {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519')
