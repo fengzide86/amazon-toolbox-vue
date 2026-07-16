@@ -6,25 +6,33 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import {
+  authenticatedUserSchema,
+  parseStoredUser,
+  type AuthenticatedUser,
+  type AuthRole,
+  type LoginPayload,
+} from '@/features/auth/model'
 
 export const useUserStore = defineStore('user', () => {
   // ===== State =====
   
   // 认证信息
-  const token = ref(sessionStorage.getItem('toolbox_token') || null)
-  const role = ref(sessionStorage.getItem('toolbox_role') || null)
-  const auth = ref(sessionStorage.getItem('toolbox_auth') || null)
-  const userInfo = ref(JSON.parse(localStorage.getItem('toolbox_user') || 'null'))
+  const token = ref<string | null>(sessionStorage.getItem('toolbox_token'))
+  const storedRole = sessionStorage.getItem('toolbox_role')
+  const role = ref<AuthRole | null>(storedRole === 'admin' || storedRole === 'user' ? storedRole : null)
+  const auth = ref<string | null>(sessionStorage.getItem('toolbox_auth'))
+  const userInfo = ref<AuthenticatedUser | null>(parseStoredUser(localStorage.getItem('toolbox_user')))
   
   // 用户信息
-  const userId = ref(null)
-  const userName = ref(null)
-  const phone = ref(null)
-  const authCodeId = ref(null)
+  const userId = ref<string | number | null>(null)
+  const userName = ref<string | null>(null)
+  const phone = ref<string | null>(null)
+  const authCodeId = ref<string | number | null>(null)
   
   // 设备信息
-  const deviceId = ref(null)
-  const deviceName = ref(null)
+  const deviceId = ref<string | null>(null)
+  const deviceName = ref<string | null>(null)
 
   // ===== Getters =====
   
@@ -52,11 +60,11 @@ export const useUserStore = defineStore('user', () => {
    * 设置登录信息
    * @param {Object} data - 登录返回的数据
    */
-  function setLogin(data) {
+  function setLogin(data: LoginPayload) {
     token.value = data.token
     role.value = data.role
-    auth.value = data.auth_code || data.auth
-    const safeUser = data.user ? { ...data.user } : null
+    auth.value = data.auth_code || data.auth || null
+    const safeUser: AuthenticatedUser | null = data.user ? { ...data.user } : null
     if (safeUser) {
       delete safeUser.token
       delete safeUser.refresh_token
@@ -85,14 +93,15 @@ export const useUserStore = defineStore('user', () => {
    * 设置用户信息
    * @param {Object} newUserInfo - 用户信息
    */
-  function setUserInfo(newUserInfo) {
-    userInfo.value = newUserInfo
-    userId.value = newUserInfo.id
-    userName.value = newUserInfo.name
-    phone.value = newUserInfo.phone
-    authCodeId.value = newUserInfo.auth_code_id
+  function setUserInfo(newUserInfo: AuthenticatedUser) {
+    const parsed = authenticatedUserSchema.parse(newUserInfo)
+    userInfo.value = parsed
+    userId.value = parsed.id ?? null
+    userName.value = parsed.name ?? null
+    phone.value = parsed.phone ?? null
+    authCodeId.value = parsed.auth_code_id ?? null
     
-    localStorage.setItem('toolbox_user', JSON.stringify(newUserInfo))
+    localStorage.setItem('toolbox_user', JSON.stringify(parsed))
   }
 
   /**
@@ -100,7 +109,7 @@ export const useUserStore = defineStore('user', () => {
    * @param {string} id - 设备ID
    * @param {string} name - 设备名称
    */
-  function setDevice(id, name) {
+  function setDevice(id: string, name: string) {
     deviceId.value = id
     deviceName.value = name
   }
@@ -134,15 +143,16 @@ export const useUserStore = defineStore('user', () => {
    */
   function restoreFromStorage() {
     token.value = sessionStorage.getItem('toolbox_token')
-    role.value = sessionStorage.getItem('toolbox_role')
+    const restoredRole = sessionStorage.getItem('toolbox_role')
+    role.value = restoredRole === 'admin' || restoredRole === 'user' ? restoredRole : null
     auth.value = sessionStorage.getItem('toolbox_auth')
-    userInfo.value = JSON.parse(localStorage.getItem('toolbox_user') || 'null')
+    userInfo.value = parseStoredUser(localStorage.getItem('toolbox_user'))
     
     if (userInfo.value) {
-      userId.value = userInfo.value.id
-      userName.value = userInfo.value.name
-      phone.value = userInfo.value.phone
-      authCodeId.value = userInfo.value.auth_code_id
+      userId.value = userInfo.value.id ?? null
+      userName.value = userInfo.value.name ?? null
+      phone.value = userInfo.value.phone ?? null
+      authCodeId.value = userInfo.value.auth_code_id ?? null
     }
   }
 
@@ -150,7 +160,7 @@ export const useUserStore = defineStore('user', () => {
    * 更新 token
    * @param {string} newToken - 新的 token
    */
-  function updateToken(newToken) {
+  function updateToken(newToken: string) {
     token.value = newToken
     sessionStorage.setItem('toolbox_token', newToken)
   }

@@ -7,6 +7,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+type ThemeName = 'light' | 'dark'
+type UnknownRecord = Record<string, unknown>
+
+export interface ActiveTool extends UnknownRecord {
+  id?: string | number
+  name?: string
+  module?: string
+  category?: string
+  platformKey?: string
+  targetUrl?: string
+}
+
 export const useAppStore = defineStore('app', () => {
   // ===== State =====
   
@@ -22,21 +34,22 @@ export const useAppStore = defineStore('app', () => {
   const sidebarCollapsed = ref(false)
   
   // 主题
-  const theme = ref(localStorage.getItem('toolbox_theme') || 'light')
+  const storedTheme = localStorage.getItem('toolbox_theme')
+  const theme = ref<ThemeName>(storedTheme === 'dark' ? 'dark' : 'light')
   
   // 系统设置
-  const settings = ref(null)
+  const settings = ref<UnknownRecord | null>(null)
   
   // 套餐列表（缓存）
-  const plans = ref([])
+  const plans = ref<UnknownRecord[]>([])
   
   // 工具分类（缓存）
-  const toolCategories = ref([])
+  const toolCategories = ref<UnknownRecord[]>([])
 
   // 工具面板状态（单窗口分屏模式）
   const toolVisible = ref(false)
   const toolUrl = ref('')
-  const currentTool = ref(null) // { id, name, module, category, platformKey, targetUrl }
+  const currentTool = ref<ActiveTool | null>(null) // { id, name, module, category, platformKey, targetUrl }
 
   // ===== Getters =====
   
@@ -59,7 +72,7 @@ export const useAppStore = defineStore('app', () => {
    * @param {boolean} isLoading - 是否加载中
    * @param {string} text - 加载提示文字
    */
-  function setLoading(isLoading, text = '') {
+  function setLoading(isLoading: boolean, text = '') {
     loading.value = isLoading
     loadingText.value = text
   }
@@ -75,7 +88,7 @@ export const useAppStore = defineStore('app', () => {
    * 设置侧边栏折叠状态
    * @param {boolean} collapsed - 是否折叠
    */
-  function setSidebarCollapsed(collapsed) {
+  function setSidebarCollapsed(collapsed: boolean) {
     sidebarCollapsed.value = collapsed
   }
 
@@ -92,7 +105,7 @@ export const useAppStore = defineStore('app', () => {
    * 设置主题
    * @param {string} newTheme - 主题 light/dark
    */
-  function setTheme(newTheme) {
+  function setTheme(newTheme: ThemeName) {
     theme.value = newTheme
     localStorage.setItem('toolbox_theme', newTheme)
     document.documentElement.setAttribute('data-theme', newTheme)
@@ -102,7 +115,7 @@ export const useAppStore = defineStore('app', () => {
    * 设置系统设置
    * @param {Object} newSettings - 系统设置
    */
-  function setSettings(newSettings) {
+  function setSettings(newSettings: UnknownRecord) {
     settings.value = newSettings
   }
 
@@ -110,7 +123,7 @@ export const useAppStore = defineStore('app', () => {
    * 设置套餐列表
    * @param {Array} newPlans - 套餐列表
    */
-  function setPlans(newPlans) {
+  function setPlans(newPlans: UnknownRecord[]) {
     plans.value = newPlans
   }
 
@@ -118,14 +131,14 @@ export const useAppStore = defineStore('app', () => {
    * 设置工具分类
    * @param {Array} categories - 工具分类列表
    */
-  function setToolCategories(categories) {
+  function setToolCategories(categories: UnknownRecord[]) {
     toolCategories.value = categories
   }
 
   /**
    * 打开工具（分屏模式）
    */
-  function openTool(tool) {
+  function openTool(tool: ActiveTool) {
     currentTool.value = tool
     toolUrl.value = tool.targetUrl || ''
     toolVisible.value = true

@@ -1,12 +1,27 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
+export interface PlatformInfo {
+  key: string
+  name: string
+  short_name: string
+  status: string
+  sort_order?: number
+}
+
+interface PlatformResponse {
+  success?: boolean
+  data?: PlatformInfo[]
+}
+
 // 动态获取 API 地址（不依赖静态导入，确保 Electron 注入的 localStorage 生效）
 function getApiBase() {
   try {
     const electronApiBase = localStorage.getItem('toolbox_api_base')
     if (electronApiBase) return electronApiBase
-  } catch (e) {}
+  } catch {
+    // 存储不可用时继续读取构建期配置。
+  }
   const viteApiBase = import.meta.env?.VITE_API_BASE
   if (viteApiBase) return viteApiBase
   return 'http://localhost:8000' // 打包应用使用内嵌本地后端
@@ -16,7 +31,7 @@ export const usePlatformStore = defineStore('platform', () => {
   // 状态
   const currentPlatform = ref(localStorage.getItem('toolbox_current_platform') || 'amazon')
   const adminPlatform = ref(localStorage.getItem('toolbox_admin_platform') || 'all')
-  const availablePlatforms = ref([])
+  const availablePlatforms = ref<PlatformInfo[]>([])
   const loading = ref(false)
 
   // 计算属性
@@ -27,13 +42,13 @@ export const usePlatformStore = defineStore('platform', () => {
   })
 
   // 设置用户端当前平台
-  const setPlatform = (platformKey) => {
+  const setPlatform = (platformKey: string) => {
     currentPlatform.value = platformKey
     localStorage.setItem('toolbox_current_platform', platformKey)
   }
 
   // 设置管理端平台筛选
-  const setAdminPlatform = (platformKey) => {
+  const setAdminPlatform = (platformKey: string) => {
     adminPlatform.value = platformKey
     localStorage.setItem('toolbox_admin_platform', platformKey)
   }
@@ -45,14 +60,13 @@ export const usePlatformStore = defineStore('platform', () => {
     try {
       const apiBase = getApiBase()
       const response = await fetch(`${apiBase}/api/tools/platforms`)
-      const data = await response.json()
+      const data: unknown = await response.json()
       // API 可能返回数组或 {success, data} 格式
       if (Array.isArray(data)) {
         availablePlatforms.value = data
-      } else if (data.success && data.data) {
-        availablePlatforms.value = data.data
-      } else if (data.data && Array.isArray(data.data)) {
-        availablePlatforms.value = data.data
+      } else if (typeof data === 'object' && data !== null) {
+        const wrapped = data as PlatformResponse
+        if (Array.isArray(wrapped.data)) availablePlatforms.value = wrapped.data
       }
       // 如果返回为空，使用默认配置
       if (!availablePlatforms.value.length) {
@@ -74,20 +88,20 @@ export const usePlatformStore = defineStore('platform', () => {
   }
 
   // 检查平台是否可用
-  const isPlatformAvailable = (platformKey) => {
+  const isPlatformAvailable = (platformKey: string) => {
     const platform = availablePlatforms.value.find(p => p.key === platformKey)
     return Boolean(platform && platform.status === 'available')
   }
 
   // 检查用户是否有平台权限
-  const hasPlatformPermission = (platformScope, platformKey) => {
+  const hasPlatformPermission = (platformScope: string | null | undefined, platformKey: string) => {
     if (!platformScope) return true // 未设置则默认有权限
     const scopes = platformScope.split(',').map(s => s.trim())
     return scopes.includes(platformKey)
   }
 
   // 获取可用平台列表（根据授权权限过滤）
-  const getAvailablePlatformsForUser = (platformScope) => {
+  const getAvailablePlatformsForUser = (platformScope: string | null | undefined) => {
     if (!platformScope) return availablePlatforms.value.filter(p => p.status === 'available')
     const scopes = platformScope.split(',').map(s => s.trim())
     return availablePlatforms.value.filter(p => p.status === 'available' && scopes.includes(p.key))

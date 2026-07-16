@@ -19,9 +19,16 @@ export interface BatchBridge {
   cancel(status?: string): Promise<unknown>
 }
 
+export interface CredentialStoreBridge {
+  saveUserCode(code: string): Promise<boolean>
+  loadUserCode(): Promise<string | null>
+  clearUserCode(): Promise<boolean>
+}
+
 export interface ToolboxElectronApi {
   runtime?: { controlApiBase?: string; deviceId?: string; deviceName?: string }
   updates?: UpdateBridge
   batch?: BatchBridge
+  credentialStore?: CredentialStoreBridge
   [key: string]: unknown
 }

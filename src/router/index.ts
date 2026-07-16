@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { authService } from '@/utils/auth'
+import { hasBusinessWorkspaceAccess } from '@/features/auth/model'
 
 const routes = [
   // 用户端路由
@@ -197,11 +198,7 @@ router.beforeEach((to, from, next) => {
     const isAuthenticated = authService.isAuthenticated()
     const isAdmin = authService.isAdmin()
     const user = authService.getUser() || {}
-    const entitlements = user.entitlements || {}
-    const hasBusinessAccess = user.product_type === 'business'
-      && user.business_workspace_enabled === true
-      && entitlements.batch_execution === true
-      && entitlements.multi_account_workspace === true
+    const hasBusinessAccess = hasBusinessWorkspaceAccess(user)
     
     // 登录页不需要验证
     if (to.name === 'UserLogin' || to.name === 'AdminLogin' || to.name === 'UserTerms') {
