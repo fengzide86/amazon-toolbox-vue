@@ -134,7 +134,7 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
@@ -154,6 +154,36 @@ import { createLog } from '@/utils/api'
 import { createToolLaunchGrant } from '@/utils/api/tools'
 import { showToast } from '@/utils'
 import { confirmAction } from '@/shared/ui/confirm'
+import { z } from 'zod'
+import type { RunStatus } from '@/automation'
+
+interface EmbeddedWebviewElement extends HTMLElement {
+  getWebContentsId(): number
+}
+
+const launchGrantSchema = z.object({
+  token: z.string(),
+  target_url: z.string().optional(),
+  expires_at: z.string().optional(),
+  script_key: z.string().optional(),
+  runner_api_version: z.coerce.number().optional(),
+  tool_version: z.string().optional(),
+  tool_manifest: z.unknown().optional(),
+  tool_signature: z.string().optional(),
+  signing_key_id: z.string().optional(),
+  signature_required: z.boolean().optional(),
+}).passthrough()
+
+const launchGrantResponseSchema = z.object({
+  launch_data: launchGrantSchema.optional(),
+  grant: launchGrantSchema.optional(),
+  expires_at: z.string().optional(),
+  expires_in: z.coerce.number().optional(),
+}).passthrough()
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback
+}
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -165,13 +195,13 @@ const {
   userAction,
 } = storeToRefs(taskRunStore)
 
-const webviewRef = ref(null)
+const webviewRef = ref<EmbeddedWebviewElement | null>(null)
 const browserLoading = ref(true)
 const restarting = ref(false)
 const taskStarted = ref(false)
 const taskStarting = ref(false)
-const loggedRunIds = new Set()
-let browserReadyFallback = null
+const loggedRunIds = new Set<string>()
+let browserReadyFallback: ReturnType<typeof setTimeout> | null = null
 
 const stageItems = [
   { key: 'prepare', label: '准备', description: '正在打开并检查目标页面' },
@@ -202,7 +232,7 @@ const currentStageIndex = computed(() => {
   if (runStatus.value === 'completed') return 3
   const stepId = currentStep.value?.id
   if (stepId === 'execute') return 1
-  if (['verify', 'summary'].includes(stepId)) return 2
+  if (stepId && ['verify', 'summary'].includes(stepId)) return 2
   return 0
 })
 
@@ -227,7 +257,7 @@ const problemCode = computed(() => {
   return String(source).replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase() || 'UNKNOWN'
 })
 
-function stageState(index) {
+function stageState(index: number) {
   if (runStatus.value === 'completed') return 'done'
   if (index < currentStageIndex.value) return 'done'
   if (index === currentStageIndex.value) return 'active'
@@ -276,15 +306,16 @@ async function restartRun() {
       return
     }
     const currentTool = appStore.currentTool
-    const response = await createToolLaunchGrant(currentTool.id, {
+    if (!currentTool?.id) throw new Error('当前工具信息不完整')
+    const response = launchGrantResponseSchema.parse(await createToolLaunchGrant(currentTool.id, {
       platformKey: currentTool.platformKey,
       deviceId: localStorage.getItem('toolbox_device_id') || '',
-    })
+    }))
     const grant = response?.launch_data || response?.grant
     if (!grant?.token) throw new Error('工具启动数据不完整')
     const nextTool = {
       ...currentTool,
-      targetUrl: grant.target_url || currentTool.targetUrl,
+      targetUrl: grant.target_url || currentTool.targetUrl || toolUrl.value,
       launchGrant: {
         token: grant.token,
         expiresAt: grant.expires_at || response.expires_at,
@@ -302,7 +333,7 @@ async function restartRun() {
     appStore.toolUrl = nextTool.targetUrl
     await taskRunStore.start(nextTool)
   } catch (error) {
-    showToast(error?.message || '暂时无法重新执行', 'error')
+    showToast(errorMessage(error, '暂时无法重新执行'), 'error')
   } finally {
     restarting.value = false
   }
@@ -329,13 +360,13 @@ async function startTaskWithBrowser() {
     try {
       await window.electronAPI.automation.registerBrowser(webview.getWebContentsId())
     } catch (error) {
-      console.warn('[ToolWorkspace] 嵌入浏览器注册失败，将使用独立浏览器:', error?.message || error)
+      console.warn('[ToolWorkspace] 嵌入浏览器注册失败，将使用独立浏览器:', errorMessage(error, '未知错误'))
     }
   }
   taskStarted.value = true
   if (browserReadyFallback) clearTimeout(browserReadyFallback)
   try {
-    await taskRunStore.start({ ...appStore.currentTool, targetUrl: toolUrl.value })
+    await taskRunStore.start({ ...(appStore.currentTool || {}), targetUrl: toolUrl.value })
   } catch (error) {
     showToast('自动处理启动失败，你可以重新执行或联系客服', 'error')
   } finally {
@@ -359,28 +390,32 @@ function bindWebviewEvents() {
   } catch {}
 }
 
-async function recordTerminalRun(status) {
+async function recordTerminalRun(status: RunStatus) {
   const runId = taskRunStore.runId
   if (!runId || loggedRunIds.has(runId) || !['completed', 'failed', 'cancelled'].includes(status)) return
   loggedRunIds.add(runId)
   const tool = taskRunStore.tool || appStore.currentTool || {}
+  const toolRecord = tool as Record<string, unknown>
+  const launchGrant = typeof toolRecord.launchGrant === 'object' && toolRecord.launchGrant !== null
+    ? toolRecord.launchGrant as Record<string, unknown>
+    : null
   try {
     await createLog({
       device_id: localStorage.getItem('toolbox_device_id') || null,
       tool_name: tool.name,
-      module: tool.module,
+      module: typeof toolRecord.module === 'string' ? toolRecord.module : undefined,
       status: status === 'completed' ? 'success' : status,
       error_code: status === 'failed' ? (taskRunStore.error?.code || 'AUTOMATION_FAILED') : null,
       detail: JSON.stringify({
         run_id: runId,
         tool_id: tool.id,
         platform_key: tool.platformKey,
-        script_key: tool.launchGrant?.scriptKey,
+        script_key: typeof launchGrant?.scriptKey === 'string' ? launchGrant.scriptKey : undefined,
         elapsed_seconds: taskRunStore.elapsedSeconds,
       }),
     })
   } catch (error) {
-    console.warn('[TaskRun] 运行日志上报失败:', error?.message || error)
+    console.warn('[TaskRun] 运行日志上报失败:', errorMessage(error, '未知错误'))
   }
 }
 

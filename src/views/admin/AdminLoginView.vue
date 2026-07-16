@@ -87,17 +87,27 @@
   </main>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Auth, showToast } from '@/utils'
 import { adminLogin } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
+import { z } from 'zod'
+
+const adminLoginResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().default('登录失败'),
+  data: z.object({
+    token: z.string(),
+    role: z.literal('admin').default('admin'),
+  }).passthrough().optional(),
+}).passthrough()
 
 const router = useRouter()
 const userStore = useUserStore()
 const password = ref('')
-const passwordInput = ref(null)
+const passwordInput = ref<HTMLInputElement | null>(null)
 const showPassword = ref(false)
 const isLoading = ref(false)
 const showError = ref(false)
@@ -130,11 +140,13 @@ function handleLogin() {
   isLoading.value = true
 
   adminLogin(password.value.trim())
-    .then((res) => {
+    .then((response) => {
+      const res = adminLoginResponseSchema.parse(response)
       if (res.success) {
+        if (!res.data?.token) throw new Error('管理员登录响应缺少访问令牌')
         // 使用 Pinia store 管理登录状态
         userStore.setLogin({
-          token: res.data?.token,
+          token: res.data.token,
           role: 'admin',
           auth_code: 'admin',
           user: res.data,
@@ -156,7 +168,7 @@ function handleLogin() {
         focusPasswordInput()
       }
     })
-    .catch((err) => {
+    .catch(() => {
       errorMessage.value = '无法连接到后端服务，请检查后端是否运行'
       showError.value = true
       showToast('连接失败', 'error')
