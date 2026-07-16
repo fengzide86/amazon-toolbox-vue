@@ -1,5 +1,7 @@
 import type { BrowserWindow, IpcMain, IpcMainInvokeEvent } from 'electron'
 import { app } from 'electron'
+import { readFileSync, rmSync, renameSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { CancellationToken, autoUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
 
 type UpdateStatus =
@@ -19,12 +21,18 @@ interface UpdateSnapshot {
   availableVersion?: string
   releaseDate?: string
   releaseNotes: string[]
+  downloadBytes?: number
   percent?: number
   transferredBytes?: number
   totalBytes?: number
+  promptSuppressedUntil?: string
   errorCode?: string
   canRestart: boolean
 }
+
+interface UpdateDeferRequest { phase?: 'download' | 'install' }
+interface UpdatePreferences { version?: string; promptSuppressedUntil?: string }
+const DAY_MS = 24 * 60 * 60 * 1000
 
 interface UpdateManagerOptions {
   ipcMain: IpcMain
@@ -69,7 +77,8 @@ export class UpdateManager {
   private checking: Promise<UpdateSnapshot> | null = null
   private cancellationToken: CancellationToken | null = null
   private updateInfo: UpdateInfo | null = null
-  private deferredForSession = false
+  private manualCheckRequested = false
+  private preferences: UpdatePreferences
   private cleanupStarted = false
   private snapshot: UpdateSnapshot
 
@@ -79,6 +88,7 @@ export class UpdateManager {
     this.hasActiveWork = options.hasActiveWork
     this.beforeInstall = options.beforeInstall
     this.updater = options.updater ?? autoUpdater
+    this.preferences = this.readPreferences()
     this.snapshot = {
       status: 'idle',
       currentVersion: app.getVersion(),
@@ -97,17 +107,22 @@ export class UpdateManager {
 
   async check(options: { manual?: boolean } = {}): Promise<UpdateSnapshot> {
     if (this.checking) return this.checking
-    if (this.deferredForSession && !options.manual) return this.getState()
     if (this.snapshot.status === 'downloading' || this.snapshot.status === 'installing') return this.getState()
 
+    this.manualCheckRequested = Boolean(options.manual)
+    if (options.manual) this.clearPromptSuppression()
     this.setState({ status: 'checking', errorCode: undefined })
     this.checking = this.updater.checkForUpdates()
       .then(() => this.getState())
       .catch((error: unknown) => {
-        this.setState({ status: 'error', errorCode: errorCode(error) })
+        if (options.manual) this.setState({ status: 'error', errorCode: errorCode(error) })
+        else {
+          console.warn('[Update] Automatic update check failed:', error)
+          this.setState({ status: 'idle', errorCode: undefined })
+        }
         return this.getState()
       })
-      .finally(() => { this.checking = null })
+      .finally(() => { this.checking = null; this.manualCheckRequested = false })
     return this.checking
   }
 
@@ -115,7 +130,7 @@ export class UpdateManager {
     if (this.snapshot.status === 'downloading') return this.getState()
     if (!this.updateInfo) throw new Error('当前没有可下载的更新')
     this.cancellationToken = new CancellationToken()
-    this.setState({ status: 'downloading', percent: 0, transferredBytes: 0, errorCode: undefined })
+    this.setState({ status: 'downloading', percent: 0, transferredBytes: 0, promptSuppressedUntil: undefined, errorCode: undefined })
     try {
       await this.updater.downloadUpdate(this.cancellationToken)
     } catch (error: unknown) {
@@ -136,10 +151,16 @@ export class UpdateManager {
     return this.getState()
   }
 
-  defer(): UpdateSnapshot {
-    this.deferredForSession = true
-    if (this.snapshot.status === 'available') this.setState({ status: 'idle' })
-    if (this.snapshot.status === 'downloaded') this.setState({ status: 'restart_deferred', canRestart: !this.hasActiveWork() })
+  defer(request: UpdateDeferRequest = {}): UpdateSnapshot {
+    if (request.phase === 'download' && this.snapshot.availableVersion) {
+      const promptSuppressedUntil = new Date(Date.now() + DAY_MS).toISOString()
+      this.preferences = { version: this.snapshot.availableVersion, promptSuppressedUntil }
+      this.writePreferences()
+      this.setState({ promptSuppressedUntil })
+    }
+    if (request.phase === 'install' && this.snapshot.status === 'downloaded') {
+      this.setState({ status: 'restart_deferred', canRestart: !this.hasActiveWork() })
+    }
     return this.getState()
   }
 
@@ -168,15 +189,24 @@ export class UpdateManager {
     lifecycleUpdater.on('before-quit-for-update', () => this.prepareForInstall())
     this.updater.on('update-available', (info: UpdateInfo) => {
       this.updateInfo = info
+      const promptSuppressedUntil = this.suppressionFor(info.version)
       this.setState({
-        status: this.deferredForSession ? 'idle' : 'available',
+        status: 'available',
         availableVersion: info.version,
         releaseDate: info.releaseDate,
         releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+        downloadBytes: info.files.find(file => typeof file.size === 'number')?.size,
+        promptSuppressedUntil,
         canRestart: false,
       })
     })
-    this.updater.on('update-not-available', () => this.setState({ status: 'idle', canRestart: false }))
+    this.updater.on('update-not-available', () => {
+      this.updateInfo = null
+      this.setState({
+        status: 'idle', availableVersion: undefined, releaseDate: undefined, releaseNotes: [],
+        downloadBytes: undefined, promptSuppressedUntil: undefined, canRestart: false,
+      })
+    })
     this.updater.on('download-progress', (progress: ProgressInfo) => this.setState({
       status: 'downloading',
       percent: Math.max(0, Math.min(100, Math.round(progress.percent * 10) / 10)),
@@ -191,21 +221,27 @@ export class UpdateManager {
         availableVersion: info.version,
         releaseDate: info.releaseDate,
         releaseNotes: normalizeReleaseNotes(info.releaseNotes),
+        downloadBytes: info.files.find(file => typeof file.size === 'number')?.size,
         percent: 100,
+        promptSuppressedUntil: undefined,
         canRestart,
       })
     })
     this.updater.on('error', (error: Error) => {
       if (this.cancellationToken?.cancelled) return
-      this.setState({ status: 'error', errorCode: errorCode(error), canRestart: false })
+      if (this.snapshot.status === 'checking' && !this.manualCheckRequested) {
+        this.setState({ status: 'idle', errorCode: undefined, canRestart: false })
+      } else {
+        this.setState({ status: 'error', errorCode: errorCode(error), canRestart: false })
+      }
     })
   }
 
   private registerIpc(): void {
-    const register = (channel: string, handler: (event: IpcMainInvokeEvent) => UpdateSnapshot | Promise<UpdateSnapshot>) => {
-      this.ipcMain.handle(channel, (event: IpcMainInvokeEvent) => {
+    const register = (channel: string, handler: (event: IpcMainInvokeEvent, request?: UpdateDeferRequest) => UpdateSnapshot | Promise<UpdateSnapshot>) => {
+      this.ipcMain.handle(channel, (event: IpcMainInvokeEvent, request?: UpdateDeferRequest) => {
         this.assertTrustedSender(event)
-        return handler(event)
+        return handler(event, request)
       })
     }
     register(CHANNELS.getState, () => this.getState())
@@ -213,7 +249,7 @@ export class UpdateManager {
     register(CHANNELS.startDownload, () => this.startDownload())
     register(CHANNELS.cancelDownload, () => this.cancelDownload())
     register(CHANNELS.install, () => this.install())
-    register(CHANNELS.defer, () => this.defer())
+    register(CHANNELS.defer, (_event, request) => this.defer(request))
   }
 
   private assertTrustedSender(event: IpcMainInvokeEvent): void {
@@ -233,5 +269,44 @@ export class UpdateManager {
     if (this.cleanupStarted) return
     this.cleanupStarted = true
     this.beforeInstall()
+  }
+
+  private preferencesPath(): string {
+    return join(app.getPath('userData'), 'update-preferences.json')
+  }
+
+  private readPreferences(): UpdatePreferences {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(this.preferencesPath(), 'utf8'))
+      return parsed && typeof parsed === 'object' ? parsed as UpdatePreferences : {}
+    } catch {
+      return {}
+    }
+  }
+
+  private writePreferences(): void {
+    try {
+      const target = this.preferencesPath()
+      const temp = `${target}.tmp`
+      writeFileSync(temp, JSON.stringify(this.preferences), 'utf8')
+      rmSync(target, { force: true })
+      renameSync(temp, target)
+    } catch (error) {
+      console.warn('[Update] Could not persist prompt preference:', error)
+    }
+  }
+
+  private clearPromptSuppression(): void {
+    if (!this.preferences.version && !this.preferences.promptSuppressedUntil) return
+    this.preferences = {}
+    this.writePreferences()
+    this.setState({ promptSuppressedUntil: undefined })
+  }
+
+  private suppressionFor(version: string): string | undefined {
+    if (this.preferences.version !== version || !this.preferences.promptSuppressedUntil) return undefined
+    return Date.parse(this.preferences.promptSuppressedUntil) > Date.now()
+      ? this.preferences.promptSuppressedUntil
+      : undefined
   }
 }

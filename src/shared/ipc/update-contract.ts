@@ -18,15 +18,18 @@ export const updateSnapshotSchema = z.object({
   availableVersion: z.string().min(1).optional(),
   releaseDate: z.string().optional(),
   releaseNotes: z.array(z.string()).default([]),
+  downloadBytes: z.number().nonnegative().optional(),
   percent: z.number().min(0).max(100).optional(),
   transferredBytes: z.number().nonnegative().optional(),
   totalBytes: z.number().nonnegative().optional(),
+  promptSuppressedUntil: z.string().optional(),
   errorCode: z.string().optional(),
   canRestart: z.boolean(),
 })
 
 export type UpdateStatus = z.infer<typeof updateStatusSchema>
 export type UpdateSnapshot = z.infer<typeof updateSnapshotSchema>
+export type UpdateDeferPhase = 'download' | 'install'
 
 export const UPDATE_CHANNELS = {
   getState: 'updates:get-state',

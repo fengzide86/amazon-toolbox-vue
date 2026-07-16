@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout" data-testid="user-layout">
+  <div class="app-layout density-comfortable" data-testid="user-layout">
     <ToolWorkspace v-if="appStore.toolVisible" />
 
     <template v-else>
@@ -10,7 +10,7 @@
       <div class="main-container">
         <UserSidebar ref="sidebarRef" :class="{ 'mobile-open': showMobileSidebar }" />
         <main class="content-studio" data-testid="user-content">
-          <AnnouncementBanner />
+          <AppNoticeQueue />
           <router-view v-slot="{ Component }">
             <Suspense>
               <template #default><component :is="Component" /></template>
@@ -48,7 +48,7 @@ import { Auth, getDeviceId } from '@/utils'
 import { authService } from '@/utils/auth'
 import { checkAuthStatus } from '@/utils/api'
 import { useAppStore } from '@/stores/app'
-import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
+import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import ToolWorkspace from '@/components/ToolWorkspace.vue'
@@ -161,7 +161,7 @@ onUnmounted(() => {
   min-width: 0;
   flex: 1;
   margin-left: var(--sidebar-width);
-  padding: 24px clamp(18px, 3vw, 42px) 48px;
+  padding: 32px clamp(24px, 3vw, 42px) 48px;
   overflow-y: auto;
 }
 
@@ -226,5 +226,9 @@ onUnmounted(() => {
   .content-studio {
     padding: 18px 16px 36px;
   }
+}
+
+@media (max-width: 768px) {
+  .content-studio { padding: 20px 16px 36px; }
 }
 </style>

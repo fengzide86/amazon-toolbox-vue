@@ -8,7 +8,6 @@ const { registerAppProtocol, registerAppScheme } = require('../dist-electron/ele
 const { BackendProcessManager } = require('../dist-electron/electron/core/backend-process-manager.cjs');
 const { CredentialManager } = require('../dist-electron/electron/core/credential-manager.cjs');
 const { NotificationManager } = require('../dist-electron/electron/core/notification-manager.cjs');
-const { spawn } = require('child_process');
 const { RunnerClient } = require('./automation/runner-client.cjs');
 const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs');
 const { EmbeddedBrowserHostManager } = require('./automation/embedded-browser-host-manager.cjs');
@@ -17,7 +16,6 @@ const { parseBatchFile, writeBatchErrors } = require('./automation/batch-importe
 const toolSigningConfig = require('./tool-signing-config.cjs');
 
 let mainWindow;
-let backendProcess = null;
 let automationRunner = null;
 let batchCoordinator = null;
 let selectedBatchImportPath = null;
@@ -342,120 +340,6 @@ function waitForBackend(maxWaitMs = 15000) {
   });
 }
 
-function checkBackendHealth(timeoutMs = 1200) {
-  const http = require('http');
-  return new Promise(resolve => {
-    let settled = false;
-    const finish = value => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-    const request = http.get('http://localhost:8000/api/health', response => {
-      response.resume();
-      finish(response.statusCode === 200);
-    });
-    request.once('error', () => finish(false));
-    request.setTimeout(timeoutMs, () => {
-      request.destroy();
-      finish(false);
-    });
-  });
-}
-
-async function ensureBackend() {
-  if (await checkBackendHealth()) {
-    console.log('[Backend] Reusing healthy service on localhost:8000');
-    return true;
-  }
-  startBackend();
-  return waitForBackend(15000);
-}
-
-function startBackend() {
-  // 打包后 exe 在 resources/ 目录（由 extraResources 提取），开发模式不走此路径
-  const backendExe = path.join(process.resourcesPath, 'toolbox-backend.exe');
-  const fs = require('fs');
-
-  if (!fs.existsSync(backendExe)) {
-    console.error('[Backend] 后端 exe 不存在:', backendExe);
-    return;
-  }
-
-  // 将后端错误日志写到用户可访问的位置，方便排查
-  const logDir = path.join(RUNTIME_ROOT, 'logs');
-  fs.mkdirSync(logDir, { recursive: true });
-  const logPath = path.join(logDir, 'backend-error.log');
-  let logStream;
-  try {
-    logStream = fs.createWriteStream(logPath, { flags: 'a' });
-  } catch (e) {
-    console.error('[Backend] 无法创建日志文件:', e.message);
-  }
-
-  try {
-    backendProcess = spawn(backendExe, [], {
-      detached: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-      env: {
-        ...process.env,
-        TOOLBOX_RUNTIME_DIR: RUNTIME_ROOT,
-        APPDATA: RUNTIME_ROOT,
-      },
-    });
-    console.log('[Backend] 后端进程已启动, PID:', backendProcess.pid);
-    console.log('[Backend] exe 路径:', backendExe);
-    console.log('[Backend] 错误日志:', logPath);
-
-    // 捕获 stderr 写入日志文件
-    if (backendProcess.stderr && logStream) {
-      backendProcess.stderr.pipe(logStream);
-    }
-    if (backendProcess.stdout && logStream) {
-      backendProcess.stdout.pipe(logStream);
-    }
-
-    backendProcess.on('error', (err) => {
-      console.error('[Backend] 后端启动失败:', err.message);
-      if (logStream) {
-        logStream.write('\n[ERROR] ' + new Date().toISOString() + ' ' + err.message + '\n');
-      }
-    });
-    backendProcess.on('exit', (code) => {
-      console.log('[Backend] 后端进程退出, code:', code);
-      if (logStream && code !== 0) {
-        logStream.write('\n[EXIT] ' + new Date().toISOString() + ' exit code: ' + code + '\n');
-      }
-      backendProcess = null;
-    });
-  } catch (err) {
-    console.error('[Backend] 启动后端失败:', err.message);
-    if (logStream) {
-      logStream.write('\n[EXCEPTION] ' + new Date().toISOString() + ' ' + err.message + '\n');
-    }
-  }
-}
-
-function cleanupBackend() {
-  if (backendProcess) {
-    console.log('[Backend] 正在关闭后端进程...');
-    try {
-      backendProcess.kill('SIGTERM');
-      // 给后端 3 秒时间优雅关闭
-      setTimeout(() => {
-        if (backendProcess) {
-          backendProcess.kill('SIGKILL');
-          backendProcess = null;
-        }
-      }, 3000);
-    } catch (err) {
-      console.error('[Backend] 关闭后端失败:', err.message);
-      backendProcess = null;
-    }
-  }
-}
-
 function createWindow() {
   // 检测开发模式：环境变量或 dist 目录不存在
   const isDev = process.env.NODE_ENV === 'development' 
@@ -472,7 +356,7 @@ function createWindow() {
       contextIsolation: true,
       sandbox: true,
       webviewTag: true,
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: path.join(__dirname, '../dist-electron/electron/preload.cjs'),
       additionalArguments: [
         `--toolbox-control-api-base=${CONTROL_API_BASE}`,
         `--toolbox-device-id=${DEVICE_IDENTITY.deviceId}`,

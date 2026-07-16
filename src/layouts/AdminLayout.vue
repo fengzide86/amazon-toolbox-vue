@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout density-compact">
     <AppHeader :is-admin="true" @toggle-sidebar="toggleSidebar" @platform-change="handlePlatformChange" />
     
     <!-- 移动端侧边栏遮罩 -->
@@ -12,6 +12,7 @@
     <div class="layout">
       <AdminSidebar :class="{ 'mobile-open': showMobileSidebar }" />
       <main class="content admin-content">
+        <AppNoticeQueue />
         <Breadcrumb />
         <router-view :key="platformKey" v-slot="{ Component }">
           <Suspense>
@@ -36,6 +37,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
+import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -97,7 +99,7 @@ onUnmounted(() => {
 .content {
   flex: 1;
   min-width: 0;
-  padding: 24px clamp(18px, 3vw, 42px) 48px;
+  padding: 32px clamp(24px, 3vw, 42px) 48px;
   overflow-y: auto;
   overflow-x: hidden;
   margin-left: var(--sidebar-width, 200px);
@@ -112,6 +114,8 @@ onUnmounted(() => {
   }
   .content {
     margin-left: 0;
+    width: 100%;
+    max-width: 100vw;
   }
 }
 
@@ -174,7 +178,7 @@ onUnmounted(() => {
 }
 .admin-content :deep(.stat-card:hover) { transform: none; border-color: var(--color-border-strong); box-shadow: var(--shadow-medium); }
 .admin-content :deep(.stat-icon) { width: 42px; height: 42px; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft) !important; }
-.admin-content :deep(.stat-label) { color: var(--color-text-secondary); font-size: 11px; }
+.admin-content :deep(.stat-label) { color: var(--color-text-secondary); font-size: var(--type-meta); }
 .admin-content :deep(.stat-value) { color: var(--color-text) !important; font-size: 25px; letter-spacing: -.03em; }
 .admin-content :deep(.table-card),
 .admin-content :deep(.form-card),
@@ -192,7 +196,7 @@ onUnmounted(() => {
 .admin-content :deep(.table-header) { min-height: 42px; gap: 12px; }
 .admin-content :deep(.card-header h3),
 .admin-content :deep(.table-header h3),
-.admin-content :deep(.chart-header h3) { color: var(--color-text); font-size: 14px; font-weight: 700; }
+.admin-content :deep(.chart-header h3) { color: var(--color-text); font-size: 15px; font-weight: 700; }
 .admin-content :deep(.filter-bar),
 .admin-content :deep(.header-actions) { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .admin-content :deep(.filter-bar) { padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface-soft); }

@@ -1,4 +1,4 @@
-import type { UpdateSnapshot } from './update-contract.js'
+import type { UpdateDeferPhase, UpdateSnapshot } from './update-contract.js'
 
 export interface UpdateBridge {
   getState(): Promise<UpdateSnapshot>
@@ -6,7 +6,7 @@ export interface UpdateBridge {
   startDownload(): Promise<UpdateSnapshot>
   cancelDownload(): Promise<UpdateSnapshot>
   install(): Promise<UpdateSnapshot>
-  defer(): Promise<UpdateSnapshot>
+  defer(request?: { phase: UpdateDeferPhase }): Promise<UpdateSnapshot>
   onState(callback: (state: UpdateSnapshot) => void): () => void
 }
 

@@ -1,10 +1,13 @@
 <template>
-  <div class="business-layout">
+  <div class="business-layout density-balanced">
     <AppHeader is-business @toggle-sidebar="showSidebar = !showSidebar" />
     <div v-if="showSidebar" class="sidebar-overlay" @click="showSidebar = false"></div>
     <BusinessSidebar :class="{ 'mobile-open': showSidebar }" />
     <main :class="['business-content', { 'is-workspace': route.name === 'BusinessWorkspace' }]">
-      <AnnouncementBanner :hide-banner="route.name === 'BusinessWorkspace'" />
+      <AppNoticeQueue
+        :suppress-update="route.name === 'BusinessWorkspace' || store.isActive"
+        :hide-announcement-banner="route.name === 'BusinessWorkspace'"
+      />
       <router-view v-slot="{ Component }">
         <Suspense><component :is="Component" /></Suspense>
       </router-view>
@@ -17,7 +20,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import BusinessSidebar from '@/components/BusinessSidebar.vue'
-import AnnouncementBanner from '@/components/AnnouncementBanner.vue'
+import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { getCurrentUser } from '@/utils/api'
 import { authService } from '@/utils/auth'
@@ -63,7 +66,7 @@ onUnmounted(() => { clearInterval(accessTimer); removeAfterEach?.(); removeNotif
 
 <style scoped>
 .business-layout{min-height:100vh;background:var(--color-canvas);overflow:hidden}.business-layout :deep(.studio-header){margin-left:var(--sidebar-width)}
-.business-content{min-width:0;min-height:calc(100vh - var(--header-height));margin-left:var(--sidebar-width);padding:24px clamp(18px,3vw,42px) 48px;overflow-x:hidden}.business-content:not(.is-workspace)>:deep(*){width:min(1180px,100%);margin-inline:auto}.business-content.is-workspace{height:calc(100vh - var(--header-height));padding:16px 18px 18px;overflow:hidden}
+.business-content{min-width:0;min-height:calc(100vh - var(--header-height));margin-left:var(--sidebar-width);padding:32px clamp(24px,3vw,42px) 48px;overflow-x:hidden}.business-content:not(.is-workspace)>:deep(*){width:min(1180px,100%);margin-inline:auto}.business-content.is-workspace{height:calc(100vh - var(--header-height));padding:16px 18px 18px;overflow:hidden}
 .sidebar-overlay{position:fixed;inset:0;z-index:998;background:var(--color-overlay);backdrop-filter:blur(4px)}
 @media(max-width:1024px){.business-layout :deep(.studio-header),.business-content{margin-left:0}.business-content{padding:18px 16px 36px}.business-content.is-workspace{padding:10px;height:calc(100vh - var(--header-height))}}
 </style>

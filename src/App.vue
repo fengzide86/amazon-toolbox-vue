@@ -7,12 +7,12 @@
         </AppTransition>
       </router-view>
     </ErrorBoundary>
-    <UpdateProgress />
+    <AppUpdateHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import UpdateProgress from '@/components/UpdateProgress.vue'
+import AppUpdateHost from '@/features/updates/AppUpdateHost.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AppTransition from '@/components/AppTransition.vue'
 </script>

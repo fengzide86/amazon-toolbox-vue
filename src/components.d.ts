@@ -61,7 +61,6 @@ declare module 'vue' {
     StatusBadge: typeof import('./components/StatusBadge.vue')['default']
     ThemeToggle: typeof import('./components/ThemeToggle.vue')['default']
     ToolWorkspace: typeof import('./components/ToolWorkspace.vue')['default']
-    UpdateProgress: typeof import('./components/UpdateProgress.vue')['default']
     UserSidebar: typeof import('./components/UserSidebar.vue')['default']
   }
   export interface GlobalDirectives {
