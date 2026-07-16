@@ -1,4 +1,3 @@
-// @ts-nocheck Runtime-only Electron smoke harness.
 const { app, BrowserWindow } = require('electron');
 const http = require('http');
 const fs = require('fs');
@@ -7,31 +6,48 @@ const path = require('path');
 const { EmbeddedBrowserHost } = require('../automation/embedded-browser-host.cjs');
 const { RunnerClient } = require('../automation/runner-client.cjs');
 
-let runner;
-let grantServer;
+interface RunnerEvent {
+  type: string;
+  error?: { message: string; [key: string]: unknown };
+  result?: Record<string, unknown>;
+}
+
+interface SmokeRunner {
+  start(tool: Record<string, unknown>): Promise<unknown>;
+  stop(): Promise<unknown>;
+}
+
+let runner: SmokeRunner | null = null;
+let grantServer: import('http').Server | null = null;
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'toolbox-embedded-smoke-'));
 const timeout = setTimeout(() => {
   console.error('embedded browser smoke test timed out');
   runner?.stop().finally(() => app.exit(2));
 }, 30000);
 
-function startGrantServer() {
-  return new Promise(resolve => {
-    grantServer = http.createServer((_request, response) => {
+function startGrantServer(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server: import('http').Server = http.createServer((_request: import('http').IncomingMessage, response: import('http').ServerResponse) => {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end(JSON.stringify({
         success: true,
         data: { valid: true, tool_id: 'embedded-smoke', script_key: 'amazon.register.v1' },
       }));
     });
-    grantServer.listen(0, '127.0.0.1', () => resolve(grantServer.address().port));
+    grantServer = server;
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') reject(new Error('smoke grant server address unavailable'));
+      else resolve(address.port);
+    });
   });
 }
 
-async function cleanup(exitCode) {
+async function cleanup(exitCode: number): Promise<void> {
   clearTimeout(timeout);
   try { await runner?.stop(); } catch {}
-  await new Promise(resolve => grantServer?.close(resolve) || resolve());
+  await new Promise<void>((resolve) => grantServer?.close(() => resolve()) || resolve());
   fs.rmSync(artifactRoot, { recursive: true, force: true });
   app.exit(exitCode);
 }
@@ -44,25 +60,25 @@ app.whenReady().then(async () => {
     webPreferences: { webviewTag: true, contextIsolation: true, nodeIntegration: false },
   });
 
-  window.webContents.once('did-attach-webview', async (_event, guest) => {
+  window.webContents.once('did-attach-webview', async (_event: import('electron').Event, guest: import('electron').WebContents) => {
     try {
       host.register(guest);
-      const completed = new Promise((resolve, reject) => {
+      const completed = new Promise<RunnerEvent>((resolve, reject) => {
         runner = new RunnerClient({
           scriptPath: path.resolve(__dirname, '../automation-runner.cjs'),
           env: {
             TOOLBOX_CONTROL_API_URL: `http://127.0.0.1:${grantPort}`,
             TOOLBOX_ARTIFACT_ROOT: artifactRoot,
           },
-          onHostRequest: (action, payload) => host.request(action, payload),
-          onEvent: event => {
+          onHostRequest: (action: string, payload: Record<string, unknown>) => host.request(action, payload),
+          onEvent: (event: RunnerEvent) => {
             if (event.type === 'run.completed') resolve(event);
-            if (event.type === 'run.failed') reject(Object.assign(new Error(event.error.message), event.error));
+            if (event.type === 'run.failed' && event.error) reject(Object.assign(new Error(event.error.message), event.error));
           },
         });
       });
 
-      await runner.start({
+      await runner?.start({
         id: 'embedded-smoke',
         name: '嵌入浏览器巡检',
         platformKey: 'amazon',
@@ -76,12 +92,13 @@ app.whenReady().then(async () => {
         },
       });
       const event = await completed;
+      const result = event.result || {};
       console.log(JSON.stringify({
         embeddedBrowser: true,
-        runner: event.result.runner,
-        script: event.result.scriptName,
-        title: event.result.pageTitle,
-        screenshotCreated: fs.existsSync(event.result.screenshot),
+        runner: result.runner,
+        script: result.scriptName,
+        title: result.pageTitle,
+        screenshotCreated: typeof result.screenshot === 'string' && fs.existsSync(result.screenshot),
       }));
       host.release();
       window.destroy();

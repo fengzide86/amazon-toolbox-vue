@@ -1,11 +1,15 @@
-// @ts-nocheck Legacy CDP response boundary; privileged actions are allowlisted.
+import type { Event, WebContents } from 'electron';
+
 class EmbeddedBrowserHost {
+  guest: WebContents | null;
+  debuggerAttached: boolean;
+
   constructor() {
     this.guest = null;
     this.debuggerAttached = false;
   }
 
-  register(guest) {
+  register(guest: WebContents) {
     if (!guest || guest.isDestroyed?.()) throw this.error('BROWSER_GUEST_INVALID', '嵌入浏览器不可用');
     this.release();
     this.guest = guest;
@@ -18,11 +22,11 @@ class EmbeddedBrowserHost {
     return { id: guest.id, url: guest.getURL?.() || '' };
   }
 
-  isReady() {
+  isReady(): boolean {
     return Boolean(this.guest && !this.guest.isDestroyed?.());
   }
 
-  async request(action, payload = {}) {
+  async request(action: string, payload: Record<string, unknown> = {}): Promise<unknown> {
     if (action === 'browser.release') return this.release();
     if (action === 'browser.detach') return this.detach();
     const guest = this.requireGuest();
@@ -35,7 +39,7 @@ class EmbeddedBrowserHost {
     throw this.error('BROWSER_ACTION_UNSUPPORTED', `不支持的浏览器动作: ${action}`);
   }
 
-  async prepare(guest = this.requireGuest()) {
+  async prepare(guest: WebContents = this.requireGuest()) {
     if (!guest.debugger.isAttached()) guest.debugger.attach('1.3');
     this.debuggerAttached = true;
     await guest.debugger.sendCommand('Page.enable');
@@ -43,13 +47,13 @@ class EmbeddedBrowserHost {
     return { mode: 'embedded-cdp', webContentsId: guest.id, url: guest.getURL() };
   }
 
-  async navigate(guest, rawUrl) {
+  async navigate(guest: WebContents, rawUrl: unknown) {
     const url = this.validUrl(rawUrl);
     if (guest.getURL() === url && !guest.isLoading?.()) return { url };
 
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       let settled = false;
-      const finish = (error) => {
+      const finish = (error?: Error) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -59,19 +63,19 @@ class EmbeddedBrowserHost {
         else resolve();
       };
       const onLoaded = () => finish();
-      const onFailed = (_event, code, description, validatedUrl, isMainFrame) => {
+      const onFailed = (_event: Event, code: number, description: string, validatedUrl: string, isMainFrame: boolean) => {
         if (isMainFrame === false || code === -3) return;
         finish(this.error('BROWSER_NAVIGATION_FAILED', description || `页面加载失败: ${validatedUrl}`));
       };
       const timer = setTimeout(() => finish(this.error('BROWSER_NAVIGATION_TIMEOUT', '页面加载超时')), 45000);
       guest.once('did-stop-loading', onLoaded);
       guest.on('did-fail-load', onFailed);
-      guest.loadURL(url).catch(error => finish(this.error('BROWSER_NAVIGATION_FAILED', error.message)));
+      guest.loadURL(url).catch((error: Error) => finish(this.error('BROWSER_NAVIGATION_FAILED', error.message)));
     });
     return { url: guest.getURL() };
   }
 
-  async inspect(guest) {
+  async inspect(guest: WebContents): Promise<unknown> {
     await this.prepare(guest);
     const expression = `(() => ({
       title: document.title,
@@ -85,7 +89,7 @@ class EmbeddedBrowserHost {
     return guest.executeJavaScript(expression, true);
   }
 
-  async highlight(guest) {
+  async highlight(guest: WebContents): Promise<unknown> {
     await this.prepare(guest);
     const expression = `(() => {
       const old = document.getElementById('__toolbox_runner_overlay__');
@@ -114,13 +118,13 @@ class EmbeddedBrowserHost {
     return guest.executeJavaScript(expression, true);
   }
 
-  async screenshot(guest) {
+  async screenshot(guest: WebContents) {
     await this.prepare(guest);
     const image = await guest.capturePage();
     return { base64: image.toPNG().toString('base64'), mimeType: 'image/png' };
   }
 
-  wait(ms = 250) {
+  wait(ms: unknown = 250): Promise<{ waited: number }> {
     const safeMs = Math.min(Math.max(Number(ms) || 0, 0), 5000);
     return new Promise(resolve => setTimeout(() => resolve({ waited: safeMs }), safeMs));
   }
@@ -140,14 +144,14 @@ class EmbeddedBrowserHost {
     return { detached: true };
   }
 
-  requireGuest() {
+  requireGuest(): WebContents {
     if (!this.isReady()) throw this.error('BROWSER_NOT_REGISTERED', '工作区浏览器尚未就绪');
-    return this.guest;
+    return this.guest as WebContents;
   }
 
-  validUrl(rawUrl) {
+  validUrl(rawUrl: unknown): string {
     try {
-      const url = new URL(rawUrl);
+      const url = new URL(String(rawUrl || ''));
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
       return url.toString();
     } catch {
@@ -155,7 +159,7 @@ class EmbeddedBrowserHost {
     }
   }
 
-  error(code, message) {
+  error(code: string, message: string): Error & { code: string } {
     return Object.assign(new Error(message), { code });
   }
 }

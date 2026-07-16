@@ -1,4 +1,3 @@
-// @ts-nocheck Legacy ExcelJS union boundary; normalized output is schema validated.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -8,13 +7,39 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.xlsx', '.csv']);
 const FORMULA_PREFIX = /^[=+\-@]/;
 
-function normalizeHeader(value) {
+interface BatchField {
+  key: string;
+  label?: string;
+  required?: boolean;
+  sensitive?: boolean;
+}
+
+interface NormalizedBatchField {
+  key: string;
+  label: string;
+  required: boolean;
+  sensitive: boolean;
+}
+
+interface BatchImportError {
+  rowNumber: number;
+  message: string;
+}
+
+interface BatchImportRow {
+  itemId: string;
+  input: Record<string, string>;
+  preview: Record<string, string>;
+  accountLabelMasked: string;
+}
+
+function normalizeHeader(value: unknown): string {
   return String(value ?? '').trim().toLowerCase().replace(/\s+/g, '_');
 }
 
-function cellValue(cell) {
+function cellValue(cell: import('exceljs').Cell | undefined): string {
   const value = cell?.value;
-  if (value && typeof value === 'object' && value.formula) {
+  if (value && typeof value === 'object' && 'formula' in value && value.formula) {
     throw Object.assign(new Error('导入文件不能包含公式单元格'), { code: 'BATCH_FORMULA_REJECTED' });
   }
   if (value && typeof value === 'object' && 'text' in value) return String(value.text).trim();
@@ -26,16 +51,16 @@ function cellValue(cell) {
   return text;
 }
 
-function maskLabel(value) {
+function maskLabel(value: unknown): string {
   const text = String(value || '').trim();
   if (text.includes('@')) {
-    const [local, domain] = text.split('@');
+    const [local = '', domain = ''] = text.split('@');
     return `${local.slice(0, 2)}***@${domain}`;
   }
   return text.length > 6 ? `${text.slice(0, 2)}***${text.slice(-2)}` : text;
 }
 
-async function loadWorkbook(filePath) {
+async function loadWorkbook(filePath: string): Promise<import('exceljs').Worksheet> {
   const stat = fs.statSync(filePath);
   if (stat.size > MAX_FILE_SIZE) throw Object.assign(new Error('导入文件不能超过 10MB'), { code: 'BATCH_FILE_TOO_LARGE' });
   const extension = path.extname(filePath).toLowerCase();
@@ -45,14 +70,14 @@ async function loadWorkbook(filePath) {
   const workbook = new ExcelJS.Workbook();
   if (extension === '.csv') await workbook.csv.readFile(filePath);
   else await workbook.xlsx.readFile(filePath);
-  const worksheet = workbook.worksheets.find(sheet => sheet.state === 'visible') || workbook.worksheets[0];
+  const worksheet = workbook.worksheets.find((sheet: import('exceljs').Worksheet) => sheet.state === 'visible') || workbook.worksheets[0];
   if (!worksheet) throw Object.assign(new Error('导入文件没有可读取的工作表'), { code: 'BATCH_SHEET_MISSING' });
   return worksheet;
 }
 
-async function parseBatchFile(filePath, schema = [], maxRows = 50) {
+async function parseBatchFile(filePath: string, schema: BatchField[] = [], maxRows = 50) {
   const worksheet = await loadWorkbook(filePath);
-  const fields = (schema || []).map(field => ({
+  const fields: NormalizedBatchField[] = (schema || []).map((field) => ({
     key: String(field.key || '').trim(),
     label: String(field.label || field.key || '').trim(),
     required: Boolean(field.required),
@@ -63,9 +88,9 @@ async function parseBatchFile(filePath, schema = [], maxRows = 50) {
   }
 
   const headerRow = worksheet.getRow(1);
-  const headers = new Map();
-  headerRow.eachCell((cell, columnNumber) => headers.set(normalizeHeader(cell.text || cell.value), columnNumber));
-  const fieldColumns = new Map();
+  const headers = new Map<string, number>();
+  headerRow.eachCell((cell: import('exceljs').Cell, columnNumber: number) => headers.set(normalizeHeader(cell.text || cell.value), columnNumber));
+  const fieldColumns = new Map<string, number>();
   for (const field of fields) {
     const column = headers.get(normalizeHeader(field.key)) || headers.get(normalizeHeader(field.label));
     if (column) fieldColumns.set(field.key, column);
@@ -75,8 +100,8 @@ async function parseBatchFile(filePath, schema = [], maxRows = 50) {
     throw Object.assign(new Error(`缺少必填列：${missingHeaders.map(item => item.label).join('、')}`), { code: 'BATCH_HEADERS_MISSING' });
   }
 
-  const rows = [];
-  const errors = [];
+  const rows: BatchImportRow[] = [];
+  const errors: BatchImportError[] = [];
   for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber += 1) {
     const row = worksheet.getRow(rowNumber);
     if (!row.hasValues) continue;
@@ -85,8 +110,8 @@ async function parseBatchFile(filePath, schema = [], maxRows = 50) {
       continue;
     }
     try {
-      const input = {};
-      const rowErrors = [];
+      const input: Record<string, string> = {};
+      const rowErrors: string[] = [];
       for (const field of fields) {
         const column = fieldColumns.get(field.key);
         const value = column ? cellValue(row.getCell(column)) : '';
@@ -98,14 +123,14 @@ async function parseBatchFile(filePath, schema = [], maxRows = 50) {
         continue;
       }
       const itemId = `item_${crypto.randomBytes(8).toString('hex')}`;
-      const preview = {};
+      const preview: Record<string, string> = {};
       for (const field of fields) {
-        preview[field.key] = field.sensitive ? '••••••' : input[field.key];
+        preview[field.key] = field.sensitive ? '••••••' : (input[field.key] ?? '');
       }
       preview.account_label = maskLabel(input.account_label);
-      rows.push({ itemId, input, preview, accountLabelMasked: preview.account_label });
+      rows.push({ itemId, input, preview, accountLabelMasked: preview.account_label ?? '' });
     } catch (error) {
-      errors.push({ rowNumber, message: error.message || '无法读取该行' });
+      errors.push({ rowNumber, message: error instanceof Error ? error.message : '无法读取该行' });
     }
   }
   if (!rows.length) throw Object.assign(new Error('没有可执行的有效数据行'), { code: 'BATCH_ROWS_EMPTY', errors });
@@ -117,7 +142,7 @@ async function parseBatchFile(filePath, schema = [], maxRows = 50) {
   };
 }
 
-async function writeBatchErrors(filePath, errors = []) {
+async function writeBatchErrors(filePath: string, errors: BatchImportError[] = []) {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('导入问题');
   worksheet.addRow(['行号', '问题']);
