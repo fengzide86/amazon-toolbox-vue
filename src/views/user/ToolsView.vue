@@ -97,7 +97,7 @@
         <div class="drawer-assurance"><ShieldCheck :size="17" /><span>系统会自动处理；确实需要你操作时，才会明确提醒。</span></div>
       </div>
       <template #footer>
-        <button class="drawer-primary" :disabled="detailsTool && toolState(detailsTool) === 'maintenance'" @click="launchFromDetails">
+        <button class="drawer-primary" :disabled="Boolean(detailsTool && toolState(detailsTool) === 'maintenance')" @click="launchFromDetails">
           {{ detailsActionText }} <ArrowRight :size="16" />
         </button>
       </template>
@@ -105,7 +105,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -129,20 +129,29 @@ import { getTools, createToolLaunchGrant } from '@/utils/api'
 import { showToast } from '@/utils'
 import { useAppStore } from '@/stores/app'
 import { usePlatformStore } from '@/stores/platform'
+import { readStoredLicense } from '@/features/user/model'
+import {
+  errorCode,
+  errorMessage,
+  toolCatalogItemSchema,
+  toolCatalogSchema,
+  toolLaunchResponseSchema,
+  type ToolCatalogItem,
+} from '@/features/tools/model'
 
 const router = useRouter() || { push: () => {} }
 const route = useRoute() || { query: {} }
 const appStore = useAppStore()
 const platformStore = usePlatformStore()
-const tools = ref([])
+const tools = ref<ToolCatalogItem[]>([])
 const loading = ref(true)
-const launchingToolId = ref(null)
+const launchingToolId = ref<string | number | null>(null)
 const detailsVisible = ref(false)
-const detailsTool = ref(null)
+const detailsTool = ref<ToolCatalogItem | null>(null)
 
 const userInfo = computed(() => {
   try {
-    return JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+    return readStoredLicense()
   } catch {
     return {}
   }
@@ -169,32 +178,32 @@ const iconMap = {
   fba_agl: Warehouse,
 }
 
-function toolIcon(tool) {
-  return iconMap[tool.capability_key] || (tool.category === 'automation' ? Zap : Boxes)
+function toolIcon(tool: ToolCatalogItem) {
+  return (tool.capability_key ? iconMap[tool.capability_key as keyof typeof iconMap] : undefined) || (tool.category === 'automation' ? Zap : Boxes)
 }
 
-function defaultDescription(tool) {
+function defaultDescription(tool: ToolCatalogItem) {
   return `自动处理${tool.name || '当前功能'}中的重复操作`
 }
 
-function normalizedList(value) {
+function normalizedList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(item => String(item).trim()).filter(Boolean)
   if (typeof value === 'string') return value.split(/[\n,，]/).map(item => item.trim()).filter(Boolean)
   return []
 }
 
-function toolCapabilities(tool) {
+function toolCapabilities(tool: ToolCatalogItem) {
   return normalizedList(tool?.capability_tags).slice(0, 3)
 }
 
-function hasToolDetails(tool) {
+function hasToolDetails(tool: ToolCatalogItem) {
   return toolCapabilities(tool).length
     || normalizedList(tool?.preparation_notes).length
     || normalizedList(tool?.intervention_scenarios).length
 }
 
-function openDetails(tool) {
-  detailsTool.value = tool
+function openDetails(rawTool: unknown) {
+  detailsTool.value = toolCatalogItemSchema.parse(rawTool)
   detailsVisible.value = true
 }
 
@@ -212,8 +221,8 @@ function launchFromDetails() {
   handleToolClick(tool)
 }
 
-function toolState(tool) {
-  const releaseStatus = tool.release_status || (tool.status === 'online' ? 'available' : tool.status)
+function toolState(tool: ToolCatalogItem) {
+  const releaseStatus = tool.release_status || (tool.status === 'online' ? 'available' : tool.status) || 'maintenance'
   if (!['available', 'beta', 'online'].includes(releaseStatus)) return 'maintenance'
   const availablePlans = Array.isArray(tool.available_plans)
     ? tool.available_plans.map(item => String(item).toUpperCase())
@@ -222,7 +231,8 @@ function toolState(tool) {
   return 'available'
 }
 
-function handleToolClick(tool) {
+function handleToolClick(rawTool: unknown) {
+  const tool = toolCatalogItemSchema.parse(rawTool)
   const state = toolState(tool)
   if (state === 'locked') {
     router.push({ path: '/user/plans', query: { tool: tool.id } })
@@ -235,7 +245,7 @@ function handleToolClick(tool) {
 async function loadData() {
   loading.value = true
   try {
-    tools.value = await getTools({ platform_key: platformStore.currentPlatform })
+    tools.value = toolCatalogSchema.parse(await getTools({ platform_key: platformStore.currentPlatform }))
   } catch (error) {
     showToast('工具加载失败，请稍后重试', 'error')
   } finally {
@@ -243,13 +253,13 @@ async function loadData() {
   }
 }
 
-async function runTool(tool) {
+async function runTool(tool: ToolCatalogItem) {
   if (launchingToolId.value !== null) return
   launchingToolId.value = tool.id
   try {
     const platformKey = platformStore.currentPlatform
     const deviceId = localStorage.getItem('toolbox_device_id') || ''
-    const response = await createToolLaunchGrant(tool.id, { platformKey, deviceId })
+    const response = toolLaunchResponseSchema.parse(await createToolLaunchGrant(tool.id, { platformKey, deviceId }))
     const grant = response?.launch_data || response?.grant
     if (!grant?.token || !grant?.target_url) throw new Error('工具启动数据不完整，请重试')
 
@@ -275,15 +285,16 @@ async function runTool(tool) {
       },
     })
   } catch (error) {
-    if (error?.code === 3006) {
+    const code = errorCode(error)
+    if (code === 3006) {
       showToast('当前套餐暂未包含该工具', 'warning')
       router.push({ path: '/user/plans', query: { tool: tool.id } })
-    } else if (error?.code === 3007) {
+    } else if (code === 3007) {
       showToast('当前授权暂未包含该平台，请联系客服', 'warning')
-    } else if (error?.code === 3003) {
+    } else if (code === 3003) {
       showToast('当前设备尚未获得授权，请管理设备或联系客服', 'warning')
     } else {
-      showToast(error?.message || '暂时无法启动，请重试', 'error')
+      showToast(errorMessage(error, '暂时无法启动，请重试'), 'error')
     }
   } finally {
     launchingToolId.value = null

@@ -196,3 +196,38 @@ export const retrievalTestResultSchema = z.object({
 }).passthrough()
 
 export type RetrievalTestResult = z.infer<typeof retrievalTestResultSchema>
+
+const authDeviceSchema = z.object({
+  id: entityIdSchema,
+  device_id: z.string(),
+  device_name: nullableText,
+  created_at: nullableText,
+}).passthrough()
+
+export const adminAuthCodeSchema = z.object({
+  id: entityIdSchema,
+  code: z.string(),
+  plan_id: entityIdSchema.nullable().optional(),
+  plan_name: nullableText,
+  device_id: nullableText,
+  device_name: nullableText,
+  max_devices: z.coerce.number().int().positive().default(1),
+  status: z.string(),
+  expires_at: nullableText,
+  created_at: nullableText,
+  devices: z.array(authDeviceSchema).default([]),
+  platform_scope: z.array(z.string()).nullable().optional(),
+  scene_type: nullableText,
+  seat_limit: z.coerce.number().int().positive().default(1),
+  seat_used: z.coerce.number().int().nonnegative().default(0),
+  device_used: z.coerce.number().int().nonnegative().default(0),
+}).passthrough()
+
+export const adminAuthCodesSchema = z.array(adminAuthCodeSchema)
+export type AdminAuthCode = z.infer<typeof adminAuthCodeSchema>
+
+export const generatedAuthCodesSchema = z.object({
+  success: z.boolean(),
+  codes: z.array(z.string()).default([]),
+  count: z.coerce.number().int().nonnegative().default(0),
+})

@@ -235,7 +235,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlans, api } from '@/utils/api'
 import { showToast } from '@/utils'
@@ -245,37 +245,45 @@ import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import {
+  adminAuthCodeSchema,
+  adminAuthCodesSchema,
+  adminPlansSchema,
+  generatedAuthCodesSchema,
+  type AdminAuthCode,
+  type AdminPlan,
+} from '@/features/admin/model'
 
-const authCodes = ref([])
-const plans = ref([])
-const selectedPlanId = ref(2)
+const authCodes = ref<AdminAuthCode[]>([])
+const plans = ref<AdminPlan[]>([])
+const selectedPlanId = ref<string | number>(2)
 const selectedPlatformScope = ref('amazon')
 const selectedSceneType = ref('competition')
 const generateCount = ref(1)
 const seatLimit = ref(1)
 const maxDevices = ref(1)
 const isLoading = ref(false)
-const generatedCodes = ref([])
+const generatedCodes = ref<string[]>([])
 const filterStatus = ref('')
 const searchText = ref('')
-const planNameMap = reactive({})
+const planNameMap = reactive<Record<string, string>>({})
 
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
 
 // 设备数弹窗
 const showDeviceModal = ref(false)
-const editingCode = ref(null)
+const editingCode = ref<AdminAuthCode | null>(null)
 const newMaxDevices = ref(1)
 
 // 延期弹窗
 const showExtendModal = ref(false)
-const extendingCode = ref(null)
+const extendingCode = ref<AdminAuthCode | null>(null)
 const extendDays = ref(30)
 
 // 详情弹窗
 const showDetailModal = ref(false)
-const detailData = ref(null)
+const detailData = ref<AdminAuthCode | null>(null)
 
 const filteredCodes = computed(() => {
   let codes = authCodes.value
@@ -292,30 +300,32 @@ const filteredCodes = computed(() => {
   return codes
 })
 
-function getPlanName(planId) {
-  return planNameMap[planId] || '未关联套餐'
+function getPlanName(planId?: string | number | null) {
+  return planId === null || planId === undefined ? '未关联套餐' : planNameMap[String(planId)] || '未关联套餐'
 }
 
-function getStatusType(status) {
-  const map = { unused: 'warning', active: 'success', frozen: 'info', expired: 'danger' }
-  return map[status] || 'info'
+function getStatusType(status?: string | null): 'warning' | 'success' | 'info' | 'danger' {
+  const map: Record<string, 'warning' | 'success' | 'info' | 'danger'> = { unused: 'warning', active: 'success', frozen: 'info', expired: 'danger' }
+  return status ? map[status] || 'info' : 'info'
 }
 
-function getStatusText(status) {
-  const map = { unused: '未使用', active: '已激活', frozen: '已冻结', expired: '已过期' }
-  return map[status] || status
+function getStatusText(status?: string | null) {
+  const map: Record<string, string> = { unused: '未使用', active: '已激活', frozen: '已冻结', expired: '已过期' }
+  return status ? map[status] || status : '-'
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr?: string | null) {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleDateString('zh-CN')
 }
 
-function getDeviceCount(code) {
+function getDeviceCount(rawCode: unknown) {
+  const code = adminAuthCodeSchema.parse(rawCode)
   return code.devices?.length || (code.device_name ? 1 : 0)
 }
 
-function getDeviceType(code) {
+function getDeviceType(rawCode: unknown): 'danger' | 'success' | 'info' {
+  const code = adminAuthCodeSchema.parse(rawCode)
   const count = getDeviceCount(code)
   const max = code.max_devices || 1
   if (count >= max) return 'danger'
@@ -323,13 +333,15 @@ function getDeviceType(code) {
   return 'info'
 }
 
-function editMaxDevices(code) {
+function editMaxDevices(rawCode: unknown) {
+  const code = adminAuthCodeSchema.parse(rawCode)
   editingCode.value = code
   newMaxDevices.value = code.max_devices || 1
   showDeviceModal.value = true
 }
 
 async function saveMaxDevices() {
+  if (!editingCode.value) return
   if (newMaxDevices.value < 1) {
     showToast('设备数不能小于1', 'error')
     return
@@ -349,10 +361,12 @@ async function loadData() {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
     const params = platformKey ? { platform_key: platformKey } : {}
     const [codesRes, plansRes] = await Promise.all([getAuthCodes(params), getPlans()])
-    authCodes.value = codesRes
-    plans.value = plansRes
-    if (plansRes.length) selectedPlanId.value = plansRes[0].id
-    plansRes.forEach(p => { planNameMap[p.id] = p.name })
+    const parsedCodes = adminAuthCodesSchema.parse(codesRes)
+    const parsedPlans = adminPlansSchema.parse(plansRes)
+    authCodes.value = parsedCodes
+    plans.value = parsedPlans
+    if (parsedPlans[0]) selectedPlanId.value = parsedPlans[0].id
+    parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
   } catch (err) {
     showToast('数据加载失败', 'error')
   }
@@ -367,14 +381,14 @@ async function handleGenerate() {
   }
   isLoading.value = true
   try {
-    const res = await batchGenerateAuthCodes({
+    const res = generatedAuthCodesSchema.parse(await batchGenerateAuthCodes({
       plan_id: selectedPlanId.value,
       count: generateCount.value,
       platform_scope: selectedPlatformScope.value,
       scene_type: selectedSceneType.value,
       seat_limit: seatLimit.value,
       max_devices: maxDevices.value
-    })
+    }))
     if (res.success) {
       generatedCodes.value = res.codes
       showToast(`成功生成 ${res.count} 个授权码`, 'success')
@@ -386,7 +400,8 @@ async function handleGenerate() {
   isLoading.value = false
 }
 
-async function toggleFreeze(code) {
+async function toggleFreeze(rawCode: unknown) {
+  const code = adminAuthCodeSchema.parse(rawCode)
   const newStatus = code.status === 'frozen' ? 'active' : 'frozen'
   try {
     await updateAuthCode(code.id, { status: newStatus })
@@ -397,19 +412,21 @@ async function toggleFreeze(code) {
   }
 }
 
-function openExtend(code) {
-  extendingCode.value = code
+function openExtend(rawCode: unknown) {
+  extendingCode.value = adminAuthCodeSchema.parse(rawCode)
   extendDays.value = 30
   showExtendModal.value = true
 }
 
-function handleCodeCommand(command, code) {
-  if (command === 'freeze') toggleFreeze(code)
-  if (command === 'extend') openExtend(code)
-  if (command === 'delete') deleteCode(code.id)
+function handleCodeCommand(command: string, code: unknown) {
+  const parsedCode = adminAuthCodeSchema.parse(code)
+  if (command === 'freeze') toggleFreeze(parsedCode)
+  if (command === 'extend') openExtend(parsedCode)
+  if (command === 'delete') deleteCode(parsedCode.id)
 }
 
 async function confirmExtend() {
+  if (!extendingCode.value) return
   if (!extendDays.value || extendDays.value < 1) {
     showToast('请输入有效天数', 'error')
     return
@@ -417,7 +434,7 @@ async function confirmExtend() {
   try {
     const baseDate = extendingCode.value.expires_at ? new Date(extendingCode.value.expires_at) : new Date()
     const startDate = baseDate < new Date() ? new Date() : baseDate
-    startDate.setDate(startDate.getDate() + parseInt(extendDays.value))
+    startDate.setDate(startDate.getDate() + extendDays.value)
     await updateAuthCode(extendingCode.value.id, { expires_at: startDate.toISOString() })
     if (extendingCode.value.status === 'expired') {
       await updateAuthCode(extendingCode.value.id, { status: 'active' })
@@ -430,7 +447,7 @@ async function confirmExtend() {
   }
 }
 
-async function deleteCode(id) {
+async function deleteCode(id: string | number) {
   if (!await confirmAction({
     title: '删除授权码？',
     message: '删除后该授权码将无法继续使用，此操作不能撤销。',
@@ -461,10 +478,10 @@ function copyCodes() {
   })
 }
 
-async function openDetail(code) {
+async function openDetail(rawCode: unknown) {
+  const code = adminAuthCodeSchema.parse(rawCode)
   try {
-    const res = await api.get(`/api/auth-codes/${code.id}`)
-    detailData.value = res
+    detailData.value = adminAuthCodeSchema.parse(await api.get(`/api/auth-codes/${code.id}`))
     showDetailModal.value = true
   } catch (err) {
     showToast('获取详情失败', 'error')
