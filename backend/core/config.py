@@ -117,6 +117,8 @@ class Settings:
                 "http://127.0.0.1:4173",
                 "null",
             ]
+        if "app://toolbox" not in self.CORS_ORIGINS:
+            self.CORS_ORIGINS.append("app://toolbox")
         
         # ===== 初始化数据库配置 =====
         # 优先使用环境变量，否则根据环境自动选择

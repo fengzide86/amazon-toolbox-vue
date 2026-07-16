@@ -2,14 +2,14 @@
 安全相关模块
 包含密码哈希、JWT认证、CORS配置等安全功能
 """
+from datetime import datetime, timedelta, timezone
+
 import bcrypt
 import jwt
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core.config import settings
 
+from core.config import settings
 
 # ===== CORS 配置 =====
 
@@ -23,8 +23,8 @@ def configure_cors(app: FastAPI) -> None:
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Toolbox-Version"],
         max_age=600,  # 预检请求缓存10分钟
     )
 
@@ -81,7 +81,7 @@ def verify_password_fallback(password: str, stored: str) -> tuple[bool, bool]:
 
 # ===== JWT Token =====
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """创建 JWT Token
     
     Args:
@@ -116,7 +116,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-def verify_token(token: str) -> Optional[dict]:
+def verify_token(token: str) -> dict | None:
     """验证 JWT Token
     
     Args:
@@ -140,7 +140,7 @@ def verify_token(token: str) -> Optional[dict]:
         return None
 
 
-def extract_token_from_header(authorization: str) -> Optional[str]:
+def extract_token_from_header(authorization: str) -> str | None:
     """从 Authorization 头中提取 Token
     
     Args:

@@ -6,8 +6,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Setting, Plan, AuthCode, AuthSeat, Device, User
 from core.security import hash_password
+from models import AuthCode, AuthSeat, Device, Plan, Setting, User
 
 
 class TestHealthCheck:
@@ -24,6 +24,22 @@ class TestHealthCheck:
         assert "version" in data
         assert "checks" in data
         assert data["checks"]["database"]["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_desktop_cors_contract(self, client: AsyncClient):
+        response = await client.options(
+            "/api/settings/public",
+            headers={
+                "Origin": "app://toolbox",
+                "Access-Control-Request-Method": "PATCH",
+                "Access-Control-Request-Headers": "authorization,content-type,x-toolbox-version",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "app://toolbox"
+        assert "PATCH" in response.headers["access-control-allow-methods"]
+        assert "X-Toolbox-Version" in response.headers["access-control-allow-headers"]
 
 
 class TestAdminLogin:
