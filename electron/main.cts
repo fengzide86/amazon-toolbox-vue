@@ -15,6 +15,8 @@ const { EmbeddedBrowserHostManager } = require('./automation/embedded-browser-ho
 const { BatchCoordinator } = require('./automation/batch-coordinator.cjs');
 const { parseBatchFile, writeBatchErrors } = require('./automation/batch-importer.cjs');
 const toolSigningConfig = require('./tool-signing-config.cjs');
+const packageMetadata = require('../../package.json');
+const { resolveRuntimeConfig } = require('./core/runtime-config.cjs');
 
 process.env.TOOLBOX_CLIENT_VERSION = app.getVersion();
 
@@ -81,10 +83,10 @@ if (!gotTheLock) {
 }
 
 // 云端控制面地址。配置为远程 HTTPS 后，桌面端不会再启动打包的 Python 后端。
-const CONTROL_API_BASE = (process.env.TOOLBOX_CONTROL_API_URL || 'http://localhost:8000').replace(/\/$/, '');
-const USE_BUNDLED_BACKEND = process.env.TOOLBOX_USE_BUNDLED_BACKEND
-  ? process.env.TOOLBOX_USE_BUNDLED_BACKEND === 'true'
-  : CONTROL_API_BASE === 'http://localhost:8000';
+const { controlApiBase: CONTROL_API_BASE, useBundledBackend: USE_BUNDLED_BACKEND } = resolveRuntimeConfig(
+  process.env,
+  packageMetadata,
+);
 
 // ===== 分屏模式：在系统浏览器中打开外部链接 =====
 ipcMain.handle('open-external', async (event, url) => {

@@ -6,6 +6,9 @@
   "private": true,
   "type": "module",
   "main": "dist-electron/electron/desktop-main.cjs",
+  "toolbox": {
+    "controlApiUrl": "https://8-130-113-104.sslip.io"
+  },
   "scripts": {
     "dev": "vite --mode development",
     "build": "set \"TEMP=D:\\AmazonToolboxData\\build-tmp\"&& set \"TMP=D:\\AmazonToolboxData\\build-tmp\"&& vite build --mode production",
@@ -16,7 +19,7 @@
     "backend:build": "cd backend && python -m PyInstaller --noconfirm --clean --distpath build\\dist --workpath build\\work toolbox-backend.spec && copy /Y build\\dist\\toolbox-backend.exe ..\\electron\\toolbox-backend.exe",
     "electron:build": "npm run backend:build && npm run electron:compile && npm run build:desktop && set \"ELECTRON_CACHE=D:\\AmazonToolboxData\\electron-cache\"&& set \"ELECTRON_BUILDER_CACHE=D:\\AmazonToolboxData\\electron-builder-cache\"&& set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --win nsis",
     "release:validate": "tsx scripts/validate-release-env.ts",
-    "electron:release": "npm run release:validate && npm run backend:build && npm run electron:compile && npm run build:desktop && set \"ELECTRON_CACHE=D:\\AmazonToolboxData\\electron-cache\"&& set \"ELECTRON_BUILDER_CACHE=D:\\AmazonToolboxData\\electron-builder-cache\"&& set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win nsis \"-c.publish.url=%ELECTRON_UPDATE_URL%\"",
+    "electron:release": "npm run release:validate && npm run backend:build && npm run electron:compile && npm run build:desktop && set \"ELECTRON_CACHE=D:\\AmazonToolboxData\\electron-cache\"&& set \"ELECTRON_BUILDER_CACHE=D:\\AmazonToolboxData\\electron-builder-cache\"&& set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win nsis",
     "electron:preview": "npm run electron:compile && electron .",
     "test": "npm run electron:compile && vitest run",
     "test:run": "npm run electron:compile && vitest run",
@@ -124,7 +127,7 @@
     },
     "publish": {
       "provider": "generic",
-      "url": "https://updates.invalid/",
+      "url": "https://8-130-113-104.sslip.io/updates/",
       "channel": "latest"
     }
   }

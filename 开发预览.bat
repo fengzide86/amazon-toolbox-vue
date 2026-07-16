@@ -22,9 +22,14 @@ if not exist "node_modules\" (
 
 if not defined TOOLBOX_CONTROL_API_URL if exist ".env.deploy" (
     for /f "usebackq tokens=1,* delims==" %%A in (".env.deploy") do (
+        if /i "%%A"=="TOOLBOX_CONTROL_API_URL" set "TOOLBOX_CONTROL_API_URL=%%B"
         if /i "%%A"=="DEPLOY_SERVER_HOST" set "TOOLBOX_PREVIEW_HOST=%%B"
     )
-    if defined TOOLBOX_PREVIEW_HOST (
+    if defined TOOLBOX_CONTROL_API_URL (
+        set "TOOLBOX_USE_BUNDLED_BACKEND=false"
+        set "VITE_CONTROL_API_BASE=!TOOLBOX_CONTROL_API_URL!"
+        echo [INFO] Using the configured remote control service.
+    ) else if defined TOOLBOX_PREVIEW_HOST (
         set "TOOLBOX_CONTROL_API_URL=http://!TOOLBOX_PREVIEW_HOST!:8000"
         set "TOOLBOX_USE_BUNDLED_BACKEND=false"
         set "VITE_CONTROL_API_BASE=http://!TOOLBOX_PREVIEW_HOST!:8000"

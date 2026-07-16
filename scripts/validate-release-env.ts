@@ -1,8 +1,11 @@
 import { accessSync, constants, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const updateUrlValue = process.env.ELECTRON_UPDATE_URL?.trim()
-if (!updateUrlValue) throw new Error('Release blocked: missing ELECTRON_UPDATE_URL')
+const packageJson = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+  build?: { publish?: { url?: string }; win?: { signAndEditExecutable?: boolean } }
+}
+const updateUrlValue = process.env.ELECTRON_UPDATE_URL?.trim() || packageJson.build?.publish?.url?.trim()
+if (!updateUrlValue) throw new Error('Release blocked: missing update publish URL')
 
 const updateUrl = new URL(updateUrlValue)
 if (['localhost', '127.0.0.1', 'updates.invalid'].includes(updateUrl.hostname)) {
@@ -23,9 +26,6 @@ if (configuredSigning.length) {
   if (!/^(https:\/\/|data:)/i.test(certificate)) accessSync(resolve(certificate), constants.R_OK)
 }
 
-const packageJson = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
-  build?: { publish?: { url?: string }; win?: { signAndEditExecutable?: boolean } }
-}
 if (configuredSigning.length && packageJson.build?.win?.signAndEditExecutable === false) {
   throw new Error('Release blocked: Windows executable signing is disabled')
 }
