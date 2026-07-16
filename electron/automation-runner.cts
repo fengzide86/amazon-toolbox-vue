@@ -1,4 +1,3 @@
-// @ts-nocheck Legacy Playwright boundary; all process messages are runtime validated.
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -19,10 +18,59 @@ const ARTIFACT_ROOT = process.env.TOOLBOX_ARTIFACT_ROOT || path.join(process.cwd
 const CONTROL_API_BASE = (process.env.TOOLBOX_CONTROL_API_URL || 'http://localhost:8000').replace(/\/$/, '');
 const MOCK_MODE = process.env.TOOLBOX_RUNNER_MOCK === 'true';
 
+type UnknownRecord = Record<string, unknown>;
+
+interface RunnerLaunchGrant extends UnknownRecord {
+  token?: string;
+  scriptKey?: string;
+  runnerApiVersion?: number;
+  expiresAt?: string;
+}
+
+interface RunnerTool extends UnknownRecord {
+  id?: string | number;
+  name?: string;
+  targetUrl?: string;
+  browserMode?: string;
+  launchGrant?: RunnerLaunchGrant;
+  executionContext?: { mode?: string; batchId?: string; itemId?: string };
+}
+
+interface RunnerStep extends UnknownRecord { id: string }
+interface PendingHostRequest {
+  resolve: (value: UnknownRecord) => void;
+  reject: (reason?: unknown) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+
+interface RunnerFailure extends Error { code?: string; stepId?: string }
+
+function asRecord(value: unknown): UnknownRecord {
+  return typeof value === 'object' && value !== null ? value as UnknownRecord : {};
+}
+
+function failure(error: unknown, fallback = '未知错误'): RunnerFailure {
+  return error instanceof Error ? error as RunnerFailure : new Error(fallback) as RunnerFailure;
+}
+
 class AutomationRuntime {
+  runId: string | null;
+  tool: RunnerTool;
+  steps: RunnerStep[];
+  status: string;
+  context: import('playwright-core').BrowserContext | null;
+  page: import('playwright-core').Page | null;
+  cancelRequested: boolean;
+  pauseWaiters: Array<() => void>;
+  userActionWaiters: Array<() => void>;
+  eventSequence: number;
+  execution: Promise<void> | null;
+  hostSequence: number;
+  hostPending: Map<string, PendingHostRequest>;
+
   constructor() {
     this.runId = null;
-    this.tool = null;
+    this.tool = {};
     this.steps = [];
     this.status = 'idle';
     this.context = null;
@@ -33,10 +81,10 @@ class AutomationRuntime {
     this.eventSequence = 0;
     this.execution = null;
     this.hostSequence = 0;
-    this.hostPending = new Map();
+    this.hostPending = new Map<string, PendingHostRequest>();
   }
 
-  emit(type, payload = {}) {
+  emit(type: string, payload: UnknownRecord = {}): void {
     this.eventSequence += 1;
     process.send?.({
       type: 'event',
@@ -51,7 +99,7 @@ class AutomationRuntime {
     });
   }
 
-  async start(tool = {}) {
+  async start(tool: RunnerTool = {}) {
     if (this.execution) {
       const previousExecution = this.execution;
       if (!['completed', 'failed', 'cancelled'].includes(this.status)) await this.cancel(false);
@@ -82,11 +130,11 @@ class AutomationRuntime {
     return { runId: this.runId };
   }
 
-  async execute() {
+  async execute(): Promise<void> {
     const runId = this.runId;
     const script = resolveScript(this.tool.launchGrant?.scriptKey);
     const embedded = this.tool.browserMode === 'embedded-cdp';
-    const result = {
+    const result: UnknownRecord = {
       runner: embedded ? 'node-embedded-cdp' : 'node-playwright',
       scriptKey: script.key,
       scriptName: script.name,
@@ -113,8 +161,8 @@ class AutomationRuntime {
         }
         fs.mkdirSync(PROFILE_ROOT, { recursive: true });
         const profilePath = path.join(PROFILE_ROOT, safeProfileName(this.tool));
-        let executablePath;
-        let launchError;
+        let executablePath: string | undefined;
+        let launchError: unknown;
         for (const candidate of executablePaths) {
           try {
             this.context = await chromium.launchPersistentContext(profilePath, {
@@ -131,10 +179,10 @@ class AutomationRuntime {
           }
         }
         if (!this.context) {
-          throw this.runnerError('BROWSER_LAUNCH_FAILED', `Chrome/Edge 启动失败：${launchError?.message || '未知错误'}`);
+          throw this.runnerError('BROWSER_LAUNCH_FAILED', `Chrome/Edge 启动失败：${failure(launchError).message}`);
         }
         this.page = this.context.pages()[0] || await this.context.newPage();
-        result.browser = path.basename(executablePath);
+        result.browser = path.basename(executablePath || 'browser');
         result.profile = safeProfileName(this.tool);
       });
 
@@ -144,7 +192,7 @@ class AutomationRuntime {
           const navigation = await this.hostRequest('browser.navigate', { url: targetUrl }, 50000);
           result.finalUrl = navigation.url;
         } else if (!MOCK_MODE) {
-          await this.page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+          await this.requirePage().goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
         } else {
           await this.sleep(20);
         }
@@ -158,8 +206,8 @@ class AutomationRuntime {
           result.finalUrl = inspection.url;
           result.pageAnalysis = inspection;
         } else {
-          result.pageTitle = MOCK_MODE ? 'Runner Mock Page' : await this.page.title();
-          result.finalUrl = MOCK_MODE ? this.tool.targetUrl : this.page.url();
+          result.pageTitle = MOCK_MODE ? 'Runner Mock Page' : await this.requirePage().title();
+          result.finalUrl = MOCK_MODE ? this.tool.targetUrl : this.requirePage().url();
         }
         await this.sleep(MOCK_MODE ? 20 : 300);
       });
@@ -169,7 +217,7 @@ class AutomationRuntime {
           result.highlight = await this.hostRequest('browser.highlight');
           await this.hostRequest('browser.wait', { ms: 1900 });
         } else if (!MOCK_MODE) {
-          result.pageAnalysis = await this.page.evaluate(() => ({
+          result.pageAnalysis = await this.requirePage().evaluate(() => ({
             title: document.title,
             url: location.href,
             forms: document.forms.length,
@@ -177,7 +225,7 @@ class AutomationRuntime {
             buttons: document.querySelectorAll('button, [role="button"], input[type="submit"]').length,
             links: document.links.length,
           }));
-          await this.page.locator('form, main, [role="main"], input, button').first().evaluate(node => {
+          await this.requirePage().locator('form, main, [role="main"], input, button').first().evaluate((node: HTMLElement) => {
             const oldOutline = node.style.outline;
             node.style.outline = '3px solid #4f46e5';
             node.style.outlineOffset = '4px';
@@ -198,9 +246,10 @@ class AutomationRuntime {
         const artifactPath = path.join(ARTIFACT_ROOT, `${runId}.png`);
         if (embedded) {
           const screenshot = await this.hostRequest('browser.screenshot');
+          if (typeof screenshot.base64 !== 'string') throw this.runnerError('BROWSER_SCREENSHOT_INVALID', '浏览器截图数据无效');
           fs.writeFileSync(artifactPath, Buffer.from(screenshot.base64, 'base64'));
         } else {
-          await this.page.screenshot({ path: artifactPath, fullPage: false });
+          await this.requirePage().screenshot({ path: artifactPath, fullPage: false });
         }
         result.screenshot = artifactPath;
         this.emit(EVENTS.ARTIFACT_CREATED, {
@@ -218,16 +267,17 @@ class AutomationRuntime {
         result: { ...result, summary: '本地 Runner 演示任务已完成', completedSteps: this.steps.length },
       });
     } catch (error) {
-      if (this.cancelRequested || error?.code === 'RUN_CANCELLED') return;
+      const runError = failure(error, '本地任务执行失败');
+      if (this.cancelRequested || runError.code === 'RUN_CANCELLED') return;
       this.status = 'failed';
       this.emit(EVENTS.RUN_FAILED, {
-        stepId: error.stepId,
-        error: { code: error.code || 'RUNNER_ERROR', message: error.message || '本地任务执行失败' },
+        stepId: runError.stepId,
+        error: { code: runError.code || 'RUNNER_ERROR', message: runError.message || '本地任务执行失败' },
       });
     }
   }
 
-  async runStep(stepId, operation) {
+  async runStep(stepId: string, operation: () => Promise<void>) {
     await this.waitWhilePaused();
     this.ensureActive();
     const step = this.steps.find(item => item.id === stepId);
@@ -235,14 +285,15 @@ class AutomationRuntime {
     try {
       await operation();
     } catch (error) {
-      error.stepId = stepId;
-      throw error;
+      const stepError = failure(error);
+      stepError.stepId = stepId;
+      throw stepError;
     }
     this.ensureActive();
     this.emit(EVENTS.STEP_COMPLETED, { stepId });
   }
 
-  async verifyGrant() {
+  async verifyGrant(): Promise<UnknownRecord> {
     const signature = verifyToolManifest(this.tool, process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || '');
     if (MOCK_MODE) return { signatureVerified: signature.verified };
     const grant = this.tool.launchGrant || {};
@@ -263,34 +314,37 @@ class AutomationRuntime {
           method: 'POST',
           headers: { 'X-Toolbox-Version': process.env.TOOLBOX_CLIENT_VERSION || 'unknown' },
         });
-        const body = await response.json();
+        const body = asRecord(await response.json());
+        const data = asRecord(body.data);
         if (response.status === 404 && endpoint.includes('launch-grant')) continue;
-        if (!response.ok || !body?.success || !body?.data?.valid) {
-          throw this.runnerError('GRANT_REJECTED', body?.message || body?.detail || '启动授权验证失败');
+        if (!response.ok || body.success !== true || data.valid !== true) {
+          const message = typeof body.message === 'string' ? body.message : typeof body.detail === 'string' ? body.detail : '启动授权验证失败';
+          throw this.runnerError('GRANT_REJECTED', message);
         }
-        if (body.data.tool_id !== this.tool.id) {
+        if (data.tool_id !== this.tool.id) {
           throw this.runnerError('GRANT_TOOL_MISMATCH', '启动授权与当前工具不匹配');
         }
         const execution = this.tool.executionContext;
         if (execution?.mode === 'batch' && (
-          body.data.execution_mode !== 'batch'
-          || body.data.client_batch_id !== execution.batchId
-          || body.data.client_item_id !== execution.itemId
+          data.execution_mode !== 'batch'
+          || data.client_batch_id !== execution.batchId
+          || data.client_item_id !== execution.itemId
         )) {
           throw this.runnerError('GRANT_BATCH_MISMATCH', '启动授权与当前批次账号不匹配');
         }
-        return { ...body.data, signatureVerified: signature.verified };
+        return { ...data, signatureVerified: signature.verified };
       } catch (error) {
         lastError = error;
-        if (error?.code?.startsWith('GRANT_')) throw error;
+        const grantError = failure(error);
+        if (grantError.code?.startsWith('GRANT_')) throw grantError;
       }
     }
-    throw this.runnerError('GRANT_VERIFY_UNAVAILABLE', lastError?.message || '无法连接控制服务验证启动授权');
+    throw this.runnerError('GRANT_VERIFY_UNAVAILABLE', failure(lastError, '无法连接控制服务验证启动授权').message);
   }
 
-  validTargetUrl() {
+  validTargetUrl(): string {
     try {
-      const url = new URL(this.tool.targetUrl);
+      const url = new URL(this.tool.targetUrl || '');
       if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
       return url.toString();
     } catch {
@@ -313,10 +367,10 @@ class AutomationRuntime {
     return { status: this.status };
   }
 
-  requestUserAction(action = {}) {
+  requestUserAction(action: UnknownRecord = {}): Promise<void> {
     this.status = 'waiting_user';
     this.emit(EVENTS.USER_ACTION_REQUIRED, { action });
-    return new Promise(resolve => this.userActionWaiters.push(resolve));
+    return new Promise<void>((resolve) => this.userActionWaiters.push(resolve));
   }
 
   completeUserAction() {
@@ -341,19 +395,19 @@ class AutomationRuntime {
     return { status: this.status };
   }
 
-  waitWhilePaused() {
+  waitWhilePaused(): Promise<void> {
     if (this.status !== 'paused') return Promise.resolve();
-    return new Promise(resolve => this.pauseWaiters.push(resolve));
+    return new Promise<void>((resolve) => this.pauseWaiters.push(resolve));
   }
 
-  ensureActive() {
+  ensureActive(): void {
     if (this.cancelRequested || this.status === 'cancelled') {
       throw this.runnerError('RUN_CANCELLED', '任务已取消');
     }
   }
 
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  sleep(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 
   async closeBrowser() {
@@ -368,14 +422,19 @@ class AutomationRuntime {
     }
   }
 
-  runnerError(code, message) {
+  requirePage(): import('playwright-core').Page {
+    if (!this.page) throw this.runnerError('BROWSER_PAGE_MISSING', '浏览器页面尚未准备好');
+    return this.page;
+  }
+
+  runnerError(code: string, message: string): RunnerFailure {
     return Object.assign(new Error(message), { code });
   }
 
-  hostRequest(action, payload = {}, timeoutMs = 15000) {
+  hostRequest(action: string, payload: UnknownRecord = {}, timeoutMs = 15000): Promise<UnknownRecord> {
     this.hostSequence += 1;
     const id = `host_${Date.now()}_${this.hostSequence}`;
-    return new Promise((resolve, reject) => {
+    return new Promise<UnknownRecord>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.hostPending.delete(id);
         reject(this.runnerError('BROWSER_HOST_TIMEOUT', `浏览器动作超时: ${action}`));
@@ -385,13 +444,20 @@ class AutomationRuntime {
     });
   }
 
-  handleHostResponse(message) {
+  handleHostResponse(message: UnknownRecord): void {
+    if (typeof message.id !== 'string') return;
     const pending = this.hostPending.get(message.id);
     if (!pending) return;
     clearTimeout(pending.timer);
     this.hostPending.delete(message.id);
-    if (message.ok) pending.resolve(message.data);
-    else pending.reject(this.runnerError(message.error?.code || 'BROWSER_HOST_ERROR', message.error?.message || '浏览器动作失败'));
+    if (message.ok === true) pending.resolve(asRecord(message.data));
+    else {
+      const hostError = asRecord(message.error);
+      pending.reject(this.runnerError(
+        typeof hostError.code === 'string' ? hostError.code : 'BROWSER_HOST_ERROR',
+        typeof hostError.message === 'string' ? hostError.message : '浏览器动作失败',
+      ));
+    }
   }
 
   async shutdown() {
@@ -402,16 +468,19 @@ class AutomationRuntime {
 
 const runtime = new AutomationRuntime();
 
-process.on('message', async message => {
-  if (message?.type === 'host-response') {
+process.on('message', async (rawMessage: unknown) => {
+  const message = asRecord(rawMessage);
+  if (message.type === 'host-response') {
     runtime.handleHostResponse(message);
     return;
   }
   if (message?.type !== 'command') return;
-  const { id, command, payload = {} } = message;
+  const id = message.id;
+  const command = message.command;
+  const payload = asRecord(message.payload);
   try {
     let data;
-    if (command === 'start') data = await runtime.start(payload.tool);
+    if (command === 'start') data = await runtime.start(asRecord(payload.tool));
     else if (command === 'pause') data = runtime.pause();
     else if (command === 'resume') data = runtime.resume();
     else if (command === 'complete-user-action') data = runtime.completeUserAction();
@@ -421,11 +490,12 @@ process.on('message', async message => {
     process.send?.({ type: 'response', id, ok: true, data });
     if (command === 'shutdown') process.exit(0);
   } catch (error) {
+    const commandError = failure(error, 'Runner 命令执行失败');
     process.send?.({
       type: 'response',
       id,
       ok: false,
-      error: { code: error.code || 'RUNNER_COMMAND_FAILED', message: error.message },
+      error: { code: commandError.code || 'RUNNER_COMMAND_FAILED', message: commandError.message },
     });
   }
 });
