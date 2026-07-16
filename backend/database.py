@@ -3,12 +3,16 @@
 支持 SQLite（本地开发）和 MySQL（生产环境）
 包含连接池优化、健康检查、慢查询日志等功能
 """
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import text, event
+import time
+from collections.abc import AsyncGenerator
+from typing import Any
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
 from core.config import settings
 from core.logging import get_logger
 from models.base import Base
-import time
 
 logger = get_logger(__name__)
 
@@ -19,7 +23,7 @@ logger.info(f"数据库类型: {settings.DB_TYPE}")
 logger.info(f"数据库连接: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
 
 # 创建异步引擎
-engine_kwargs = {
+engine_kwargs: dict[str, Any] = {
     "echo": False,
 }
 
@@ -59,7 +63,7 @@ async_session_maker = async_sessionmaker(
 SLOW_QUERY_THRESHOLD = 1.0  # 1秒
 
 
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession]:
     """获取数据库会话（依赖注入用）
     
     包含慢查询日志记录
@@ -107,8 +111,8 @@ async def run_migrations():
 
 async def _migrate_sqlite():
     """SQLite 数据库迁移"""
-    import sqlite3
     import os
+    import sqlite3
     
     # 获取 SQLite 数据库路径
     db_path = settings.DB_PATH
@@ -269,7 +273,7 @@ async def check_db_health() -> dict:
     Returns:
         健康状态字典
     """
-    result = {
+    result: dict[str, Any] = {
         "status": "ok",
         "type": settings.DB_TYPE,
         "latency_ms": None,
@@ -304,7 +308,7 @@ async def get_db_stats() -> dict:
     }
     
     if settings.DB_TYPE == "mysql":
-        pool = engine.pool
+        pool: Any = engine.pool
         stats["pool"] = {
             "size": pool.size(),
             "checked_in": pool.checkedin(),

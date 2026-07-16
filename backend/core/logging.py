@@ -2,21 +2,20 @@
 日志配置模块（增强版）
 提供结构化日志、日志轮转、请求追踪等功能
 """
+import json
 import logging
 import logging.handlers
-import sys
 import os
-import json
+import sys
 import uuid
-from pathlib import Path
-from datetime import datetime
-from typing import Optional, Any, Dict
 from contextvars import ContextVar
+from datetime import datetime
+from typing import Any
 
 # ===== 请求上下文变量 =====
 # 用于在请求链路中传递 request_id
 _request_id_var: ContextVar[str] = ContextVar('request_id', default='')
-_user_id_var: ContextVar[Optional[int]] = ContextVar('user_id', default=None)
+_user_id_var: ContextVar[int | None] = ContextVar('user_id', default=None)
 
 
 def get_request_id() -> str:
@@ -24,7 +23,7 @@ def get_request_id() -> str:
     return _request_id_var.get()
 
 
-def set_request_id(request_id: str = None) -> str:
+def set_request_id(request_id: str | None = None) -> str:
     """设置当前请求ID"""
     if not request_id:
         request_id = uuid.uuid4().hex[:8]
@@ -32,12 +31,12 @@ def set_request_id(request_id: str = None) -> str:
     return request_id
 
 
-def get_user_id() -> Optional[int]:
+def get_user_id() -> int | None:
     """获取当前用户ID"""
     return _user_id_var.get()
 
 
-def set_user_id(user_id: Optional[int]):
+def set_user_id(user_id: int | None):
     """设置当前用户ID"""
     _user_id_var.set(user_id)
 
@@ -140,7 +139,7 @@ class HumanReadableFormatter(logging.Formatter):
 
 def setup_logging(
     level: str = "INFO",
-    log_dir: str = None,
+    log_dir: str | None = None,
     json_format: bool = False,
     max_bytes: int = 10 * 1024 * 1024,  # 10MB
     backup_count: int = 5,
@@ -277,7 +276,7 @@ class ToolboxLogger:
         """记录异常（自动包含堆栈信息）"""
         self._logger.exception(msg, *args, **kwargs)
     
-    def with_data(self, msg: str, data: Dict[str, Any], level: int = logging.INFO):
+    def with_data(self, msg: str, data: dict[str, Any], level: int = logging.INFO):
         """记录带额外数据的日志
         
         Args:
@@ -297,7 +296,7 @@ class ToolboxLogger:
         record.extra_data = data
         self._logger.handle(record)
     
-    def api_call(self, method: str, path: str, status: int, duration: float, user_id: int = None):
+    def api_call(self, method: str, path: str, status: int, duration: float, user_id: int | None = None):
         """记录 API 调用日志
         
         Args:
@@ -307,7 +306,7 @@ class ToolboxLogger:
             duration: 耗时（秒）
             user_id: 用户ID
         """
-        data = {
+        data: dict[str, Any] = {
             "method": method,
             "path": path,
             "status": status,
@@ -319,7 +318,7 @@ class ToolboxLogger:
         level = logging.WARNING if status >= 400 else logging.INFO
         self.with_data(f"{method} {path} -> {status}", data, level)
     
-    def db_query(self, query_type: str, table: str, duration: float, rows: int = None):
+    def db_query(self, query_type: str, table: str, duration: float, rows: int | None = None):
         """记录数据库查询日志
         
         Args:
@@ -328,7 +327,7 @@ class ToolboxLogger:
             duration: 耗时（秒）
             rows: 影响行数
         """
-        data = {
+        data: dict[str, Any] = {
             "query_type": query_type,
             "table": table,
             "duration_ms": round(duration * 1000, 2),
@@ -338,7 +337,7 @@ class ToolboxLogger:
         
         self.with_data(f"DB {query_type} {table}", data)
     
-    def security(self, event: str, detail: str, user_id: int = None, ip: str = None):
+    def security(self, event: str, detail: str, user_id: int | None = None, ip: str | None = None):
         """记录安全相关日志
         
         Args:
@@ -347,7 +346,7 @@ class ToolboxLogger:
             user_id: 用户ID
             ip: IP 地址
         """
-        data = {"event": event, "detail": detail}
+        data: dict[str, Any] = {"event": event, "detail": detail}
         if user_id is not None:
             data["user_id"] = user_id
         if ip:

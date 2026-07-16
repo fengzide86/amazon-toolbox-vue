@@ -2,20 +2,20 @@
 依赖注入模块
 提供数据库会话、当前用户等依赖
 """
-from typing import Optional
+from collections.abc import AsyncGenerator
+
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.security import verify_token
 from database import get_db
-from models import User, AuthCode
-from core.security import verify_token, extract_token_from_header
-
+from models import AuthCode, User
 
 # ===== 数据库会话依赖 =====
 
-async def get_current_db() -> AsyncSession:
+async def get_current_db() -> AsyncGenerator[AsyncSession]:
     """获取当前数据库会话（用于依赖注入）"""
     async for session in get_db():
         yield session
@@ -27,9 +27,9 @@ async def get_current_db() -> AsyncSession:
 optional_security = HTTPBearer(auto_error=False)
 
 async def get_optional_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
     db: AsyncSession = Depends(get_current_db)
-) -> Optional[dict]:
+) -> dict | None:
     """获取当前用户（可选，允许未登录）
     
     Returns:
@@ -88,7 +88,6 @@ async def get_current_user(
     
     user_id = payload.get("user_id")
     role = payload.get("role", "user")
-    auth_code_id = payload.get("auth_code_id")
     device_id = payload.get("device_id")
     
     # 管理员特殊处理：基于 role 判断，不再依赖 user_id==0

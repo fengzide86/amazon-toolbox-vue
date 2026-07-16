@@ -2,9 +2,8 @@
 应用配置管理
 集中管理所有配置项，支持环境变量覆盖
 """
-from typing import List, Optional
-import os
 import json
+import os
 
 # 加载 .env 文件（如果存在）
 try:
@@ -42,7 +41,7 @@ class Settings:
     PORT: int = 8000
     
     # CORS 配置
-    CORS_ORIGINS: List[str] = None
+    CORS_ORIGINS: list[str]
     
     # ===== 数据库配置 =====
     # 数据库类型: "sqlite" (本地开发) 或 "mysql" (生产环境)
@@ -64,7 +63,7 @@ class Settings:
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24小时
     
     # ===== Redis 配置（可选）=====
-    REDIS_URL: Optional[str] = None
+    REDIS_URL: str | None = None
 
     # ===== 自动化工具签名（Ed25519 原始密钥，Base64）=====
     TOOL_SIGNING_PRIVATE_KEY_B64: str = ""
@@ -78,7 +77,7 @@ class Settings:
     DEFAULT_ADMIN_PASSWORD: str = ""
     
     # 默认分润比例
-    DEFAULT_PROFIT_RATIOS: dict = None
+    DEFAULT_PROFIT_RATIOS: dict[str, float]
     
     # ===== AI 客服配置 =====
     AI_PROVIDER: str = "qwen"                    # qwen/openai
@@ -213,7 +212,7 @@ class Settings:
         - warnings: 低风险警告，不阻止启动
         - errors: 高风险错误，建议修复后再启动
         """
-        result = {"warnings": [], "errors": []}
+        result: dict[str, list[str]] = {"warnings": [], "errors": []}
         # 使用 SQLite 或 DEBUG 模式时，视为开发环境，跳过严格检查
         is_production = not self.DEBUG and self.DB_TYPE != "sqlite"
         

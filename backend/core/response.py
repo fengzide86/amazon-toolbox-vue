@@ -2,7 +2,8 @@
 统一响应格式模块
 提供标准化的 API 响应结构
 """
-from typing import Any, Optional, List, Dict
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -10,18 +11,18 @@ class APIResponse(BaseModel):
     """统一 API 响应格式"""
     success: bool = Field(default=True, description="是否成功")
     message: str = Field(default="ok", description="响应消息")
-    data: Optional[Any] = Field(default=None, description="响应数据")
-    total: Optional[int] = Field(default=None, description="总数（分页用）")
-    page: Optional[int] = Field(default=None, description="当前页码")
-    page_size: Optional[int] = Field(default=None, description="每页数量")
+    data: Any | None = Field(default=None, description="响应数据")
+    total: int | None = Field(default=None, description="总数（分页用）")
+    page: int | None = Field(default=None, description="当前页码")
+    page_size: int | None = Field(default=None, description="每页数量")
 
 
 class ErrorResponse(BaseModel):
     """错误响应格式"""
     success: bool = Field(default=False)
     message: str
-    error_code: Optional[int] = None
-    detail: Optional[Any] = None
+    error_code: int | None = None
+    detail: Any | None = None
 
 
 # ===== 快捷响应函数 =====
@@ -29,10 +30,10 @@ class ErrorResponse(BaseModel):
 def success_response(
     data: Any = None,
     message: str = "ok",
-    total: int = None,
-    page: int = None,
-    page_size: int = None
-) -> Dict:
+    total: int | None = None,
+    page: int | None = None,
+    page_size: int | None = None
+) -> dict[str, Any]:
     """成功响应
     
     Args:
@@ -61,9 +62,9 @@ def success_response(
 
 def error_response(
     message: str = "操作失败",
-    error_code: int = None,
+    error_code: int | None = None,
     detail: Any = None
-) -> Dict:
+) -> dict[str, Any]:
     """错误响应
     
     Args:
@@ -86,11 +87,11 @@ def error_response(
 
 
 def paginated_response(
-    items: List[Any],
+    items: list[Any],
     total: int,
     page: int,
     page_size: int
-) -> Dict:
+) -> dict[str, Any]:
     """分页响应
     
     Args:
@@ -113,17 +114,17 @@ def paginated_response(
     }
 
 
-def created_response(data: Any = None, message: str = "创建成功") -> Dict:
+def created_response(data: Any = None, message: str = "创建成功") -> dict[str, Any]:
     """创建成功响应"""
     return success_response(data=data, message=message)
 
 
-def updated_response(data: Any = None, message: str = "更新成功") -> Dict:
+def updated_response(data: Any = None, message: str = "更新成功") -> dict[str, Any]:
     """更新成功响应"""
     return success_response(data=data, message=message)
 
 
-def deleted_response(message: str = "删除成功") -> Dict:
+def deleted_response(message: str = "删除成功") -> dict[str, Any]:
     """删除成功响应"""
     return success_response(data=None, message=message)
 
