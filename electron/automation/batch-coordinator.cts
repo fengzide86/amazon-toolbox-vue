@@ -1,23 +1,109 @@
-// @ts-nocheck Legacy coordinator boundary; public IPC payloads are schema validated.
 const { RunnerClient } = require('./runner-client.cjs');
 
 const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
 
+type UnknownRecord = Record<string, unknown>;
+
+interface RunnerEvent extends UnknownRecord {
+  type: string;
+  action?: { type?: string; instruction?: string };
+  error?: { message?: string };
+}
+
+interface RunnerLike {
+  start(tool: UnknownRecord): Promise<unknown>;
+  stop(): Promise<unknown>;
+  completeUserAction(): Promise<unknown>;
+}
+
+interface HostManagerLike {
+  register(itemId: string, guest: unknown): unknown;
+  release(itemId: string): unknown;
+  releaseAll(): unknown;
+  isReady(itemId: string): boolean;
+  request(itemId: string, action: string, payload: UnknownRecord): Promise<unknown> | unknown;
+  size(): number;
+}
+
+interface ImportedRow {
+  itemId: string;
+  input: UnknownRecord;
+  preview: UnknownRecord;
+  accountLabelMasked: string;
+}
+
+interface ParsedImport {
+  importId: string;
+  fileName: string;
+  rows: ImportedRow[];
+  errors: unknown[];
+}
+
+interface BatchItem {
+  itemId: string;
+  input: UnknownRecord | null;
+  accountLabelMasked: string;
+  status: string;
+  interventionType: string | null;
+  message: string;
+  runner: RunnerLike | null;
+  browserReady: boolean;
+  readyToResume: boolean;
+  notifiedInterventions: Set<string>;
+}
+
+interface ActiveBatch {
+  batchId: string;
+  serverBatchId?: string | number;
+  tool: UnknownRecord;
+  status: string;
+  maxOpenSessions: number;
+  items: BatchItem[];
+}
+
+interface RunnerFactoryOptions {
+  scriptPath: string;
+  env: NodeJS.ProcessEnv;
+  onEvent: (event: RunnerEvent) => void;
+  onHostRequest: (action: string, payload: UnknownRecord) => Promise<unknown> | unknown;
+}
+
+interface CoordinatorOptions {
+  scriptPath?: string;
+  env?: NodeJS.ProcessEnv;
+  hostManager?: HostManagerLike;
+  onEvent?: (event: UnknownRecord) => void;
+  onNotify?: (payload: { itemId: string; accountLabelMasked: string; type: string }) => void;
+  runnerFactory?: (options: RunnerFactoryOptions) => RunnerLike;
+}
+
 class BatchCoordinator {
-  constructor({ scriptPath, env, hostManager, onEvent = () => {}, onNotify = () => {}, runnerFactory } = {}) {
+  scriptPath: string;
+  env: NodeJS.ProcessEnv;
+  hostManager: HostManagerLike;
+  onEvent: (event: UnknownRecord) => void;
+  onNotify: (payload: { itemId: string; accountLabelMasked: string; type: string }) => void;
+  runnerFactory: (options: RunnerFactoryOptions) => RunnerLike;
+  imports: Map<string, ImportedRow[]>;
+  batch: ActiveBatch | null;
+  activeItemId: string | null;
+  provisioningItemId: string | null;
+
+  constructor({ scriptPath = '', env, hostManager, onEvent = () => {}, onNotify = () => {}, runnerFactory }: CoordinatorOptions = {}) {
+    if (!hostManager) throw new Error('BatchCoordinator requires hostManager');
     this.scriptPath = scriptPath;
     this.env = env || {};
     this.hostManager = hostManager;
     this.onEvent = onEvent;
     this.onNotify = onNotify;
-    this.runnerFactory = runnerFactory || (options => new RunnerClient(options));
-    this.imports = new Map();
+    this.runnerFactory = runnerFactory || ((options: RunnerFactoryOptions) => new RunnerClient(options) as RunnerLike);
+    this.imports = new Map<string, ImportedRow[]>();
     this.batch = null;
     this.activeItemId = null;
     this.provisioningItemId = null;
   }
 
-  storeImport(parsed) {
+  storeImport(parsed: ParsedImport) {
     this.imports.set(parsed.importId, parsed.rows);
     return {
       importId: parsed.importId,
@@ -29,7 +115,7 @@ class BatchCoordinator {
     };
   }
 
-  create({ importId, batchId, serverBatchId, tool, maxOpenSessions = 6 }) {
+  create({ importId, batchId, serverBatchId, tool, maxOpenSessions = 6 }: { importId: string; batchId: string; serverBatchId?: string | number; tool: UnknownRecord; maxOpenSessions?: number }) {
     if (this.batch && this.batch.status === 'running') throw this.error('BATCH_ACTIVE', '已有批次正在执行');
     const importedRows = this.imports.get(importId);
     if (!importedRows?.length) throw this.error('BATCH_IMPORT_MISSING', '导入数据已经失效，请重新选择文件');
@@ -58,7 +144,7 @@ class BatchCoordinator {
     return this.snapshot();
   }
 
-  registerBrowser(itemId, guest) {
+  registerBrowser(itemId: string, guest: unknown) {
     const item = this.requireItem(itemId);
     const result = this.hostManager.register(itemId, guest);
     item.browserReady = true;
@@ -66,14 +152,16 @@ class BatchCoordinator {
     return result;
   }
 
-  unregisterBrowser(itemId) {
+  unregisterBrowser(itemId: string) {
     const item = this.batch?.items.find(candidate => candidate.itemId === itemId);
     if (item) item.browserReady = false;
     return this.hostManager.release(itemId);
   }
 
-  async startItem(itemId, tool) {
+  async startItem(itemId: string, tool: UnknownRecord) {
     const item = this.requireItem(itemId);
+    const batch = this.batch;
+    if (!batch) throw this.error('BATCH_NOT_FOUND', '批次不存在');
     if (this.activeItemId && this.activeItemId !== itemId) throw this.error('BATCH_RUNNER_BUSY', '另一个账号正在处理');
     if (!this.hostManager.isReady(itemId)) throw this.error('BROWSER_NOT_REGISTERED', '账号浏览器尚未就绪');
     if (TERMINAL.has(item.status)) throw this.error('BATCH_ITEM_TERMINAL', '该账号已经结束');
@@ -83,12 +171,12 @@ class BatchCoordinator {
     item.interventionType = null;
     item.message = '';
     const runTool = {
-      ...this.batch.tool,
+      ...batch.tool,
       ...tool,
       browserMode: 'embedded-cdp',
       executionContext: {
         mode: 'batch',
-        batchId: this.batch.batchId,
+        batchId: batch.batchId,
         itemId,
         sessionId: `session_${itemId}`,
         input: item.input,
@@ -99,12 +187,12 @@ class BatchCoordinator {
     try {
       return await item.runner.start(runTool);
     } catch (error) {
-      this.finishItem(item, 'failed', error.message || '启动失败');
+      this.finishItem(item, 'failed', error instanceof Error ? error.message : '启动失败');
       throw error;
     }
   }
 
-  failProvision(itemId, message = '启动授权未通过') {
+  failProvision(itemId: string, message = '启动授权未通过') {
     const item = this.requireItem(itemId);
     if (this.provisioningItemId !== itemId) return this.snapshot();
     this.provisioningItemId = null;
@@ -117,7 +205,7 @@ class BatchCoordinator {
     return this.snapshot();
   }
 
-  async completeUserAction(itemId) {
+  async completeUserAction(itemId: string) {
     const item = this.requireItem(itemId);
     if (item.status !== 'waiting_user') return this.snapshot();
     item.readyToResume = true;
@@ -127,7 +215,7 @@ class BatchCoordinator {
     return this.snapshot();
   }
 
-  async restartItem(itemId) {
+  async restartItem(itemId: string) {
     const item = this.requireItem(itemId);
     if (item.status !== 'failed') throw this.error('BATCH_ITEM_NOT_FAILED', '只有未完成账号可以重新发起');
     await item.runner?.stop?.().catch(() => {});
@@ -142,7 +230,7 @@ class BatchCoordinator {
 
   async cancel(status = 'cancelled') {
     if (!this.batch) return { status: 'idle' };
-    const runners = this.batch.items.map(item => item.runner?.stop?.()).filter(Boolean);
+    const runners = this.batch.items.flatMap((item) => item.runner ? [item.runner.stop()] : []);
     await Promise.allSettled(runners);
     for (const item of this.batch.items) {
       if (!TERMINAL.has(item.status)) item.status = 'cancelled';
@@ -157,16 +245,16 @@ class BatchCoordinator {
     return this.snapshot();
   }
 
-  createRunner(item) {
+  createRunner(item: BatchItem): RunnerLike {
     return this.runnerFactory({
       scriptPath: this.scriptPath,
       env: this.env,
-      onEvent: event => this.handleRunnerEvent(item, event),
-      onHostRequest: (action, payload) => this.hostManager.request(item.itemId, action, payload),
+      onEvent: (event: RunnerEvent) => this.handleRunnerEvent(item, event),
+      onHostRequest: (action: string, payload: UnknownRecord) => this.hostManager.request(item.itemId, action, payload),
     });
   }
 
-  handleRunnerEvent(item, event) {
+  handleRunnerEvent(item: BatchItem, event: RunnerEvent) {
     const enriched = { ...event, batchId: this.batch?.batchId, itemId: item.itemId };
     if (event.type === 'user.action_required') {
       item.status = 'waiting_user';
@@ -187,7 +275,9 @@ class BatchCoordinator {
     else this.emit('batch.runner_event', { itemId: item.itemId, runnerEvent: enriched });
   }
 
-  finishItem(item, status, message = '') {
+  finishItem(item: BatchItem, status: string, message = '') {
+    const batch = this.batch;
+    if (!batch) return;
     item.status = status;
     item.message = message || '';
     item.interventionType = null;
@@ -196,16 +286,16 @@ class BatchCoordinator {
     item.runner?.stop?.().catch(() => {});
     item.runner = null;
     this.emit('batch.item_updated', { itemId: item.itemId });
-    if (this.batch.items.every(candidate => TERMINAL.has(candidate.status))) {
-      this.batch.status = 'completed';
-      for (const candidate of this.batch.items) candidate.input = null;
+    if (batch.items.every(candidate => TERMINAL.has(candidate.status))) {
+      batch.status = 'completed';
+      for (const candidate of batch.items) candidate.input = null;
       this.emit('batch.finished');
       return;
     }
     this.schedule();
   }
 
-  async resumeWaiting(item) {
+  async resumeWaiting(item: BatchItem) {
     if (!item.runner) {
       item.status = 'pending';
       item.readyToResume = false;
@@ -219,11 +309,11 @@ class BatchCoordinator {
     try {
       await item.runner.completeUserAction();
     } catch (error) {
-      this.finishItem(item, 'failed', error.message);
+      this.finishItem(item, 'failed', error instanceof Error ? error.message : '继续处理失败');
     }
   }
 
-  schedule() {
+  schedule(): void {
     if (!this.batch || this.batch.status !== 'running' || this.activeItemId || this.provisioningItemId) return;
     const resumable = this.batch.items.find(item => item.status === 'waiting_user' && item.readyToResume);
     if (resumable) {
@@ -240,7 +330,7 @@ class BatchCoordinator {
     this.emit('batch.item_ready', { itemId: next.itemId });
   }
 
-  snapshot() {
+  snapshot(): UnknownRecord {
     if (!this.batch) return { status: 'idle', items: [] };
     const items = this.batch.items.map(item => ({
       itemId: item.itemId,
@@ -250,7 +340,7 @@ class BatchCoordinator {
       message: item.message,
       browserReady: item.browserReady,
     }));
-    const count = status => items.filter(item => item.status === status).length;
+    const count = (status: string) => items.filter(item => item.status === status).length;
     return {
       batchId: this.batch.batchId,
       serverBatchId: this.batch.serverBatchId,
@@ -271,17 +361,17 @@ class BatchCoordinator {
     };
   }
 
-  emit(type, payload = {}) {
+  emit(type: string, payload: UnknownRecord = {}): void {
     this.onEvent({ type, timestamp: Date.now(), ...payload, snapshot: this.snapshot() });
   }
 
-  requireItem(itemId) {
+  requireItem(itemId: string): BatchItem {
     const item = this.batch?.items.find(candidate => candidate.itemId === itemId);
     if (!item) throw this.error('BATCH_ITEM_NOT_FOUND', '批次账号不存在');
     return item;
   }
 
-  error(code, message) {
+  error(code: string, message: string): Error & { code: string } {
     return Object.assign(new Error(message), { code });
   }
 }
