@@ -21,11 +21,17 @@ export default async function globalSetup(): Promise<void> {
   const passwordInput = page.locator('#adminPassword')
   await passwordInput.fill('admin123')
 
-  await page.locator('button[type="submit"]').click()
-  await page.waitForResponse(
-    (resp) => resp.url().includes('/api/auth/admin-login') && resp.request().method() === 'POST',
-    { timeout: 15000 }
-  )
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse(
+      (resp) => resp.url().includes('/api/auth/admin-login') && resp.request().method() === 'POST',
+      { timeout: 15000 }
+    ),
+    page.locator('button[type="submit"]').click(),
+  ])
+
+  if (!loginResponse.ok()) {
+    throw new Error(`Admin login failed during E2E setup: HTTP ${loginResponse.status()}`)
+  }
 
   await page.waitForURL(/admin\/dashboard/, { timeout: 15000 })
   await page.waitForLoadState('networkidle')

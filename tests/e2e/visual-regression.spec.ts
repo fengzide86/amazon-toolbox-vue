@@ -5,16 +5,19 @@ const FRONTEND_URL = 'http://localhost:3000'
 
 // E2E 专用测试授权码
 const TEST_E2E_AMZ = 'TEST-E2E-AMZ'
+const TEST_DEVICE_ID = 'playwright-e2e-device'
 let cachedAdminSession: Record<string, string> | null = null
 
 // Helper: clear auth state
 async function clearAuth(page: Page): Promise<void> {
   await page.goto(`${FRONTEND_URL}/#/user/login`)
   await page.waitForLoadState('networkidle')
-  await page.evaluate(() => {
+  await page.evaluate((deviceId) => {
     localStorage.clear()
     sessionStorage.clear()
-  })
+    localStorage.setItem('toolbox_device_id', deviceId)
+    localStorage.setItem('toolbox_device_name', 'Playwright E2E')
+  }, TEST_DEVICE_ID)
 }
 
 // Helper: login as user with auth code
@@ -227,11 +230,6 @@ test.describe('视觉回归测试 - 登录响应式', () => {
   })
 
   test('授权成功后立即导航并播放跨路由光轨', async ({ page }) => {
-    await page.route('**/api/auth/verify', route => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: { token: 'visual-track-token', platform_scope: ['amazon'] } }),
-    }))
     await page.goto(`${FRONTEND_URL}/#/user/login`)
     await page.evaluate(() => {
       window.__routeTrackObserved = false
@@ -240,7 +238,7 @@ test.describe('视觉回归测试 - 登录响应式', () => {
       })
       observer.observe(document.documentElement, { childList: true, subtree: true })
     })
-    await page.locator('#authCode').fill('TRACK-DEMO-01')
+    await page.locator('#authCode').fill(TEST_E2E_AMZ)
     await page.locator('button[type="submit"]').click()
     await expect.poll(() => page.evaluate(() => window.__routeTrackObserved), { timeout: 3000 }).toBe(true)
     await expect(page.getByTestId('user-layout')).toBeVisible({ timeout: 5000 })
