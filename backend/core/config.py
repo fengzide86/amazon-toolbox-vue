@@ -240,7 +240,7 @@ class Settings:
         
         # 6. AI Key 检查（仅生产环境）
         if is_production and not self.QWEN_API_KEY:
-            result["warnings"].append("生产环境未配置 QWEN_API_KEY，AI 客服功能将不可用")
+            result["warnings"].append("生产环境未配置 QWEN_API_KEY，工具帮助将使用 FAQ 与人工工单降级")
         
         # 7. 更新地址检查（仅生产环境）
         update_url = os.getenv("UPDATE_URL", "")
