@@ -35,13 +35,13 @@
   </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { Zap, ClipboardList, ShieldCheck, Monitor, MessageCircle } from '@lucide/vue'
 
 const route = useRoute()
 
-function isActive(path) {
+function isActive(path: string) {
   return route.path === path
 }
 

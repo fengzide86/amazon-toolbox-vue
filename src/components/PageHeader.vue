@@ -11,11 +11,15 @@
   </header>
 </template>
 
-<script setup>
-defineProps({
-  title: { type: String, required: true },
-  description: { type: String, default: '' },
-  eyebrow: { type: String, default: '' },
-  level: { type: String, default: 'h2', validator: value => ['h1', 'h2'].includes(value) },
+<script setup lang="ts">
+withDefaults(defineProps<{
+  title: string
+  description?: string
+  eyebrow?: string
+  level?: 'h1' | 'h2'
+}>(), {
+  description: '',
+  eyebrow: '',
+  level: 'h2',
 })
 </script>

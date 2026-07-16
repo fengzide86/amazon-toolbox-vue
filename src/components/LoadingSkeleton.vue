@@ -59,14 +59,10 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  type: {
-    type: String,
-    default: 'default',
-    validator: (v) => ['default', 'dashboard', 'table', 'grid'].includes(v)
-  }
-})
+<script setup lang="ts">
+withDefaults(defineProps<{
+  type?: 'default' | 'dashboard' | 'table' | 'grid'
+}>(), { type: 'default' })
 </script>
 
 <style scoped>

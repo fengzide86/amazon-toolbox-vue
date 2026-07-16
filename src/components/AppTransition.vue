@@ -10,16 +10,17 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
-defineProps({ mode: { type: String, default: 'out-in' } })
+withDefaults(defineProps<{ mode?: 'in-out' | 'out-in' | 'default' }>(), { mode: 'out-in' })
 
 const trackVisible = ref(false)
-let trackTimer = null
+let trackTimer: number | undefined
 
-function playTrack(event) {
-  const duration = Number(event?.detail?.duration) || 440
+function playTrack(event: Event) {
+  const detail = event instanceof CustomEvent ? event.detail as { duration?: number } : undefined
+  const duration = Number(detail?.duration) || 440
   window.clearTimeout(trackTimer)
   trackVisible.value = false
   requestAnimationFrame(() => {

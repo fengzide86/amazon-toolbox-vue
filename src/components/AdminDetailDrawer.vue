@@ -11,7 +11,7 @@
   </el-drawer>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   modelValue: { type: Boolean, default: false },
   title: { type: String, required: true },

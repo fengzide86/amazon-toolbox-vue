@@ -1,6 +1,6 @@
 <template><span :class="['status-badge-v6', `status-badge-v6--${status}`]"><slot>{{ label }}</slot></span></template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   status: { type: String, default: 'neutral' },
   label: { type: String, default: '' },

@@ -18,7 +18,7 @@
   </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { BadgeCheck, ClipboardList, Layers3, LayoutDashboard, PanelsTopLeft } from '@lucide/vue'
 

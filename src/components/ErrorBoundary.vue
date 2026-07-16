@@ -25,10 +25,10 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onErrorCaptured } from 'vue'
+<script setup lang="ts">
+import { ref, onErrorCaptured, type ComponentPublicInstance } from 'vue'
 import { useRouter } from 'vue-router'
-import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
+import { captureException } from '@/utils/sentry'
 
 const props = defineProps({
   showDetails: {
@@ -38,7 +38,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const error = ref(null)
+const error = ref<Error | null>(null)
 const errorMessage = ref('发生了未知错误')
 
 onErrorCaptured((err, instance, info) => {
@@ -68,32 +68,11 @@ function goHome() {
   router.push('/')
 }
 
-function sendErrorToAnalytics(err, instance, info) {
-  // 集成 Sentry 或其他错误追踪服务
-  if (window.Sentry) {
-    window.Sentry.captureException(err, {
-      extra: {
-        component: instance?.$options?.name,
-        info: info
-      }
-    })
-  }
-  
-  // 也可以发送到后端 API
-  fetch('/api/analytics/error', {
-    method: 'POST',
-    headers: toolboxVersionHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({
-      error: err.message,
-      stack: err.stack,
-      component: instance?.$options?.name,
-      info: info,
-      url: window.location.href,
-      timestamp: Date.now(),
-    }),
-    keepalive: true,
-  }).catch(() => {
-    // 静默失败
+function sendErrorToAnalytics(err: Error, instance: ComponentPublicInstance | null, info: string) {
+  captureException(err, {
+    component: instance?.$options?.name || 'Unknown',
+    info,
+    url: window.location.href,
   })
 }
 </script>
