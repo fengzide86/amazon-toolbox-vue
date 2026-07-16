@@ -15,8 +15,31 @@ export interface BatchSnapshot {
 }
 
 export interface BatchBridge {
-  getSnapshot(): Promise<BatchSnapshot | null>
+  selectImportFile(options: unknown): Promise<unknown>
+  parseImportFile(options: unknown): Promise<unknown>
+  exportImportErrors(errors: unknown): Promise<unknown>
+  create(payload: unknown): Promise<unknown>
+  start(payload: unknown): Promise<unknown>
+  failItem(payload: unknown): Promise<unknown>
+  selectItem(itemId: string): Promise<unknown>
+  completeUserAction(itemId: string): Promise<unknown>
+  restartItem(itemId: string): Promise<unknown>
   cancel(status?: string): Promise<unknown>
+  getSnapshot(): Promise<BatchSnapshot | null>
+  registerBrowser(itemId: string, webContentsId: number): Promise<unknown>
+  unregisterBrowser(itemId: string): Promise<unknown>
+  onEvent(callback: (event: unknown) => void): () => void
+}
+
+export interface AutomationBridge {
+  start(tool: unknown): Promise<unknown>
+  pause(): Promise<unknown>
+  resume(): Promise<unknown>
+  completeUserAction(): Promise<unknown>
+  cancel(): Promise<unknown>
+  registerBrowser(webContentsId: number): Promise<unknown>
+  unregisterBrowser(): Promise<unknown>
+  onEvent(callback: (event: unknown) => void): () => void
 }
 
 export interface CredentialStoreBridge {
@@ -29,6 +52,7 @@ export interface ToolboxElectronApi {
   runtime?: { controlApiBase?: string; deviceId?: string; deviceName?: string }
   updates?: UpdateBridge
   batch?: BatchBridge
+  automation?: AutomationBridge
   credentialStore?: CredentialStoreBridge
   [key: string]: unknown
 }

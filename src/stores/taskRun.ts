@@ -1,71 +1,99 @@
 import { computed, markRaw, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { AUTOMATION_EVENT, RUN_STATUS, createAutomationAdapter, isTerminalStatus } from '@/automation'
+import {
+  AUTOMATION_EVENT,
+  RUN_STATUS,
+  automationEventSchema,
+  createAutomationAdapter,
+  isTerminalStatus,
+  type AutomationAdapter,
+  type AutomationAdapterOptions,
+  type AutomationError,
+  type AutomationStep,
+  type AutomationTool,
+  type RunStatus,
+  type UserAction,
+} from '@/automation'
+
+const STATUS_TEXT: Record<RunStatus, string> = {
+  idle: '未开始',
+  preparing: '准备中',
+  running: '执行中',
+  waiting_user: '需要操作',
+  paused: '已暂停',
+  completed: '已完成',
+  failed: '执行失败',
+  cancelled: '已取消',
+}
+
+function normalizeError(error: unknown): AutomationError {
+  if (error instanceof Error) {
+    const code = 'code' in error && typeof error.code === 'string' ? error.code : 'RUNNER_START_FAILED'
+    return { code, message: error.message || '自动处理启动失败' }
+  }
+  return { code: 'RUNNER_START_FAILED', message: '自动处理启动失败' }
+}
 
 export const useTaskRunStore = defineStore('taskRun', () => {
-  const runId = ref(null)
-  const tool = ref(null)
-  const status = ref(RUN_STATUS.IDLE)
-  const steps = ref([])
-  const currentStepId = ref(null)
+  const runId = ref<string | null>(null)
+  const tool = ref<AutomationTool | null>(null)
+  const status = ref<RunStatus>(RUN_STATUS.IDLE)
+  const steps = ref<AutomationStep[]>([])
+  const currentStepId = ref<string | null>(null)
   const browserUrl = ref('')
   const elapsedSeconds = ref(0)
-  const result = ref(null)
-  const error = ref(null)
-  const artifacts = ref([])
-  const userAction = ref(null)
+  const result = ref<Record<string, unknown> | null>(null)
+  const error = ref<AutomationError | null>(null)
+  const artifacts = ref<unknown[]>([])
+  const userAction = ref<UserAction | null>(null)
 
-  let adapter = null
-  let unsubscribe = null
-  let clockTimer = null
+  let adapter: AutomationAdapter | null = null
+  let unsubscribe: (() => void) | null = null
+  let clockTimer: ReturnType<typeof setInterval> | null = null
 
   const completedCount = computed(() => steps.value.filter(step => step.status === 'done').length)
   const progressPercent = computed(() => steps.value.length
     ? Math.round((completedCount.value / steps.value.length) * 100)
     : 0)
-  const currentStep = computed(() => steps.value.find(step => step.id === currentStepId.value) || steps.value.at(-1) || {})
+  const currentStep = computed<AutomationStep | null>(() =>
+    steps.value.find(step => step.id === currentStepId.value) || steps.value.at(-1) || null)
   const formattedElapsed = computed(() => {
     const minutes = Math.floor(elapsedSeconds.value / 60).toString().padStart(2, '0')
     const seconds = (elapsedSeconds.value % 60).toString().padStart(2, '0')
     return `${minutes}:${seconds}`
   })
-  const statusText = computed(() => ({
-    [RUN_STATUS.IDLE]: '未开始',
-    [RUN_STATUS.PREPARING]: '准备中',
-    [RUN_STATUS.RUNNING]: '执行中',
-    [RUN_STATUS.WAITING_USER]: '需要操作',
-    [RUN_STATUS.PAUSED]: '已暂停',
-    [RUN_STATUS.COMPLETED]: '已完成',
-    [RUN_STATUS.FAILED]: '执行失败',
-    [RUN_STATUS.CANCELLED]: '已取消',
-  }[status.value] || status.value))
+  const statusText = computed(() => STATUS_TEXT[status.value])
 
-  function startClock() {
+  function startClock(): void {
     stopClock()
     clockTimer = setInterval(() => {
       if (status.value === RUN_STATUS.RUNNING) elapsedSeconds.value += 1
     }, 1000)
   }
 
-  function stopClock() {
+  function stopClock(): void {
     if (clockTimer) clearInterval(clockTimer)
     clockTimer = null
   }
 
-  function updateStep(stepId, patch) {
+  function updateStep(stepId: string | null | undefined, patch: Partial<AutomationStep>): void {
+    if (!stepId) return
     const index = steps.value.findIndex(step => step.id === stepId)
-    if (index === -1) return
-    steps.value[index] = { ...steps.value[index], ...patch }
+    const current = steps.value[index]
+    if (index === -1 || !current) return
+    steps.value[index] = { ...current, ...patch }
   }
 
-  function applyEvent(event) {
-    if (!event?.type) return
+  function applyEvent(input: unknown): void {
+    const parsed = automationEventSchema.safeParse(input)
+    if (!parsed.success) return
+    const event = parsed.data
     if (event.type !== AUTOMATION_EVENT.RUN_STARTED && runId.value && event.runId && event.runId !== runId.value) return
 
     switch (event.type) {
       case AUTOMATION_EVENT.RUN_STARTED:
-        runId.value = event.runId
-        tool.value = event.tool
+        runId.value = event.runId || null
+        tool.value = event.tool || tool.value
         status.value = RUN_STATUS.RUNNING
         steps.value = (event.steps || []).map(step => ({ ...step, status: 'pending', startedAt: null, completedAt: null }))
         elapsedSeconds.value = 0
@@ -79,6 +107,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
         browserUrl.value = event.url || ''
         break
       case AUTOMATION_EVENT.STEP_STARTED:
+        if (!event.step) break
         currentStepId.value = event.step.id
         updateStep(event.step.id, { status: 'active', startedAt: event.timestamp })
         break
@@ -124,19 +153,19 @@ export const useTaskRunStore = defineStore('taskRun', () => {
         stopClock()
         break
       case AUTOMATION_EVENT.ARTIFACT_CREATED:
-        artifacts.value.push(event.artifact)
+        if (event.artifact !== undefined) artifacts.value.push(event.artifact)
         break
     }
   }
 
-  function disposeAdapter() {
+  function disposeAdapter(): void {
     unsubscribe?.()
     unsubscribe = null
-    adapter?.dispose?.()
+    adapter?.dispose()
     adapter = null
   }
 
-  async function start(nextTool, options = {}) {
+  async function start(nextTool: AutomationTool, options: AutomationAdapterOptions = {}): Promise<unknown> {
     disposeAdapter()
     stopClock()
     runId.value = null
@@ -156,34 +185,20 @@ export const useTaskRunStore = defineStore('taskRun', () => {
       return await adapter.start(nextTool)
     } catch (startError) {
       status.value = RUN_STATUS.FAILED
-      error.value = { code: startError?.code || 'RUNNER_START_FAILED', message: startError?.message || '自动处理启动失败' }
+      error.value = normalizeError(startError)
       stopClock()
       throw startError
     }
   }
 
-  function pause() {
-    adapter?.pause?.()
-  }
+  function pause(): void { void adapter?.pause() }
+  function resume(): void { void adapter?.resume() }
+  function cancel(): void { void adapter?.cancel() }
+  function completeUserAction(): unknown { return adapter?.completeUserAction() }
+  function restart(): Promise<unknown> | undefined { return tool.value ? start(tool.value) : undefined }
 
-  function resume() {
-    adapter?.resume?.()
-  }
-
-  function cancel() {
-    adapter?.cancel?.()
-  }
-
-  function completeUserAction() {
-    return adapter?.completeUserAction?.()
-  }
-
-  function restart() {
-    if (tool.value) return start(tool.value)
-  }
-
-  function reset() {
-    if (!isTerminalStatus(status.value)) adapter?.cancel?.()
+  function reset(): void {
+    if (!isTerminalStatus(status.value)) void adapter?.cancel()
     disposeAdapter()
     stopClock()
     runId.value = null
@@ -200,29 +215,8 @@ export const useTaskRunStore = defineStore('taskRun', () => {
   }
 
   return {
-    runId,
-    tool,
-    status,
-    steps,
-    currentStepId,
-    browserUrl,
-    elapsedSeconds,
-    result,
-    error,
-    artifacts,
-    userAction,
-    completedCount,
-    progressPercent,
-    currentStep,
-    formattedElapsed,
-    statusText,
-    start,
-    pause,
-    resume,
-    cancel,
-    completeUserAction,
-    restart,
-    reset,
-    applyEvent,
+    runId, tool, status, steps, currentStepId, browserUrl, elapsedSeconds, result, error, artifacts, userAction,
+    completedCount, progressPercent, currentStep, formattedElapsed, statusText,
+    start, pause, resume, cancel, completeUserAction, restart, reset, applyEvent,
   }
 })
