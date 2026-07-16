@@ -79,6 +79,27 @@ async function expectNoPageOverflow(page) {
   expect(overflow).toBeLessThanOrEqual(1)
 }
 
+async function installAvailableUpdateBridge(page) {
+  await page.addInitScript(() => {
+    const snapshot = {
+      status: 'available', currentVersion: '1.7.2', availableVersion: '1.8.0',
+      releaseNotes: ['提升界面可读性'], downloadBytes: 52_428_800, canRestart: false,
+    }
+    window.electronAPI = {
+      ...(window.electronAPI || {}),
+      updates: {
+        getState: async () => snapshot,
+        check: async () => snapshot,
+        startDownload: async () => ({ ...snapshot, status: 'downloading', percent: 0 }),
+        cancelDownload: async () => ({ ...snapshot, status: 'cancelled' }),
+        install: async () => snapshot,
+        defer: async () => snapshot,
+        onState: () => () => {},
+      },
+    }
+  })
+}
+
 // ===========================
 // 视觉回归测试
 // ===========================
@@ -293,5 +314,52 @@ test.describe('视觉回归测试 - 后台', () => {
       await page.waitForLoadState('networkidle')
       await expectNoPageOverflow(page)
     }
+  })
+})
+
+test.describe('更新交互与可读性回归', () => {
+  test('登录页永远不渲染更新入口、横幅或浮层', async ({ page }) => {
+    await installAvailableUpdateBridge(page)
+    await clearAuth(page)
+    await page.goto(`${FRONTEND_URL}/#/user/login`)
+    await expect(page.locator('.update-status-entry')).toHaveCount(0)
+    await expect(page.locator('.update-notice')).toHaveCount(0)
+    await expect(page.locator('.update-drawer')).toHaveCount(0)
+  })
+
+  test('Header 三档宽度不重叠且交互文字不小于 14px', async ({ page }) => {
+    await installAvailableUpdateBridge(page)
+    await loginAdmin(page)
+    for (const width of [1365, 1024, 768]) {
+      await page.setViewportSize({ width, height: 768 })
+      await page.goto(`${FRONTEND_URL}/#/admin/dashboard`)
+      await expect(page.locator('.update-status-entry')).toBeVisible()
+      const overlap = await page.evaluate(() => {
+        const update = document.querySelector('.update-status-entry')?.getBoundingClientRect()
+        const account = document.querySelector('.avatar-wrapper')?.getBoundingClientRect()
+        if (!update || !account) return 0
+        return Math.max(0, Math.min(update.right, account.right) - Math.max(update.left, account.left))
+          * Math.max(0, Math.min(update.bottom, account.bottom) - Math.max(update.top, account.top))
+      })
+      expect(overlap).toBe(0)
+      const undersizedControls = await page.evaluate(() => [...document.querySelectorAll('button,a,input,select,textarea,[role="button"]')]
+        .filter(element => element instanceof HTMLElement && element.offsetParent !== null)
+        .filter(element => Number.parseFloat(getComputedStyle(element).fontSize) < 14)
+        .map(element => element.textContent?.trim() || element.getAttribute('aria-label')))
+      expect(undersizedControls).toEqual([])
+      await expectNoPageOverflow(page)
+    }
+  })
+
+  test('更新详情是真正的非模态抽屉', async ({ page }) => {
+    await installAvailableUpdateBridge(page)
+    await loginAdmin(page)
+    await page.goto(`${FRONTEND_URL}/#/admin/dashboard`)
+    await page.locator('.update-status-entry').click()
+    const drawer = page.locator('.update-drawer')
+    await expect(drawer).toBeVisible()
+    await expect(drawer).not.toHaveAttribute('aria-modal')
+    await expect(page.locator('.update-drawer-layer')).toHaveCSS('pointer-events', 'none')
+    await expect(drawer).toHaveCSS('pointer-events', 'auto')
   })
 })

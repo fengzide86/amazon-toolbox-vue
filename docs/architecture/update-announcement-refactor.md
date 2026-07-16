@@ -18,7 +18,7 @@
 | `updates:start-download` | renderer → main | 用户确认后开始下载 |
 | `updates:cancel-download` | renderer → main | 使用 CancellationToken 取消 |
 | `updates:install` | renderer → main | 无活动任务时安装 |
-| `updates:defer` | renderer → main | 本次会话稍后处理 |
+| `updates:defer` | renderer → main | 下载提醒按版本延后 24 小时，安装提醒延后到退出 |
 | `updates:state` | main → renderer | 推送不可变状态快照 |
 
 高权限 IPC 必须同时验证当前主窗口 sender 与 `app://toolbox/` 来源；开发环境只额外允许 `http://localhost:3000/`。
@@ -26,21 +26,22 @@
 ## 发布流程
 
 1. 后端先部署数据库迁移和兼容 API。
-2. 使用 `npm run release:validate` 检查 HTTPS 更新地址、签名证书、密码与 publisherName。
-3. 使用 `npm run electron:release` 生成签名 NSIS 产物。
-4. 管理后台“应用更新”上传同版本安装包、blockmap 和 `latest.yml`。
-5. 暂存校验通过后人工核对，再点击“确认发布”。
-6. 用 consumer 与 business 授权各验证一次检查、下载、延后重启和定向更新公告。
+2. 配置非本机的更新地址；优先使用 HTTPS。暂时只能使用 HTTP 时，显式设置 `ALLOW_INSECURE_UPDATE_URL=1`。
+3. 使用 `npm run release:validate` 检查更新地址与可选签名配置。
+4. 使用 `npm run electron:release` 生成 NSIS 产物；未配置证书时允许未签名构建，Windows 会显示“未知发布者”。
+5. 管理后台“应用更新”一次选择安装包、blockmap 和 `latest.yml`，版本由清单自动识别。
+6. 暂存校验通过后人工核对，再点击“确认发布”。
+7. 用 consumer 与 business 授权各验证一次检查、下载、延后重启和定向更新公告。
 
-生产 release 在缺少 HTTPS 或 Windows 签名配置时必须失败，不能绕过门禁。证书与密码不得写入仓库。
+签名是可选增强项，但只要配置就必须同时提供证书、密码和 publisherName，不能留下半套配置。证书与密码不得写入仓库。Microsoft Store 可作为后续发行渠道，不是当前客户交付或应用内授权的前置条件。
 
 ## 回滚
 
 - 功能回滚使用阶段提交的 `git revert`，不使用 `reset --hard`。
 - 关闭公告中心功能开关后，旧 `/api/announcements/active` 仍可服务旧客户端。
-- 更新服务保留上一版本安装包与 manifest；重新发布上一签名版本时仍走暂存校验。
+- 更新服务保留上一版本安装包与 manifest；自动更新只允许发布更高版本，紧急回滚应发布更高补丁版本，或提供旧版安装包人工降级。
 - 数据库新增列和 receipt 表保留，不做破坏性降级。
-- 基线标签为 `pre-update-refactor-20260715`。
+- 本轮可读性与非阻塞更新基线标签为 `pre-readable-update-ui-20260716`。
 
 ## 质量门禁
 
