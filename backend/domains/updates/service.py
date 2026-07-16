@@ -6,6 +6,9 @@ import json
 import os
 import re
 import shutil
+import threading
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict
 
@@ -28,17 +31,13 @@ class UpdateReleaseService:
         self.staging_dir = self.releases_dir / ".staging"
         self.releases_dir.mkdir(parents=True, exist_ok=True)
         self.staging_dir.mkdir(parents=True, exist_ok=True)
+        self._publish_lock = threading.Lock()
 
-    async def stage(self, version: str, files: list[UploadFile]) -> dict[str, object]:
-        self._validate_version(version)
+    async def stage(self, version: str | None, files: list[UploadFile]) -> dict[str, object]:
         if not files:
             raise HTTPException(400, "请选择需要暂存的更新文件")
-        target = (self.staging_dir / version).resolve()
-        self._assert_within(target, self.staging_dir)
-        temp = (self.staging_dir / f".{version}.uploading").resolve()
+        temp = (self.staging_dir / f".uploading-{uuid.uuid4().hex}").resolve()
         self._assert_within(temp, self.staging_dir)
-        if temp.exists():
-            shutil.rmtree(temp)
         temp.mkdir(parents=True)
 
         staged: list[StagedFile] = []
@@ -56,12 +55,20 @@ class UpdateReleaseService:
             installer = next((item for item in staged if item["name"].lower().endswith(".exe")), None)
             if not manifest_path or not installer:
                 raise HTTPException(400, "暂存发布必须同时包含 latest.yml 和 Windows 安装包")
-            manifest = self._validate_manifest(manifest_path, version, staged)
+            inferred_version = self._manifest_version(manifest_path)
+            if version and version != inferred_version:
+                raise HTTPException(400, "提交版本与 latest.yml 版本不一致")
+            resolved_version = version or inferred_version
+            self._validate_version(resolved_version)
+            target = (self.staging_dir / resolved_version).resolve()
+            self._assert_within(target, self.staging_dir)
+            manifest = self._validate_manifest(manifest_path, resolved_version, staged)
             metadata: dict[str, object] = {
-                "version": version,
+                "version": resolved_version,
                 "status": "staged",
                 "files": staged,
                 "manifest": manifest,
+                "staged_at": datetime.now(UTC).isoformat(),
             }
             (temp / "stage.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
             if target.exists():
@@ -74,6 +81,10 @@ class UpdateReleaseService:
             raise
 
     def publish(self, version: str) -> dict[str, object]:
+        with self._publish_lock:
+            return self._publish_locked(version)
+
+    def _publish_locked(self, version: str) -> dict[str, object]:
         self._validate_version(version)
         source = (self.staging_dir / version).resolve()
         self._assert_within(source, self.staging_dir)
@@ -85,6 +96,9 @@ class UpdateReleaseService:
         manifest_name = next((item["name"] for item in files if item["name"].lower() == "latest.yml"), None)
         if not manifest_name:
             raise HTTPException(409, "暂存版本缺少 latest.yml")
+        current_version = self._current_version()
+        if current_version and self._semver_key(version) <= self._semver_key(current_version):
+            raise HTTPException(409, f"发布版本必须高于当前线上版本 v{current_version}")
 
         # 安装包和 blockmap 先就位；manifest 最后原子替换，客户端不会看到半发布状态。
         for item in files:
@@ -95,17 +109,26 @@ class UpdateReleaseService:
         manifest_temp = self.releases_dir / ".latest.yml.tmp"
         shutil.copy2(source / manifest_name, manifest_temp)
         os.replace(manifest_temp, self.releases_dir / "latest.yml")
-        (source / "published.json").write_text(json.dumps({"version": version}, ensure_ascii=False), encoding="utf-8")
-        return {"version": version, "status": "published", "files": files}
+        published_at = datetime.now(UTC).isoformat()
+        (source / "published.json").write_text(
+            json.dumps({"version": version, "published_at": published_at}, ensure_ascii=False), encoding="utf-8"
+        )
+        return {"version": version, "status": "published", "files": files, "published_at": published_at, "is_latest": True}
 
     def list_releases(self) -> list[dict[str, object]]:
         releases: list[dict[str, object]] = []
+        current_version = self._current_version()
         for entry in sorted(self.staging_dir.iterdir(), reverse=True):
             metadata_path = entry / "stage.json" if entry.is_dir() else None
             if not metadata_path or not metadata_path.exists():
                 continue
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            metadata["status"] = "published" if (entry / "published.json").exists() else "staged"
+            published_path = entry / "published.json"
+            metadata["status"] = "published" if published_path.exists() else "staged"
+            metadata["is_latest"] = metadata.get("version") == current_version
+            if published_path.exists():
+                published = json.loads(published_path.read_text(encoding="utf-8"))
+                metadata["published_at"] = published.get("published_at")
             releases.append(metadata)
         return releases
 
@@ -162,6 +185,39 @@ class UpdateReleaseService:
             if item.get("sha512") != staged["sha512"] or int(item.get("size") or -1) != staged["size"]:
                 raise HTTPException(400, f"更新文件校验值不匹配：{name}")
         return manifest
+
+    @staticmethod
+    def _manifest_version(path: Path) -> str:
+        try:
+            manifest = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, yaml.YAMLError) as error:
+            raise HTTPException(400, "latest.yml 格式无效") from error
+        version = manifest.get("version") if isinstance(manifest, dict) else None
+        if not isinstance(version, str):
+            raise HTTPException(400, "latest.yml 缺少有效版本号")
+        return version
+
+    def _current_version(self) -> str | None:
+        manifest_path = self.releases_dir / "latest.yml"
+        if not manifest_path.exists():
+            return None
+        try:
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, yaml.YAMLError):
+            return None
+        version = manifest.get("version") if isinstance(manifest, dict) else None
+        return version if isinstance(version, str) and SEMVER.fullmatch(version) else None
+
+    @staticmethod
+    def _semver_key(version: str) -> tuple[tuple[int, int, int], int, tuple[tuple[int, int | str], ...]]:
+        core, _, prerelease = version.partition("-")
+        major, minor, patch = (int(value) for value in core.split("."))
+        if not prerelease:
+            return (major, minor, patch), 1, ()
+        identifiers: list[tuple[int, int | str]] = []
+        for value in prerelease.split("."):
+            identifiers.append((0, int(value)) if value.isdigit() else (1, value))
+        return (major, minor, patch), 0, tuple(identifiers)
 
     @staticmethod
     def _validate_version(version: str) -> None:

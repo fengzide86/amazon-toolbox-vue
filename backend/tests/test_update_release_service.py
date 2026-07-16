@@ -56,3 +56,39 @@ async def test_stage_rejects_path_traversal(tmp_path):
     service = UpdateReleaseService(tmp_path / "updates")
     with pytest.raises(HTTPException):
         await service.stage("1.8.0", [upload("../setup.exe", b"abc")])
+
+
+@pytest.mark.asyncio
+async def test_stage_infers_version_from_manifest(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+    installer = b"unsigned-installer-is-supported"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.1",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+
+    staged = await service.stage(None, [upload("setup.exe", installer), upload("latest.yml", manifest)])
+    assert staged["version"] == "1.8.1"
+    assert staged["staged_at"]
+
+
+@pytest.mark.asyncio
+async def test_publish_rejects_non_increasing_version(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+
+    async def stage(version: str) -> None:
+        installer = version.encode()
+        digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+        manifest = yaml.safe_dump({
+            "version": version,
+            "files": [{"url": f"setup-{version}.exe", "sha512": digest, "size": len(installer)}],
+        }).encode()
+        await service.stage(version, [upload(f"setup-{version}.exe", installer), upload("latest.yml", manifest)])
+
+    await stage("1.8.0")
+    service.publish("1.8.0")
+    await stage("1.7.9")
+    with pytest.raises(HTTPException) as error:
+        service.publish("1.7.9")
+    assert error.value.status_code == 409

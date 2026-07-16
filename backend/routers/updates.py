@@ -21,7 +21,7 @@ def get_static_files() -> StaticFiles:
 
 @router.post("/releases/stage")
 async def stage_release(
-    version: str = Form(...),
+    version: str | None = Form(None),
     files: list[UploadFile] = File(...),
     _admin: dict[str, object] = Depends(get_current_admin),
 ) -> object:

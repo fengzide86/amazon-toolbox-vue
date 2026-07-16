@@ -13,6 +13,9 @@ const releaseSchema = z.object({
   status: z.enum(['staged', 'published']),
   files: z.array(stagedFileSchema),
   manifest: z.record(z.string(), z.unknown()).optional(),
+  staged_at: z.string().optional(),
+  published_at: z.string().optional(),
+  is_latest: z.boolean().optional(),
 })
 
 export type UpdateRelease = z.infer<typeof releaseSchema>
@@ -27,9 +30,9 @@ export async function listUpdateReleases(): Promise<UpdateRelease[]> {
   return z.array(releaseSchema).parse(await api.get('/api/updates/releases', {}, { cache: false }))
 }
 
-export async function stageUpdateRelease(version: string, files: File[]): Promise<UpdateRelease> {
+export async function stageUpdateRelease(files: File[], version?: string): Promise<UpdateRelease> {
   const form = new FormData()
-  form.append('version', version)
+  if (version) form.append('version', version)
   for (const file of files) form.append('files', file, file.name)
   const response = await request('/api/updates/releases/stage', { method: 'POST', body: form })
   return releaseSchema.parse(response?.data ?? response)
