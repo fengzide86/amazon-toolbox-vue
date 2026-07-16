@@ -52,13 +52,13 @@ defineProps({
 .empty-state-title {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin: 0 0 0.5rem;
 }
 
 .empty-state-description {
   font-size: 0.875rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin: 0;
   max-width: 300px;
 }

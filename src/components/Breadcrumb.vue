@@ -34,14 +34,14 @@ const currentTitle = computed(() => {
   padding: 0;
   margin-bottom: 14px;
   font-size: var(--type-control);
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
 }
 
 .breadcrumb-item {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   text-decoration: none;
   transition: color 0.2s;
   padding: 4px 6px;
@@ -49,7 +49,7 @@ const currentTitle = computed(() => {
 }
 
 .breadcrumb-item:hover {
-  color: var(--color-accent);
+  color: var(--color-primary);
   background: var(--color-primary-soft);
 }
 

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <slot v-if="!error"></slot>
     <div v-else class="error-boundary">
@@ -122,7 +122,7 @@ function sendErrorToAnalytics(err, instance, info) {
   width: 80px;
   height: 80px;
   margin: 0 auto 1.5rem;
-  color: var(--studio-danger);
+  color: var(--color-danger);
 }
 
 .error-icon svg {
@@ -133,13 +133,13 @@ function sendErrorToAnalytics(err, instance, info) {
 .error-title {
   font-size: 1.875rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 1rem;
 }
 
 .error-message {
   font-size: 1rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 2rem;
   line-height: 1.6;
 }
@@ -153,7 +153,7 @@ function sendErrorToAnalytics(err, instance, info) {
 
 .btn-primary {
   padding: 0.75rem 1.5rem;
-  background: var(--studio-accent);
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 8px;
@@ -163,7 +163,7 @@ function sendErrorToAnalytics(err, instance, info) {
 }
 
 .btn-primary:hover {
-  background: var(--studio-accent-hover);
+  background: var(--color-primary-hover);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.4);
 }
@@ -171,8 +171,8 @@ function sendErrorToAnalytics(err, instance, info) {
 .btn-secondary {
   padding: 0.75rem 1.5rem;
   background: white;
-  color: var(--studio-accent);
-  border: 2px solid var(--studio-accent);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
@@ -180,7 +180,7 @@ function sendErrorToAnalytics(err, instance, info) {
 }
 
 .btn-secondary:hover {
-  background: var(--studio-bg-hover);
+  background: var(--color-surface-soft);
   transform: translateY(-2px);
 }
 
@@ -192,16 +192,16 @@ function sendErrorToAnalytics(err, instance, info) {
 .error-details summary {
   cursor: pointer;
   font-weight: 600;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 1rem;
 }
 
 .error-details pre {
-  background: var(--studio-bg-hover);
+  background: var(--color-surface-soft);
   padding: 1rem;
   border-radius: 8px;
   overflow-x: auto;
   font-size: 0.875rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
 }
 </style>

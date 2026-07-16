@@ -295,7 +295,7 @@ onMounted(focusPasswordInput)
 }
 
 .logo-section h1 {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-primary);
@@ -303,7 +303,7 @@ onMounted(focusPasswordInput)
 }
 
 .logo-section p {
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -329,8 +329,8 @@ onMounted(focusPasswordInput)
   background: #F8FAFC;
   border: 2px solid var(--color-border);
   border-radius: 12px;
-  color: var(--color-foreground);
-  caret-color: var(--studio-accent);
+  color: var(--color-text);
+  caret-color: var(--color-primary);
   cursor: text;
   user-select: text;
   -webkit-user-select: text;
@@ -345,13 +345,13 @@ onMounted(focusPasswordInput)
 }
 
 .input-wrapper input:focus {
-  border-color: var(--studio-accent);
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(14,165,233,0.1);
   background: white;
 }
 
 .input-wrapper input:focus-visible {
-  border-color: var(--studio-accent);
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 4px rgba(14,165,233,0.2);
 }
 
@@ -360,7 +360,7 @@ onMounted(focusPasswordInput)
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   pointer-events: none;
 }
 
@@ -380,7 +380,7 @@ onMounted(focusPasswordInput)
   min-width: 44px;
   min-height: 44px;
   cursor: pointer;
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -389,11 +389,11 @@ onMounted(focusPasswordInput)
 }
 
 .toggle-password:hover {
-  color: var(--studio-accent);
+  color: var(--color-primary);
 }
 
 .toggle-password:focus-visible {
-  outline: 2px solid var(--studio-accent);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
@@ -411,7 +411,7 @@ onMounted(focusPasswordInput)
   border-radius: 12px;
   font-size: 1rem;
   font-weight: 600;
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   cursor: pointer;
   transition: all 0.2s ease-out;
   display: flex;
@@ -461,7 +461,7 @@ onMounted(focusPasswordInput)
   border-radius: 10px;
   margin-bottom: 1.5rem;
   font-size: 0.85rem;
-  color: var(--color-destructive);
+  color: var(--color-danger);
 }
 
 .error-message.show {
@@ -482,7 +482,7 @@ onMounted(focusPasswordInput)
 }
 
 .footer-links a {
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   text-decoration: none;
   font-size: 0.85rem;
   transition: color 0.2s ease-out;
@@ -491,11 +491,11 @@ onMounted(focusPasswordInput)
 }
 
 .footer-links a:hover {
-  color: var(--studio-accent);
+  color: var(--color-primary);
 }
 
 .footer-links a:focus-visible {
-  outline: 2px solid var(--studio-accent);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

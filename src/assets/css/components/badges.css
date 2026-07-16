@@ -12,11 +12,11 @@
 }
 
 .status-dot.warning {
-    background: var(--color-gold);
+    background: var(--color-premium);
 }
 
 .status-dot.error {
-    background: var(--color-destructive);
+    background: var(--color-danger);
 }
 
 /* ===== Status Badge (with text for accessibility) ===== */

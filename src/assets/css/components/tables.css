@@ -3,8 +3,8 @@
     background: white;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-sm);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-low);
     overflow: hidden;
 }
 
@@ -12,11 +12,11 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: var(--spacing-md);
+    margin-bottom: var(--space-4);
 }
 
 .table-header h3 {
-    font-family: var(--font-heading);
+    font-family: var(--font-family);
     font-size: 1rem;
     font-weight: 600;
     color: var(--color-primary);
@@ -24,7 +24,7 @@
 
 .table-header a {
     font-size: 0.85rem;
-    color: var(--color-accent);
+    color: var(--color-primary);
     text-decoration: none;
     font-weight: 600;
     cursor: pointer;
@@ -32,7 +32,7 @@
 }
 
 .table-header a:hover {
-    color: var(--color-accent-hover);
+    color: var(--color-primary-hover);
 }
 
 .data-table {
@@ -46,18 +46,18 @@
     text-align: left;
     font-size: 0.75rem;
     font-weight: 600;
-    color: var(--color-muted);
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     border-bottom: 1px solid var(--color-border);
-    background: var(--color-border-light);
+    background: var(--color-surface-soft);
 }
 
 .data-table td {
     padding: 1rem 1.25rem;
     font-size: 0.875rem;
     border-bottom: 1px solid var(--color-border);
-    color: var(--color-foreground);
+    color: var(--color-text);
 }
 
 .data-table tr:last-child td {
@@ -69,13 +69,13 @@
 }
 
 .data-table tr:hover td {
-    background: var(--color-border-light);
+    background: var(--color-surface-soft);
 }
 
 /* ===== Empty Row (表格空行) ===== */
 .empty-row {
     text-align: center;
-    color: var(--color-muted);
+    color: var(--color-text-secondary);
     padding: 2rem;
 }
 
@@ -84,20 +84,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-md) 0;
-    margin-top: var(--spacing-md);
+    padding: var(--space-4) 0;
+    margin-top: var(--space-4);
     border-top: 1px solid var(--color-border);
 }
 
 .pagination-info {
     font-size: 0.85rem;
-    color: var(--color-muted);
+    color: var(--color-text-secondary);
 }
 
 .pagination-buttons {
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    gap: var(--space-1);
 }
 
 .pagination-btn {
@@ -109,7 +109,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     background: white;
-    color: var(--color-muted);
+    color: var(--color-text-secondary);
     font-size: 0.85rem;
     font-weight: 500;
     cursor: pointer;
@@ -117,15 +117,15 @@
 }
 
 .pagination-btn:hover:not(:disabled) {
-    background: var(--color-border-light);
+    background: var(--color-surface-soft);
     color: var(--color-primary);
     border-color: var(--color-border);
 }
 
 .pagination-btn.active {
-    background: var(--color-accent);
+    background: var(--color-primary);
     color: white;
-    border-color: var(--color-accent);
+    border-color: var(--color-primary);
 }
 
 .pagination-btn:disabled {

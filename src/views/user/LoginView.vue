@@ -659,7 +659,7 @@ onUnmounted(() => {
 .logo-mark {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -675,7 +675,7 @@ onUnmounted(() => {
 
 /* 标题 */
 .brand-title {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 2.25rem;
   font-weight: 700;
   color: white;
@@ -702,14 +702,14 @@ onUnmounted(() => {
 .divider-line {
   width: 40px;
   height: 2px;
-  background: linear-gradient(90deg, var(--studio-accent), var(--studio-amazon));
+  background: linear-gradient(90deg, var(--color-primary), var(--color-premium));
   border-radius: 1px;
 }
 
 .divider-dot {
   width: 6px;
   height: 6px;
-  background: var(--studio-amazon);
+  background: var(--color-premium);
   border-radius: 50%;
 }
 
@@ -741,7 +741,7 @@ onUnmounted(() => {
 }
 
 .stat-number {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 2.25rem;
   font-weight: 700;
   color: white;
@@ -751,7 +751,7 @@ onUnmounted(() => {
 }
 
 .stat-unit {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.25rem;
   font-weight: 600;
   color: #FF9900; /* 直接使用颜色值，确保显示正常 */
@@ -765,7 +765,7 @@ onUnmounted(() => {
 .stat-line {
   width: 32px;
   height: 2px;
-  background: linear-gradient(90deg, var(--studio-accent), transparent);
+  background: linear-gradient(90deg, var(--color-primary), transparent);
   border-radius: 1px;
 }
 
@@ -805,7 +805,7 @@ onUnmounted(() => {
 }
 
 .feature-tag svg {
-  color: var(--studio-amazon);
+  color: var(--color-premium);
 }
 
 /* ===== 右侧登录区 ===== */
@@ -816,7 +816,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   position: relative;
 }
 
@@ -826,7 +826,7 @@ onUnmounted(() => {
   padding: 2.5rem;
   background: white;
   border-radius: 20px;
-  border: 1px solid var(--studio-border);
+  border: 1px solid var(--color-border);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 10px 30px -5px rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
@@ -845,7 +845,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--studio-accent), var(--studio-accent-light), var(--studio-amazon));
+  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-muted), var(--color-premium));
 }
 
 /* Logo 区域 */
@@ -857,7 +857,7 @@ onUnmounted(() => {
 .logo-icon {
   width: 56px;
   height: 56px;
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
   border-radius: 16px;
   display: inline-flex;
   align-items: center;
@@ -873,16 +873,16 @@ onUnmounted(() => {
 }
 
 .logo-section h2 {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 0.4rem;
 }
 
 .logo-section p {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 /* 错误/成功消息 */
@@ -907,14 +907,14 @@ onUnmounted(() => {
 .error-message.show {
   display: flex;
   background: rgba(239, 68, 68, 0.08);
-  color: var(--studio-danger);
+  color: var(--color-danger);
   border: 1px solid rgba(239, 68, 68, 0.15);
 }
 
 .success-message.show {
   display: flex;
   background: rgba(16, 185, 129, 0.08);
-  color: var(--studio-success);
+  color: var(--color-success);
   border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
@@ -939,12 +939,12 @@ onUnmounted(() => {
 
 .connection-status.online {
   background: rgba(16, 185, 129, 0.06);
-  color: var(--studio-success);
+  color: var(--color-success);
 }
 
 .connection-status.offline {
   background: rgba(245, 158, 11, 0.06);
-  color: var(--studio-warning);
+  color: var(--color-warning);
 }
 
 .status-dot {
@@ -955,7 +955,7 @@ onUnmounted(() => {
 }
 
 .connection-status.online .status-dot {
-  background: var(--studio-success);
+  background: var(--color-success);
 }
 
 .connection-status.online .status-dot::after {
@@ -963,13 +963,13 @@ onUnmounted(() => {
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  background: var(--studio-success);
+  background: var(--color-success);
   opacity: 0.3;
   animation: ping 2s ease-in-out infinite;
 }
 
 .connection-status.offline .status-dot {
-  background: var(--studio-warning);
+  background: var(--color-warning);
   animation: blink 1.5s ease-in-out infinite;
 }
 
@@ -992,7 +992,7 @@ onUnmounted(() => {
   display: block;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 0.5rem;
 }
 
@@ -1005,13 +1005,13 @@ onUnmounted(() => {
   left: 0.875rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   pointer-events: none;
   transition: color 0.3s ease;
 }
 
 .input-wrapper:focus-within .input-icon {
-  color: var(--studio-accent);
+  color: var(--color-primary);
 }
 
 .input-icon svg {
@@ -1022,13 +1022,13 @@ onUnmounted(() => {
 .input-wrapper input {
   width: 100%;
   padding: 0.8rem 1rem 0.8rem 2.75rem;
-  background: var(--studio-bg);
-  border: 1.5px solid var(--studio-border);
+  background: var(--color-canvas);
+  border: 1.5px solid var(--color-border);
   border-radius: 12px;
   font-size: 0.9rem;
   font-family: var(--font-family);
-  color: var(--studio-text-main);
-  caret-color: var(--studio-accent);
+  color: var(--color-text);
+  caret-color: var(--color-primary);
   cursor: text;
   user-select: text;
   -webkit-user-select: text;
@@ -1041,12 +1041,12 @@ onUnmounted(() => {
 }
 
 .input-wrapper input::placeholder {
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .input-wrapper input:focus {
   background: white;
-  border-color: var(--studio-accent);
+  border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
 }
 
@@ -1056,23 +1056,23 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: var(--studio-bg-hover);
+  background: var(--color-surface-soft);
   border-radius: 10px;
   font-size: 0.8rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 1.5rem;
-  border: 1px solid var(--studio-border);
+  border: 1px solid var(--color-border);
 }
 
 .device-info svg {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .device-info strong {
-  color: var(--studio-text-main);
+  color: var(--color-text);
   font-weight: 600;
 }
 
@@ -1080,13 +1080,13 @@ onUnmounted(() => {
 .btn-login {
   width: 100%;
   padding: 0.9rem;
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-hover));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   color: white;
   border: none;
   border-radius: 12px;
   font-size: 0.95rem;
   font-weight: 600;
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
@@ -1176,7 +1176,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.3rem;
   font-size: var(--type-control);
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   text-decoration: none;
   transition: all 0.2s ease;
   padding: 0.25rem 0.4rem;
@@ -1184,7 +1184,7 @@ onUnmounted(() => {
 }
 
 .footer-link:hover {
-  color: var(--studio-accent);
+  color: var(--color-primary);
   background: rgba(14, 165, 233, 0.05);
 }
 
@@ -1194,12 +1194,12 @@ onUnmounted(() => {
 }
 
 .admin-link {
-  color: var(--studio-accent);
+  color: var(--color-primary);
   font-weight: 500;
 }
 
 .admin-link:hover {
-  color: var(--studio-accent-hover);
+  color: var(--color-primary-hover);
   background: rgba(14, 165, 233, 0.08);
 }
 
@@ -1211,7 +1211,7 @@ onUnmounted(() => {
 
 .login-footer p {
   font-size: var(--type-meta);
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 /* ===== 弹窗 ===== */
@@ -1258,30 +1258,30 @@ onUnmounted(() => {
   background: transparent;
   border: none;
   border-radius: 8px;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .modal-close:hover {
-  background: var(--studio-bg-hover);
-  color: var(--studio-text-main);
+  background: var(--color-surface-soft);
+  color: var(--color-text);
 }
 
 .modal h3 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.1rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 1.25rem;
 }
 
 .modal h3 svg {
   width: 20px;
   height: 20px;
-  color: var(--studio-accent);
+  color: var(--color-primary);
 }
 
 /* 帮助步骤 */
@@ -1301,7 +1301,7 @@ onUnmounted(() => {
 .step-number {
   width: 24px;
   height: 24px;
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
   color: white;
   border-radius: 50%;
   display: flex;
@@ -1344,7 +1344,7 @@ onUnmounted(() => {
 
 .btn-confirm {
   padding: 0.625rem 1.5rem;
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-hover));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
   color: white;
   border: none;
   border-radius: 10px;
@@ -1366,7 +1366,7 @@ onUnmounted(() => {
 
 .contact-desc {
   font-size: 0.9rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 1rem;
 }
 
@@ -1375,21 +1375,21 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: var(--studio-bg-hover);
+  background: var(--color-surface-soft);
   border-radius: 10px;
-  border: 1px solid var(--studio-border);
+  border: 1px solid var(--color-border);
 }
 
 .wechat-label {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .wechat-id {
   flex: 1;
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--studio-accent);
+  color: var(--color-primary);
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
 }
 
@@ -1398,7 +1398,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.25rem;
   padding: 0.375rem 0.75rem;
-  background: var(--studio-accent);
+  background: var(--color-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -1409,7 +1409,7 @@ onUnmounted(() => {
 }
 
 .copy-btn:hover {
-  background: var(--studio-accent-hover);
+  background: var(--color-primary-hover);
   transform: translateY(-1px);
 }
 
@@ -1421,7 +1421,7 @@ onUnmounted(() => {
 .copy-success {
   margin-top: 0.5rem;
   font-size: var(--type-meta);
-  color: var(--studio-success);
+  color: var(--color-success);
   text-align: center;
   animation: fadeIn 0.3s ease;
 }

@@ -965,16 +965,16 @@ onMounted(loadData)
 
 <style scoped>
 .page-title {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 1.5rem;
 }
 
 .settings-card {
   margin-bottom: 1.5rem;
-  background: var(--studio-surface);
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
 }
 
@@ -992,40 +992,40 @@ onMounted(loadData)
 .card-header span {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
 }
 
 .header-hint {
   display: block;
   margin-top: 3px;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.72rem;
   font-weight: 400;
 }
 
 .tool-name {
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
 }
 
 .tool-meta {
   margin-top: 0.2rem;
   font-size: 0.75rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   word-break: break-all;
 }
 
 .tool-code {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
   font-size: 0.78rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   word-break: break-all;
 }
 
 .tool-url {
   margin-top: 0.25rem;
   font-size: 0.75rem;
-  color: var(--studio-accent);
+  color: var(--color-primary);
   word-break: break-all;
 }
 
@@ -1044,7 +1044,7 @@ onMounted(loadData)
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.45rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.75rem;
 }
 
@@ -1065,8 +1065,8 @@ onMounted(loadData)
 }
 
 .permission-assurance.neutral {
-  color: var(--studio-text-muted);
-  background: var(--studio-bg);
+  color: var(--color-text-secondary);
+  background: var(--color-canvas);
 }
 
 .permission-grid {
@@ -1079,7 +1079,7 @@ onMounted(loadData)
 
 .tool-desc-admin {
   display: inline-block;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -1102,13 +1102,13 @@ onMounted(loadData)
 
 .setting-title {
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 0.25rem;
 }
 
 .setting-desc {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-top: 0.25rem;
 }
 
@@ -1120,10 +1120,10 @@ onMounted(loadData)
 
 .profit-info {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 1rem;
   padding: 0.75rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: var(--radius-sm);
 }
 
@@ -1139,8 +1139,8 @@ onMounted(loadData)
 
 :deep(.el-table) {
   --el-table-border-color: var(--color-border);
-  --el-table-header-bg-color: var(--studio-bg);
-  --el-table-row-hover-bg-color: var(--studio-bg-hover);
+  --el-table-header-bg-color: var(--color-canvas);
+  --el-table-row-hover-bg-color: var(--color-surface-soft);
 }
 
 :deep(.el-dialog) {

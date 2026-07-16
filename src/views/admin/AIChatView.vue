@@ -357,7 +357,7 @@ onMounted(() => {
 }
 
 .config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.debug-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--studio-border); border-radius: 8px; font-size: 12px; line-height: 1.8; background: var(--studio-surface-muted); }
+.debug-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 12px; line-height: 1.8; background: var(--color-surface-soft); }
 .debug-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 
 .page-header {
@@ -365,10 +365,10 @@ onMounted(() => {
 }
 
 .page-title {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -395,7 +395,7 @@ onMounted(() => {
 }
 
 .panel-section {
-  background: var(--studio-surface);
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 6px 16px rgba(0,0,0,0.03);
@@ -404,10 +404,10 @@ onMounted(() => {
 .section-title {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin: 0 0 1rem 0;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--studio-border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 /* ===== 左侧面板：配置区 ===== */
@@ -419,7 +419,7 @@ onMounted(() => {
   display: block;
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -445,7 +445,7 @@ onMounted(() => {
 }
 
 .stat-mini {
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: var(--radius-md);
   padding: 12px;
   text-align: center;
@@ -454,13 +454,13 @@ onMounted(() => {
 .stat-value-mini {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   line-height: 1.2;
 }
 
 .stat-label-mini {
   font-size: 0.75rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-top: 4px;
 }
 
@@ -476,31 +476,31 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .session-item-mini:hover {
-  background: var(--studio-bg-hover);
+  background: var(--color-surface-soft);
   transform: translateX(2px);
 }
 
 .session-item-mini.active {
   background: rgba(14, 165, 233, 0.08);
-  border-left: 3px solid var(--studio-accent);
+  border-left: 3px solid var(--color-primary);
 }
 
 .session-id-mini {
   font-family: monospace;
   font-size: 0.8rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
 }
 
 .empty-mini {
   text-align: center;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
   padding: 1rem;
 }
@@ -516,7 +516,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: var(--radius-md);
   margin-bottom: 1rem;
   min-height: 300px;
@@ -553,12 +553,12 @@ onMounted(() => {
   max-width: 70%;
   padding: 12px 16px;
   border-radius: 12px;
-  background: var(--studio-surface);
+  background: var(--color-surface);
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .message-sandbox.user .message-content-sandbox {
-  background: var(--studio-accent);
+  background: var(--color-primary);
   color: white;
 }
 
@@ -570,7 +570,7 @@ onMounted(() => {
 
 .message-time-sandbox {
   font-size: 0.7rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-top: 6px;
   text-align: right;
 }
@@ -584,7 +584,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 

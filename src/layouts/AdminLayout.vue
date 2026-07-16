@@ -143,7 +143,7 @@ onUnmounted(() => {
     flex-direction: column;
   }
   .content {
-    padding: var(--spacing-md, 1rem);
+    padding: var(--space-4, 1rem);
   }
 }
 
@@ -155,7 +155,7 @@ onUnmounted(() => {
   padding: 0 !important;
   border: 0 !important;
   color: var(--color-text) !important;
-  font-size: var(--font-page-title) !important;
+  font-size: var(--type-page) !important;
   line-height: 1.25 !important;
   letter-spacing: -.03em !important;
 }

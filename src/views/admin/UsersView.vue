@@ -208,31 +208,31 @@ onMounted(loadData)
 .data-toolbar-v6 { margin-bottom: 1rem; }
 
 .table-card {
-  background: var(--studio-surface);
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
 }
 
 .mono-text {
   font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
   font-size: 0.8rem;
-  color: var(--studio-text-secondary);
+  color: var(--color-text-secondary);
 }
 
 .time-text {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 :deep(.el-table) {
-  --el-table-border-color: var(--studio-border);
-  --el-table-header-bg-color: var(--studio-bg);
-  --el-table-row-hover-bg-color: var(--studio-bg-hover);
+  --el-table-border-color: var(--color-border);
+  --el-table-header-bg-color: var(--color-canvas);
+  --el-table-row-hover-bg-color: var(--color-surface-soft);
 }
 
 :deep(.el-input-number) {
@@ -240,7 +240,7 @@ onMounted(loadData)
 }
 
 .user-detail-list { display: grid; gap: 14px; }
-.user-detail-list label { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--studio-border); }
-.user-detail-list label > span { color: var(--studio-text-muted); font-size: 13px; }
-.user-detail-list strong { min-width: 0; color: var(--studio-text-main); overflow-wrap: anywhere; }
+.user-detail-list label { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+.user-detail-list label > span { color: var(--color-text-secondary); font-size: 13px; }
+.user-detail-list strong { min-width: 0; color: var(--color-text); overflow-wrap: anywhere; }
 </style>

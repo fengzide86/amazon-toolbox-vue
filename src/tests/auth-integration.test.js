@@ -4,7 +4,7 @@
  * 防止格式不一致导致的认证问题
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { Auth, runToolSimulation } from '@/utils'
+import { Auth } from '@/utils'
 import { authService } from '@/utils/auth'
 import { setActivePinia, createPinia } from 'pinia'
 import { useUserStore } from '@/stores/user'
@@ -110,15 +110,6 @@ describe('认证系统集成测试', () => {
       
       expect(localStorage.getItem('toolbox_token')).toBeNull()
       expect(localStorage.getItem('toolbox_auth')).toBeNull()
-    })
-
-    it('退出登录时清理工具运行遮罩，登录输入框不再被遮挡', () => {
-      runToolSimulation('测试工具')
-      expect(document.querySelector('.tool-running-overlay')).not.toBeNull()
-
-      Auth.clear()
-
-      expect(document.querySelector('.tool-running-overlay')).toBeNull()
     })
 
     it('authService.clear() 清理 toolbox_token', () => {

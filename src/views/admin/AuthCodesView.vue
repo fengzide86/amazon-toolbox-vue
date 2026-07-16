@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <PageHeader title="授权码管理" description="生成、检索并维护客户授权码" />
 
@@ -470,10 +470,10 @@ onMounted(loadData)
 
 <style scoped>
 .table-card {
-  background: var(--studio-surface);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--studio-shadow);
+  box-shadow: var(--shadow-low);
 }
 
 .card-header {
@@ -485,7 +485,7 @@ onMounted(loadData)
 .card-header h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -506,7 +506,7 @@ onMounted(loadData)
 
 .generate-field > span {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 
@@ -524,7 +524,7 @@ onMounted(loadData)
 
 .generated-count {
   font-size: 0.85rem;
-  color: var(--studio-accent);
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -533,13 +533,13 @@ onMounted(loadData)
 .code-link {
   font-family: monospace;
   font-size: 0.85rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   text-decoration: none;
   font-weight: 500;
 }
 
 .code-link:hover {
-  color: var(--studio-accent);
+  color: var(--color-primary);
 }
 
 .platform-tag {
@@ -552,7 +552,7 @@ onMounted(loadData)
   font-size: 0.75rem;
   font-weight: 600;
   background: rgba(16, 185, 129, 0.1);
-  color: var(--studio-success);
+  color: var(--color-success);
 }
 
 .device-badge {
@@ -560,7 +560,7 @@ onMounted(loadData)
 }
 
 .text-muted {
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .text-small {
@@ -570,7 +570,7 @@ onMounted(loadData)
 .generated-codes {
   margin-top: 1rem;
   padding: 1rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: 12px;
   display: flex;
   flex-wrap: wrap;
@@ -584,19 +584,19 @@ onMounted(loadData)
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .dialog-info {
   font-family: monospace;
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 1rem;
 }
 
 .dialog-subtitle {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 1rem;
 }
 
@@ -609,7 +609,7 @@ onMounted(loadData)
 
 .dialog-form-row label {
   font-size: 0.9rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   white-space: nowrap;
 }
 
@@ -633,14 +633,14 @@ onMounted(loadData)
 .detail-label {
   width: 100px;
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
 .detail-value {
   flex: 1;
   font-size: 0.9rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
 }
 
 .detail-section {
@@ -649,7 +649,7 @@ onMounted(loadData)
 
 .device-item {
   padding: 0.5rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: 6px;
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
@@ -657,8 +657,8 @@ onMounted(loadData)
 
 :deep(.el-table) {
   --el-table-border-color: var(--color-border);
-  --el-table-header-bg-color: var(--studio-bg);
-  --el-table-row-hover-bg-color: var(--studio-bg);
+  --el-table-header-bg-color: var(--color-canvas);
+  --el-table-row-hover-bg-color: var(--color-canvas);
 }
 
 :deep(.el-card__header) {

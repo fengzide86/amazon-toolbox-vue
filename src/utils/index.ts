@@ -32,45 +32,6 @@ export function showToast(message: string, type: ToastType = 'info'): void {
   }, 3000)
 }
 
-let activeToolOverlay: HTMLElement | null = null
-
-export function clearToolSimulation(): void {
-  activeToolOverlay?.remove()
-  activeToolOverlay = null
-  document.querySelectorAll('.tool-running-overlay').forEach(overlay => overlay.remove())
-}
-
-if (typeof window !== 'undefined') window.addEventListener('toolbox:auth-cleared', clearToolSimulation)
-
-function escapeHtml(text: string): string {
-  const element = document.createElement('div')
-  element.textContent = text
-  return element.innerHTML
-}
-
-/**
- * 只保留给旧测试与开发预览的兼容层。真实任务必须使用 taskRun store，
- * 此处不再生成百分比、预计时间或自动完成结果。
- */
-export function runToolSimulation(toolName: string): void {
-  clearToolSimulation()
-  const safeToolName = escapeHtml(toolName)
-  const overlay = document.createElement('div')
-  overlay.className = 'tool-running-overlay'
-  overlay.innerHTML = `
-    <div class="tool-running-card">
-      <div class="tool-running-content">
-        <div class="spinner"></div>
-        <h3>正在运行：${safeToolName}</h3>
-        <p>正在自动处理，请按页面提示操作。</p>
-        <button class="btn" id="toolCloseBtn">关闭预览</button>
-      </div>
-    </div>`
-  document.body.appendChild(overlay)
-  activeToolOverlay = overlay
-  overlay.querySelector('#toolCloseBtn')?.addEventListener('click', clearToolSimulation)
-}
-
 export const Auth = {
   set(code: string): void {
     const current = authService.getAuth() || {}
@@ -81,7 +42,6 @@ export const Auth = {
     return authService.getAuth()?.auth_code || null
   },
   clear(): void {
-    clearToolSimulation()
     authService.clear()
     localStorage.removeItem('toolbox_login_time')
     void window.electronAPI?.credentialStore?.clearUserCode().catch(() => undefined)

@@ -189,8 +189,8 @@ onUnmounted(() => {
   width: min(400px, 100%);
   padding: 36px;
   border-radius: var(--radius-xl);
-  background: var(--studio-surface);
-  box-shadow: var(--shadow-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-overlay);
   text-align: center;
 }
 
@@ -201,19 +201,19 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: var(--studio-danger);
+  color: var(--color-danger);
   background: rgba(239, 68, 68, 0.1);
 }
 
 .kickout-card h3 {
   margin: 0 0 10px;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   font-size: 20px;
 }
 
 .kickout-card p {
   margin: 0 0 22px;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   line-height: 1.65;
 }
 

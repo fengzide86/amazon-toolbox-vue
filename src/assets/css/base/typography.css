@@ -12,16 +12,16 @@
 /* ===== Typography: 字阶应用 ===== */
 .tool-name,
 .card-title {
-    font-size: var(--font-title);
+    font-size: var(--type-control);
     font-weight: var(--font-weight-semibold);
-    color: var(--studio-text-main);
+    color: var(--color-text);
 }
 
 .tool-desc,
 .card-subtitle {
-    font-size: var(--font-subtitle);
+    font-size: var(--type-micro);
     font-weight: var(--font-weight-normal);
-    color: var(--studio-text-muted);
+    color: var(--color-text-secondary);
 }
 
 /* ===== Icons: 统一规范 ===== */
@@ -39,20 +39,20 @@
 .nav-item:hover svg,
 .menu-icon:hover svg,
 .icon-muted:hover svg {
-    color: var(--studio-accent);
+    color: var(--color-primary);
 }
 
 /* 激活状态：品牌色 */
 .sidebar-nav a.active svg,
 .nav-item.active svg {
-    color: var(--studio-accent);
+    color: var(--color-primary);
 }
 
 /* 功能图标：保持原色（如状态指示器） */
-.icon-success svg { color: var(--studio-success); }
-.icon-warning svg { color: var(--studio-warning); }
-.icon-danger svg { color: var(--studio-danger); }
-.icon-info svg { color: var(--studio-info); }
+.icon-success svg { color: var(--color-success); }
+.icon-warning svg { color: var(--color-warning); }
+.icon-danger svg { color: var(--color-danger); }
+.icon-info svg { color: var(--color-info); }
 
 /* Lucide 图标全局保护 */
 svg.lucide {

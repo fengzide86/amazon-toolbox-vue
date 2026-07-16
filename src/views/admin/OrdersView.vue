@@ -5,7 +5,7 @@
     <section class="order-stats" aria-label="订单统计">
       <article class="stat-card">
           <div class="stat-label">总订单数</div>
-          <div class="stat-value" style="color: var(--studio-accent);">{{ stats.total }}</div>
+          <div class="stat-value" style="color: var(--color-primary);">{{ stats.total }}</div>
       </article>
       <article class="stat-card">
           <div class="stat-label">已付款</div>
@@ -13,11 +13,11 @@
       </article>
       <article class="stat-card">
           <div class="stat-label">待确认</div>
-          <div class="stat-value" style="color: var(--studio-warning);">{{ stats.pending }}</div>
+          <div class="stat-value" style="color: var(--color-warning);">{{ stats.pending }}</div>
       </article>
       <article class="stat-card">
           <div class="stat-label">已退款</div>
-          <div class="stat-value" style="color: var(--studio-danger);">{{ stats.refunded }}</div>
+          <div class="stat-value" style="color: var(--color-danger);">{{ stats.refunded }}</div>
       </article>
     </section>
 
@@ -280,28 +280,28 @@ onMounted(loadData)
   text-align: center;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--studio-surface);
+  background: var(--color-surface);
 }
 
 .order-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 1.5rem; }
 
 .stat-label {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 0.5rem;
 }
 
 .stat-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
 }
 
 .table-card {
-  background: var(--studio-surface);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--studio-shadow);
+  box-shadow: var(--shadow-low);
 }
 
 .card-header {
@@ -313,7 +313,7 @@ onMounted(loadData)
 .card-header h3 {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -330,7 +330,7 @@ onMounted(loadData)
   flex-direction: column;
   gap: 7px;
 }
-.order-field > span { color: var(--studio-text-muted); font-size: .85rem; }
+.order-field > span { color: var(--color-text-secondary); font-size: .85rem; }
 .order-field :deep(.el-select), .order-field :deep(.el-input) { width: 100%; }
 .order-submit { display: flex; justify-content: flex-end; }
 .data-toolbar-v6 { margin-bottom: 1rem; }
@@ -338,13 +338,13 @@ onMounted(loadData)
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 :deep(.el-table) {
   --el-table-border-color: var(--color-border);
-  --el-table-header-bg-color: var(--studio-bg);
-  --el-table-row-hover-bg-color: var(--studio-bg);
+  --el-table-header-bg-color: var(--color-canvas);
+  --el-table-row-hover-bg-color: var(--color-canvas);
 }
 
 :deep(.el-card__header) {
@@ -358,8 +358,8 @@ onMounted(loadData)
 
 .detail-list { display: grid; gap: 12px; }
 .detail-list > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
-.detail-list span { color: var(--studio-text-muted); font-size: 13px; }
-.detail-list strong { color: var(--studio-text-main); font-size: 14px; overflow-wrap: anywhere; }
+.detail-list span { color: var(--color-text-secondary); font-size: 13px; }
+.detail-list strong { color: var(--color-text); font-size: 14px; overflow-wrap: anywhere; }
 .mono { font-family: monospace; }
 
 @media (max-width: 1100px) {

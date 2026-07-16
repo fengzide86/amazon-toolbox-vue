@@ -13,6 +13,7 @@
   --color-primary: #2d5fca;
   --color-primary-hover: #244fae;
   --color-primary-active: #1e438f;
+  --color-primary-muted: #8eace8;
   --color-primary-soft: #eaf0ff;
   --color-premium: #a98552;
   --color-premium-soft: #f4eee5;
@@ -21,49 +22,13 @@
   --color-warning: #b7791f;
   --color-warning-soft: #fff6e8;
   --color-danger: #c33d49;
+  --color-danger-hover: #a9333e;
   --color-danger-soft: #fff0f1;
   --color-info: #4776d7;
   --color-border: #e1e5eb;
   --color-border-strong: #cfd5de;
   --color-focus-ring: rgba(45, 95, 202, 0.2);
   --color-overlay: rgba(24, 32, 51, 0.48);
-
-  /* Legacy aliases kept deliberately while pages migrate */
-  --studio-bg: var(--color-canvas);
-  --studio-surface: var(--color-surface);
-  --studio-frame: var(--color-surface);
-  --studio-text-main: var(--color-text);
-  --studio-text-muted: var(--color-text-secondary);
-  --studio-text-secondary: var(--color-text-secondary);
-  --studio-text-on-dark: var(--color-text);
-  --studio-text-on-dark-muted: var(--color-text-secondary);
-  --studio-icon-on-dark: var(--color-text-secondary);
-  --studio-accent: var(--color-primary);
-  --studio-accent-hover: var(--color-primary-hover);
-  --studio-accent-light: #8eace8;
-  --studio-accent-bg: var(--color-primary-soft);
-  --studio-success: var(--color-success);
-  --studio-warning: var(--color-warning);
-  --studio-danger: var(--color-danger);
-  --studio-info: var(--color-info);
-  --studio-gold: var(--color-premium);
-  --studio-amazon: var(--color-premium);
-  --studio-amazon-light: #c5a87f;
-  --studio-border: var(--color-border);
-  --studio-bg-hover: #f0f2f5;
-  --color-accent: var(--color-primary);
-  --color-accent-hover: var(--color-primary-hover);
-  --color-accent-light: #8eace8;
-  --color-gold: var(--color-premium);
-  --color-background: var(--color-canvas);
-  --color-body-bg: var(--color-canvas);
-  --color-foreground: var(--color-text);
-  --color-muted: var(--color-text-secondary);
-  --color-border-light: #f0f2f5;
-  --color-destructive: var(--color-danger);
-  --color-destructive-hover: #a9333e;
-  --color-bg-card: var(--color-surface);
-  --color-bg-secondary: var(--color-surface-soft);
 
   /* 4px spacing grid */
   --space-1: 4px;
@@ -75,14 +40,6 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
-  --spacing-xs: var(--space-1);
-  --spacing-sm: var(--space-2);
-  --spacing-md: var(--space-4);
-  --spacing-lg: var(--space-6);
-  --spacing-xl: var(--space-8);
-  --spacing-2xl: var(--space-10);
-  --spacing-3xl: var(--space-12);
-
   /* Shape and elevation */
   --radius-sm: 7px;
   --radius-md: 10px;
@@ -92,27 +49,8 @@
   --shadow-low: 0 1px 2px rgba(24, 32, 51, 0.04), 0 4px 12px rgba(24, 32, 51, 0.035);
   --shadow-medium: 0 12px 32px rgba(24, 32, 51, 0.08), 0 2px 8px rgba(24, 32, 51, 0.04);
   --shadow-overlay: 0 24px 64px rgba(24, 32, 51, 0.16);
-  --shadow-xs: 0 1px 2px rgba(24, 32, 51, 0.04);
-  --shadow-sm: var(--shadow-low);
-  --shadow-md: var(--shadow-medium);
-  --shadow-lg: 0 18px 48px rgba(24, 32, 51, 0.11);
-  --shadow-xl: var(--shadow-overlay);
-  --studio-shadow: var(--shadow-low);
-  --studio-shadow-hover: var(--shadow-medium);
-
   /* Typography */
   --font-family: Inter, "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-heading: var(--font-family);
-  --font-page-title: 28px;
-  --font-section-title: 18px;
-  --font-body: 14px;
-  --font-small: 12px;
-  --font-xs: 11px;
-  --font-title: 14px;
-  --font-subtitle: 12px;
-  --font-stat: 26px;
-  --font-stat-lg: 32px;
-  /* Readable product typography. The legacy --font-* aliases remain during migration. */
   --type-display: 40px;
   --type-page: 28px;
   --type-section: 18px;
@@ -121,6 +59,8 @@
   --type-control: 14px;
   --type-meta: 13px;
   --type-micro: 12px;
+  --type-stat: 26px;
+  --type-stat-large: 32px;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -136,7 +76,6 @@
   --motion-signature: 420ms;
   --motion-ambient: 2100ms;
   --transition: var(--motion-fast) var(--ease-standard);
-  --transition-slow: var(--motion-normal) var(--ease-emphasized);
   --transition-physics: var(--motion-normal) var(--ease-emphasized);
 
   /* Layout and z-index */

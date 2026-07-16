@@ -302,7 +302,7 @@ onMounted(async () => {
   height: calc(100vh - 120px);
   max-width: 900px;
   margin: 0 auto;
-  background: var(--color-bg-card);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-low);
@@ -374,7 +374,7 @@ onMounted(async () => {
 
 .message-content {
   max-width: 70%;
-  background: var(--color-bg-secondary);
+  background: var(--color-surface-soft);
   padding: 0.75rem 1rem;
   border: 1px solid var(--color-border);
   border-radius: 12px 12px 12px 4px;
@@ -464,24 +464,24 @@ onMounted(async () => {
 .quick-questions button {
   min-height: 34px;
   padding: 0 11px;
-  border: 1px solid var(--studio-border);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   background: white;
   font-size:var(--type-control);
   cursor: pointer;
 }
 
 .quick-questions button:hover {
-  color: var(--studio-accent);
-  border-color: var(--studio-accent-light);
-  background: var(--studio-accent-bg);
+  color: var(--color-primary);
+  border-color: var(--color-primary-muted);
+  background: var(--color-primary-soft);
 }
 
 .rating-panel {
   text-align: center;
   padding: 1rem;
-  background: var(--color-bg-secondary);
+  background: var(--color-surface-soft);
   border-radius: 12px;
   margin: 1rem 0;
 }
@@ -556,7 +556,7 @@ onMounted(async () => {
 }
 
 .modal {
-  background: var(--color-bg-card);
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-overlay);
@@ -585,7 +585,7 @@ onMounted(async () => {
 }
 
 .history-item:hover {
-  background: var(--color-bg-secondary);
+  background: var(--color-surface-soft);
 }
 
 .history-info {
@@ -600,9 +600,9 @@ onMounted(async () => {
   border-radius: 4px;
 }
 
-.history-status.active { background: rgba(14, 165, 233, 0.1); color: var(--studio-accent); }
-.history-status.resolved { background: rgba(16, 185, 129, 0.1); color: var(--studio-success); }
-.history-status.transferred { background: rgba(255, 153, 0, 0.1); color: var(--studio-warning); }
+.history-status.active { background: rgba(14, 165, 233, 0.1); color: var(--color-primary); }
+.history-status.resolved { background: rgba(16, 185, 129, 0.1); color: var(--color-success); }
+.history-status.transferred { background: rgba(255, 153, 0, 0.1); color: var(--color-warning); }
 
 .history-time {
   font-size: 0.8rem;
@@ -622,12 +622,12 @@ onMounted(async () => {
 }
 
 .btn-success {
-  background: var(--studio-success);
+  background: var(--color-success);
   color: white;
 }
 
 .btn-warning {
-  background: var(--studio-warning);
+  background: var(--color-warning);
   color: white;
 }
 

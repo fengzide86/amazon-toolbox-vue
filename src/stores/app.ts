@@ -7,7 +7,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-type ThemeName = 'light' | 'dark'
 type UnknownRecord = Record<string, unknown>
 
 export interface ActiveTool extends UnknownRecord {
@@ -33,10 +32,6 @@ export const useAppStore = defineStore('app', () => {
   // 侧边栏状态
   const sidebarCollapsed = ref(false)
   
-  // 主题
-  const storedTheme = localStorage.getItem('toolbox_theme')
-  const theme = ref<ThemeName>(storedTheme === 'dark' ? 'dark' : 'light')
-  
   // 系统设置
   const settings = ref<UnknownRecord | null>(null)
   
@@ -52,9 +47,6 @@ export const useAppStore = defineStore('app', () => {
   const currentTool = ref<ActiveTool | null>(null) // { id, name, module, category, platformKey, targetUrl }
 
   // ===== Getters =====
-  
-  // 是否深色模式
-  const isDarkMode = computed(() => theme.value === 'dark')
   
   // 获取应用版本
   const getVersion = computed(() => version.value)
@@ -90,25 +82,6 @@ export const useAppStore = defineStore('app', () => {
    */
   function setSidebarCollapsed(collapsed: boolean) {
     sidebarCollapsed.value = collapsed
-  }
-
-  /**
-   * 切换主题
-   */
-  function toggleTheme() {
-    theme.value = theme.value === 'light' ? 'dark' : 'light'
-    localStorage.setItem('toolbox_theme', theme.value)
-    document.documentElement.setAttribute('data-theme', theme.value)
-  }
-
-  /**
-   * 设置主题
-   * @param {string} newTheme - 主题 light/dark
-   */
-  function setTheme(newTheme: ThemeName) {
-    theme.value = newTheme
-    localStorage.setItem('toolbox_theme', newTheme)
-    document.documentElement.setAttribute('data-theme', newTheme)
   }
 
   /**
@@ -172,7 +145,6 @@ export const useAppStore = defineStore('app', () => {
     loading,
     loadingText,
     sidebarCollapsed,
-    theme,
     settings,
     plans,
     toolCategories,
@@ -180,7 +152,6 @@ export const useAppStore = defineStore('app', () => {
     toolUrl,
     currentTool,
     // Getters
-    isDarkMode,
     getVersion,
     getSettings,
     isToolVisible,
@@ -188,8 +159,6 @@ export const useAppStore = defineStore('app', () => {
     setLoading,
     toggleSidebar,
     setSidebarCollapsed,
-    toggleTheme,
-    setTheme,
     setSettings,
     setPlans,
     setToolCategories,

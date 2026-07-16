@@ -59,7 +59,6 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StatusBadge: typeof import('./components/StatusBadge.vue')['default']
-    ThemeToggle: typeof import('./components/ThemeToggle.vue')['default']
     ToolWorkspace: typeof import('./components/ToolWorkspace.vue')['default']
     UserSidebar: typeof import('./components/UserSidebar.vue')['default']
   }

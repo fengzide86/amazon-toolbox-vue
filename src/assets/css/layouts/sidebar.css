@@ -2,24 +2,24 @@
 .layout {
     max-width: var(--content-max-width);
     margin: 0 auto;
-    padding: var(--spacing-lg) var(--spacing-xl);
+    padding: var(--space-6) var(--space-8);
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
-    gap: var(--spacing-xl);
+    gap: var(--space-8);
 }
 
 .sidebar {
     position: sticky;
-    top: calc(var(--header-height) + var(--spacing-lg));
+    top: calc(var(--header-height) + var(--space-6));
     height: fit-content;
-    max-height: calc(100vh - var(--header-height) - var(--spacing-3xl));
+    max-height: calc(100vh - var(--header-height) - var(--space-12));
     display: flex;
     flex-direction: column;
     background: white;
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
-    padding: var(--spacing-sm);
-    box-shadow: var(--shadow-sm);
+    padding: var(--space-2);
+    box-shadow: var(--shadow-low);
 }
 
 .sidebar-nav {
@@ -38,23 +38,23 @@
     gap: 0.75rem;
     padding: 0.75rem 1rem;
     border-radius: var(--radius-md);
-    color: var(--color-muted);
+    color: var(--color-text-secondary);
     text-decoration: none;
     font-size: 0.875rem;
     font-weight: 500;
     transition: all var(--transition);
-    font-family: var(--font-heading);
+    font-family: var(--font-family);
     cursor: pointer;
 }
 
 .sidebar-nav a:hover {
-    background: var(--color-border-light);
+    background: var(--color-surface-soft);
     color: var(--color-primary);
 }
 
 .sidebar-nav a.active {
     background: rgba(99, 102, 241, 0.1);
-    color: var(--color-accent);
+    color: var(--color-primary);
     font-weight: 600;
 }
 
@@ -67,7 +67,7 @@
     transform: translateY(-50%);
     width: 3px;
     height: 60%;
-    background: var(--color-accent);
+    background: var(--color-primary);
     border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
@@ -94,7 +94,7 @@
     background: transparent;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    color: var(--color-muted);
+    color: var(--color-text-secondary);
     font-size: 0.8rem;
     font-weight: 600;
     cursor: pointer;
@@ -104,7 +104,7 @@
 .btn-logout:hover {
     background: rgba(220, 38, 38, 0.06);
     border-color: rgba(220, 38, 38, 0.3);
-    color: var(--color-destructive);
+    color: var(--color-danger);
 }
 
 .btn-logout svg {

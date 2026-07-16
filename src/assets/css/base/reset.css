@@ -20,21 +20,21 @@ select {
 
 body {
     font-family: var(--font-family);
-    background: var(--color-body-bg);
-    color: var(--color-foreground);
+    background: var(--color-canvas);
+    color: var(--color-text);
     min-height: 100vh;
 }
 
 /* ===== Focus Styles (Accessibility) ===== */
 :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
     border-radius: 4px;
 }
 
 button:focus-visible,
 a:focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-primary);
     outline-offset: 2px;
 }
 
@@ -54,7 +54,7 @@ a:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--color-muted);
+    background: var(--color-text-secondary);
 }
 
 /* 微型滚动条 */
@@ -73,5 +73,5 @@ a:focus-visible {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--studio-accent);
+    background: var(--color-primary);
 }

@@ -95,7 +95,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 .terms-header h1 {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.875rem;
   font-weight: 700;
   color: var(--color-text);
@@ -103,13 +103,13 @@
 }
 .terms-date {
   font-size: 0.85rem;
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
 }
 .terms-content section {
   margin-bottom: 2rem;
 }
 .terms-content h2 {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--color-text);
@@ -125,7 +125,7 @@
 }
 .terms-content ul {
   padding-left: 1.5rem;
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   line-height: 1.7;
 }

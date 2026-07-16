@@ -116,10 +116,10 @@ onMounted(loadData)
 
 <style scoped>
 .page-title {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-bottom: 1.5rem;
 }
 
@@ -147,7 +147,7 @@ onMounted(loadData)
 
 .stat-label {
   font-size: 0.8rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   font-weight: 500;
   margin-bottom: 0.25rem;
 }
@@ -159,7 +159,7 @@ onMounted(loadData)
 }
 
 .total-card {
-  background: linear-gradient(135deg, var(--studio-accent), var(--studio-accent-light));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
   margin-bottom: 1.5rem;
   text-align: center;
   color: white;
@@ -185,7 +185,7 @@ onMounted(loadData)
 .total-value {
   font-size: 2.5rem;
   font-weight: 800;
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
 }
 
 .total-empty {
@@ -205,10 +205,10 @@ onMounted(loadData)
 }
 
 .card-header h3 {
-  font-family: var(--font-heading);
+  font-family: var(--font-family);
   font-size: 1rem;
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -217,7 +217,7 @@ onMounted(loadData)
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--studio-accent);
+  color: var(--color-primary);
   text-decoration: none;
   padding: 0.4rem 0.75rem;
   border-radius: 8px;
@@ -247,7 +247,7 @@ onMounted(loadData)
   gap: 0.5rem;
   min-width: 80px;
   font-size: 0.85rem;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   font-weight: 500;
 }
 
@@ -258,7 +258,7 @@ onMounted(loadData)
 .ratio-bar-track {
   flex: 1;
   height: 8px;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -274,7 +274,7 @@ onMounted(loadData)
   text-align: right;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 768px) {

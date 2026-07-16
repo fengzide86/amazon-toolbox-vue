@@ -237,19 +237,19 @@ onMounted(loadData)
 .data-toolbar-v6 { margin-bottom: 1rem; }
 
 .table-card {
-  background: var(--studio-surface);
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
 }
 
 .time-text {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
 }
 
 .detail-content {
@@ -263,14 +263,14 @@ onMounted(loadData)
 
 .detail-label {
   font-weight: 600;
-  color: var(--studio-text-main);
+  color: var(--color-text);
   margin-right: 0.5rem;
 }
 
 .detail-text {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
@@ -280,15 +280,15 @@ onMounted(loadData)
 
 .reply-text {
   background: rgba(14, 165, 233, 0.05);
-  border-left: 3px solid var(--studio-accent);
+  border-left: 3px solid var(--color-primary);
 }
 
 .reply-info {
   font-size: 0.85rem;
-  color: var(--studio-text-muted);
+  color: var(--color-text-secondary);
   margin-bottom: 1rem;
   padding: 0.75rem;
-  background: var(--studio-bg);
+  background: var(--color-canvas);
   border-radius: var(--radius-sm);
 }
 
@@ -307,9 +307,9 @@ onMounted(loadData)
 }
 
 :deep(.el-table) {
-  --el-table-border-color: var(--studio-border);
-  --el-table-header-bg-color: var(--studio-bg);
-  --el-table-row-hover-bg-color: var(--studio-bg-hover);
+  --el-table-border-color: var(--color-border);
+  --el-table-header-bg-color: var(--color-canvas);
+  --el-table-row-hover-bg-color: var(--color-surface-soft);
 }
 
 :deep(.el-dialog) {
@@ -317,12 +317,12 @@ onMounted(loadData)
 }
 
 :deep(.el-dialog__header) {
-  border-bottom: 1px solid var(--studio-border);
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 1rem;
 }
 
 :deep(.el-dialog__footer) {
-  border-top: 1px solid var(--studio-border);
+  border-top: 1px solid var(--color-border);
   padding-top: 1rem;
 }
 </style>
