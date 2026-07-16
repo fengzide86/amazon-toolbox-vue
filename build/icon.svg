@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="自动化工具箱">
+  <defs>
+    <linearGradient id="mineral" x1="72" y1="48" x2="432" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3A6DD4"/>
+      <stop offset="1" stop-color="#234FAE"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#mineral)"/>
+  <path d="M142 157c0-17.7 14.3-32 32-32h164c17.7 0 32 14.3 32 32v35H142v-35Z" fill="#FCFCFD"/>
+  <path d="M142 220h84v167h-52c-17.7 0-32-14.3-32-32V220Zm144 0h84v135c0 17.7-14.3 32-32 32h-52V220Z" fill="#FCFCFD"/>
+  <rect x="226" y="192" width="60" height="195" rx="18" fill="#DCE7FF"/>
+  <circle cx="401" cy="111" r="39" fill="#B89561"/>
+  <path d="m401 86 7.5 17.5L426 111l-17.5 7.5L401 136l-7.5-17.5L376 111l17.5-7.5L401 86Z" fill="#FCFCFD"/>
+</svg>
