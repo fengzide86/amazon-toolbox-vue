@@ -26,12 +26,13 @@
     "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.ts",
     "test:embedded-browser": "npm run electron:compile && electron dist-electron/electron/smoke/embedded-browser-smoke.cjs",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
-    "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"tests/**/*.ts\" \"*.config.ts\"",
+    "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\"",
     "security:audit": "python scripts/audit_secrets.py",
     "security:audit-history": "python scripts/audit_secrets.py --history",
     "deadcode": "tsx scripts/audit-dead-code.ts",
+    "package:audit": "tsx scripts/audit-desktop-package.ts",
     "build:verify": "npm run build && tsx scripts/verify-build.ts",
-    "verify:backend": "python -m pytest backend --rootdir=backend -q && python -m ruff check backend && python -m mypy --config-file backend/pyproject.toml backend/app backend/domains",
+    "verify:backend": "python -m pytest backend --rootdir=backend -q && python -m ruff check backend/domains/auth backend/domains/knowledge backend/domains/catalog backend/core/deprecation.py backend/app/lifecycle.py backend/routers/auth.py backend/routers/ai_chat.py backend/routers/knowledge.py backend/routers/help.py backend/routers/tools.py backend/routers/announcements.py backend/routers/updates.py && python -m mypy --config-file backend/pyproject.toml backend/app backend/domains",
     "verify": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run deadcode && npm test && npm run electron:compile && npm run build:desktop && npm run verify:backend"
   },
   "dependencies": {

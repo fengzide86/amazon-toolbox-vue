@@ -9,7 +9,7 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   ...vue.configs['flat/recommended'],
   {
-    files: ['src/**/*.{ts,vue}', 'electron/**/*.{ts,cts}', 'tests/**/*.ts'],
+    files: ['src/**/*.{ts,vue}', 'electron/**/*.{ts,cts}', 'scripts/**/*.ts', 'tests/**/*.ts'],
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: { parser: tseslint.parser, extraFileExtensions: ['.vue'] },
