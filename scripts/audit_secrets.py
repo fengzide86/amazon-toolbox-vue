@@ -9,8 +9,16 @@ from pathlib import Path
 PATTERNS = [
     re.compile(r"(?i)(server_password|ssh_password)\s*=\s*['\"][^'\"]{6,}['\"]"),
     re.compile(r"(?i)(mysql_password|jwt_secret_key|api_key)\s*=\s*['\"][^'\"]{8,}['\"]"),
+    re.compile(r"(?i)authorization\s*[:=]\s*['\"]?bearer\s+[a-z0-9._-]{20,}"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b"),
+    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    re.compile(r"https?://(?!(?:127\.0\.0\.1|localhost)(?::|/))\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?"),
 ]
-SAFE_MARKERS = ("os.getenv", "os.environ", "replace-with", "your_", "example", "placeholder")
+SAFE_MARKERS = (
+    "os.getenv", "os.environ", "replace-with", "your_", "example", "placeholder",
+    "updates.invalid", "127.0.0.1", "localhost",
+)
+KNOWN_EXPIRED_HISTORY_PATHS = {"admin_token.txt"}
 
 
 def git(*args: str) -> str:
@@ -29,7 +37,11 @@ def suspicious_lines(content: str) -> list[int]:
 
 
 def tracked_files() -> list[str]:
-    return [line for line in git("ls-files").splitlines() if Path(line).suffix.lower() in {".py", ".js", ".cjs", ".yml", ".yaml", ".env", ".bat"}]
+    audited_suffixes = {
+        ".py", ".js", ".cjs", ".ts", ".cts", ".json", ".yml", ".yaml",
+        ".env", ".bat", ".ps1", ".txt", ".md",
+    }
+    return [line for line in git("ls-files").splitlines() if Path(line).suffix.lower() in audited_suffixes]
 
 
 def audit_revision(revision: str, files: list[str]) -> list[tuple[str, int]]:
@@ -44,10 +56,16 @@ def audit_revision(revision: str, files: list[str]) -> list[tuple[str, int]]:
 
 
 def audit_history_revision(revision: str) -> list[tuple[str, int]]:
-    expression = r"(server_password|ssh_password|mysql_password|jwt_secret_key|api_key)[[:space:]]*=[[:space:]]*['\"][^'\"]{6,}['\"]"
+    expression = (
+        r"(server_password|ssh_password|mysql_password|jwt_secret_key|api_key)"
+        r"[[:space:]]*=[[:space:]]*['\"][^'\"]{6,}['\"]"
+        r"|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+        r"|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY"
+    )
     command = [
         "git", "grep", "-n", "-I", "-i", "-E", expression, revision, "--",
-        "*.py", "*.js", "*.cjs", "*.yml", "*.yaml", "*.env", "*.bat",
+        "*.py", "*.js", "*.cjs", "*.ts", "*.cts", "*.json", "*.yml", "*.yaml",
+        "*.env", "*.bat", "*.ps1", "*.txt", "*.md",
     ]
     result = subprocess.run(command, text=True, encoding="utf-8", errors="replace", capture_output=True)
     findings = []
@@ -56,7 +74,7 @@ def audit_history_revision(revision: str) -> list[tuple[str, int]]:
             _commit, file, line, content = raw.split(":", 3)
         except ValueError:
             continue
-        if file.startswith(".clinerules/"):
+        if file.startswith(".clinerules/") or file in KNOWN_EXPIRED_HISTORY_PATHS:
             continue
         if any(marker in content.lower() for marker in SAFE_MARKERS):
             continue

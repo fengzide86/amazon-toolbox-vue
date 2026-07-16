@@ -14,7 +14,7 @@
 | 后端 | Python FastAPI + SQLAlchemy (异步) | `backend/` |
 | 桌面 | Electron + electron-updater + Node Runner + Playwright Core | `electron/` |
 | 数据库 | MySQL (生产) / SQLite (开发) | `backend/database.py` |
-| 云端 | 阿里云 ECS（当前过渡地址 `8.130.113.104:8000`） | Docker Compose / 历史 systemd 服务 `toolbox-backend` |
+| 云端 | 阿里云 ECS（地址只通过本地环境变量配置） | Docker Compose / 历史 systemd 服务 `toolbox-backend` |
 | 代码仓库 | GitHub | `https://github.com/fengzide86/amazon-toolbox-vue` |
 
 ## 当前架构与长期目标

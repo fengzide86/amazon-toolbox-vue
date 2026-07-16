@@ -1,4 +1,4 @@
-wokanda# ===== 依赖目录 =====
+# ===== 依赖目录 =====
 node_modules/
 __pycache__/
 *.pyc
@@ -11,6 +11,9 @@ venv/
 .env.deploy
 .env.local
 .env.*.local
+*_token.txt
+*.credentials.json
+credentials.local.*
 backend/.env
 backend/.env.production
 backend/.env.local
