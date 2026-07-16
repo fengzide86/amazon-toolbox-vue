@@ -123,6 +123,9 @@ export const adminPlanSchema = z.object({
   price: z.coerce.number(),
   duration_days: z.coerce.number().int().nonnegative().optional(),
   status: z.string().default('active'),
+  features: nullableText,
+  product_type: z.enum(['consumer', 'business']).default('consumer'),
+  entitlements: z.record(z.string(), z.unknown()).default({}),
 }).passthrough()
 export const adminPlansSchema = z.array(adminPlanSchema)
 export type AdminPlan = z.infer<typeof adminPlanSchema>
@@ -196,6 +199,21 @@ export const retrievalTestResultSchema = z.object({
 }).passthrough()
 
 export type RetrievalTestResult = z.infer<typeof retrievalTestResultSchema>
+
+export const toolReleaseSchema = z.object({
+  tool_id: z.string(),
+  version: z.string(),
+  script_key: z.string(),
+  runner_api_version: z.coerce.number().default(1),
+  artifact_sha256: z.string().default('embedded'),
+  artifact_url: nullableText,
+  channel: z.string().default('canary'),
+  rollout_percentage: z.coerce.number().default(0),
+  status: z.string().default('draft'),
+  created_at: nullableText,
+}).passthrough()
+export const toolReleasesSchema = z.array(toolReleaseSchema)
+export type ToolRelease = z.infer<typeof toolReleaseSchema>
 
 const authDeviceSchema = z.object({
   id: entityIdSchema,

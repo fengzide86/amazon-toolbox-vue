@@ -85,7 +85,7 @@
           <template #default="{ row }">
             <el-input 
               v-if="editingPlan?.id === row.id" 
-              v-model="editingPlan.name" 
+              v-model="editingPlan!.name"
               size="small"
             />
             <span v-else>{{ row.name }}</span>
@@ -96,7 +96,7 @@
           <template #default="{ row }">
             <el-input-number 
               v-if="editingPlan?.id === row.id" 
-              v-model="editingPlan.price" 
+              v-model="editingPlan!.price"
               size="small"
               :min="0"
               style="width: 100px;"
@@ -109,7 +109,7 @@
           <template #default="{ row }">
             <el-input-number 
               v-if="editingPlan?.id === row.id" 
-              v-model="editingPlan.duration_days" 
+              v-model="editingPlan!.duration_days"
               size="small"
               :min="1"
               style="width: 100px;"
@@ -122,7 +122,7 @@
           <template #default="{ row }">
             <el-input 
               v-if="editingPlan?.id === row.id" 
-              v-model="editingPlan.features" 
+              v-model="editingPlan!.features"
               size="small"
             />
             <span v-else style="font-size: 0.85rem;">{{ row.features }}</span>
@@ -485,22 +485,56 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getPlansAdmin, getSettings, updateSetting, getTools, updateTools, getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from '@/utils/api'
 import { showToast } from '@/utils'
 import { confirmAction } from '@/shared/ui/confirm'
+import { ElMessageBox } from 'element-plus'
+import {
+  adminPlanSchema,
+  adminPlansSchema,
+  adminSettingsSchema,
+  toolReleaseSchema,
+  toolReleasesSchema,
+  type AdminPlan,
+  type ToolRelease,
+} from '@/features/admin/model'
+import {
+  errorMessage,
+  toolCatalogItemSchema,
+  toolCatalogSchema,
+  toolUpdateResponseSchema,
+  type ToolCatalogItem,
+} from '@/features/tools/model'
 
-const plans = ref([])
-const settings = ref([])
-const tools = ref([])
-const toolReleases = ref([])
-const editingPlan = ref(null)
+interface PlanPermissionDraft {
+  id: string | number
+  product_type: 'consumer' | 'business'
+  batchEnabled: boolean
+  maxBatchRows: number
+  maxOpenSessions: number
+  desktopNotification: boolean
+}
+
+interface BatchInputField {
+  key: string
+  label: string
+  type: 'text'
+  required: boolean
+  sensitive: boolean
+}
+
+const plans = ref<AdminPlan[]>([])
+const settings = ref<Array<{ key: string; value?: string | null }>>([])
+const tools = ref<ToolCatalogItem[]>([])
+const toolReleases = ref<ToolRelease[]>([])
+const editingPlan = ref<AdminPlan | null>(null)
 const editingToolIndex = ref(-1)
-const editingToolSnapshot = ref(null)
+const editingToolSnapshot = ref<ToolCatalogItem | null>(null)
 const showAddPlan = ref(false)
 const showPlanPermissions = ref(false)
-const planPermissionDraft = ref(null)
+const planPermissionDraft = ref<PlanPermissionDraft | null>(null)
 const showReleaseModal = ref(false)
 const releaseSaving = ref(false)
 const newRelease = ref({ tool_id: '', version: '1.0.0', script_key: '', artifact_sha256: 'embedded' })
@@ -545,21 +579,24 @@ async function loadData() {
     const [plansRes, settingsRes, toolsRes, releasesRes] = await Promise.all([
       getPlansAdmin(), getSettings(), getTools(), getToolReleases()
     ])
-    plans.value = (plansRes || []).filter(p => p !== null)
-    settings.value = (settingsRes || []).filter(s => s !== null)
-    tools.value = (toolsRes || []).filter(t => t !== null)
-    toolReleases.value = (releasesRes || []).filter(r => r !== null)
+    plans.value = adminPlansSchema.parse(plansRes)
+    const parsedSettings = adminSettingsSchema.parse(settingsRes)
+    settings.value = parsedSettings
+    tools.value = toolCatalogSchema.parse(toolsRes)
+    toolReleases.value = toolReleasesSchema.parse(releasesRes)
 
-    const pwdSetting = settingsRes.find(s => s.key === 'admin_password')
-    const wxSetting = settingsRes.find(s => s.key === 'wechat_id')
-    const profitSetting = settingsRes.find(s => s.key === 'profit_ratios')
-    const businessSetting = settingsRes.find(s => s.key === 'business_workspace_enabled')
-    if (wxSetting) wechatId.value = wxSetting.value
+    const wxSetting = parsedSettings.find((setting) => setting.key === 'wechat_id')
+    const profitSetting = parsedSettings.find((setting) => setting.key === 'profit_ratios')
+    const businessSetting = parsedSettings.find((setting) => setting.key === 'business_workspace_enabled')
+    if (wxSetting) wechatId.value = wxSetting.value || ''
     businessWorkspaceEnabled.value = String(businessSetting?.value || '').toLowerCase() === 'true'
     if (profitSetting && profitSetting.value) {
       try {
-        const ratios = JSON.parse(profitSetting.value)
-        profitRatios.value = { ...profitRatios.value, ...ratios }
+        const ratios: unknown = JSON.parse(profitSetting.value)
+        if (typeof ratios === 'object' && ratios !== null) {
+          const updates = Object.fromEntries(Object.entries(ratios).filter(([, value]) => typeof value === 'number'))
+          profitRatios.value = { ...profitRatios.value, ...updates }
+        }
       } catch (e) {
         // 使用默认值
       }
@@ -600,7 +637,8 @@ async function saveWechat() {
   }
 }
 
-async function saveBusinessWorkspaceSetting(value) {
+async function saveBusinessWorkspaceSetting(rawValue: string | number | boolean) {
+  const value = rawValue === true
   try {
     await updateSetting({ key: 'business_workspace_enabled', value: value ? 'true' : 'false', description: '专业批量工作台全局发布开关' })
     showToast(value ? '专业批量工作台已开启' : '专业批量工作台已关闭', 'success')
@@ -610,11 +648,12 @@ async function saveBusinessWorkspaceSetting(value) {
   }
 }
 
-function startEdit(plan) {
-  editingPlan.value = { ...plan }
+function startEdit(rawPlan: unknown) {
+  editingPlan.value = { ...adminPlanSchema.parse(rawPlan) }
 }
 
-async function savePlan(plan) {
+async function savePlan(_plan: unknown) {
+  if (!editingPlan.value) return
   try {
     const { id, name, price, duration_days, features, status } = editingPlan.value
     const { api } = await import('@/utils/api')
@@ -627,7 +666,8 @@ async function savePlan(plan) {
   }
 }
 
-function openPlanPermissions(plan) {
+function openPlanPermissions(rawPlan: unknown) {
+  const plan = adminPlanSchema.parse(rawPlan)
   const entitlements = { ...defaultEntitlements(), ...(plan.entitlements || {}) }
   planPermissionDraft.value = {
     id: plan.id,
@@ -661,11 +701,12 @@ async function savePlanPermissions() {
     showToast('产品权限已更新', 'success')
     await loadData()
   } catch (error) {
-    showToast(error?.message || '权限保存失败', 'error')
+    showToast(errorMessage(error, '权限保存失败'), 'error')
   }
 }
 
-async function togglePlanStatus(plan) {
+async function togglePlanStatus(rawPlan: unknown) {
+  const plan = adminPlanSchema.parse(rawPlan)
   const newStatus = plan.status === 'active' ? 'disabled' : 'active'
   try {
     const { api } = await import('@/utils/api')
@@ -704,7 +745,7 @@ async function addPlan() {
 
 function addTool() {
   const nextOrder = tools.value.length + 1
-  tools.value.push({ 
+  tools.value.push(toolCatalogItemSchema.parse({
     id: `tool_custom_${Date.now()}`,
     name: '新工具', 
     module: '未分类', 
@@ -731,18 +772,19 @@ function addTool() {
     business_description: '',
     batch_input_schema: [],
     batch_schema_text: 'account_label|客户简称|text|required'
-  })
+  }))
   editingToolIndex.value = tools.value.length - 1
   editingToolSnapshot.value = null
 }
 
-function startToolEdit(row, index) {
-  row.available_plans_text = (row.available_plans || []).join(',')
-  row.capability_tags_text = (row.capability_tags || []).join(',')
-  row.preparation_notes_text = (row.preparation_notes || []).join(',')
-  row.intervention_scenarios_text = (row.intervention_scenarios || []).join(',')
+function startToolEdit(rawRow: unknown, index: number) {
+  const row = toolCatalogItemSchema.parse(rawRow)
+  row.available_plans_text = splitList(row.available_plans).join(',')
+  row.capability_tags_text = splitList(row.capability_tags).join(',')
+  row.preparation_notes_text = splitList(row.preparation_notes).join(',')
+  row.intervention_scenarios_text = splitList(row.intervention_scenarios).join(',')
   row.batch_schema_text = formatBatchSchema(row.batch_input_schema)
-  editingToolSnapshot.value = JSON.parse(JSON.stringify(row))
+  editingToolSnapshot.value = toolCatalogItemSchema.parse(JSON.parse(JSON.stringify(row)) as unknown)
   editingToolIndex.value = index
 }
 
@@ -757,7 +799,7 @@ function cancelToolEdit() {
   editingToolSnapshot.value = null
 }
 
-function normalizeToolForSave(tool, index) {
+function normalizeToolForSave(tool: ToolCatalogItem, index: number): ToolCatalogItem {
   const {
     available_plans_text: _availablePlansText,
     capability_tags_text: capabilityTagsText,
@@ -769,8 +811,8 @@ function normalizeToolForSave(tool, index) {
   const platformKey = tool.platform_key || 'amazon'
   const capabilityKey = slugify(tool.capability_key || tool.id || tool.name || `tool_${index + 1}`)
   const id = slugify(tool.id || `tool_${capabilityKey}`)
-  const plansText = tool.available_plans_text ?? (tool.available_plans || []).join(',')
-  return {
+  const plansText = tool.available_plans_text ?? splitList(tool.available_plans).join(',')
+  return toolCatalogItemSchema.parse({
     ...toolData,
     id,
     name: (tool.name || '未命名工具').trim(),
@@ -794,33 +836,35 @@ function normalizeToolForSave(tool, index) {
     business_description: tool.business_description || '',
     batch_input_schema: tool.supports_batch ? parseBatchSchema(batchSchemaText, tool.batch_input_schema) : [],
     requires_signature: tool.requires_signature !== false
-  }
+  })
 }
 
-function splitList(value, limit = 20) {
+function splitList(value: unknown, limit = 20): string[] {
   const source = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/)
   return source.map(item => String(item).trim()).filter(Boolean).slice(0, limit)
 }
 
-function formatBatchSchema(schema = []) {
-  const rows = schema.length ? schema : [{ key: 'account_label', label: '客户简称', type: 'text', required: true }]
+function formatBatchSchema(schema: BatchInputField[] = []): string {
+  const rows: BatchInputField[] = schema.length ? schema : [{ key: 'account_label', label: '客户简称', type: 'text', required: true, sensitive: false }]
   return rows.map(field => `${field.key}|${field.label || field.key}|text|${field.required ? 'required' : 'optional'}`).join('\n')
 }
 
-function parseBatchSchema(text, fallback = []) {
+function parseBatchSchema(text: unknown, fallback: BatchInputField[] = []): BatchInputField[] {
   const forbidden = /password|passwd|pwd|secret|token|cookie/i
   const rows = String(text || formatBatchSchema(fallback)).split('\n').map(line => {
     const [rawKey, rawLabel, , required] = line.split('|').map(item => item?.trim())
-    const key = slugify(rawKey)
+    const key = slugify(rawKey || '')
     if (!key || forbidden.test(key)) return null
     return { key, label: rawLabel || key, type: 'text', required: required !== 'optional', sensitive: false }
-  }).filter(Boolean)
+  }).filter((field): field is BatchInputField => field !== null)
   if (!rows.some(field => field.key === 'account_label')) rows.unshift({ key: 'account_label', label: '客户简称', type: 'text', required: true, sensitive: false })
   return rows
 }
 
-async function saveTool(index) {
-  const tool = normalizeToolForSave(tools.value[index], index)
+async function saveTool(index: number) {
+  const selectedTool = tools.value[index]
+  if (!selectedTool) return
+  const tool = normalizeToolForSave(selectedTool, index)
   if (!tool.name || !tool.id) {
     showToast('请填写工具名称和 ID', 'error')
     return
@@ -831,8 +875,8 @@ async function saveTool(index) {
   }
   tools.value.splice(index, 1, tool)
   try {
-    const saved = await updateTools(tools.value.map((item, itemIndex) => normalizeToolForSave(item, itemIndex)))
-    if (Array.isArray(saved?.data)) {
+    const saved = toolUpdateResponseSchema.parse(await updateTools(tools.value.map((item, itemIndex) => normalizeToolForSave(item, itemIndex))))
+    if (saved.data) {
       tools.value = saved.data
     } else {
       await loadData()
@@ -841,11 +885,11 @@ async function saveTool(index) {
     editingToolIndex.value = -1
     editingToolSnapshot.value = null
   } catch (error) {
-    showToast(error?.message || '保存失败', 'error')
+    showToast(errorMessage(error, '保存失败'), 'error')
   }
 }
 
-async function removeTool(index) {
+async function removeTool(index: number) {
   if (!await confirmAction({
     title: '删除工具配置？',
     message: '删除后用户端将不再展示此工具，此操作不能撤销。',
@@ -858,7 +902,7 @@ async function removeTool(index) {
     .catch(() => showToast('删除失败', 'error'))
 }
 
-function slugify(value) {
+function slugify(value: unknown): string {
   return String(value || '')
     .trim()
     .toLowerCase()
@@ -867,29 +911,29 @@ function slugify(value) {
     .replace(/^_|_$/g, '') || 'tool'
 }
 
-function platformLabel(platformKey) {
+function platformLabel(platformKey?: string) {
   return platformKey === 'aliexpress' ? '速卖通' : '亚马逊'
 }
 
-function categoryLabel(category) {
+function categoryLabel(category?: string) {
   return categoryOptions.find(item => item.value === category)?.label || '其他工具'
 }
 
-function toolStatusLabel(status) {
+function toolStatusLabel(status?: string) {
   return status === 'online' ? '用户端在线' : status === 'offline' ? '用户端下线' : '用户端维护'
 }
 
-function releaseStatusLabel(status) {
-  const labels = {
+function releaseStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
     available: '可启动',
     beta: 'Beta 可启动',
     maintenance: '维护中',
     disabled: '已禁用'
   }
-  return labels[status] || '维护中'
+  return status ? labels[status] || '维护中' : '维护中'
 }
 
-function syncReleaseScriptKey(toolId) {
+function syncReleaseScriptKey(toolId: string | number) {
   const tool = tools.value.find(item => item.id === toolId)
   if (tool) newRelease.value.script_key = tool.script_key || `${tool.platform_key}.${tool.capability_key}.v1`
 }
@@ -907,18 +951,29 @@ async function saveRelease() {
     newRelease.value = { tool_id: '', version: '1.0.0', script_key: '', artifact_sha256: 'embedded' }
     await loadData()
   } catch (error) {
-    showToast(error?.message || '创建版本失败', 'error')
+    showToast(errorMessage(error, '创建版本失败'), 'error')
   } finally {
     releaseSaving.value = false
   }
 }
 
-async function publishRelease(release, channel) {
+async function publishRelease(rawRelease: unknown, channel: 'stable' | 'canary') {
+  const release = toolReleaseSchema.parse(rawRelease)
   let rollout = 100
   if (channel === 'canary') {
-    const input = window.prompt('请输入灰度比例（1-99）', String(release.rollout_percentage || 10))
-    if (input === null) return
-    rollout = Number(input)
+    try {
+      const result = await ElMessageBox.prompt('请输入 1–99 的灰度比例', '灰度发布', {
+        inputValue: String(release.rollout_percentage || 10),
+        inputPattern: /^(?:[1-9]|[1-9]\d)$/,
+        inputErrorMessage: '请输入 1–99 的整数',
+        confirmButtonText: '确认发布',
+        cancelButtonText: '取消',
+      })
+      rollout = Number(result.value)
+    } catch (error) {
+      if (error === 'cancel' || error === 'close') return
+      throw error
+    }
     if (!Number.isInteger(rollout) || rollout < 1 || rollout > 99) {
       showToast('灰度比例必须是 1-99 的整数', 'error')
       return
@@ -929,11 +984,12 @@ async function publishRelease(release, channel) {
     showToast(channel === 'stable' ? '已全量发布' : `已灰度发布 ${rollout}%`, 'success')
     await loadData()
   } catch (error) {
-    showToast(error?.message || '发布失败', 'error')
+    showToast(errorMessage(error, '发布失败'), 'error')
   }
 }
 
-async function rollbackRelease(release) {
+async function rollbackRelease(rawRelease: unknown) {
+  const release = toolReleaseSchema.parse(rawRelease)
   if (!await confirmAction({
     title: '回滚工具版本？',
     message: `将 ${release.tool_id} 回滚到 ${release.version}，后续启动会使用该版本。`,
@@ -945,7 +1001,7 @@ async function rollbackRelease(release) {
     showToast(`已回滚到 ${release.version}`, 'success')
     await loadData()
   } catch (error) {
-    showToast(error?.message || '回滚失败', 'error')
+    showToast(errorMessage(error, '回滚失败'), 'error')
   }
 }
 

@@ -14,10 +14,34 @@ export const toolCatalogItemSchema = z.object({
   available_plans: z.array(z.union([z.string(), z.number()])).optional(),
   release_status: z.string().optional(),
   status: z.string().optional(),
+  script_key: z.string().optional(),
+  target_url: z.string().optional(),
+  tool_version: z.string().optional(),
+  runner_api_version: z.coerce.number().optional(),
+  sort_order: z.coerce.number().optional(),
+  available_plans_text: z.string().optional(),
+  capability_tags_text: z.string().optional(),
+  preparation_notes_text: z.string().optional(),
+  intervention_scenarios_text: z.string().optional(),
+  supports_batch: z.boolean().optional(),
+  business_description: z.string().optional(),
+  batch_input_schema: z.array(z.object({
+    key: z.string(),
+    label: z.string(),
+    type: z.literal('text').default('text'),
+    required: z.boolean().default(true),
+    sensitive: z.boolean().default(false),
+  })).optional(),
+  batch_schema_text: z.string().optional(),
+  requires_signature: z.boolean().optional(),
 }).passthrough()
 
 export const toolCatalogSchema = z.array(toolCatalogItemSchema)
 export type ToolCatalogItem = z.infer<typeof toolCatalogItemSchema>
+
+export const toolUpdateResponseSchema = z.object({
+  data: toolCatalogSchema.optional(),
+}).passthrough()
 
 export const toolLaunchGrantSchema = z.object({
   token: z.string(),
