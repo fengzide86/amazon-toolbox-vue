@@ -138,6 +138,7 @@ import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const orders = ref([])
 const plans = ref([])
@@ -228,7 +229,12 @@ async function markPaid(order) {
 }
 
 async function refund(order) {
-  if (!confirm(`确定退款 ¥${order.amount} 吗？`)) return
+  if (!await confirmAction({
+    title: '确认退款？',
+    message: `将记录退款 ¥${order.amount}，请确认金额和订单无误。`,
+    confirmText: '确认退款',
+    danger: true,
+  })) return
   try {
     await refundOrder(order.id)
     showToast('退款成功', 'success')

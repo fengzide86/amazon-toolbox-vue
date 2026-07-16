@@ -244,6 +244,7 @@ import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const authCodes = ref([])
 const plans = ref([])
@@ -430,7 +431,12 @@ async function confirmExtend() {
 }
 
 async function deleteCode(id) {
-  if (!confirm('确定要删除此授权码吗？')) return
+  if (!await confirmAction({
+    title: '删除授权码？',
+    message: '删除后该授权码将无法继续使用，此操作不能撤销。',
+    confirmText: '确认删除',
+    danger: true,
+  })) return
   try {
     await deleteAuthCode(id)
     showToast('已删除', 'success')

@@ -241,6 +241,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 import { Search } from '@element-plus/icons-vue'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
@@ -353,7 +354,12 @@ async function submitForm() {
 }
 
 async function handleDelete(item) {
-  if (!confirm(`确定删除「${item.title}」？`)) return
+  if (!await confirmAction({
+    title: '删除知识条目？',
+    message: `「${item.title}」将从工具帮助中移除，此操作不能撤销。`,
+    confirmText: '确认删除',
+    danger: true,
+  })) return
   try {
     await deleteKnowledge(item.id)
     showToast('已删除', 'success')

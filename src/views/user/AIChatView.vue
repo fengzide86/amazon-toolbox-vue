@@ -107,6 +107,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, getChatHistory } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const platformStore = usePlatformStore()
 
@@ -235,7 +236,11 @@ async function submitRating(star) {
 }
 
 async function transferToHuman() {
-  if (!confirm('确定要转接人工客服吗？')) return
+  if (!await confirmAction({
+    title: '转接人工支持？',
+    message: '系统会把当前问题整理成待处理工单，方便工作人员继续跟进。',
+    confirmText: '创建工单',
+  })) return
   try {
     await transferChatToHuman(sessionId.value)
     showActions.value = false

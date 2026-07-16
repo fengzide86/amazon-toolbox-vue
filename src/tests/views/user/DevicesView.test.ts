@@ -7,6 +7,8 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import DevicesView from '@/views/user/DevicesView.vue'
 
+const mocks = vi.hoisted(() => ({ confirmAction: vi.fn() }))
+
 // Mock API
 vi.mock('@/utils/api', () => ({
   getMyDevices: vi.fn().mockResolvedValue([])
@@ -17,6 +19,7 @@ vi.mock('@/utils', () => ({
   showToast: vi.fn(),
   getDeviceId: vi.fn(() => 'device_001')
 }))
+vi.mock('@/shared/ui/confirm', () => ({ confirmAction: mocks.confirmAction }))
 
 describe('DevicesView', () => {
   beforeEach(() => {
@@ -199,7 +202,7 @@ describe('DevicesView', () => {
         }
       ])
 
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+      mocks.confirmAction.mockResolvedValue(false)
 
       const wrapper = mount(DevicesView, {
         global: { plugins: [createPinia()] }
@@ -209,8 +212,10 @@ describe('DevicesView', () => {
     const unbindBtn = wrapper.find('.unbind-btn')
     await unbindBtn.trigger('click')
 
-      expect(confirmSpy).toHaveBeenCalled()
-      confirmSpy.mockRestore()
+      expect(mocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({
+        title: '解绑这台设备？',
+        danger: true,
+      }))
     })
   })
 

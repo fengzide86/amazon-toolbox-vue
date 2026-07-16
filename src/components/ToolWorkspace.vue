@@ -153,6 +153,7 @@ import { useTaskRunStore } from '@/stores/taskRun'
 import { createLog } from '@/utils/api'
 import { createToolLaunchGrant } from '@/utils/api/tools'
 import { showToast } from '@/utils'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -242,12 +243,24 @@ async function completeUserAction() {
 }
 
 async function stopRun() {
-  if (!window.confirm('确定停止本次自动操作吗？')) return
+  if (!await confirmAction({
+    title: '停止本次处理？',
+    message: '停止后可以返回工具箱重新发起。',
+    confirmText: '停止处理',
+    cancelText: '继续运行',
+    danger: true,
+  })) return
   await taskRunStore.cancel()
 }
 
 async function closeWorkspace() {
-  if (isActiveRun.value && !window.confirm('自动操作尚未完成，现在退出将停止本次处理。')) return
+  if (isActiveRun.value && !await confirmAction({
+    title: '退出执行工作区？',
+    message: '当前自动处理尚未完成，退出后本次运行会停止。',
+    confirmText: '退出并停止',
+    cancelText: '留在这里',
+    danger: true,
+  })) return
   if (isActiveRun.value) await taskRunStore.cancel()
   taskRunStore.reset()
   await window.electronAPI?.automation?.unregisterBrowser?.()

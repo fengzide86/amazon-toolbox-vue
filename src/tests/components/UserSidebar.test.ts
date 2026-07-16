@@ -80,7 +80,7 @@ describe('UserSidebar', () => {
       expect(labels).toContain('执行记录')
       expect(labels).toContain('套餐与授权')
       expect(labels).toContain('设备授权')
-      expect(labels).toContain('AI 客服')
+      expect(labels).toContain('工具帮助')
       expect(labels).not.toContain('退出登录')
       expect(labels).not.toContain('首页总览')
       expect(labels).not.toContain('设备管理')

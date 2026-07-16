@@ -51,6 +51,7 @@ import { computed, ref, onMounted } from 'vue'
 import { getMyDevices, userUnbindDevice } from '@/utils/api'
 import { getDeviceId, showToast } from '@/utils'
 import { AlertTriangle, CircleCheck, Monitor } from '@lucide/vue'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const devices = ref([])
 const maxDevices = ref(1)
@@ -88,7 +89,12 @@ async function handleUnbind(device) {
     showToast('至少需要保留一台设备', 'warning')
     return
   }
-  if (!confirm(`确定解绑设备 "${device.device_name || '未知设备'}" 吗？`)) return
+  if (!await confirmAction({
+    title: '解绑这台设备？',
+    message: `解绑「${device.device_name || '未知设备'}」后，它需要重新授权才能使用。`,
+    confirmText: '确认解绑',
+    danger: true,
+  })) return
 
   unbinding.value = true
   try {

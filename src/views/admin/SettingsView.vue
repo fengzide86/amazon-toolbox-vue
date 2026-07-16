@@ -489,6 +489,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { getPlansAdmin, getSettings, updateSetting, getTools, updateTools, getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from '@/utils/api'
 import { showToast } from '@/utils'
+import { confirmAction } from '@/shared/ui/confirm'
 
 const plans = ref([])
 const settings = ref([])
@@ -844,8 +845,13 @@ async function saveTool(index) {
   }
 }
 
-function removeTool(index) {
-  if (!confirm('确定删除此工具配置吗？')) return
+async function removeTool(index) {
+  if (!await confirmAction({
+    title: '删除工具配置？',
+    message: '删除后用户端将不再展示此工具，此操作不能撤销。',
+    confirmText: '确认删除',
+    danger: true,
+  })) return
   tools.value.splice(index, 1)
   updateTools(tools.value)
     .then(() => showToast('已删除', 'success'))
@@ -928,7 +934,12 @@ async function publishRelease(release, channel) {
 }
 
 async function rollbackRelease(release) {
-  if (!window.confirm(`确定将 ${release.tool_id} 回滚到 ${release.version} 吗？`)) return
+  if (!await confirmAction({
+    title: '回滚工具版本？',
+    message: `将 ${release.tool_id} 回滚到 ${release.version}，后续启动会使用该版本。`,
+    confirmText: '确认回滚',
+    danger: true,
+  })) return
   try {
     await rollbackToolRelease(release.tool_id, release.version)
     showToast(`已回滚到 ${release.version}`, 'success')

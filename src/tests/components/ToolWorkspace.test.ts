@@ -6,11 +6,12 @@ import { useAppStore } from '@/stores/app'
 import { useTaskRunStore } from '@/stores/taskRun'
 import { AUTOMATION_EVENT } from '@/automation'
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), createLog: vi.fn() }))
+const mocks = vi.hoisted(() => ({ push: vi.fn(), createLog: vi.fn(), confirmAction: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/utils/api', () => ({ createLog: mocks.createLog }))
 vi.mock('@/utils/api/tools', () => ({ createToolLaunchGrant: vi.fn() }))
 vi.mock('@/utils', () => ({ showToast: vi.fn() }))
+vi.mock('@/shared/ui/confirm', () => ({ confirmAction: mocks.confirmAction }))
 
 describe('ToolWorkspace 极简运行工作台', () => {
   let pinia
@@ -74,7 +75,7 @@ describe('ToolWorkspace 极简运行工作台', () => {
   })
 
   it('停止操作必须确认，并进入可重新执行的停止结果页', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mocks.confirmAction.mockResolvedValue(true)
     const wrapper = mountWorkspace()
     await flushPromises()
 
@@ -82,7 +83,10 @@ describe('ToolWorkspace 极简运行工作台', () => {
     await stopButton.trigger('click')
     await wrapper.vm.$nextTick()
 
-    expect(window.confirm).toHaveBeenCalledWith('确定停止本次自动操作吗？')
+    expect(mocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({
+      title: '停止本次处理？',
+      danger: true,
+    }))
     expect(useTaskRunStore().status).toBe('cancelled')
     expect(wrapper.find('.result-card.cancelled').text()).toContain('操作已停止')
     expect(wrapper.find('.result-card.cancelled').text()).toContain('重新执行')
