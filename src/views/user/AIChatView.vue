@@ -322,8 +322,8 @@ onMounted(async () => {
   font-size: 20px;
   letter-spacing: -.02em;
 }
-.chat-header div > span { color: var(--color-primary); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
-.chat-header p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: 12px; }
+.chat-header div > span { color: var(--color-primary); font-size:var(--type-micro); font-weight: 800; letter-spacing: .12em; }
+.chat-header p { margin: 5px 0 0; color: var(--color-text-secondary); font-size:var(--type-control); }
 
 .chat-messages {
   flex: 1;
@@ -468,7 +468,7 @@ onMounted(async () => {
   border-radius: 999px;
   color: var(--studio-text-main);
   background: white;
-  font-size: 12px;
+  font-size:var(--type-control);
   cursor: pointer;
 }
 

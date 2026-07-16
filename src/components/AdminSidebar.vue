@@ -99,7 +99,7 @@ import {
   place-items: center;
   background: var(--color-primary);
   color: white;
-  font-size: 11px;
+  font-size:var(--type-meta);
   font-weight: 700;
   border-radius: 9px;
   box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
@@ -135,7 +135,7 @@ import {
 
 .menu-icon { width: 15px; height: 15px; color: var(--color-text-tertiary); stroke-width: 1.8px; transition: color var(--motion-fast); flex-shrink: 0; }
 
-.menu-label { color: var(--color-text-secondary); font-size: 12px; font-weight: 600; transition: color var(--motion-fast); white-space: nowrap; }
+.menu-label { color: var(--color-text-secondary); font-size:var(--type-meta); font-weight: 600; transition: color var(--motion-fast); white-space: nowrap; }
 
 .menu-nav-item:hover { background: #f2f4f7; }
 

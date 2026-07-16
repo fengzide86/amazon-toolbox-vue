@@ -33,7 +33,7 @@ const currentTitle = computed(() => {
   min-height: 30px;
   padding: 0;
   margin-bottom: 14px;
-  font-size: 11px;
+  font-size: var(--type-control);
   color: var(--color-muted);
 }
 
@@ -64,6 +64,6 @@ const currentTitle = computed(() => {
 
 .breadcrumb-separator {
   color: var(--color-text-tertiary);
-  font-size: 0.8rem;
+  font-size: var(--type-meta);
 }
 </style>

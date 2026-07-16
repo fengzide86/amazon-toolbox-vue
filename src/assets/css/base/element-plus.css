@@ -9,6 +9,7 @@
 .el-button {
   min-height: 36px;
   border-radius: var(--radius-md) !important;
+  font-size: var(--type-control) !important;
   font-weight: 600;
   transition: color var(--motion-fast), background var(--motion-fast), border-color var(--motion-fast), transform var(--motion-press) !important;
 }
@@ -42,6 +43,15 @@
 .el-textarea__inner:focus { box-shadow: 0 0 0 1px var(--color-primary) inset, 0 0 0 3px var(--color-focus-ring) !important; }
 
 .el-form-item__label { color: var(--color-text) !important; font-weight: 600; }
+.el-input__inner,
+.el-textarea__inner,
+.el-select__input,
+.el-select__placeholder,
+.el-select-dropdown__item,
+.el-dropdown-menu__item,
+.el-form-item__label {
+  font-size: var(--type-control) !important;
+}
 .el-tag { border-radius: 999px !important; font-weight: 600; }
 
 .el-table {
@@ -52,8 +62,8 @@
   border-radius: var(--radius-md);
   color: var(--color-text);
 }
-.el-table th.el-table__cell { height: 44px; color: var(--color-text-secondary); font-size: 12px; font-weight: 700; }
-.el-table td.el-table__cell { padding: 9px 0; }
+.el-table th.el-table__cell { height: 44px; color: var(--color-text-secondary); font-size:var(--type-meta); font-weight: 700; }
+.el-table td.el-table__cell { padding: 9px 0; font-size: var(--type-control); }
 
 .el-dialog,
 .el-drawer {

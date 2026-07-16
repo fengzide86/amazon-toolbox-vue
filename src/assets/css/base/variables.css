@@ -112,6 +112,15 @@
   --font-subtitle: 12px;
   --font-stat: 26px;
   --font-stat-lg: 32px;
+  /* Readable product typography. The legacy --font-* aliases remain during migration. */
+  --type-display: 40px;
+  --type-page: 28px;
+  --type-section: 18px;
+  --type-card: 16px;
+  --type-body: 15px;
+  --type-control: 14px;
+  --type-meta: 13px;
+  --type-micro: 12px;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -133,13 +142,16 @@
   /* Layout and z-index */
   --sidebar-width: 224px;
   --sidebar-collapsed-width: 72px;
-  --header-height: 60px;
+  --header-height: 64px;
   --content-max-width: 1440px;
   --z-header: 100;
   --z-sidebar: 110;
+  --z-sticky-notice: 150;
   --z-dropdown: 1000;
+  --z-drawer: 1400;
   --z-dialog: 2000;
   --z-toast: 3000;
+  --z-route-transition: 3500;
 
   /* Element Plus */
   --el-color-primary: var(--color-primary);
@@ -165,4 +177,29 @@
   --el-border-color: var(--color-border);
   --el-border-color-light: #e9ecf1;
   --el-fill-color-blank: var(--color-surface);
+}
+
+.density-comfortable {
+  --density-body: var(--type-body);
+  --density-control: 15px;
+  --density-control-height: 44px;
+  --density-card-padding: 24px;
+}
+
+.density-balanced {
+  --density-body: 14px;
+  --density-control: var(--type-control);
+  --density-control-height: 40px;
+  --density-card-padding: 20px;
+}
+
+.density-compact {
+  --density-body: 14px;
+  --density-control: var(--type-control);
+  --density-control-height: 38px;
+  --density-card-padding: 18px;
+}
+
+@media (max-width: 768px) {
+  :root { --header-height: 58px; --type-page: 24px; }
 }

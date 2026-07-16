@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="devices-page">
     <header class="devices-header">
       <span>本机授权</span>
@@ -110,7 +110,7 @@ onMounted(loadDevices)
 <style scoped>
 .devices-page { width: min(980px, 100%); margin: 0 auto; }
 .devices-header { margin-bottom: 22px; }
-.devices-header > span { display: block; margin-bottom: 8px; color: var(--color-primary); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.devices-header > span { display: block; margin-bottom: 8px; color: var(--color-primary); font-size:var(--type-meta); font-weight: 800; letter-spacing: .12em; }
 .devices-header h2 { margin: 0; color: var(--color-text); font-size: var(--font-page-title); letter-spacing: -.03em; }
 .devices-header p { margin: 8px 0 0; color: var(--color-text-secondary); font-size: 13px; }
 
@@ -132,7 +132,7 @@ onMounted(loadDevices)
 .device-info-banner strong,
 .device-info-banner span { display: block; }
 .device-info-banner strong { color: var(--color-text); font-size: 14px; }
-.device-info-banner span { margin-top: 3px; color: var(--color-text-secondary); font-size: 12px; }
+.device-info-banner span { margin-top: 3px; color: var(--color-text-secondary); font-size:var(--type-meta); }
 .device-info-banner small { color: var(--color-text-secondary); white-space: nowrap; }
 
 .device-list { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -160,7 +160,7 @@ onMounted(loadDevices)
 
 .device-info { flex: 1; min-width: 0; }
 .device-name { font-weight: 600; font-size: 0.95rem; color: var(--studio-text-main); margin-bottom: 0.25rem; }
-.device-name span { margin-left: 7px; padding: 3px 7px; border-radius: 999px; color: var(--color-success); background: var(--color-success-soft); font-size: 10px; }
+.device-name span { margin-left: 7px; padding: 3px 7px; border-radius: 999px; color: var(--color-success); background: var(--color-success-soft); font-size:var(--type-micro); }
 .device-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--studio-text-muted); flex-wrap: wrap; }
 .device-id { font-family: monospace; }
 

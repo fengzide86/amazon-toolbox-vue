@@ -85,14 +85,14 @@ onMounted(loadPlans)
 
 <style scoped>
 .plans-page { width: min(1180px, 100%); margin: 0 auto; }
-.plans-eyebrow { display: block; margin-bottom: 8px; color: var(--color-premium); font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+.plans-eyebrow { display: block; margin-bottom: 8px; color: var(--color-premium); font-size:var(--type-meta); font-weight: 800; letter-spacing: .12em; }
 .plans-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
 .plans-header h2 { margin: 0; color: var(--studio-text-main); font-size: var(--font-page-title); letter-spacing: -.03em; }
 .plans-header p { margin: 7px 0 0; color: var(--studio-text-muted); font-size: 13px; }
 .current-plan { display: grid; grid-template-columns: auto auto; align-items: center; gap: 2px 7px; padding: 10px 13px; border: 1px solid rgba(169,133,82,.22); border-radius: var(--radius-md); color: var(--color-premium); background: var(--color-premium-soft); }
-.current-plan span { color: var(--studio-text-muted); font-size: 10px; }
-.current-plan strong { grid-column: 2; color: var(--studio-text-main); font-size: 12px; }
-.upgrade-notice { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid rgba(183,121,31,.2); border-radius: var(--radius-md); color: var(--color-warning); background: var(--color-warning-soft); font-size: 12px; }
+.current-plan span { color: var(--studio-text-muted); font-size:var(--type-micro); }
+.current-plan strong { grid-column: 2; color: var(--studio-text-main); font-size:var(--type-control); }
+.upgrade-notice { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; padding: 12px 14px; border: 1px solid rgba(183,121,31,.2); border-radius: var(--radius-md); color: var(--color-warning); background: var(--color-warning-soft); font-size:var(--type-control); }
 .plans-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 .plans-grid--count-1 { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
 .plans-grid--count-2, .plans-grid--count-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -102,18 +102,18 @@ onMounted(loadPlans)
 .plan-card.current { border-color: var(--studio-accent-light); }
 .plan-card.anchor { background: var(--color-surface-premium); }
 .plan-topline { min-height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.plan-badge, .current-badge { padding: 4px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+.plan-badge, .current-badge { padding: 4px 7px; border-radius: 999px; font-size:var(--type-micro); font-weight: 800; }
 .plan-badge { color: white; background: var(--color-premium); }
 .current-badge { color: var(--studio-accent-hover); background: var(--studio-accent-bg); }
 .plan-card h3 { margin: 16px 0 8px; color: var(--studio-text-main); font-size: 17px; }
 .plan-price { display: flex; align-items: flex-start; color: var(--studio-text-main); }
 .plan-price small { margin-top: 7px; font-size: 14px; }
 .plan-price strong { font-size: 34px; line-height: 1.1; }
-.plan-duration { margin-top: 5px; color: var(--studio-text-muted); font-size: 11px; }
+.plan-duration { margin-top: 5px; color: var(--studio-text-muted); font-size:var(--type-meta); }
 .plan-card ul { flex: 1; margin: 20px 0; padding: 16px 0 0; border-top: 1px solid var(--studio-border); list-style: none; }
-.plan-card li { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 11px; color: var(--studio-text-main); font-size: 12px; line-height: 1.5; }
+.plan-card li { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 11px; color: var(--studio-text-main); font-size:var(--type-control); line-height: 1.5; }
 .plan-card li svg { flex-shrink: 0; margin-top: 1px; color: var(--studio-success); }
-.plan-card button { width: 100%; min-height: 40px; border: 0; border-radius: 8px; color: white; background: var(--studio-accent); font-size: 12px; font-weight: 800; cursor: pointer; }
+.plan-card button { width: 100%; min-height: 40px; border: 0; border-radius: 8px; color: white; background: var(--studio-accent); font-size:var(--type-control); font-weight: 800; cursor: pointer; }
 .featured button, .anchor button { background: var(--color-primary); }
 .plan-card button:disabled { color: var(--studio-text-muted); background: var(--studio-bg-hover); cursor: default; }
 .empty-state { padding: 80px; color: var(--studio-text-muted); text-align: center; }

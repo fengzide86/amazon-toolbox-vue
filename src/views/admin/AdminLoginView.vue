@@ -237,12 +237,12 @@ onMounted(focusPasswordInput)
   border: 1px solid rgba(255, 255, 255, .25);
   border-radius: 11px;
   background: rgba(255, 255, 255, .12);
-  font-size: 10px;
+  font-size:var(--type-micro);
   letter-spacing: .06em;
 }
 
 .context-copy { position: relative; z-index: 1; margin-top: auto; }
-.context-eyebrow { margin: 0 0 14px; color: rgba(255,255,255,.64); font-size: 10px; font-weight: 700; letter-spacing: .18em; }
+.context-eyebrow { margin: 0 0 14px; color: rgba(255,255,255,.64); font-size:var(--type-micro); font-weight: 700; letter-spacing: .18em; }
 .context-copy h2 { margin: 0 0 16px; color: #fff; font-size: clamp(30px, 3.1vw, 40px); line-height: 1.15; letter-spacing: -.04em; }
 .context-copy > p:last-child { max-width: 380px; margin: 0; color: rgba(255,255,255,.74); font-size: 14px; line-height: 1.8; }
 
@@ -261,7 +261,7 @@ onMounted(focusPasswordInput)
 
 .context-capabilities li { display: flex; align-items: center; gap: 8px; }
 .context-capabilities li span { width: 5px; height: 5px; border-radius: 50%; background: #d8c39d; box-shadow: 0 0 0 4px rgba(216,195,157,.12); }
-.context-security { gap: 9px; color: rgba(255,255,255,.65); font-size: 11px; }
+.context-security { gap: 9px; color: rgba(255,255,255,.65); font-size:var(--type-meta); }
 .security-dot { width: 7px; height: 7px; border-radius: 50%; background: #8ce1be; box-shadow: 0 0 0 5px rgba(140,225,190,.11); }
 
 .login-card {
@@ -572,7 +572,7 @@ onMounted(focusPasswordInput)
 @media (max-width: 480px) {
   .login-container { padding: 16px; }
   .admin-context { padding: 20px 22px; }
-  .context-brand span { font-size: 11px; }
+  .context-brand span { font-size:var(--type-meta); }
   .login-card { padding: 30px 22px; }
 }
 </style>

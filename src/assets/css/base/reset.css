@@ -10,6 +10,14 @@ input, textarea, select, button, a, [role="button"] {
     -webkit-app-region: no-drag !important;
 }
 
+button,
+input,
+textarea,
+select {
+    font: inherit;
+    font-size: var(--type-control);
+}
+
 body {
     font-family: var(--font-family);
     background: var(--color-body-bg);
