@@ -129,7 +129,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { getOrders, createOrder as apiCreateOrder, updateOrder, refundOrder, getPlans, exportOrders, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
@@ -139,19 +139,26 @@ import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import {
+  adminOrderSchema,
+  adminOrdersSchema,
+  adminPlansSchema,
+  type AdminOrder,
+  type AdminPlan,
+} from '@/features/admin/model'
 
-const orders = ref([])
-const plans = ref([])
+const orders = ref<AdminOrder[]>([])
+const plans = ref<AdminPlan[]>([])
 const isLoading = ref(false)
 const filterStatus = ref('')
-const planNameMap = reactive({})
+const planNameMap = reactive<Record<string, string>>({})
 
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
 const showDetailDrawer = ref(false)
-const detailOrder = ref(null)
+const detailOrder = ref<AdminOrder | null>(null)
 
-const newOrder = ref({ plan_id: null, amount: 0, channel: '', responsible: '', status: 'pending' })
+const newOrder = ref<{ plan_id: string | number | null; amount: number; channel: string; responsible: string; status: string }>({ plan_id: null, amount: 0, channel: '', responsible: '', status: 'pending' })
 
 const stats = computed(() => ({
   total: orders.value.length,
@@ -165,21 +172,21 @@ const filteredOrders = computed(() => {
   return orders.value.filter(o => o.status === filterStatus.value)
 })
 
-function getPlanName(planId) {
-  return planNameMap[planId] || '未知套餐'
+function getPlanName(planId?: string | number | null) {
+  return planId === null || planId === undefined ? '未知套餐' : planNameMap[String(planId)] || '未知套餐'
 }
 
-function getStatusType(status) {
-  const map = { pending: 'warning', paid: 'success', refunded: 'danger' }
-  return map[status] || 'info'
+function getStatusType(status?: string | null): 'warning' | 'success' | 'danger' | 'info' {
+  const map: Record<string, 'warning' | 'success' | 'danger'> = { pending: 'warning', paid: 'success', refunded: 'danger' }
+  return status ? map[status] || 'info' : 'info'
 }
 
-function getStatusText(status) {
-  const map = { pending: '待确认', paid: '已完成', refunded: '已退款' }
-  return map[status] || status
+function getStatusText(status?: string | null) {
+  const map: Record<string, string> = { pending: '待确认', paid: '已完成', refunded: '已退款' }
+  return status ? map[status] || status : '-'
 }
 
-function formatTime(timeStr) {
+function formatTime(timeStr?: string | null) {
   if (!timeStr) return '-'
   const d = new Date(timeStr)
   return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
@@ -190,13 +197,15 @@ async function loadData() {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
     const params = platformKey ? { platform_key: platformKey } : {}
     const [ordersRes, plansRes] = await Promise.all([getOrders(params), getPlans()])
-    orders.value = ordersRes
-    plans.value = plansRes
-    if (plansRes.length && !newOrder.value.plan_id) {
-      newOrder.value.plan_id = plansRes[0].id
-      newOrder.value.amount = plansRes[0].price
+    const parsedOrders = adminOrdersSchema.parse(ordersRes)
+    const parsedPlans = adminPlansSchema.parse(plansRes)
+    orders.value = parsedOrders
+    plans.value = parsedPlans
+    if (parsedPlans.length && !newOrder.value.plan_id) {
+      newOrder.value.plan_id = parsedPlans[0]?.id ?? null
+      newOrder.value.amount = parsedPlans[0]?.price ?? 0
     }
-    plansRes.forEach(p => { planNameMap[p.id] = p.name })
+    parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
   } catch (err) {
     showToast('数据加载失败', 'error')
   }
@@ -218,9 +227,10 @@ async function createOrder() {
   isLoading.value = false
 }
 
-async function markPaid(order) {
+async function markPaid(order: unknown) {
+  const selectedOrder = adminOrderSchema.parse(order)
   try {
-    await updateOrder(order.id, { status: 'paid' })
+    await updateOrder(selectedOrder.id, { status: 'paid' })
     showToast('已确认付款', 'success')
     await loadData()
   } catch (err) {
@@ -228,15 +238,16 @@ async function markPaid(order) {
   }
 }
 
-async function refund(order) {
+async function refund(order: unknown) {
+  const selectedOrder = adminOrderSchema.parse(order)
   if (!await confirmAction({
     title: '确认退款？',
-    message: `将记录退款 ¥${order.amount}，请确认金额和订单无误。`,
+    message: `将记录退款 ¥${selectedOrder.amount}，请确认金额和订单无误。`,
     confirmText: '确认退款',
     danger: true,
   })) return
   try {
-    await refundOrder(order.id)
+    await refundOrder(selectedOrder.id)
     showToast('退款成功', 'success')
     await loadData()
   } catch (err) {
@@ -244,12 +255,12 @@ async function refund(order) {
   }
 }
 
-function openOrderDetail(order) {
-  detailOrder.value = order
+function openOrderDetail(order: unknown) {
+  detailOrder.value = adminOrderSchema.parse(order)
   showDetailDrawer.value = true
 }
 
-function handleOrderCommand(command, order) {
+function handleOrderCommand(command: string, order: unknown) {
   if (command === 'paid') markPaid(order)
   if (command === 'refund') refund(order)
 }
@@ -262,7 +273,7 @@ watch(() => newOrder.value.plan_id, (id) => {
 
 async function exportOrdersData() {
   try {
-    const params = {}
+    const params: Record<string, string> = {}
     if (filterStatus.value) params.status = filterStatus.value
     const blob = await exportOrders(params)
     const url = URL.createObjectURL(blob)

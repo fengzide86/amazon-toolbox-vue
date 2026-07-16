@@ -116,3 +116,83 @@ export const adminBatchDetailSchema = z.object({
 })
 
 export type AdminBatchDetail = z.infer<typeof adminBatchDetailSchema>
+
+export const adminPlanSchema = z.object({
+  id: entityIdSchema,
+  name: z.string(),
+  price: z.coerce.number(),
+  duration_days: z.coerce.number().int().nonnegative().optional(),
+  status: z.string().default('active'),
+}).passthrough()
+export const adminPlansSchema = z.array(adminPlanSchema)
+export type AdminPlan = z.infer<typeof adminPlanSchema>
+
+export const adminOrderSchema = z.object({
+  id: entityIdSchema,
+  order_no: z.string(),
+  plan_id: entityIdSchema.nullable().optional(),
+  amount: z.coerce.number(),
+  channel: nullableText,
+  responsible: nullableText,
+  status: z.string().default('pending'),
+  refund_amount: z.coerce.number().default(0),
+  created_at: nullableText,
+}).passthrough()
+export const adminOrdersSchema = z.array(adminOrderSchema)
+export type AdminOrder = z.infer<typeof adminOrderSchema>
+
+export const knowledgeItemSchema = z.object({
+  id: entityIdSchema,
+  category: z.string(),
+  title: z.string(),
+  content: z.string(),
+  keywords: z.array(z.string()).default([]),
+  priority: z.string().default('medium'),
+  status: z.string().default('active'),
+  vector_id: nullableText,
+  view_count: z.coerce.number().int().nonnegative().default(0),
+  platform_key: nullableText,
+  capability_key: nullableText,
+  created_at: nullableText,
+  updated_at: nullableText,
+}).passthrough()
+export type KnowledgeItem = z.infer<typeof knowledgeItemSchema>
+
+export const knowledgeListSchema = z.object({
+  items: z.array(knowledgeItemSchema).default([]),
+  total: z.coerce.number().int().nonnegative().default(0),
+  page: z.coerce.number().int().positive().default(1),
+  page_size: z.coerce.number().int().positive().default(20),
+})
+
+export const knowledgeCategoriesSchema = z.array(z.object({
+  name: z.string(),
+  count: z.coerce.number().int().nonnegative().default(0),
+}))
+
+export const knowledgeStatsSchema = z.object({
+  total: z.coerce.number().int().nonnegative().default(0),
+  active: z.coerce.number().int().nonnegative().default(0),
+  categories: z.coerce.number().int().nonnegative().default(0),
+  vector_store: z.object({
+    total_vectors: z.coerce.number().int().nonnegative().default(0),
+    status: z.string().default('unknown'),
+  }).passthrough().default({ total_vectors: 0, status: 'unknown' }),
+})
+
+export const vectorSyncResultSchema = z.object({ synced: z.coerce.number().int().nonnegative() })
+
+export const retrievalTestResultSchema = z.object({
+  elapsed_ms: z.coerce.number().nonnegative(),
+  results: z.array(z.object({
+    id: entityIdSchema,
+    title: z.string(),
+    category: z.string(),
+    content: z.string(),
+    score: z.coerce.number(),
+    platform_key: nullableText,
+    capability_key: nullableText,
+  }).passthrough()).default([]),
+}).passthrough()
+
+export type RetrievalTestResult = z.infer<typeof retrievalTestResultSchema>

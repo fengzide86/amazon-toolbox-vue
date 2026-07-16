@@ -231,7 +231,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, createKnowledge, updateKnowledge, deleteKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from '@/utils/api'
 import { showToast } from '@/utils'
@@ -242,29 +242,39 @@ import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 import { Search } from '@element-plus/icons-vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import {
+  knowledgeCategoriesSchema,
+  knowledgeItemSchema,
+  knowledgeListSchema,
+  knowledgeStatsSchema,
+  retrievalTestResultSchema,
+  vectorSyncResultSchema,
+  type KnowledgeItem,
+  type RetrievalTestResult,
+} from '@/features/admin/model'
 
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
 
-const list = ref([])
+const list = ref<KnowledgeItem[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 const filterCategory = ref('')
 const searchKeyword = ref('')
-const categories = ref([])
-const stats = ref({})
+const categories = ref<Array<{ name: string; count: number }>>([])
+const stats = ref(knowledgeStatsSchema.parse({}))
 const showModal = ref(false)
-const editingId = ref(null)
+const editingId = ref<string | number | null>(null)
 const submitting = ref(false)
 const syncing = ref(false)
 const keywordsStr = ref('')
 const showRetrievalTest = ref(false)
 const retrievalLoading = ref(false)
-const retrievalResult = ref(null)
+const retrievalResult = ref<RetrievalTestResult | null>(null)
 const retrievalForm = ref({ query: '', platform_key: '', capability_key: '', top_k: 5, min_score: 0.3 })
 const showDetailDrawer = ref(false)
-const detailItem = ref(null)
+const detailItem = ref<KnowledgeItem | null>(null)
 
 const allCategories = ['安装教程', '授权说明', '使用教程', '报错处理', '套餐说明', '退款规则', '比赛须知', '其他']
 
@@ -280,14 +290,14 @@ const form = ref({
 
 async function loadData() {
   try {
-    const params = { page: page.value, page_size: pageSize }
+    const params: Record<string, string | number> = { page: page.value, page_size: pageSize }
     if (filterCategory.value) params.category = filterCategory.value
     if (searchKeyword.value) params.keyword = searchKeyword.value
     const pk = platformStore.adminPlatform
     if (pk && pk !== 'all') params.platform_key = pk
-    const res = await getKnowledgeList(params)
-    list.value = res.items || []
-    total.value = res.total || 0
+    const result = knowledgeListSchema.parse(await getKnowledgeList(params))
+    list.value = result.items
+    total.value = result.total
   } catch (err) {
     showToast('加载失败', 'error')
   }
@@ -296,8 +306,8 @@ async function loadData() {
 async function loadMeta() {
   try {
     const [cats, st] = await Promise.all([getKnowledgeCategories(), getKnowledgeStats()])
-    categories.value = cats || []
-    stats.value = st || {}
+    categories.value = knowledgeCategoriesSchema.parse(cats)
+    stats.value = knowledgeStatsSchema.parse(st)
   } catch (err) { /* ignore */ }
 }
 
@@ -309,7 +319,8 @@ function openCreate() {
   showModal.value = true
 }
 
-function openEdit(item) {
+function openEdit(rawItem: unknown) {
+  const item = knowledgeItemSchema.parse(rawItem)
   editingId.value = item.id
   form.value = {
     category: item.category,
@@ -353,7 +364,8 @@ async function submitForm() {
   }
 }
 
-async function handleDelete(item) {
+async function handleDelete(rawItem: unknown) {
+  const item = knowledgeItemSchema.parse(rawItem)
   if (!await confirmAction({
     title: '删除知识条目？',
     message: `「${item.title}」将从工具帮助中移除，此操作不能撤销。`,
@@ -372,22 +384,22 @@ async function handleDelete(item) {
 async function syncVector() {
   syncing.value = true
   try {
-    const res = await syncKnowledgeVector()
-    showToast(`已同步 ${res.synced} 条`, 'success')
+    const result = vectorSyncResultSchema.parse(await syncKnowledgeVector())
+    showToast(`已同步 ${result.synced} 条`, 'success')
     await loadMeta()
-  } catch (err) {
-    showToast(err.message || '同步失败', 'error')
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '同步失败', 'error')
   } finally {
     syncing.value = false
   }
 }
 
-function openKnowledgeDetail(item) {
-  detailItem.value = item
+function openKnowledgeDetail(rawItem: unknown) {
+  detailItem.value = knowledgeItemSchema.parse(rawItem)
   showDetailDrawer.value = true
 }
 
-function handleKnowledgeCommand(command, item) {
+function handleKnowledgeCommand(command: string, item: unknown) {
   if (command === 'edit') openEdit(item)
   if (command === 'delete') handleDelete(item)
 }
@@ -406,14 +418,14 @@ async function runRetrievalTest() {
   }
   retrievalLoading.value = true
   try {
-    retrievalResult.value = await testKnowledgeRetrieval({
+    retrievalResult.value = retrievalTestResultSchema.parse(await testKnowledgeRetrieval({
       ...retrievalForm.value,
       query: retrievalForm.value.query.trim(),
       platform_key: retrievalForm.value.platform_key || null,
       capability_key: retrievalForm.value.capability_key || null,
-    })
-  } catch (err) {
-    showToast(err.message || '召回测试失败', 'error')
+    }))
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : '召回测试失败', 'error')
   } finally {
     retrievalLoading.value = false
   }
