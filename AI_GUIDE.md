@@ -31,7 +31,7 @@
 7. 公告受众由后端按套餐解析，不信任前端传入的 consumer/business。
 8. 旧公告、旧更新上传和旧 launch-token 协议保留到 1.9.0；新版请求发送 `X-Toolbox-Version`。
 9. 只保留右上角账号菜单中的退出入口。
-10. 不主动连接、停止或修改服务器；服务器运行方式未确认前保留 Docker 与 systemd 兼容入口。
+10. 生产服务器已确认使用 `toolbox-backend.service` systemd 服务运行 Uvicorn；仓库不再维护未使用的 Docker Compose 入口。除非用户明确授权，不主动部署、停止或重启生产服务。
 
 ## 开发和验证
 

@@ -76,6 +76,6 @@ npm run package:audit
 1. 用真实 C 端授权运行一次工具。
 2. 用真实 B 端授权导入一个小批次并处理一次登录或验证码现场。
 3. 登录管理后台，检查行动中心、公告和更新发布。
-4. 确认服务器实际使用 Docker Compose，还是 `toolbox-backend` systemd 服务。
+生产服务器已于 2026-07-16 只读确认使用 `/etc/systemd/system/toolbox-backend.service`，通过 Uvicorn 运行后端；服务器未安装 Docker。仓库已删除未使用的 Docker Compose 部署入口。
 
-第 4 项确认前，不删除最后的服务器兼容入口，也不自动部署或停止服务。
+服务器部署、重启和数据库维护仍需单独确认后执行，桌面构建和应用更新发布不会自动修改生产服务。
