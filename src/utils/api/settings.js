@@ -1,5 +1,5 @@
 // 设置相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 export function getSettings() {
     return api.get('/api/settings');

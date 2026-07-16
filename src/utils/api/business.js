@@ -1,4 +1,4 @@
-import { api } from './index.js'
+import { api } from './index'
 
 export const getBusinessBootstrap = () => api.get('/api/business/bootstrap', {}, { cache: false })
 export const getBusinessTools = () => api.get('/api/business/tools', {}, { cache: false })

@@ -1,5 +1,5 @@
 // 工具相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 export function getTools(params = {}) {
     return api.get('/api/tools', params);

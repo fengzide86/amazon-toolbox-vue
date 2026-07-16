@@ -1,6 +1,6 @@
 // 日志相关 API
-import { api, API_BASE } from './index.js';
-import { authService } from '../auth.js';
+import { api, API_BASE } from './index';
+import { authService } from '../auth';
 
 export function getLogs(userIdOrParams = {}) {
     const params = typeof userIdOrParams === 'number' 

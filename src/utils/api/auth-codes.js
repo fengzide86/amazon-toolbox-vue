@@ -1,5 +1,5 @@
 // 授权码相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 export function getAuthCodes(params = {}) {
     return api.get('/api/auth-codes', params);

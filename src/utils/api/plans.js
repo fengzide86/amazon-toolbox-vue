@@ -1,5 +1,5 @@
 // 套餐相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 // 获取套餐列表
 export function getPlans() {

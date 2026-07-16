@@ -20,6 +20,11 @@ const releaseSchema = z.object({
 
 export type UpdateRelease = z.infer<typeof releaseSchema>
 
+function unwrapResponseData(response: unknown): unknown {
+  if (typeof response !== 'object' || response === null || !('data' in response)) return response
+  return (response as { data: unknown }).data
+}
+
 const releaseNoteSchema = z.object({
   title: z.string(),
   content: z.string(),
@@ -35,12 +40,12 @@ export async function stageUpdateRelease(files: File[], version?: string): Promi
   if (version) form.append('version', version)
   for (const file of files) form.append('files', file, file.name)
   const response = await request('/api/updates/releases/stage', { method: 'POST', body: form })
-  return releaseSchema.parse(response?.data ?? response)
+  return releaseSchema.parse(unwrapResponseData(response))
 }
 
 export async function publishUpdateRelease(version: string): Promise<UpdateRelease> {
   const response = await api.post(`/api/updates/releases/${encodeURIComponent(version)}/publish`)
-  return releaseSchema.parse(response?.data ?? response)
+  return releaseSchema.parse(unwrapResponseData(response))
 }
 
 export async function removeStagedUpdateRelease(version: string): Promise<void> {

@@ -1,5 +1,5 @@
 // 工单相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 export function getFeedbacks(params = {}) {
     return api.get('/api/feedback', params);

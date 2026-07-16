@@ -1,5 +1,5 @@
 // AI 客服相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 export function createChatSession(data = {}) {
     return api.post('/api/ai-chat/session', data);

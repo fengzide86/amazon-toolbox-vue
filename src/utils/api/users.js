@@ -1,5 +1,5 @@
 // 用户管理相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 // 获取用户列表
 export function getUsers() {

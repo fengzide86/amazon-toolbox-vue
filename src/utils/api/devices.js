@@ -1,5 +1,5 @@
 // 设备相关 API
-import { api, request } from './index.js';
+import { api, request } from './index';
 
 // 获取设备列表（管理员）
 export function getDevices(authCodeId = null) {

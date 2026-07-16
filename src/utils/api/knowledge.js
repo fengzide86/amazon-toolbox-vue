@@ -1,5 +1,5 @@
 // 知识库相关 API
-import { api } from './index.js';
+import { api } from './index';
 
 export function getKnowledgeList(params = {}) {
     return api.get('/api/knowledge', params);

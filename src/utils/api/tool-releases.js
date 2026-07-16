@@ -1,4 +1,4 @@
-import { api } from './index.js'
+import { api } from './index'
 
 export function getToolReleases() {
   return api.get('/api/tool-releases', {}, { cache: false })

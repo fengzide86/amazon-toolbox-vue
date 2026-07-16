@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { verifyAuthCode } from './api/auth.js'
+import { verifyAuthCode } from './api/auth'
 import { getDeviceId, getDeviceName } from './index.js'
 import { loadRememberedUserCode, clearRememberedUserCode } from './credentialStore'
 import { useUserStore } from '@/stores/user'

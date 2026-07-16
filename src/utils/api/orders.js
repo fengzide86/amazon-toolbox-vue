@@ -1,6 +1,6 @@
 // 订单相关 API
-import { api, API_BASE } from './index.js';
-import { authService } from '../auth.js';
+import { api, API_BASE } from './index';
+import { authService } from '../auth';
 
 // 获取订单列表（支持平台过滤）
 export function getOrders(params = {}) {
