@@ -46,24 +46,25 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { getMyDevices, userUnbindDevice } from '@/utils/api'
 import { getDeviceId, showToast } from '@/utils'
 import { AlertTriangle, CircleCheck, Monitor } from '@lucide/vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import { deviceListSchema, readStoredLicense, type DeviceSummary } from '@/features/user/model'
 
-const devices = ref([])
+const devices = ref<DeviceSummary[]>([])
 const maxDevices = ref(1)
 const unbinding = ref(false)
 const currentDeviceId = getDeviceId()
 const currentDeviceBound = computed(() => devices.value.some(isCurrentDevice))
 
-function isCurrentDevice(device) {
+function isCurrentDevice(device: DeviceSummary): boolean {
   return Boolean(currentDeviceId && device.device_id === currentDeviceId)
 }
 
-function formatTime(timeStr) {
+function formatTime(timeStr: string | null | undefined): string {
   if (!timeStr) return '-'
   const d = new Date(timeStr)
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
@@ -71,20 +72,20 @@ function formatTime(timeStr) {
 
 async function loadDevices() {
   try {
-    const userInfo = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+    const userInfo = readStoredLicense()
     const userId = userInfo.user_id || userInfo.id
     if (!userId) {
       showToast('用户信息不存在', 'error')
       return
     }
-    devices.value = await getMyDevices(userId)
+    devices.value = deviceListSchema.parse(await getMyDevices(userId))
     maxDevices.value = userInfo.max_devices || 1
   } catch (err) {
     showToast('设备列表加载失败', 'error')
   }
 }
 
-async function handleUnbind(device) {
+async function handleUnbind(device: DeviceSummary) {
   if (devices.value.length <= 1) {
     showToast('至少需要保留一台设备', 'warning')
     return
@@ -98,13 +99,14 @@ async function handleUnbind(device) {
 
   unbinding.value = true
   try {
-    const userInfo = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+    const userInfo = readStoredLicense()
     const userId = userInfo.user_id || userInfo.id
+    if (userId === undefined) throw new Error('用户信息已失效，请重新登录')
     await userUnbindDevice(device.id, userId)
     showToast('设备已解绑', 'success')
     await loadDevices()
-  } catch (err) {
-    showToast(err.message || '解绑失败', 'error')
+  } catch (err: unknown) {
+    showToast(err instanceof Error ? err.message : '解绑失败', 'error')
   } finally {
     unbinding.value = false
   }

@@ -30,48 +30,55 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Ban, Check, CircleAlert, History, LoaderCircle, MessageCircle } from '@lucide/vue'
 import { getLogs } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
+import { executionRecordListSchema, type ExecutionRecord } from '@/features/user/model'
 
 const router = useRouter()
 const platformStore = usePlatformStore()
-const records = ref([])
+const records = ref<ExecutionRecord[]>([])
 const loading = ref(true)
 
-function formatTime(value) {
+function formatTime(value: string | null | undefined): string {
   if (!value) return '-'
   return new Date(value).toLocaleString('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
   })
 }
 
-function statusText(status) {
-  return { success: '已完成', failed: '未完成', cancelled: '已停止' }[status] || '已结束'
+function statusText(status: string): string {
+  const labels: Record<string, string> = { success: '已完成', failed: '未完成', cancelled: '已停止' }
+  return labels[status] || '已结束'
 }
 
-function statusClass(status) {
-  return { success: 'success', failed: 'failed', cancelled: 'cancelled' }[status] || 'cancelled'
+function statusClass(status: string): string {
+  const classes: Record<string, string> = { success: 'success', failed: 'failed', cancelled: 'cancelled' }
+  return classes[status] || 'cancelled'
 }
 
-function statusIcon(status) {
+function statusIcon(status: string) {
   return status === 'success' ? Check : status === 'failed' ? CircleAlert : Ban
 }
 
-function detailOf(record) {
-  try { return JSON.parse(record.detail || '{}') } catch { return {} }
+function detailOf(record: ExecutionRecord): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(record.detail || '{}')
+    if (typeof parsed !== 'object' || parsed === null) return {}
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+  } catch { return {} }
 }
 
-function useAgain(record) {
+function useAgain(record: ExecutionRecord) {
   const detail = detailOf(record)
   router.push({ path: '/user/tools', query: detail.tool_id ? { tool: detail.tool_id } : {} })
 }
 
-function contactSupport(record) {
+function contactSupport(record: ExecutionRecord) {
   const detail = detailOf(record)
   localStorage.setItem('toolbox_support_context', JSON.stringify({
     run_id: detail.run_id,
@@ -86,7 +93,7 @@ function contactSupport(record) {
 async function loadRecords() {
   loading.value = true
   try {
-    records.value = await getLogs({ platform_key: platformStore.currentPlatform, limit: 100 })
+    records.value = executionRecordListSchema.parse(await getLogs({ platform_key: platformStore.currentPlatform, limit: 100 }))
   } catch (error) {
     showToast('使用记录加载失败', 'error')
   } finally {

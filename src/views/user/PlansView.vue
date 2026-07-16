@@ -34,47 +34,46 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Check, LockKeyhole, ShieldCheck } from '@lucide/vue'
 import { getPlans } from '@/utils/api'
 import { showToast } from '@/utils'
+import { customerPlanListSchema, readStoredLicense, type CustomerPlan } from '@/features/user/model'
 
 const route = useRoute() || { query: {} }
-const plans = ref([])
-const userInfo = computed(() => {
-  try { return JSON.parse(localStorage.getItem('toolbox_user') || '{}') } catch { return {} }
-})
+const plans = ref<CustomerPlan[]>([])
+const userInfo = computed(readStoredLicense)
 const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
 const currentPlanCode = computed(() => userInfo.value.plan_code || userInfo.value.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase() || '')
 
-function cleanPlanName(name = '') {
+function cleanPlanName(name = ''): string {
   return name.replace(/^Y\d+\s*/i, '') || name
 }
 
-function formatPrice(price) {
+function formatPrice(price: string | number): string | number {
   const value = Number(price || 0)
   return Number.isInteger(value) ? value : value.toFixed(2)
 }
 
-function isCurrent(plan) {
+function isCurrent(plan: CustomerPlan): boolean {
   return Boolean(currentPlanCode.value && plan.plan_code === currentPlanCode.value)
 }
 
-function benefitsOf(plan) {
+function benefitsOf(plan: CustomerPlan): string[] {
   if (Array.isArray(plan.benefits) && plan.benefits.length) return plan.benefits
   if (!plan.features) return ['基础工具权限']
   return String(plan.features).split(/[+\n]/).map(item => item.trim()).filter(Boolean)
 }
 
-function contactService(plan) {
+function contactService(plan: CustomerPlan) {
   showToast(`购买 ${cleanPlanName(plan.name)}：请联系客服 AmazonToolbox_Support`, 'info')
 }
 
 async function loadPlans() {
   try {
-    plans.value = (await getPlans()).filter(plan => plan.status === 'active')
+    plans.value = customerPlanListSchema.parse(await getPlans()).filter(plan => plan.status === 'active')
   } catch (error) {
     showToast('套餐加载失败', 'error')
   }
