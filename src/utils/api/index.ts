@@ -11,8 +11,8 @@ const CACHE_PATTERNS = [
   /\/api\/logs\/tools/,
 ]
 
-type QueryValue = string | number | boolean | null | undefined
-type QueryParams = Record<string, QueryValue>
+export type ApiQueryValue = string | number | boolean | null | undefined
+export type ApiQueryParams = Record<string, ApiQueryValue>
 type ApiBody = unknown
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body' | 'headers'> {
@@ -187,9 +187,9 @@ function invalidationPrefix(url: string): string {
 }
 
 export const api = {
-  async get<T = unknown>(url: string, params: QueryParams = {}, options: ApiGetOptions = {}): Promise<T> {
+  async get<T = unknown>(url: string, params: ApiQueryParams = {}, options: ApiGetOptions = {}): Promise<T> {
     const entries = Object.entries(params)
-      .filter((entry): entry is [string, Exclude<QueryValue, null | undefined>] => entry[1] !== null && entry[1] !== undefined)
+      .filter((entry): entry is [string, Exclude<ApiQueryValue, null | undefined>] => entry[1] !== null && entry[1] !== undefined)
       .map(([key, value]) => [key, String(value)] as [string, string])
     const queryString = new URLSearchParams(entries).toString()
     const fullUrl = queryString ? `${url}?${queryString}` : url
@@ -232,18 +232,18 @@ export const api = {
 }
 
 export { verifyAuthCode, adminLogin, checkAuthStatus, getCurrentUser } from './auth'
-export { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode } from './auth-codes.js'
-export { getPlans, getPlansAdmin } from './plans.js'
-export { getOrders, exportOrders, createOrder, updateOrder, refundOrder } from './orders.js'
-export { getUsers, updateUser } from './users.js'
-export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices.js'
-export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from './knowledge.js'
-export { createChatSession, getChatSession, sendChatMessage, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats, debugAIChat } from './ai-chat.js'
+export { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode } from './auth-codes'
+export { getPlans, getPlansAdmin } from './plans'
+export { getOrders, exportOrders, createOrder, updateOrder, refundOrder } from './orders'
+export { getUsers, updateUser } from './users'
+export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices'
+export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from './knowledge'
+export { createChatSession, getChatSession, sendChatMessage, resolveChatSession, transferChatToHuman, rateChatSession, getChatHistory, getAIChatConfig, updateAIChatConfig, getAdminChatSessions, getAdminChatSession, getAIChatStats, debugAIChat } from './ai-chat'
 export { getAnnouncements, getActiveAnnouncements, getAnnouncementFeed, markAnnouncementRead, dismissAnnouncement, createAnnouncement, updateAnnouncement, deleteAnnouncement } from './announcements'
 export { getTools, getToolCategories, updateTools, updateToolCategories, createToolLaunchGrant } from './tools'
-export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases.js'
-export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback.js'
-export { getLogs, exportLogs, getLogTools, createLog } from './logs.js'
-export { getDashboard, getDashboardCharts, getProfit, getProfitSummary } from './dashboard.js'
+export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases'
+export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback'
+export { getLogs, exportLogs, getLogTools, createLog } from './logs'
+export { getDashboard, getDashboardCharts, getProfit, getProfitSummary } from './dashboard'
 export { getBusinessBootstrap, getBusinessTools, getBusinessBatches, getBusinessBatch, createBusinessBatch, updateBusinessBatch, updateBusinessBatchItem, finishBusinessBatch, getAdminActionCenter, getAdminBusinessBatch } from './business'
-export { getSettings, updateSetting } from './settings.js'
+export { getSettings, updateSetting } from './settings'

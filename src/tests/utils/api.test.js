@@ -2,7 +2,7 @@
  * API 工具函数单元测试
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getAuthCodes, getOrders, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit } from '@/utils/api'
+import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getAuthCodes, updateAuthCode, deleteAuthCode, getOrders, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit } from '@/utils/api'
 
 // Mock fetch
 global.fetch = vi.fn()
@@ -209,6 +209,16 @@ describe('API Utils', () => {
         expect.stringContaining('/api/auth-codes'),
         expect.objectContaining({ method: 'GET' })
       )
+    })
+
+    it('授权码更新和删除应把真实 ID 放进请求路径', async () => {
+      await updateAuthCode(42, { note: 'updated' })
+      expect(global.fetch.mock.calls[0][0]).toContain('/api/auth-codes/42')
+
+      vi.clearAllMocks()
+      global.fetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
+      await deleteAuthCode('CODE-9')
+      expect(global.fetch.mock.calls[0][0]).toContain('/api/auth-codes/CODE-9')
     })
 
     it('getOrders 应该调用正确的接口', async () => {
