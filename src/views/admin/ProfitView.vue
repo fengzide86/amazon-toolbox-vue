@@ -57,15 +57,28 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { getProfitSummary, getSettings } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { Setting } from '@element-plus/icons-vue'
+import { adminSettingsSchema, profitSummarySchema } from '@/features/admin/model'
 
-const summary = ref({})
-const profitRatios = ref({
+type ProfitKey = 'tech' | 'market' | 'product' | 'service' | 'coordination' | 'record'
+type ProfitAmountKey = 'total_tech' | 'total_market' | 'total_product' | 'total_service' | 'total_coordination' | 'total_record'
+interface ProfitItem {
+  key: ProfitKey
+  label: string
+  icon: string
+  amountKey: ProfitAmountKey
+  color: string
+  bgColor: string
+  barColor: string
+}
+
+const summary = ref(profitSummarySchema.parse({}))
+const profitRatios = ref<Record<ProfitKey, number>>({
   tech: 30,
   market: 25,
   product: 15,
@@ -76,7 +89,7 @@ const profitRatios = ref({
 
 const platformStore = usePlatformStore()
 
-const profitItems = computed(() => [
+const profitItems = computed<ProfitItem[]>(() => [
   { key: 'tech', label: '技术', icon: '🔧', amountKey: 'total_tech', color: '#6366F1', bgColor: 'rgba(99,102,241,0.1)', barColor: '#6366F1' },
   { key: 'market', label: '市场', icon: '📢', amountKey: 'total_market', color: '#10B981', bgColor: 'rgba(16,185,129,0.1)', barColor: '#10B981' },
   { key: 'product', label: '产品', icon: '📦', amountKey: 'total_product', color: '#F59E0B', bgColor: 'rgba(245,158,11,0.1)', barColor: '#F59E0B' },
@@ -93,13 +106,18 @@ async function loadData() {
       getProfitSummary(params),
       getSettings()
     ])
-    summary.value = summaryRes
+    summary.value = profitSummarySchema.parse(summaryRes)
     
-    const profitSetting = settingsRes.find(s => s.key === 'profit_ratios')
+    const settings = adminSettingsSchema.parse(settingsRes)
+    const profitSetting = settings.find((setting) => setting.key === 'profit_ratios')
     if (profitSetting && profitSetting.value) {
       try {
-        const ratios = JSON.parse(profitSetting.value)
-        profitRatios.value = { ...profitRatios.value, ...ratios }
+        const ratios = JSON.parse(profitSetting.value) as unknown
+        const ratioUpdate = Object.fromEntries(
+          Object.entries(typeof ratios === 'object' && ratios !== null ? ratios : {})
+            .filter(([key, value]) => key in profitRatios.value && typeof value === 'number' && Number.isFinite(value)),
+        ) as Partial<Record<ProfitKey, number>>
+        profitRatios.value = { ...profitRatios.value, ...ratioUpdate }
       } catch (e) {
         // 使用默认值
       }

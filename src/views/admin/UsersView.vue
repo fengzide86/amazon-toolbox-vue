@@ -23,7 +23,7 @@
           <template #default="{ row }">
             <el-input 
               v-if="!isCompact && editingUser?.id === row.id"
-              v-model="editingUser.name" 
+              v-model="editingUser!.name"
               size="small"
               style="width: 120px;"
             />
@@ -34,7 +34,7 @@
           <template #default="{ row }">
             <el-input 
               v-if="editingUser?.id === row.id" 
-              v-model="editingUser.phone" 
+              v-model="editingUser!.phone"
               size="small"
               style="width: 120px;"
             />
@@ -51,7 +51,7 @@
           <template #default="{ row }">
             <el-input-number 
               v-if="editingUser?.id === row.id" 
-              v-model="editingUser.total_seats" 
+              v-model="editingUser!.total_seats"
               size="small"
               :min="1"
               style="width: 80px;"
@@ -63,7 +63,7 @@
           <template #default="{ row }">
             <el-input-number 
               v-if="editingUser?.id === row.id" 
-              v-model="editingUser.extra_devices" 
+              v-model="editingUser!.extra_devices"
               size="small"
               :min="0"
               style="width: 80px;"
@@ -115,7 +115,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getUsers, updateUser } from '@/utils/api'
 import { showToast } from '@/utils'
@@ -124,14 +124,15 @@ import DataToolbar from '@/components/DataToolbar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
 import { useCompactLayout } from '@/composables/useCompactLayout'
+import { adminUserSchema, adminUsersSchema, type AdminUser } from '@/features/admin/model'
 
-const users = ref([])
+const users = ref<AdminUser[]>([])
 const searchText = ref('')
-const editingUser = ref(null)
+const editingUser = ref<AdminUser | null>(null)
 const isCompact = useCompactLayout()
 const showUserDrawer = ref(false)
 const drawerEditing = ref(false)
-const detailUser = ref(null)
+const detailUser = ref<AdminUser | null>(null)
 
 const filteredUsers = computed(() => {
   if (!searchText.value) return users.value
@@ -144,19 +145,21 @@ const filteredUsers = computed(() => {
   )
 })
 
-function formatTime(timeStr) {
+function formatTime(timeStr?: string | null) {
   if (!timeStr) return '-'
   const d = new Date(timeStr)
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
 
-function startEdit(user) {
-  editingUser.value = { ...user }
+function startEdit(user: unknown) {
+  editingUser.value = { ...adminUserSchema.parse(user) }
 }
 
-async function saveUser(user) {
+async function saveUser(user: unknown) {
+  if (!editingUser.value) return
+  const selectedUser = adminUserSchema.parse(user)
   try {
-    await updateUser(user.id, {
+    await updateUser(selectedUser.id, {
       name: editingUser.value.name,
       phone: editingUser.value.phone,
       total_seats: editingUser.value.total_seats,
@@ -170,8 +173,8 @@ async function saveUser(user) {
   }
 }
 
-function openUserDrawer(user, editing) {
-  detailUser.value = { ...user }
+function openUserDrawer(user: unknown, editing: boolean) {
+  detailUser.value = { ...adminUserSchema.parse(user) }
   drawerEditing.value = editing
   showUserDrawer.value = true
 }
@@ -195,7 +198,7 @@ async function saveDrawerUser() {
 
 async function loadData() {
   try {
-    users.value = (await getUsers() || []).filter(u => u !== null)
+    users.value = adminUsersSchema.parse((await getUsers()) || [])
   } catch (err) {
     showToast('数据加载失败', 'error')
   }

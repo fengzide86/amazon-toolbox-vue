@@ -73,14 +73,14 @@
           <span class="detail-label">内容：</span>
           <div class="detail-text">{{ currentFeedback?.content || '无内容' }}</div>
         </div>
-        <div class="detail-row" v-if="currentFeedback?.screenshots">
+        <div class="detail-row" v-if="currentFeedback && feedbackScreenshots(currentFeedback)">
           <span class="detail-label">截图：</span>
           <div class="screenshot-list">
             <el-image
-              v-for="(url, index) in parseScreenshots(currentFeedback.screenshots)"
+              v-for="(url, index) in parseScreenshots(feedbackScreenshots(currentFeedback))"
               :key="index"
               :src="url"
-              :preview-src-list="parseScreenshots(currentFeedback.screenshots)"
+              :preview-src-list="parseScreenshots(feedbackScreenshots(currentFeedback))"
               :initial-index="index"
               fit="cover"
               class="screenshot-img"
@@ -134,7 +134,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { getFeedbacks, updateFeedback, API_BASE } from '@/utils/api'
 import { showToast } from '@/utils'
@@ -143,15 +143,21 @@ import { usePlatformStore } from '@/stores/platform'
 import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import {
+  adminFeedbacksSchema,
+  adminFeedbackSchema,
+  type AdminFeedback,
+  type FeedbackStatus,
+} from '@/features/admin/model'
 
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
-const feedbacks = ref([])
+const feedbacks = ref<AdminFeedback[]>([])
 const filterStatus = ref('')
 const showDetailModal = ref(false)
 const showReplyModal = ref(false)
-const currentFeedback = ref(null)
-const replyStatus = ref('processing')
+const currentFeedback = ref<AdminFeedback | null>(null)
+const replyStatus = ref<FeedbackStatus>('processing')
 const replyContent = ref('')
 const isSubmitting = ref(false)
 
@@ -160,35 +166,37 @@ const filteredFeedbacks = computed(() => {
   return feedbacks.value.filter(f => f.status === filterStatus.value)
 })
 
-function getStatusType(status) {
-  const map = { pending: 'warning', processing: 'info', resolved: 'success' }
-  return map[status] || 'warning'
+function getStatusType(status?: string | null): 'warning' | 'info' | 'success' {
+  const map: Record<string, 'warning' | 'info' | 'success'> = { pending: 'warning', processing: 'info', resolved: 'success' }
+  return status ? map[status] || 'warning' : 'warning'
 }
 
-function getStatusText(status) {
-  const map = { pending: '待处理', processing: '处理中', resolved: '已解决' }
-  return map[status] || status
+function getStatusText(status?: string | null) {
+  const map: Record<string, string> = { pending: '待处理', processing: '处理中', resolved: '已解决' }
+  return status ? map[status] || status : '-'
 }
 
-function formatTime(timeStr) {
+function formatTime(timeStr?: string | null) {
   if (!timeStr) return '-'
   const d = new Date(timeStr)
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
 }
 
-function viewDetail(fb) {
-  currentFeedback.value = fb
+function viewDetail(fb: unknown) {
+  currentFeedback.value = adminFeedbackSchema.parse(fb)
   showDetailModal.value = true
 }
 
-function openReply(fb) {
-  currentFeedback.value = fb
-  replyStatus.value = fb.status === 'pending' ? 'processing' : fb.status
-  replyContent.value = fb.admin_reply || ''
+function openReply(fb: unknown) {
+  const feedback = adminFeedbackSchema.parse(fb)
+  currentFeedback.value = feedback
+  replyStatus.value = feedback.status === 'pending' ? 'processing' : feedback.status
+  replyContent.value = feedback.admin_reply || ''
   showReplyModal.value = true
 }
 
 async function submitReply() {
+  if (!currentFeedback.value) return
   if (!replyContent.value.trim() && replyStatus.value === 'resolved') {
     showToast('请输入回复内容', 'error')
     return
@@ -209,11 +217,18 @@ async function submitReply() {
   }
 }
 
-function parseScreenshots(screenshotsStr) {
+function feedbackScreenshots(feedback: AdminFeedback): string | string[] | null | undefined {
+  return feedback.screenshots ?? feedback.screenshot
+}
+
+function parseScreenshots(screenshotsStr: string | string[] | null | undefined): string[] {
   if (!screenshotsStr) return []
   try {
-    const urls = typeof screenshotsStr === 'string' ? JSON.parse(screenshotsStr) : screenshotsStr
-    return urls.map(url => url.startsWith('http') ? url : `${API_BASE}${url}`)
+    const candidate: unknown = typeof screenshotsStr === 'string' ? JSON.parse(screenshotsStr) : screenshotsStr
+    if (!Array.isArray(candidate)) return []
+    return candidate
+      .filter((url): url is string => typeof url === 'string')
+      .map((url) => url.startsWith('http') ? url : `${API_BASE}${url}`)
   } catch {
     return []
   }
@@ -222,7 +237,7 @@ function parseScreenshots(screenshotsStr) {
 async function loadData() {
   try {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
-    feedbacks.value = await getFeedbacks({ platform_key: platformKey })
+    feedbacks.value = adminFeedbacksSchema.parse(await getFeedbacks({ platform_key: platformKey }))
   } catch (err) {
     showToast('数据加载失败', 'error')
   }

@@ -82,18 +82,31 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { CheckCircle2, ChevronRight, KeyRound, LoaderCircle, MessageSquareText, MonitorSmartphone, RefreshCw, ShieldAlert, ShieldCheck, TicketCheck, TimerReset, UserRoundCheck, WifiOff } from '@lucide/vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { getAdminActionCenter, getAdminBusinessBatch } from '@/utils/api'
 import { showToast } from '@/utils'
+import {
+  adminActionCenterSchema,
+  adminBatchDetailSchema,
+  type AdminActionCenter,
+  type AdminBatchDetail,
+} from '@/features/admin/model'
 
-const data = ref({ summary: {} })
+const data = ref<AdminActionCenter>(adminActionCenterSchema.parse({
+  summary: {},
+  expiring_authorizations: [],
+  device_anomalies: [],
+  pending_tickets: [],
+  waiting_interventions: [],
+  stale_batches: [],
+}))
 const loading = ref(false)
 const batchLoading = ref(false)
 const batchDrawerVisible = ref(false)
-const batchDetail = ref(null)
+const batchDetail = ref<AdminBatchDetail | null>(null)
 
 const summaryCards = computed(() => [
   { key: 'expiring_authorizations', label: '即将到期授权', value: data.value.summary?.expiring_authorizations || 0, hint: '7 天内需要跟进', icon: TimerReset, tone: 'premium' },
@@ -104,23 +117,23 @@ const summaryCards = computed(() => [
 
 async function loadData() {
   loading.value = true
-  try { data.value = await getAdminActionCenter() }
+  try { data.value = adminActionCenterSchema.parse(await getAdminActionCenter()) }
   catch { showToast('行动中心加载失败，请稍后重试', 'error') }
   finally { loading.value = false }
 }
 
-async function openBatch(batchId) {
+async function openBatch(batchId: string | number) {
   batchDrawerVisible.value = true
   batchLoading.value = true
   batchDetail.value = null
-  try { batchDetail.value = await getAdminBusinessBatch(batchId) }
+  try { batchDetail.value = adminBatchDetailSchema.parse(await getAdminBusinessBatch(batchId)) }
   catch { showToast('批次详情读取失败', 'error') }
   finally { batchLoading.value = false }
 }
 
-function scrollToSection(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
-function formatDate(value) { return value ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(value)) : '-' }
-function formatRelative(value) {
+function scrollToSection(id: string) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+function formatDate(value?: string | null) { return value ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(new Date(value)) : '-' }
+function formatRelative(value?: string | null) {
   if (!value) return '-'
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
   if (minutes < 1) return '刚刚'
@@ -128,9 +141,18 @@ function formatRelative(value) {
   if (minutes < 1440) return `${Math.floor(minutes / 60)} 小时前`
   return formatDate(value)
 }
-function interventionText(type) { return ({ login: '需要登录', captcha: '需要验证码', two_factor: '需要二次验证', page_confirmation: '需要页面确认', other: '需要操作' }[type] || '查看状态') }
-function priorityText(value) { return ({ high: '高优先级', medium: '普通', low: '低优先级' }[value] || '普通') }
-function batchStatusText(status) { return ({ running: '正在处理', completed: '已完成', cancelled: '已结束', interrupted: '连接中断', waiting_user: '需要操作', failed: '未完成', pending: '等待处理' }[status] || status) }
+function interventionText(type?: string | null) {
+  const labels: Record<string, string> = { login: '需要登录', captcha: '需要验证码', two_factor: '需要二次验证', page_confirmation: '需要页面确认', other: '需要操作' }
+  return type ? labels[type] || '查看状态' : '查看状态'
+}
+function priorityText(value?: string | null) {
+  const labels: Record<string, string> = { high: '高优先级', medium: '普通', low: '低优先级' }
+  return value ? labels[value] || '普通' : '普通'
+}
+function batchStatusText(status: string) {
+  const labels: Record<string, string> = { running: '正在处理', completed: '已完成', cancelled: '已结束', interrupted: '连接中断', waiting_user: '需要操作', failed: '未完成', pending: '等待处理' }
+  return labels[status] || status
+}
 onMounted(loadData)
 </script>
 
