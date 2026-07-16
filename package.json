@@ -23,11 +23,11 @@
     "test:e2e": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test",
     "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.ts",
     "test:embedded-browser": "electron scripts/embedded-browser-smoke.cjs",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"tests/**/*.ts\" \"*.config.ts\"",
     "security:audit": "python scripts/audit_secrets.py",
     "security:audit-history": "python scripts/audit_secrets.py --history",
-    "build:verify": "npm run build && node scripts/verify-build.js"
+    "build:verify": "npm run build && tsx scripts/verify-build.ts"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",

@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const FRONTEND_URL = 'http://localhost:3000'
 const ADMIN_STATE_FILE = join(__dirname, '..', '..', 'test-results', 'admin-state.json')
 
-export default async function globalSetup() {
+export default async function globalSetup(): Promise<void> {
   // Ensure directory exists
   mkdirSync(join(__dirname, '..', '..', 'test-results'), { recursive: true })
 

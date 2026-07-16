@@ -1,13 +1,14 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
+import type { UpdateSnapshot, UpdateStatus } from '../../src/shared/ipc/update-contract'
 
 const FRONTEND_URL = 'http://localhost:3000'
 
 // E2E 专用测试授权码
 const TEST_E2E_AMZ = 'TEST-E2E-AMZ'
-let cachedAdminSession = null
+let cachedAdminSession: Record<string, string> | null = null
 
 // Helper: clear auth state
-async function clearAuth(page) {
+async function clearAuth(page: Page): Promise<void> {
   await page.goto(`${FRONTEND_URL}/#/user/login`)
   await page.waitForLoadState('networkidle')
   await page.evaluate(() => {
@@ -17,7 +18,7 @@ async function clearAuth(page) {
 }
 
 // Helper: login as user with auth code
-async function loginUser(page, authCode) {
+async function loginUser(page: Page, authCode: string): Promise<void> {
   await page.goto(`${FRONTEND_URL}/#/user/login`)
   await page.waitForLoadState('networkidle')
 
@@ -41,7 +42,7 @@ async function loginUser(page, authCode) {
   await expect(page.getByTestId('user-content')).toBeVisible({ timeout: 10000 })
 }
 
-async function loginAdmin(page) {
+async function loginAdmin(page: Page): Promise<void> {
   await page.goto(`${FRONTEND_URL}/#/admin/login`)
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear() })
   if (cachedAdminSession) {
@@ -62,36 +63,37 @@ async function loginAdmin(page) {
   expect((await responsePromise).status()).toBe(200)
   await expect(page.locator('.studio-admin-sidebar')).toBeVisible({ timeout: 15000 })
   cachedAdminSession = await page.evaluate(() => Object.fromEntries(
-    Array.from({ length: sessionStorage.length }, (_, index) => {
+    Array.from({ length: sessionStorage.length }, (_, index): [string, string] | null => {
       const key = sessionStorage.key(index)
-      return [key, sessionStorage.getItem(key)]
-    })
+      return key ? [key, sessionStorage.getItem(key) || ''] : null
+    }).filter((entry): entry is [string, string] => entry !== null)
   ))
 }
 
-async function distinctRowCounts(locator) {
+async function distinctRowCounts(locator: Locator): Promise<number[]> {
   const tops = await locator.evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().top)))
   return [...new Set(tops)].map(top => tops.filter(value => value === top).length)
 }
 
-async function expectNoPageOverflow(page) {
+async function expectNoPageOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)
 }
 
-async function installAvailableUpdateBridge(page) {
+async function installAvailableUpdateBridge(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const snapshot = {
+    const snapshot: UpdateSnapshot = {
       status: 'available', currentVersion: '1.7.2', availableVersion: '1.8.0',
       releaseNotes: ['提升界面可读性'], downloadBytes: 52_428_800, canRestart: false,
     }
+    const withStatus = (status: UpdateStatus, percent?: number): UpdateSnapshot => ({ ...snapshot, status, percent })
     window.electronAPI = {
       ...(window.electronAPI || {}),
       updates: {
         getState: async () => snapshot,
         check: async () => snapshot,
-        startDownload: async () => ({ ...snapshot, status: 'downloading', percent: 0 }),
-        cancelDownload: async () => ({ ...snapshot, status: 'cancelled' }),
+        startDownload: async () => withStatus('downloading', 0),
+        cancelDownload: async () => withStatus('cancelled'),
         install: async () => snapshot,
         defer: async () => snapshot,
         onState: () => () => {},
@@ -120,6 +122,7 @@ test.describe('视觉回归测试 - 用户端', () => {
     // 检查图标有正确的尺寸
     const firstIcon = sidebar.locator('svg').first()
     const box = await firstIcon.boundingBox()
+    if (!box) throw new Error('Sidebar icon has no bounding box')
     expect(box.width).toBeGreaterThan(10)
     expect(box.height).toBeGreaterThan(10)
   })
@@ -209,6 +212,7 @@ test.describe('视觉回归测试 - 登录响应式', () => {
 
     const brandBox = await page.locator('.login-brand').boundingBox()
     const formBox = await page.locator('.login-form-section').boundingBox()
+    if (!brandBox || !formBox) throw new Error('Login layout is not visible')
     expect(Math.abs(brandBox.y - formBox.y)).toBeLessThanOrEqual(1)
     expect(formBox.x).toBeGreaterThan(brandBox.x + brandBox.width - 2)
     expect(await distinctRowCounts(page.locator('.feature-tag'))).toEqual([6])

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => console.error(`[pageerror] ${error.message}`))
@@ -17,7 +17,7 @@ const batchTool = {
   batch_input_schema: [{ key: 'account_label', label: '客户简称', type: 'text', required: true }],
 }
 
-async function mockControlPlane(page, role = 'business') {
+async function mockControlPlane(page: Page, role: 'business' | 'consumer' | 'admin' = 'business'): Promise<void> {
   const user = role === 'business' ? businessUser : { role: 'user', product_type: 'consumer', business_workspace_enabled: false, plan_name: '普通版', entitlements: {} }
   await page.addInitScript(({ user, role }) => {
     sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'visual-token' }))
@@ -27,7 +27,7 @@ async function mockControlPlane(page, role = 'business') {
   }, { user, role })
   await page.route(/^http:\/\/(localhost|127\.0\.0\.1):8000\/api\//, async route => {
     const url = route.request().url()
-    let data = []
+    let data: unknown = []
     if (url.includes('/api/business/bootstrap')) data = { ...businessUser, tools: [batchTool] }
     else if (url.includes('/api/business/batches')) data = []
     else if (url.includes('/api/auth/me')) data = role === 'admin' ? { role: 'admin' } : user
@@ -42,7 +42,7 @@ async function mockControlPlane(page, role = 'business') {
   })
 }
 
-async function expectNoOverflow(page) {
+async function expectNoOverflow(page: Page): Promise<void> {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1)
 }
 

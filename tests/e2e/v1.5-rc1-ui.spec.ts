@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -11,7 +11,7 @@ const TEST_E2E_AMZ = 'TEST-E2E-AMZ'
 const TEST_E2E_AE = 'TEST-E2E-AE'
 
 // Helper: clear auth state
-async function clearAuth(page) {
+async function clearAuth(page: Page): Promise<void> {
   await page.goto(`${FRONTEND_URL}/#/user/login`)
   await page.waitForLoadState('networkidle')
   await page.evaluate(() => {
@@ -20,7 +20,7 @@ async function clearAuth(page) {
 }
 
 // Helper: login as user with auth code
-async function loginUser(page, authCode) {
+async function loginUser(page: Page, authCode: string): Promise<void> {
   await page.goto(`${FRONTEND_URL}/#/user/login`)
   await page.waitForLoadState('networkidle')
 

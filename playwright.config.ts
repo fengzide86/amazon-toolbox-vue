@@ -8,7 +8,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60000,
   retries: 0,
-  globalSetup: join(__dirname, 'tests', 'e2e', 'global-setup.js'),
+  globalSetup: join(__dirname, 'tests', 'e2e', 'global-setup.ts'),
   use: {
     baseURL: 'http://localhost:3000',
     headless: true,
