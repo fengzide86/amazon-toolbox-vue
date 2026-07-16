@@ -55,7 +55,12 @@ function configureRuntimeRoot() {
 }
 
 const RUNTIME_ROOT = configureRuntimeRoot();
-const backendManager = new BackendProcessManager({ runtimeRoot: RUNTIME_ROOT, resourcesPath: () => process.resourcesPath });
+const backendManager = new BackendProcessManager({
+  runtimeRoot: RUNTIME_ROOT,
+  resourcesPath: () => app.isPackaged
+    ? process.resourcesPath
+    : path.join(app.getAppPath(), 'electron'),
+});
 const credentialManager = new CredentialManager({ ipcMain, getWindow: () => mainWindow });
 const notificationManager = new NotificationManager({
   getWindow: () => mainWindow,
@@ -392,9 +397,17 @@ app.whenReady().then(async () => {
     || !require('fs').existsSync(path.join(__dirname, '../../dist'));
 
   // 仅兼容期的 localhost 配置启动旧 Python 后端；远程控制面模式不再携带服务端进程。
-  if (!isDev && USE_BUNDLED_BACKEND) {
+  if (USE_BUNDLED_BACKEND) {
     // 等待后端就绪再加载窗口，避免前端请求全部 ERR_CONNECTION_REFUSED
-    await backendManager.ensure();
+    const backendReady = await backendManager.ensure();
+    if (!backendReady) {
+      dialog.showErrorBox(
+        '后端启动失败',
+        `无法连接本地服务 ${CONTROL_API_BASE}。请查看 ${path.join(RUNTIME_ROOT, 'logs', 'backend-error.log')}。`,
+      );
+      app.quit();
+      return;
+    }
   } else {
     console.log('[Backend] 跳过内嵌后端，控制面:', CONTROL_API_BASE);
   }
