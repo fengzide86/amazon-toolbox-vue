@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { verifyAuthCode } from './api/auth'
-import { getDeviceId, getDeviceName } from './index.js'
+import { getDeviceId, getDeviceName } from './index'
 import { loadRememberedUserCode, clearRememberedUserCode } from './credentialStore'
 import { useUserStore } from '@/stores/user'
 import { authenticatedUserSchema } from '@/features/auth/model'

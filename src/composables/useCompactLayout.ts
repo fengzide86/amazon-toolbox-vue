@@ -2,9 +2,9 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 export function useCompactLayout(query = '(max-width: 1024px)') {
   const isCompact = ref(false)
-  let mediaQuery = null
+  let mediaQuery: MediaQueryList | null = null
 
-  function update(event) {
+  function update(event?: MediaQueryListEvent | MediaQueryList) {
     isCompact.value = Boolean(event?.matches ?? mediaQuery?.matches)
   }
 
