@@ -113,6 +113,7 @@
       "node_modules/playwright-core/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
         "nsis"
