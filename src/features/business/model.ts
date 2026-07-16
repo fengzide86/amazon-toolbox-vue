@@ -26,7 +26,14 @@ export type BusinessBootstrap = z.infer<typeof businessBootstrapSchema>
 export const importPreviewSchema = z.object({
   importId: z.string(),
   validCount: z.number().nonnegative(),
-  errors: z.array(z.unknown()).default([]),
+  rows: z.array(z.object({
+    itemId: z.string(),
+    preview: z.record(z.string(), z.unknown()),
+  }).passthrough()).default([]),
+  errors: z.array(z.object({
+    rowNumber: z.number().optional(),
+    message: z.string(),
+  }).passthrough()).default([]),
 }).passthrough()
 export type ImportPreview = z.infer<typeof importPreviewSchema>
 
@@ -73,6 +80,18 @@ export type BatchEvent = z.infer<typeof batchEventSchema>
 export const serverBatchSchema = z.object({
   id: z.union([z.string(), z.number()]),
 }).passthrough()
+
+export const serverBatchHistorySchema = z.object({
+  id: z.union([z.string(), z.number()]),
+  tool_name: z.string().default('批量工具'),
+  status: z.string().default('running'),
+  total_count: z.number().nonnegative().default(0),
+  waiting_count: z.number().nonnegative().default(0),
+  completed_count: z.number().nonnegative().default(0),
+  failed_count: z.number().nonnegative().default(0),
+  started_at: z.string().nullable().optional(),
+}).passthrough()
+export type ServerBatchHistory = z.infer<typeof serverBatchHistorySchema>
 
 export const launchGrantSchema = z.object({
   token: z.string(),

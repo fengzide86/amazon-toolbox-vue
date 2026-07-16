@@ -132,31 +132,75 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { Boxes, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3, FileSpreadsheet, Layers3, List, LoaderCircle, LockKeyhole, MonitorUp, PanelRight, Play, Plus, ShieldCheck, Square, Upload, X } from '@lucide/vue'
 import { showToast } from '@/utils'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
+import type { BatchItem } from '@/features/business/model'
 
-const store=useBusinessWorkspaceStore(); const queueOpen=ref(false); const actionOpen=ref(false); const registered=new Set()
-const isElectron=computed(()=>Boolean(window.electronAPI?.batch)); const processedCount=computed(()=>(store.snapshot.counts?.completed||0)+(store.snapshot.counts?.failed||0))
-const targetUrl=computed(()=>store.snapshot.tool?.target_url||store.snapshot.tool?.targetUrl||'https://sellercentral.amazon.com/')
-const displayUrl=computed(()=>{try{return new URL(targetUrl.value).host}catch{return targetUrl.value}})
-const syncText=computed(()=>({synced:'状态已同步',syncing:'正在同步',offline:'本地继续处理中'}[store.syncState]||''))
-const actionDescription=computed(()=>{const item=store.selectedItem;if(!item)return'';if(item.status==='waiting_user')return item.message||'请在左侧页面完成提示的操作';if(item.status==='running')return'脚本正在自动处理当前账号';if(item.status==='completed')return'这个账号已经处理完成';if(item.status==='failed')return item.message||'本次处理未完成，可以查看页面后重新发起';return'系统会在轮到该账号时自动开始'})
-const stageIndex=computed(()=>store.selectedItem?.status==='completed'?4:store.selectedItem?.status==='running'?1:store.selectedItem?.status==='waiting_user'?1:0)
-const partitionFor=id=>`batch-${String(store.snapshot.batchId||'draft').replace(/[^a-zA-Z0-9_-]/g,'_')}-${String(id).replace(/[^a-zA-Z0-9_-]/g,'_')}`
+interface EmbeddedWebviewElement extends HTMLElement {
+  getWebContentsId?: () => number
+}
 
-async function chooseFile(){try{await store.selectImportFile()}catch(e){showToast(e.message||'导入失败','error')}}
-async function exportErrors(){try{const result=await store.exportImportErrors();if(result)showToast('问题清单已导出','success')}catch(e){showToast(e.message||'导出失败','error')}}
-async function beginBatch(){try{await store.startBatch()}catch(e){showToast(e.message||'无法开始批次','error')}}
-async function registerBrowser(item,event){if(registered.has(item.itemId))return;const view=event.currentTarget;if(!view?.getWebContentsId)return;registered.add(item.itemId);try{await store.registerBrowser(item.itemId,view.getWebContentsId())}catch(e){registered.delete(item.itemId);showToast(e.message||'浏览器准备失败','error')}}
-async function completeAction(){try{await store.completeUserAction(store.selectedItemId);actionOpen.value=false}catch(e){showToast(e.message||'无法继续','error')}}
-async function restartItem(){try{registered.delete(store.selectedItemId);await store.restartItem(store.selectedItemId)}catch(e){showToast(e.message||'无法重新发起','error')}}
-async function endBatch(){try{await ElMessageBox.confirm('结束后会关闭所有客户浏览器并清理本机导入数据，不能从通用检查点继续。','结束当前批次？',{confirmButtonText:'结束批次',cancelButtonText:'继续使用',type:'warning'});await store.cancelBatch('cancelled')}catch(e){if(e!=='cancel'&&e!=='close')showToast(e.message||'结束失败','error')}}
-async function newBatch(){try{registered.clear();await store.resetWorkspace()}catch(e){showToast(e.message||'暂时不能新建批次','error')}}
-onMounted(()=>store.init())
+const store = useBusinessWorkspaceStore()
+const queueOpen = ref(false)
+const actionOpen = ref(false)
+const registered = new Set<string>()
+const syncLabels: Record<string, string> = { synced: '状态已同步', syncing: '正在同步', offline: '本地继续处理中' }
+
+const errorMessage = (error: unknown, fallback: string): string => error instanceof Error && error.message ? error.message : fallback
+const isElectron = computed(() => Boolean(window.electronAPI?.batch))
+const processedCount = computed(() => (store.snapshot.counts.completed || 0) + (store.snapshot.counts.failed || 0))
+const targetUrl = computed(() => store.snapshot.tool?.target_url || store.snapshot.tool?.targetUrl || 'https://sellercentral.amazon.com/')
+const displayUrl = computed(() => { try { return new URL(targetUrl.value).host } catch { return targetUrl.value } })
+const syncText = computed(() => syncLabels[store.syncState] || '')
+const actionDescription = computed(() => {
+  const item = store.selectedItem
+  if (!item) return ''
+  if (item.status === 'waiting_user') return item.message || '请在左侧页面完成提示的操作'
+  if (item.status === 'running') return '脚本正在自动处理当前账号'
+  if (item.status === 'completed') return '这个账号已经处理完成'
+  if (item.status === 'failed') return item.message || '本次处理未完成，可以查看页面后重新发起'
+  return '系统会在轮到该账号时自动开始'
+})
+const stageIndex = computed<number>(() => store.selectedItem?.status === 'completed' ? 4 : store.selectedItem?.status === 'running' || store.selectedItem?.status === 'waiting_user' ? 1 : 0)
+const partitionFor = (id: string): string => `batch-${String(store.snapshot.batchId || 'draft').replace(/[^a-zA-Z0-9_-]/g, '_')}-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+
+async function chooseFile() { try { await store.selectImportFile() } catch (error) { showToast(errorMessage(error, '导入失败'), 'error') } }
+async function exportErrors() { try { const result = await store.exportImportErrors(); if (result) showToast('问题清单已导出', 'success') } catch (error) { showToast(errorMessage(error, '导出失败'), 'error') } }
+async function beginBatch() { try { await store.startBatch() } catch (error) { showToast(errorMessage(error, '无法开始批次'), 'error') } }
+async function registerBrowser(item: BatchItem, event: Event) {
+  if (registered.has(item.itemId)) return
+  const view = event.currentTarget as EmbeddedWebviewElement | null
+  if (!view?.getWebContentsId) return
+  registered.add(item.itemId)
+  try { await store.registerBrowser(item.itemId, view.getWebContentsId()) }
+  catch (error) { registered.delete(item.itemId); showToast(errorMessage(error, '浏览器准备失败'), 'error') }
+}
+async function completeAction() {
+  const itemId = store.selectedItemId
+  if (!itemId) return
+  try { await store.completeUserAction(itemId); actionOpen.value = false }
+  catch (error) { showToast(errorMessage(error, '无法继续'), 'error') }
+}
+async function restartItem() {
+  const itemId = store.selectedItemId
+  if (!itemId) return
+  try { registered.delete(itemId); await store.restartItem(itemId) }
+  catch (error) { showToast(errorMessage(error, '无法重新发起'), 'error') }
+}
+async function endBatch() {
+  try {
+    await ElMessageBox.confirm('结束后会关闭所有客户浏览器并清理本机导入数据，不能从通用检查点继续。', '结束当前批次？', { confirmButtonText: '结束批次', cancelButtonText: '继续使用', type: 'warning' })
+    await store.cancelBatch('cancelled')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') showToast(errorMessage(error, '结束失败'), 'error')
+  }
+}
+async function newBatch() { try { registered.clear(); await store.resetWorkspace() } catch (error) { showToast(errorMessage(error, '暂时不能新建批次'), 'error') } }
+onMounted(() => { void store.init() })
 </script>
 
 <style scoped>

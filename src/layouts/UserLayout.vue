@@ -14,7 +14,7 @@
           <router-view v-slot="{ Component }">
             <Suspense>
               <template #default><component :is="Component" /></template>
-              <template #fallback><LoadingSkeleton :type="route.meta?.skeleton || 'default'" /></template>
+              <template #fallback><LoadingSkeleton :type="skeletonType(route.meta?.skeleton)" /></template>
             </Suspense>
           </router-view>
         </main>
@@ -40,12 +40,13 @@
   </div>
 </template>
 
-<script setup>
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+<script setup lang="ts">
+import { nextTick, onMounted, onUnmounted, ref, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CircleAlert } from '@lucide/vue'
 import { Auth, getDeviceId } from '@/utils'
 import { authService } from '@/utils/auth'
+import { authenticatedUserSchema } from '@/features/auth/model'
 import { checkAuthStatus } from '@/utils/api'
 import { useAppStore } from '@/stores/app'
 import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
@@ -60,17 +61,24 @@ const route = useRoute()
 const showKickout = ref(false)
 const kickoutMessage = ref('')
 const showMobileSidebar = ref(false)
-const sidebarRef = ref(null)
-let pollTimer = null
-let initialTimer = null
-let removeAfterEach = null
-let removeNotification = null
+const sidebarRef = ref<ComponentPublicInstance | null>(null)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let initialTimer: ReturnType<typeof setTimeout> | null = null
+let removeAfterEach: (() => void) | null = null
+let removeNotification: (() => void) | null | undefined = null
+
+function skeletonType(value: unknown): 'default' | 'dashboard' | 'table' | 'grid' {
+  return value === 'dashboard' || value === 'table' || value === 'grid' ? value : 'default'
+}
 
 function toggleSidebar() {
   showMobileSidebar.value = !showMobileSidebar.value
   document.body.style.overflow = showMobileSidebar.value ? 'hidden' : ''
   if (showMobileSidebar.value) {
-    nextTick(() => sidebarRef.value?.$el?.querySelector('a, button')?.focus())
+    nextTick(() => {
+      const root = sidebarRef.value?.$el as HTMLElement | undefined
+      root?.querySelector<HTMLElement>('a, button')?.focus()
+    })
   }
 }
 
@@ -79,7 +87,7 @@ function closeSidebar() {
   document.body.style.overflow = ''
 }
 
-function handleKeydown(event) {
+function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && showMobileSidebar.value) closeSidebar()
 }
 
@@ -95,12 +103,15 @@ async function checkStatus() {
   if (!authCode || authCode === 'admin') return
   try {
     const response = await checkAuthStatus(authCode, getDeviceId())
-    if (!response.success) {
-      kickoutMessage.value = response.message || '授权已失效，请重新登录'
+    const result = typeof response === 'object' && response !== null
+      ? response as { success?: boolean; message?: string; data?: Record<string, unknown> }
+      : {}
+    if (!result.success) {
+      kickoutMessage.value = result.message || '授权已失效，请重新登录'
       showKickout.value = true
       stopPolling()
-    } else if (response.data) {
-      authService.setUser({ ...(authService.getUser() || {}), ...response.data })
+    } else if (result.data) {
+      authService.setUser(authenticatedUserSchema.parse({ ...(authService.getUser() || {}), ...result.data }))
     }
   } catch (error) {
     console.warn('Auth status check failed:', error)

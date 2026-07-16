@@ -48,11 +48,21 @@ export interface CredentialStoreBridge {
   clearUserCode(): Promise<boolean>
 }
 
+export interface NotificationFocusPayload {
+  mode?: 'single' | 'batch'
+  itemId?: string
+}
+
+export interface NotificationBridge {
+  onFocus(callback: (payload: NotificationFocusPayload) => void): () => void
+}
+
 export interface ToolboxElectronApi {
   runtime?: { controlApiBase?: string; deviceId?: string; deviceName?: string }
   updates?: UpdateBridge
   batch?: BatchBridge
   automation?: AutomationBridge
   credentialStore?: CredentialStoreBridge
+  notifications?: NotificationBridge
   [key: string]: unknown
 }

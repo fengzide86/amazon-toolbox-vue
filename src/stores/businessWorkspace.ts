@@ -20,11 +20,13 @@ import {
   launchGrantEnvelopeSchema,
   launchGrantSchema,
   serverBatchSchema,
+  serverBatchHistorySchema,
   type BatchEvent,
   type BusinessBatchSnapshot,
   type BusinessBootstrap,
   type BusinessTool,
   type ImportPreview,
+  type ServerBatchHistory,
 } from '@/features/business/model'
 
 const STATUS_MESSAGE: Record<string, string> = {
@@ -36,7 +38,7 @@ const STATUS_MESSAGE: Record<string, string> = {
   cancelled: '已结束',
 }
 
-const historySchema = z.array(z.record(z.string(), z.unknown()))
+const historySchema = z.array(serverBatchHistorySchema)
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -55,7 +57,7 @@ function requireBatchApi() {
 
 export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => {
   const bootstrap = ref<BusinessBootstrap | null>(null)
-  const history = ref<Array<Record<string, unknown>>>([])
+  const history = ref<ServerBatchHistory[]>([])
   const importPreview = ref<ImportPreview | null>(null)
   const selectedTool = ref<BusinessTool | null>(null)
   const snapshot = ref<BusinessBatchSnapshot>(emptyBatchSnapshot())
@@ -90,7 +92,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     return bootstrap.value
   }
 
-  async function loadHistory(): Promise<Array<Record<string, unknown>>> {
+  async function loadHistory(): Promise<ServerBatchHistory[]> {
     history.value = historySchema.parse(await getBusinessBatches({ limit: 30 }))
     return history.value
   }

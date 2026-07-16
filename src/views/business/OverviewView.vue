@@ -28,14 +28,19 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { BellRing, FileSpreadsheet, PanelsTopLeft, Plus, ShieldCheck } from '@lucide/vue'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 const store = useBusinessWorkspaceStore()
 const waitingCount = computed(() => store.snapshot.counts?.waiting || 0)
-const formatDate = value => value ? new Date(value).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-'
-const batchStatus = value => ({ running:'处理中', completed:'已完成', cancelled:'已结束', interrupted:'已中断' }[value] || value)
+const formatDate = (value: string | null | undefined): string => value
+  ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  : '-'
+const statusLabels: Record<string, string> = {
+  running: '处理中', completed: '已完成', cancelled: '已结束', interrupted: '已中断',
+}
+const batchStatus = (value: string): string => statusLabels[value] || value
 onMounted(() => store.loadHistory())
 </script>
 

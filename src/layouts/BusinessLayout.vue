@@ -15,7 +15,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
@@ -24,17 +24,18 @@ import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { getCurrentUser } from '@/utils/api'
 import { authService } from '@/utils/auth'
+import { authenticatedUserSchema } from '@/features/auth/model'
 
 const route = useRoute()
 const router = useRouter()
 const store = useBusinessWorkspaceStore()
 const showSidebar = ref(false)
-let removeAfterEach
-let removeNotification
-let accessTimer
+let removeAfterEach: (() => void) | undefined
+let removeNotification: (() => void) | undefined
+let accessTimer: ReturnType<typeof setInterval> | undefined
 
 async function refreshAccess() {
-  const user = await getCurrentUser()
+  const user = authenticatedUserSchema.parse(await getCurrentUser())
   authService.setUser(user)
   const allowed = user?.product_type === 'business'
     && user?.business_workspace_enabled === true
@@ -49,8 +50,10 @@ async function refreshAccess() {
 
 onMounted(async () => {
   try { await store.init() }
-  catch (error) {
-    if (error?.status === 403) await refreshAccess().catch(() => router.replace('/user/tools'))
+  catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'status' in error && error.status === 403) {
+      await refreshAccess().catch(() => router.replace('/user/tools'))
+    }
     else throw error
   }
   accessTimer = setInterval(() => refreshAccess().catch(() => {}), 30000)
@@ -61,7 +64,12 @@ onMounted(async () => {
     if (payload.itemId) store.selectItem(payload.itemId)
   })
 })
-onUnmounted(() => { clearInterval(accessTimer); removeAfterEach?.(); removeNotification?.(); store.dispose() })
+onUnmounted(() => {
+  if (accessTimer) clearInterval(accessTimer)
+  removeAfterEach?.()
+  removeNotification?.()
+  store.dispose()
+})
 </script>
 
 <style scoped>

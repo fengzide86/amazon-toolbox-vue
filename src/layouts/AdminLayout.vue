@@ -20,7 +20,7 @@
               <component :is="Component" />
             </template>
             <template #fallback>
-              <LoadingSkeleton :type="route.meta?.skeleton || 'default'" />
+              <LoadingSkeleton :type="skeletonType(route.meta?.skeleton)" />
             </template>
           </Suspense>
         </router-view>
@@ -29,7 +29,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlatformStore } from '@/stores/platform'
@@ -44,6 +44,10 @@ const route = useRoute()
 const platformStore = usePlatformStore()
 const showMobileSidebar = ref(false)
 const platformKey = ref(0)
+
+function skeletonType(value: unknown): 'default' | 'dashboard' | 'table' | 'grid' {
+  return value === 'dashboard' || value === 'table' || value === 'grid' ? value : 'default'
+}
 
 function toggleSidebar() {
   showMobileSidebar.value = !showMobileSidebar.value
