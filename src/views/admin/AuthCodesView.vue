@@ -955,7 +955,7 @@ onMounted(() => {
   .business-value-strip li { text-align: center; white-space: normal; }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 768px) {
   .card-header { display: grid; }
   .product-switch { width: 100%; }
   .generate-form { grid-template-columns: 1fr; }

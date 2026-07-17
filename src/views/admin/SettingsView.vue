@@ -493,7 +493,7 @@ const {
 <style scoped>
 .page-title {
   font-family: var(--font-family);
-  font-size: 1.5rem;
+  font-size: 26px;
   font-weight: 700;
   color: var(--color-text);
   margin-bottom: 1.5rem;
@@ -526,7 +526,7 @@ const {
   display: block;
   margin-top: 3px;
   color: var(--color-text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--type-meta);
   font-weight: 400;
 }
 
@@ -537,21 +537,21 @@ const {
 
 .tool-meta {
   margin-top: 0.2rem;
-  font-size: 0.75rem;
+  font-size: var(--type-meta);
   color: var(--color-text-secondary);
   word-break: break-all;
 }
 
 .tool-code {
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
-  font-size: 0.78rem;
+  font-size: var(--type-meta);
   color: var(--color-text);
   word-break: break-all;
 }
 
 .tool-url {
   margin-top: 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--type-meta);
   color: var(--color-primary);
   word-break: break-all;
 }
@@ -572,7 +572,7 @@ const {
   gap: 0.5rem;
   margin-top: 0.45rem;
   color: var(--color-text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--type-meta);
 }
 
 .capability-preview {
@@ -587,7 +587,7 @@ const {
   border-radius: 10px;
   color: var(--color-primary);
   background: var(--color-primary-soft);
-  font-size: 0.78rem;
+  font-size: var(--type-meta);
   line-height: 1.6;
 }
 
@@ -607,7 +607,7 @@ const {
 .tool-desc-admin {
   display: inline-block;
   color: var(--color-text-secondary);
-  font-size: 0.82rem;
+  font-size: var(--type-meta);
   line-height: 1.45;
 }
 

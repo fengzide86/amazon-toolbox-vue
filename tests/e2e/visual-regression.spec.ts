@@ -86,6 +86,7 @@ async function expectNoPageOverflow(page: Page): Promise<void> {
 async function installAvailableUpdateBridge(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const snapshot: UpdateSnapshot = {
+      supported: true,
       status: 'available', currentVersion: '1.7.2', availableVersion: '1.8.0',
       releaseNotes: ['提升界面可读性'], downloadBytes: 52_428_800, canRestart: false,
     }
