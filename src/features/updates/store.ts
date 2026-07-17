@@ -4,11 +4,13 @@ import { defineStore } from 'pinia'
 import { updateSnapshotSchema, type UpdateSnapshot } from '@/shared/ipc/update-contract'
 import { getVersionReleaseNotes } from './release-api'
 import { useOverlayCoordinatorStore } from '@/features/shell/overlay-store'
+import { showToast } from '@/utils'
 
 const PROMPT_KEY = 'toolbox_update_prompt_preferences'
 const DAY_MS = 24 * 60 * 60 * 1000
 
 const emptyState: UpdateSnapshot = {
+  supported: false,
   status: 'idle',
   currentVersion: '—',
   releaseNotes: [],
@@ -41,7 +43,7 @@ export const useUpdateStore = defineStore('application-updates', () => {
   const loadedReleaseNoteVersions = new Set<string>()
   let removeStateListener: (() => void) | undefined
 
-  const supported = computed(() => Boolean(window.electronAPI?.updates))
+  const supported = computed(() => Boolean(window.electronAPI?.updates && state.value.supported))
   const drawerOpen = computed(() => overlay.activeDrawer === 'updates')
   const displayPercent = computed(() => Math.round(state.value.percent ?? 0))
   const promptSuppressed = computed(() => {
@@ -53,7 +55,9 @@ export const useUpdateStore = defineStore('application-updates', () => {
     return Math.max(localUntil, mainUntil) > Date.now()
   })
   const shouldShowNotice = computed(() => state.value.status === 'available' && !promptSuppressed.value)
-  const showHeaderEntry = computed(() => supported.value && !['idle'].includes(state.value.status))
+  const showHeaderEntry = computed(() => supported.value && [
+    'available', 'downloading', 'downloaded', 'restart_deferred', 'cancelled', 'error',
+  ].includes(state.value.status))
   const shouldPromptRestart = computed(() => (
     state.value.status === 'downloaded'
     && state.value.canRestart
@@ -104,11 +108,15 @@ export const useUpdateStore = defineStore('application-updates', () => {
   }
 
   async function checkManually(): Promise<void> {
-    if (!window.electronAPI?.updates) return
+    if (!window.electronAPI?.updates || !supported.value) {
+      showToast('开发预览无需检查更新', 'info')
+      return
+    }
     localStorage.removeItem(PROMPT_KEY)
     installingDeferredForSession.value = false
-    applySnapshot(await window.electronAPI.updates.check())
     openDetails()
+    applySnapshot(await window.electronAPI.updates.check())
+    if (state.value.status === 'idle') showToast('当前已是最新版本', 'success')
   }
 
   async function startDownload(): Promise<void> {

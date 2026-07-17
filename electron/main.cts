@@ -490,7 +490,7 @@ app.whenReady().then(async () => {
   });
   // 创建窗口
   createWindow();
-  setTimeout(() => updateManager?.check(), 5000);
+  if (app.isPackaged) setTimeout(() => updateManager?.check(), 5000);
 });
 
 app.on('window-all-closed', () => {

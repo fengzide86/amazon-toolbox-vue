@@ -16,7 +16,11 @@
         </div>
         <p v-if="downloadSizeLabel" class="download-size">下载文件 {{ downloadSizeLabel }}</p>
 
-        <div v-if="store.state.status === 'downloading'" class="progress-block">
+        <div v-if="store.state.status === 'checking'" class="state-notice is-checking">
+          <LoaderCircle :size="18" class="is-spinning" />
+          <div><strong>正在检查新版本</strong><span>检查完成后这里会自动更新，不会遮挡其他页面。</span></div>
+        </div>
+        <div v-else-if="store.state.status === 'downloading'" class="progress-block">
           <div><span>正在后台下载</span><strong>{{ store.displayPercent }}%</strong></div>
           <div class="progress-track" role="progressbar" :aria-valuenow="store.displayPercent" aria-valuemin="0" aria-valuemax="100">
             <span :style="{ width: `${store.state.percent ?? 0}%` }" />
@@ -40,7 +44,10 @@
         </section>
 
         <footer>
-          <template v-if="store.state.status === 'available'">
+          <template v-if="store.state.status === 'checking'">
+            <button class="button secondary" type="button" @click="store.closeDetails">后台检查</button>
+          </template>
+          <template v-else-if="store.state.status === 'available'">
             <button class="button secondary" type="button" @click="store.deferDownload">稍后</button>
             <button class="button primary" type="button" @click="store.startDownload">下载更新</button>
           </template>
@@ -69,7 +76,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { Download, X } from '@lucide/vue'
+import { Download, LoaderCircle, X } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useUpdateStore } from './store'
 
@@ -122,4 +129,9 @@ async function confirmCancel(): Promise<void> {
 @media(prefers-reduced-motion:reduce){.update-drawer-enter-active,.update-drawer-leave-active,.update-drawer-enter-active .update-drawer,.update-drawer-leave-active .update-drawer,.progress-track span{transition:none}}
 .update-drawer-layer{background:transparent;pointer-events:none}.update-drawer{pointer-events:auto}
 .download-size{margin:-10px 0 18px;color:var(--color-text-secondary);font-size:var(--type-meta);text-align:right}
+.is-checking{grid-template-columns:auto 1fr;align-items:center;color:var(--color-primary);background:var(--color-primary-soft)}
+.is-checking>div{display:grid;gap:4px}
+.is-spinning{animation:update-drawer-spin 1s linear infinite}
+@keyframes update-drawer-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.is-spinning{animation:none}}
 </style>

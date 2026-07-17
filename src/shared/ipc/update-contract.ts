@@ -13,6 +13,7 @@ export const updateStatusSchema = z.enum([
 ])
 
 export const updateSnapshotSchema = z.object({
+  supported: z.boolean().default(true),
   status: updateStatusSchema,
   currentVersion: z.string().min(1),
   availableVersion: z.string().min(1).optional(),
@@ -25,6 +26,7 @@ export const updateSnapshotSchema = z.object({
   promptSuppressedUntil: z.string().optional(),
   errorCode: z.string().optional(),
   canRestart: z.boolean(),
+  lastCheckedAt: z.string().optional(),
 })
 
 export type UpdateStatus = z.infer<typeof updateStatusSchema>

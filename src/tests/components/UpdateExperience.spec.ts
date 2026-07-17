@@ -5,6 +5,7 @@ import { useUpdateStore } from '@/features/updates/store'
 import type { UpdateSnapshot } from '@/shared/ipc/update-contract'
 
 const available: UpdateSnapshot = {
+  supported: true,
   status: 'available',
   currentVersion: '1.7.2',
   availableVersion: '1.7.3',
@@ -78,5 +79,22 @@ describe('non-blocking update experience', () => {
     await store.initialize()
     store.dispose()
     expect(removeListener).toHaveBeenCalledOnce()
+  })
+
+  it('hides the update entry when the desktop runtime reports preview mode', async () => {
+    bridge.getState.mockResolvedValueOnce({
+      supported: false,
+      status: 'idle',
+      currentVersion: '1.7.6',
+      releaseNotes: [],
+      canRestart: false,
+    })
+    const store = useUpdateStore()
+
+    await store.initialize()
+
+    expect(store.supported).toBe(false)
+    expect(store.showHeaderEntry).toBe(false)
+    expect(bridge.check).not.toHaveBeenCalled()
   })
 })

@@ -16,6 +16,7 @@ type UpdateStatus =
   | 'error'
 
 interface UpdateSnapshot {
+  supported: boolean
   status: UpdateStatus
   currentVersion: string
   availableVersion?: string
@@ -28,11 +29,13 @@ interface UpdateSnapshot {
   promptSuppressedUntil?: string
   errorCode?: string
   canRestart: boolean
+  lastCheckedAt?: string
 }
 
 interface UpdateDeferRequest { phase?: 'download' | 'install' }
 interface UpdatePreferences { version?: string; promptSuppressedUntil?: string }
 const DAY_MS = 24 * 60 * 60 * 1000
+const CHECK_TIMEOUT_MS = 20000
 
 interface UpdateManagerOptions {
   ipcMain: IpcMain
@@ -64,6 +67,7 @@ function normalizeReleaseNotes(notes: UpdateInfo['releaseNotes']): string[] {
 }
 
 function errorCode(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string') return error.code
   if (error instanceof Error) return error.name || 'UPDATE_ERROR'
   return 'UPDATE_ERROR'
 }
@@ -80,6 +84,9 @@ export class UpdateManager {
   private manualCheckRequested = false
   private preferences: UpdatePreferences
   private cleanupStarted = false
+  private checkGeneration = 0
+  private activeCheckGeneration = 0
+  private acceptCheckEvents = false
   private snapshot: UpdateSnapshot
 
   constructor(options: UpdateManagerOptions) {
@@ -90,14 +97,17 @@ export class UpdateManager {
     this.updater = options.updater ?? autoUpdater
     this.preferences = this.readPreferences()
     this.snapshot = {
+      supported: app.isPackaged,
       status: 'idle',
       currentVersion: app.getVersion(),
       releaseNotes: [],
       canRestart: false,
     }
-    this.updater.autoDownload = false
-    this.updater.autoInstallOnAppQuit = true
-    this.bindUpdaterEvents()
+    if (this.snapshot.supported) {
+      this.updater.autoDownload = false
+      this.updater.autoInstallOnAppQuit = true
+      this.bindUpdaterEvents()
+    }
     this.registerIpc()
   }
 
@@ -106,23 +116,45 @@ export class UpdateManager {
   }
 
   async check(options: { manual?: boolean } = {}): Promise<UpdateSnapshot> {
+    if (!this.snapshot.supported) return this.getState()
     if (this.checking) return this.checking
     if (this.snapshot.status === 'downloading' || this.snapshot.status === 'installing') return this.getState()
 
     this.manualCheckRequested = Boolean(options.manual)
+    const generation = ++this.checkGeneration
+    this.activeCheckGeneration = generation
+    this.acceptCheckEvents = true
     if (options.manual) this.clearPromptSuppression()
     this.setState({ status: 'checking', errorCode: undefined })
-    this.checking = this.updater.checkForUpdates()
-      .then(() => this.getState())
-      .catch((error: unknown) => {
-        if (options.manual) this.setState({ status: 'error', errorCode: errorCode(error) })
-        else {
-          console.warn('[Update] Automatic update check failed:', error)
-          this.setState({ status: 'idle', errorCode: undefined })
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const checkPromise = this.updater.checkForUpdates()
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => reject(Object.assign(new Error('更新检查超时'), { code: 'UPDATE_CHECK_TIMEOUT' })), CHECK_TIMEOUT_MS)
+    })
+    this.checking = Promise.race([checkPromise, timeoutPromise])
+      .then(() => {
+        if (this.activeCheckGeneration !== generation) return this.getState()
+        if (this.snapshot.status === 'checking') {
+          this.setState({ status: 'idle', errorCode: undefined, lastCheckedAt: new Date().toISOString() })
         }
         return this.getState()
       })
-      .finally(() => { this.checking = null; this.manualCheckRequested = false })
+      .catch((error: unknown) => {
+        if (this.activeCheckGeneration !== generation) return this.getState()
+        this.acceptCheckEvents = false
+        if (options.manual) this.setState({ status: 'error', errorCode: errorCode(error) })
+        else {
+          console.warn('[Update] Automatic update check failed:', error)
+          this.setState({ status: 'idle', errorCode: undefined, lastCheckedAt: new Date().toISOString() })
+        }
+        return this.getState()
+      })
+      .finally(() => {
+        if (timeout) clearTimeout(timeout)
+        if (this.activeCheckGeneration === generation) this.activeCheckGeneration = 0
+        this.checking = null
+        this.manualCheckRequested = false
+      })
     return this.checking
   }
 
@@ -188,6 +220,7 @@ export class UpdateManager {
     }
     lifecycleUpdater.on('before-quit-for-update', () => this.prepareForInstall())
     this.updater.on('update-available', (info: UpdateInfo) => {
+      if (!this.acceptCheckEvents) return
       this.updateInfo = info
       const promptSuppressedUntil = this.suppressionFor(info.version)
       this.setState({
@@ -198,13 +231,16 @@ export class UpdateManager {
         downloadBytes: info.files.find(file => typeof file.size === 'number')?.size,
         promptSuppressedUntil,
         canRestart: false,
+        lastCheckedAt: new Date().toISOString(),
       })
     })
     this.updater.on('update-not-available', () => {
+      if (!this.acceptCheckEvents) return
       this.updateInfo = null
       this.setState({
         status: 'idle', availableVersion: undefined, releaseDate: undefined, releaseNotes: [],
         downloadBytes: undefined, promptSuppressedUntil: undefined, canRestart: false,
+        lastCheckedAt: new Date().toISOString(),
       })
     })
     this.updater.on('download-progress', (progress: ProgressInfo) => this.setState({
@@ -229,8 +265,9 @@ export class UpdateManager {
     })
     this.updater.on('error', (error: Error) => {
       if (this.cancellationToken?.cancelled) return
+      if (this.snapshot.status === 'checking' && !this.acceptCheckEvents) return
       if (this.snapshot.status === 'checking' && !this.manualCheckRequested) {
-        this.setState({ status: 'idle', errorCode: undefined, canRestart: false })
+        this.setState({ status: 'idle', errorCode: undefined, canRestart: false, lastCheckedAt: new Date().toISOString() })
       } else {
         this.setState({ status: 'error', errorCode: errorCode(error), canRestart: false })
       }

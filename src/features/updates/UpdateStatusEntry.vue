@@ -9,7 +9,6 @@
     @click="openDetails"
   >
     <Download v-if="store.state.status === 'available' || store.state.status === 'cancelled'" :size="17" />
-    <RefreshCw v-else-if="store.state.status === 'checking'" :size="17" class="is-spinning" />
     <CircleCheck v-else-if="store.state.status === 'downloaded' || store.state.status === 'restart_deferred'" :size="17" />
     <CircleAlert v-else-if="store.state.status === 'error'" :size="17" />
     <LoaderCircle v-else :size="17" class="is-spinning" />
@@ -21,14 +20,14 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CircleAlert, CircleCheck, Download, LoaderCircle, RefreshCw } from '@lucide/vue'
+import { CircleAlert, CircleCheck, Download, LoaderCircle } from '@lucide/vue'
 
 import { useUpdateStore } from './store'
 
 const store = useUpdateStore()
 const props = withDefaults(defineProps<{ detailsDisabled?: boolean }>(), { detailsDisabled: false })
 const shortLabel = computed(() => ({
-  checking: '检查更新', available: '发现新版本', downloading: '后台下载', downloaded: '可以重启',
+  checking: '', available: '发现新版本', downloading: '后台下载', downloaded: '可以重启',
   restart_deferred: '更新已就绪', installing: '正在重启', cancelled: '重新下载', error: '更新异常', idle: '',
 })[store.state.status])
 const accessibleLabel = computed(() => props.detailsDisabled
