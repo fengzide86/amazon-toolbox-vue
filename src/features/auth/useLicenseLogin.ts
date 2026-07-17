@@ -1,5 +1,5 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Auth, getDeviceId, getDeviceName, showToast } from '@/utils'
 import { api, verifyAuthCode } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
@@ -31,6 +31,7 @@ function validateAuthCode(code: string): { valid: true } | { valid: false; messa
 
 export function useLicenseLogin() {
   const router = useRouter()
+  const route = useRoute()
   const userStore = useUserStore()
   const authCode = ref('')
   const authCodeInput = ref<HTMLInputElement | null>(null)
@@ -159,6 +160,14 @@ export function useLicenseLogin() {
   }
 
   onMounted(() => {
+    const handoffCode = sessionStorage.getItem('toolbox_login_handoff_code')
+    if (handoffCode) {
+      sessionStorage.removeItem('toolbox_login_handoff_code')
+      authCode.value = handoffCode
+    } else if (typeof route.query.code === 'string') {
+      // 兼容旧的内部测试链接；新管理端使用一次性 sessionStorage 交接，避免授权码留在地址栏。
+      authCode.value = route.query.code
+    }
     deviceId.value = getDeviceId()
     deviceName.value = getDeviceName()
     void loadWechatId()

@@ -16,6 +16,10 @@
         <Key :size="14" class="menu-icon" />
         <span class="menu-label">授权码管理</span>
       </router-link>
+      <router-link to="/admin/business-access" class="menu-nav-item" active-class="is-active">
+        <BriefcaseBusiness :size="14" class="menu-icon" />
+        <span class="menu-label">专业工作台</span>
+      </router-link>
       <router-link to="/admin/orders" class="menu-nav-item" active-class="is-active">
         <Receipt :size="14" class="menu-icon" />
         <span class="menu-label">订单与套餐</span>
@@ -59,7 +63,7 @@
 
 <script setup lang="ts">
 import {
-  LayoutDashboard, Key, Receipt, Percent, Users, Wrench,
+  LayoutDashboard, Key, BriefcaseBusiness, Receipt, Percent, Users, Wrench,
   BookOpen, MessageSquare, Megaphone, PackageCheck, Settings
 } from '@lucide/vue'
 </script>

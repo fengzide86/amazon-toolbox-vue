@@ -58,17 +58,6 @@
           </div>
         </el-form-item>
 
-        <el-form-item>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-title">专业批量工作台</div>
-              <div class="setting-desc">全局发布开关。关闭后所有 B 端入口和接口立即停用，不影响普通用户。</div>
-            </div>
-            <div class="setting-control">
-              <el-switch v-model="businessWorkspaceEnabled" inline-prompt active-text="已开启" inactive-text="未开启" @change="saveBusinessWorkspaceSetting" />
-            </div>
-          </div>
-        </el-form-item>
       </el-form>
     </el-card>
 
@@ -491,9 +480,9 @@ import { useAdminSettings } from '@/features/admin/useAdminSettings'
 const {
   plans, settings, tools, toolReleases, editingPlan, editingToolIndex, showAddPlan,
   showPlanPermissions, planPermissionDraft, showReleaseModal, releaseSaving, newRelease,
-  adminPassword, wechatId, businessWorkspaceEnabled, newPlan, categoryOptions,
+  adminPassword, wechatId, newPlan, categoryOptions,
   showProfitModal, profitRatios, profitTotal, profitRatiosText,
-  savePassword, saveWechat, saveBusinessWorkspaceSetting, startEdit, savePlan,
+  savePassword, saveWechat, startEdit, savePlan,
   openPlanPermissions, savePlanPermissions, togglePlanStatus, addPlan, addTool,
   startToolEdit, cancelToolEdit, saveTool, removeTool, platformLabel, categoryLabel,
   toolStatusLabel, releaseStatusLabel, syncReleaseScriptKey, saveRelease,

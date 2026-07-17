@@ -126,6 +126,12 @@ const routes = [
         meta: { title: '授权码管理', skeleton: 'table' }
       },
       {
+        path: 'business-access',
+        name: 'AdminBusinessAccess',
+        component: () => import('@/views/admin/BusinessAccessView.vue'),
+        meta: { title: '专业工作台', skeleton: 'dashboard' }
+      },
+      {
         path: 'orders',
         name: 'AdminOrders',
         component: () => import('@/views/admin/OrdersView.vue'),

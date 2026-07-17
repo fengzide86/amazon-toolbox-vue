@@ -1,8 +1,8 @@
 """
 授权码相关 Schema
 """
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, Dict, Optional, List
 from datetime import datetime
 
 
@@ -52,6 +52,8 @@ class AuthCodeResponse(BaseModel):
     seat_used: Optional[int] = None
     device_used: Optional[int] = None
     plan_name: Optional[str] = None
+    product_type: str = "consumer"
+    entitlements: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
 

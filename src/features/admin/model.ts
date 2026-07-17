@@ -239,6 +239,8 @@ export const adminAuthCodeSchema = z.object({
   seat_limit: z.coerce.number().int().positive().default(1),
   seat_used: z.coerce.number().int().nonnegative().default(0),
   device_used: z.coerce.number().int().nonnegative().default(0),
+  product_type: z.enum(['consumer', 'business']).default('consumer'),
+  entitlements: z.record(z.string(), z.unknown()).default({}),
 }).passthrough()
 
 export const adminAuthCodesSchema = z.array(adminAuthCodeSchema)

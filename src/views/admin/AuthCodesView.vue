@@ -1,18 +1,62 @@
 <template>
-  <div>
-    <PageHeader title="授权码管理" description="生成、检索并维护客户授权码" />
+  <div class="auth-codes-page">
+    <PageHeader
+      eyebrow="LICENSE OPERATIONS"
+      title="授权码管理"
+      description="为普通工具箱和专业工作台生成独立授权"
+    >
+      <template #actions>
+        <router-link class="business-center-link" to="/admin/business-access">专业工作台</router-link>
+      </template>
+    </PageHeader>
 
-    <el-card class="table-card" style="margin-bottom: 1.5rem;">
+    <el-card :class="['table-card', 'generator-card', { 'is-business': generatorProductType === 'business' }]">
       <template #header>
         <div class="card-header">
-          <h3>生成新授权码</h3>
+          <div>
+            <h3>生成新授权码</h3>
+            <p>先选择客户进入的产品，再配置授权范围。</p>
+          </div>
+          <div class="product-switch" role="tablist" aria-label="授权产品类型">
+            <button
+              type="button"
+              :class="{ active: generatorProductType === 'consumer' }"
+              role="tab"
+              :aria-selected="generatorProductType === 'consumer'"
+              @click="generatorProductType = 'consumer'"
+            >普通授权 C 端</button>
+            <button
+              type="button"
+              :class="{ active: generatorProductType === 'business' }"
+              role="tab"
+              :aria-selected="generatorProductType === 'business'"
+              @click="generatorProductType = 'business'"
+            >专业授权 B 端</button>
+          </div>
         </div>
       </template>
+      <div v-if="generatorProductType === 'business'" class="business-value-strip">
+        <div>
+          <span class="business-kicker">BUSINESS ACCESS</span>
+          <strong>专业工作台授权</strong>
+          <p>用于教师、运营及批量操作人员。当前处于内部验证阶段。</p>
+        </div>
+        <ul>
+          <li>专业工作台</li>
+          <li>本地批量导入</li>
+          <li>多账号浏览器现场</li>
+        </ul>
+      </div>
       <div class="generate-form">
         <label class="generate-field generate-field--wide">
           <span>套餐</span>
           <el-select v-model="selectedPlanId" placeholder="选择套餐">
-            <el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" />
+            <el-option
+              v-for="plan in availablePlans"
+              :key="plan.id"
+              :label="`${plan.name} · ¥${plan.price}`"
+              :value="plan.id"
+            />
           </el-select>
         </label>
         <label class="generate-field">
@@ -23,7 +67,7 @@
             <el-option label="双平台" value="amazon,aliexpress" />
           </el-select>
         </label>
-        <label class="generate-field">
+        <label v-if="generatorProductType === 'consumer'" class="generate-field">
           <span>场景类型</span>
           <el-select v-model="selectedSceneType" placeholder="场景类型">
             <el-option label="比赛" value="competition" />
@@ -46,14 +90,7 @@
           <el-button type="primary" @click="handleGenerate" :loading="isLoading">
             {{ isLoading ? '生成中...' : '生成授权码' }}
           </el-button>
-          <el-button v-if="generatedCodes.length" @click="copyCodes">📋 一键复制</el-button>
-          <span v-if="generatedCodes.length" class="generated-count">已生成 {{ generatedCodes.length }} 个</span>
         </div>
-      </div>
-      <div v-if="generatedCodes.length" class="generated-codes">
-        <el-tag v-for="code in generatedCodes" :key="code" type="primary" effect="dark" class="code-tag">
-          {{ code }}
-        </el-tag>
       </div>
     </el-card>
 
@@ -65,6 +102,10 @@
       </template>
       <DataToolbar label="授权码筛选">
         <el-input v-model="searchText" placeholder="搜索授权码/设备..." style="width: 220px;" clearable />
+        <el-select v-model="filterProductType" placeholder="全部产品" clearable style="width: 150px;">
+          <el-option label="普通 C 端" value="consumer" />
+          <el-option label="专业 B 端" value="business" />
+        </el-select>
         <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 150px;">
           <el-option label="未使用" value="unused" />
           <el-option label="已激活" value="active" />
@@ -77,6 +118,13 @@
         <el-table-column label="授权码" min-width="180">
           <template #default="{ row }">
             <a href="#" @click.prevent="openDetail(row)" class="code-link">{{ row.code }}</a>
+          </template>
+        </el-table-column>
+        <el-table-column label="产品类型" width="120">
+          <template #default="{ row }">
+            <span :class="['product-type-badge', `is-${row.product_type}`]">
+              {{ row.product_type === 'business' ? '专业 B 端' : '普通 C 端' }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isCompact" label="套餐" min-width="120">
@@ -146,6 +194,40 @@
       </el-table>
     </el-card>
 
+    <AdminDetailDrawer
+      v-model="showGeneratedDrawer"
+      :title="generatorProductType === 'business' ? '专业授权已生成' : '授权码已生成'"
+      size="min(520px, 94vw)"
+    >
+      <div class="generated-success">
+        <span :class="['success-mark', { business: generatorProductType === 'business' }]">
+          <Check :size="25" />
+        </span>
+        <span class="success-eyebrow">{{ generatorProductType === 'business' ? 'BUSINESS LICENSE' : 'CUSTOMER LICENSE' }}</span>
+        <h3>{{ generatorProductType === 'business' ? '专业工作台授权' : '普通工具箱授权' }}</h3>
+        <p>{{ selectedPlan?.name || '当前套餐' }} · {{ generatedCodes.length }} 个授权码</p>
+        <div class="generated-code-list">
+          <button v-for="code in generatedCodes" :key="code" type="button" @click="copyText(code)">
+            <span>{{ code }}</span><Copy :size="15" />
+          </button>
+        </div>
+        <div class="generated-meta">
+          <span><small>设备</small><strong>{{ maxDevices }} 台</strong></span>
+          <span><small>席位</small><strong>{{ seatLimit }} 个</strong></span>
+          <span><small>状态</small><strong>可以登录</strong></span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showGeneratedDrawer = false">继续生成</el-button>
+        <el-button @click="copyCodes">复制全部</el-button>
+        <el-button
+          v-if="generatorProductType === 'business' && generatedCodes[0]"
+          type="primary"
+          @click="loginWithGeneratedCode"
+        >退出管理并用此码登录</el-button>
+      </template>
+    </AdminDetailDrawer>
+
     <!-- 修改最大设备数弹窗 -->
     <el-dialog v-model="showDeviceModal" title="修改最大设备数" width="400px">
       <p class="dialog-info">授权码：{{ editingCode?.code }}</p>
@@ -183,6 +265,10 @@
         <div class="detail-row">
           <span class="detail-label">套餐</span>
           <span class="detail-value">{{ detailData.plan_name || getPlanName(detailData.plan_id) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">产品类型</span>
+          <span class="detail-value">{{ detailData.product_type === 'business' ? '专业 B 端' : '普通 C 端' }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">状态</span>
@@ -237,8 +323,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlans, api } from '@/utils/api'
+import { useRouter } from 'vue-router'
+import { Check, Copy } from '@lucide/vue'
+import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlansAdmin, api } from '@/utils/api'
 import { showToast } from '@/utils'
+import { authService } from '@/utils/auth'
 import { usePlatformStore } from '@/stores/platform'
 import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
@@ -257,6 +346,7 @@ import {
 const authCodes = ref<AdminAuthCode[]>([])
 const plans = ref<AdminPlan[]>([])
 const selectedPlanId = ref<string | number>(2)
+const generatorProductType = ref<'consumer' | 'business'>('consumer')
 const selectedPlatformScope = ref('amazon')
 const selectedSceneType = ref('competition')
 const generateCount = ref(1)
@@ -265,11 +355,14 @@ const maxDevices = ref(1)
 const isLoading = ref(false)
 const generatedCodes = ref<string[]>([])
 const filterStatus = ref('')
+const filterProductType = ref('')
 const searchText = ref('')
 const planNameMap = reactive<Record<string, string>>({})
 
+const router = useRouter()
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
+const showGeneratedDrawer = ref(false)
 
 // 设备数弹窗
 const showDeviceModal = ref(false)
@@ -285,8 +378,16 @@ const extendDays = ref(30)
 const showDetailModal = ref(false)
 const detailData = ref<AdminAuthCode | null>(null)
 
+const availablePlans = computed(() =>
+  plans.value.filter(plan => plan.product_type === generatorProductType.value && plan.status === 'active'),
+)
+const selectedPlan = computed(() => plans.value.find(plan => plan.id === selectedPlanId.value))
+
 const filteredCodes = computed(() => {
   let codes = authCodes.value
+  if (filterProductType.value) {
+    codes = codes.filter(code => code.product_type === filterProductType.value)
+  }
   if (filterStatus.value) {
     codes = codes.filter(c => c.status === filterStatus.value)
   }
@@ -360,12 +461,14 @@ async function loadData() {
   try {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
     const params = platformKey ? { platform_key: platformKey } : {}
-    const [codesRes, plansRes] = await Promise.all([getAuthCodes(params), getPlans()])
+    const [codesRes, plansRes] = await Promise.all([getAuthCodes(params), getPlansAdmin({ page_size: 100 })])
     const parsedCodes = adminAuthCodesSchema.parse(codesRes)
     const parsedPlans = adminPlansSchema.parse(plansRes)
     authCodes.value = parsedCodes
     plans.value = parsedPlans
-    if (parsedPlans[0]) selectedPlanId.value = parsedPlans[0].id
+    const preferredPlan = parsedPlans.find(plan =>
+      plan.product_type === generatorProductType.value && plan.status === 'active')
+    if (preferredPlan) selectedPlanId.value = preferredPlan.id
     parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
   } catch (err) {
     showToast('数据加载失败', 'error')
@@ -373,10 +476,20 @@ async function loadData() {
 }
 
 watch(() => platformStore.adminPlatform, () => { loadData() })
+watch(generatorProductType, productType => {
+  const preferredPlan = plans.value.find(plan => plan.product_type === productType && plan.status === 'active')
+  if (preferredPlan) selectedPlanId.value = preferredPlan.id
+  selectedSceneType.value = productType === 'business' ? 'operations' : 'competition'
+  generatedCodes.value = []
+})
 
 async function handleGenerate() {
   if (!generateCount.value || generateCount.value < 1) {
     showToast('请输入生成数量', 'error')
+    return
+  }
+  if (!selectedPlan.value || selectedPlan.value.product_type !== generatorProductType.value) {
+    showToast(generatorProductType.value === 'business' ? '请先配置可用的 B 端套餐' : '请选择可用套餐', 'error')
     return
   }
   isLoading.value = true
@@ -391,6 +504,7 @@ async function handleGenerate() {
     }))
     if (res.success) {
       generatedCodes.value = res.codes
+      showGeneratedDrawer.value = true
       showToast(`成功生成 ${res.count} 个授权码`, 'success')
       await loadData()
     }
@@ -478,6 +592,24 @@ function copyCodes() {
   })
 }
 
+async function copyText(value: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    showToast('授权码已复制', 'success')
+  } catch {
+    showToast('复制失败，请手动复制', 'error')
+  }
+}
+
+async function loginWithGeneratedCode() {
+  const code = generatedCodes.value[0]
+  if (!code) return
+  sessionStorage.setItem('toolbox_login_handoff_code', code)
+  showGeneratedDrawer.value = false
+  authService.clear()
+  await router.replace('/user/login')
+}
+
 async function openDetail(rawCode: unknown) {
   const code = adminAuthCodeSchema.parse(rawCode)
   try {
@@ -488,7 +620,13 @@ async function openDetail(rawCode: unknown) {
   }
 }
 
-onMounted(loadData)
+onMounted(() => {
+  if (router.currentRoute.value.query.product === 'business') {
+    generatorProductType.value = 'business'
+    filterProductType.value = 'business'
+  }
+  void loadData()
+})
 </script>
 
 <style scoped>
@@ -498,18 +636,93 @@ onMounted(loadData)
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-low);
 }
+.generator-card { margin-bottom: 24px; overflow: hidden; }
+.generator-card.is-business {
+  border-color: rgba(169,133,82,.3);
+  background: linear-gradient(180deg, var(--color-surface), var(--color-surface-premium, #f8f7f4));
+}
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
+.card-header > div:first-child { display: grid; gap: 4px; }
+.card-header p { margin: 0; color: var(--color-text-secondary); font-size: var(--type-meta); }
 
 .card-header h3 {
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
+}
+
+.business-center-link {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  border: 1px solid rgba(169,133,82,.34);
+  border-radius: 10px;
+  color: #765d38;
+  background: var(--color-surface-premium, #f8f7f4);
+  font-size: var(--type-control);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.product-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: var(--color-surface-soft);
+}
+.product-switch button {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: var(--type-control);
+  font-weight: 700;
+  cursor: pointer;
+}
+.product-switch button.active {
+  color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-low);
+}
+.product-switch button:last-child.active { color: #765d38; }
+
+.business-value-strip {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  margin: 4px 0 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(169,133,82,.24);
+  border-radius: 14px;
+  background: #f8f5ef;
+}
+.business-value-strip > div { display: grid; gap: 5px; }
+.business-kicker { color: var(--color-premium); font-size: var(--type-micro); font-weight: 800; letter-spacing: .12em; }
+.business-value-strip strong { color: var(--color-text); font-size: var(--type-card); }
+.business-value-strip p { margin: 0; color: var(--color-text-secondary); font-size: var(--type-control); }
+.business-value-strip ul { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.business-value-strip li {
+  padding: 7px 10px;
+  border: 1px solid rgba(169,133,82,.2);
+  border-radius: 8px;
+  color: #765d38;
+  background: rgba(255,255,255,.72);
+  font-size: var(--type-meta);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .generate-form {
@@ -590,19 +803,55 @@ onMounted(loadData)
   font-size: 0.8rem;
 }
 
-.generated-codes {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: var(--color-canvas);
-  border-radius: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.product-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 99px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-soft);
+  font-size: var(--type-micro);
+  font-weight: 800;
 }
+.product-type-badge.is-business { color: #765d38; background: #f3ecdf; }
 
-.code-tag {
-  font-family: monospace;
+.generated-success { display: grid; justify-items: center; padding: 6px 0 20px; text-align: center; }
+.success-mark {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  color: white;
+  background: var(--color-success);
+  box-shadow: 0 12px 28px rgba(22,138,99,.16);
 }
+.success-mark.business { background: var(--color-primary); box-shadow: 0 12px 28px rgba(45,95,202,.17); }
+.success-eyebrow { color: var(--color-premium); font-size: var(--type-micro); font-weight: 800; letter-spacing: .12em; }
+.generated-success h3 { margin: 7px 0 5px; color: var(--color-text); font-size: 21px; }
+.generated-success > p { margin: 0 0 18px; color: var(--color-text-secondary); font-size: var(--type-control); }
+.generated-code-list { width: 100%; display: grid; gap: 8px; }
+.generated-code-list button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+  cursor: pointer;
+}
+.generated-code-list button span { overflow-wrap: anywhere; font: 700 14px/1.4 var(--font-mono, monospace); }
+.generated-code-list button svg { flex: none; color: var(--color-primary); }
+.generated-meta { width: 100%; display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; }
+.generated-meta span { display: grid; gap: 4px; padding: 11px; border-radius: 10px; background: var(--color-surface-soft); }
+.generated-meta small { color: var(--color-text-tertiary); font-size: var(--type-micro); }
+.generated-meta strong { color: var(--color-text); font-size: var(--type-meta); }
 
 .empty-state {
   padding: 2rem;
@@ -700,13 +949,21 @@ onMounted(loadData)
 
 @media (max-width: 900px) {
   .generate-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-header { align-items: flex-start; gap: 14px; }
+  .business-value-strip { grid-template-columns: 1fr; gap: 14px; }
+  .business-value-strip ul { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .business-value-strip li { text-align: center; white-space: normal; }
 }
 
 @media (max-width: 680px) {
+  .card-header { display: grid; }
+  .product-switch { width: 100%; }
   .generate-form { grid-template-columns: 1fr; }
   .generate-actions { grid-column: auto; display: grid; grid-template-columns: 1fr; }
   .generate-actions :deep(.el-button) { width: 100%; margin-left: 0; }
   .generated-count { text-align: center; }
   .detail-row { align-items: flex-start; }
+  .business-value-strip ul { grid-template-columns: 1fr; }
+  .generated-meta { grid-template-columns: 1fr; }
 }
 </style>

@@ -102,3 +102,31 @@ class TestPlanCodePrefix:
         data = get_data(resp)
         basic = next(p for p in data if p["price"] == 99)
         assert basic["code_prefix"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_auth_code_list_exposes_business_product_context(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+):
+    plan = Plan(
+        name="B端内部验证版",
+        price=0,
+        duration_days=30,
+        status="active",
+        product_type="business",
+        entitlements='{"batch_execution": true, "multi_account_workspace": true, "max_batch_rows": 50}',
+    )
+    db_session.add(plan)
+    await db_session.flush()
+    db_session.add(AuthCode(code="BUSINESS-INTERNAL-001", plan_id=plan.id, seat_limit=1, max_devices=1))
+    await db_session.commit()
+
+    response = await client.get("/api/auth-codes", headers=auth_headers)
+
+    assert response.status_code == 200
+    business_code = next(item for item in response.json() if item["code"] == "BUSINESS-INTERNAL-001")
+    assert business_code["product_type"] == "business"
+    assert business_code["plan_name"] == "B端内部验证版"
+    assert business_code["entitlements"]["batch_execution"] is True

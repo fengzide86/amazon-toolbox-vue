@@ -92,6 +92,24 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     return bootstrap.value
   }
 
+  async function refreshBootstrap(): Promise<BusinessBootstrap> {
+    loading.value = true
+    error.value = null
+    try {
+      bootstrap.value = businessBootstrapSchema.parse(await getBusinessBootstrap())
+      if (selectedTool.value && !bootstrap.value.tools.some(tool => tool.id === selectedTool.value?.id)) {
+        selectedTool.value = null
+        importPreview.value = null
+      }
+      return bootstrap.value
+    } catch (refreshError) {
+      error.value = errorMessage(refreshError, '工作台状态刷新失败')
+      throw refreshError
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function loadHistory(): Promise<ServerBatchHistory[]> {
     history.value = historySchema.parse(await getBusinessBatches({ limit: 30 }))
     return history.value
@@ -326,7 +344,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   return {
     bootstrap, history, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error,
     entitlements, tools, items, openItems, isActive,
-    init, loadHistory, chooseTool, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
+    init, refreshBootstrap, loadHistory, chooseTool, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
     completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, dispose,
   }
 })

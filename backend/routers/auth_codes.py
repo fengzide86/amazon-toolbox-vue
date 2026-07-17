@@ -19,6 +19,7 @@ from core.logging import get_logger
 from core.exceptions import NotFoundException, ConflictException
 from core.dependencies import get_current_admin
 from core.audit import log_admin_action
+from services.entitlement_service import normalize_entitlements
 
 logger = get_logger(__name__)
 
@@ -49,14 +50,6 @@ async def _calculate_device_used(db: AsyncSession, auth_code_id: int) -> int:
         select(func.count(Device.id)).where(Device.auth_code_id == auth_code_id)
     )
     return result.scalar() or 0
-
-
-async def _get_plan_name(db: AsyncSession, plan_id: int) -> str:
-    """获取套餐名称"""
-    if not plan_id:
-        return "未关联套餐"
-    result = await db.execute(select(Plan.name).where(Plan.id == plan_id))
-    return result.scalar() or "未关联套餐"
 
 
 def generate_random_code(length: int = 6) -> str:
@@ -96,7 +89,9 @@ async def get_auth_codes(
         AuthCode,
         func.coalesce(seat_subquery.c.seat_used, 0).label('seat_used'),
         func.coalesce(device_subquery.c.device_used, 0).label('device_used'),
-        Plan.name.label('plan_name')
+        Plan.name.label('plan_name'),
+        Plan.product_type.label('product_type'),
+        Plan.entitlements.label('plan_entitlements'),
     ).options(selectinload(AuthCode.devices))
     
     # 关联子查询和 Plan 表
@@ -113,7 +108,7 @@ async def get_auth_codes(
     
     # 构建响应列表
     response_list = []
-    for code, seat_used, device_used, plan_name in rows:
+    for code, seat_used, device_used, plan_name, product_type, plan_entitlements in rows:
         code_dict = {
             "id": code.id,
             "code": code.code,
@@ -133,6 +128,8 @@ async def get_auth_codes(
             "seat_used": seat_used or 0,
             "device_used": device_used or 0,
             "plan_name": plan_name or "未关联套餐",
+            "product_type": product_type or "consumer",
+            "entitlements": normalize_entitlements(plan_entitlements, product_type or "consumer"),
         }
         response_list.append(AuthCodeResponse(**code_dict))
     
@@ -159,7 +156,13 @@ async def get_auth_code_detail(
     # 计算统计字段
     seat_used = await _calculate_seat_used(db, code.id)
     device_used = await _calculate_device_used(db, code.id)
-    plan_name = await _get_plan_name(db, code.plan_id)
+    plan_result = await db.execute(
+        select(Plan.name, Plan.product_type, Plan.entitlements).where(Plan.id == code.plan_id)
+    )
+    plan_row = plan_result.first()
+    plan_name = plan_row[0] if plan_row else "未关联套餐"
+    product_type = (plan_row[1] if plan_row else None) or "consumer"
+    plan_entitlements = plan_row[2] if plan_row else None
     
     # 构建响应
     code_dict = {
@@ -181,6 +184,8 @@ async def get_auth_code_detail(
         "seat_used": seat_used,
         "device_used": device_used,
         "plan_name": plan_name,
+        "product_type": product_type,
+        "entitlements": normalize_entitlements(plan_entitlements, product_type),
     }
     
     return AuthCodeResponse(**code_dict)

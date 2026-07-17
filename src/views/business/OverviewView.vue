@@ -1,8 +1,15 @@
 <template>
   <div class="business-overview">
     <header class="page-header">
-      <div><span class="eyebrow">PROFESSIONAL OPERATIONS</span><h1>批量业务工作台</h1><p>一个账号需要操作时，系统会保留现场并继续处理后面的账号。</p></div>
-      <router-link class="primary-link" to="/business/workspace"><Plus :size="16" />新建批次</router-link>
+      <div>
+        <span class="eyebrow">PROFESSIONAL OPERATIONS</span>
+        <div class="title-line"><h1>专业工作台已就绪</h1><span>内部验证版</span></div>
+        <p>{{ hasTools ? '选择已经开放的业务工具，系统会按顺序处理多个账号。' : '批量工具会根据真实业务脚本逐个开放。' }}</p>
+      </div>
+      <div class="page-actions">
+        <router-link class="primary-link" to="/business/workspace"><ArrowRight :size="16" />查看工作台</router-link>
+        <router-link class="secondary-link" to="/business/license">查看授权信息</router-link>
+      </div>
     </header>
     <section class="attention-card" v-if="waitingCount">
       <div class="attention-icon"><BellRing :size="20" /></div>
@@ -10,9 +17,9 @@
       <router-link to="/business/workspace">去处理</router-link>
     </section>
     <section class="capability-grid">
-      <article><FileSpreadsheet :size="20" /><span>本地批量导入</span><strong>{{ store.entitlements.max_batch_rows || 50 }} 行/批次</strong></article>
-      <article><PanelsTopLeft :size="20" /><span>浏览器现场</span><strong>最多 {{ store.entitlements.max_open_sessions || 6 }} 个</strong></article>
-      <article><ShieldCheck :size="20" /><span>账号数据</span><strong>只在本机处理</strong></article>
+      <article><FileSpreadsheet :size="20" /><div><span>本地批量导入</span><strong>最多 {{ store.entitlements.max_batch_rows || 50 }} 个账号</strong></div><small>原始表格不会上传</small></article>
+      <article><PanelsTopLeft :size="20" /><div><span>独立浏览器现场</span><strong>最多保留 {{ store.entitlements.max_open_sessions || 6 }} 个</strong></div><small>账号登录状态互不串线</small></article>
+      <article><ShieldCheck :size="20" /><div><span>需要操作时提醒</span><strong>不用一直盯着页面</strong></div><small>登录和验证时再回来处理</small></article>
     </section>
     <section class="surface recent">
       <header><div><span>最近批次</span><small>只展示业务状态，不展示内部脚本指标</small></div><router-link to="/business/records">全部记录</router-link></header>
@@ -23,17 +30,22 @@
           <span :class="['status', `is-${batch.status}`]">{{ batchStatus(batch.status) }}</span>
         </article>
       </div>
-      <div v-else class="empty">还没有批次记录。选择一个工具并导入客户数据即可开始。</div>
+      <div v-else class="empty">
+        <span class="empty-icon"><Layers3 :size="24" /></span>
+        <strong>还没有执行记录</strong>
+        <p>完成第一个真实批次后，业务结果会保存在这里。</p>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { BellRing, FileSpreadsheet, PanelsTopLeft, Plus, ShieldCheck } from '@lucide/vue'
+import { ArrowRight, BellRing, FileSpreadsheet, Layers3, PanelsTopLeft, ShieldCheck } from '@lucide/vue'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 const store = useBusinessWorkspaceStore()
 const waitingCount = computed(() => store.snapshot.counts?.waiting || 0)
+const hasTools = computed(() => store.tools.length > 0)
 const formatDate = (value: string | null | undefined): string => value
   ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
   : '-'
@@ -45,9 +57,9 @@ onMounted(() => store.loadHistory())
 </script>
 
 <style scoped>
-.business-overview{display:grid;gap:20px}.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}.eyebrow{display:block;margin-bottom:8px;color:var(--color-primary);font-size:var(--type-micro);font-weight:800;letter-spacing:.12em}.page-header h1{margin:0;color:var(--color-text);font-size:30px;letter-spacing:-.04em}.page-header p{margin:8px 0 0;color:var(--color-text-secondary)}.primary-link{height:42px;display:flex;align-items:center;gap:8px;padding:0 18px;border-radius:11px;color:#fff;background:var(--color-primary);text-decoration:none;font-size:13px;font-weight:700;box-shadow:0 8px 20px rgba(45,95,202,.18)}
+.business-overview{display:grid;gap:20px}.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}.eyebrow{display:block;margin-bottom:8px;color:var(--color-primary);font-size:var(--type-micro);font-weight:800;letter-spacing:.12em}.title-line{display:flex;align-items:center;gap:12px}.title-line h1{margin:0;color:var(--color-text);font-size:var(--type-page);letter-spacing:-.04em}.title-line>span{padding:6px 9px;border-radius:8px;color:#765d38;background:#f1e8d9;font-size:var(--type-micro);font-weight:800;white-space:nowrap}.page-header p{margin:9px 0 0;color:var(--color-text-secondary);font-size:var(--type-control);line-height:1.6}.page-actions{display:flex;align-items:center;gap:9px}.primary-link,.secondary-link{height:42px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 17px;border-radius:11px;text-decoration:none;font-size:var(--type-control);font-weight:700}.primary-link{color:#fff;background:var(--color-primary);box-shadow:0 8px 20px rgba(45,95,202,.18)}.secondary-link{border:1px solid var(--color-border);color:var(--color-text);background:var(--color-surface)}
 .attention-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:18px;border:1px solid rgba(183,121,31,.25);border-radius:15px;background:#fffaf0}.attention-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;color:var(--color-warning);background:#fff0d2}.attention-card strong{color:var(--color-text)}.attention-card p{margin:4px 0 0;color:var(--color-text-secondary);font-size:var(--type-meta)}.attention-card a{color:var(--color-warning);font-weight:700;text-decoration:none}
-.capability-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.capability-grid article{min-height:110px;padding:18px;display:grid;align-content:space-between;border:1px solid var(--color-border);border-radius:15px;background:var(--color-surface);box-shadow:var(--shadow-low)}.capability-grid svg{color:var(--color-primary)}.capability-grid span{color:var(--color-text-tertiary);font-size:var(--type-meta)}.capability-grid strong{color:var(--color-text);font-size:15px}
-.surface{border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface);box-shadow:var(--shadow-low)}.recent>header{min-height:65px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--color-border)}.recent header div{display:grid;gap:3px}.recent header span{font-weight:700;color:var(--color-text)}.recent header small{color:var(--color-text-tertiary)}.recent header a{font-size:var(--type-meta);color:var(--color-primary);text-decoration:none}.batch-list article{min-height:60px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--color-border)}.batch-list article:last-child{border:0}.batch-list div{display:grid;gap:3px}.batch-list strong{font-size:13px;color:var(--color-text)}.batch-list div span,.batch-count{font-size:var(--type-meta);color:var(--color-text-tertiary)}.status{padding:5px 9px;border-radius:99px;font-size:var(--type-micro);font-weight:700;background:var(--color-surface-soft);color:var(--color-text-secondary)}.status.is-running{color:var(--color-primary);background:var(--color-primary-soft)}.status.is-completed{color:var(--color-success);background:#eaf8f2}.empty{padding:42px 20px;text-align:center;color:var(--color-text-secondary);font-size:13px}
-@media(max-width:760px){.page-header{display:grid}.primary-link{width:max-content}.capability-grid{grid-template-columns:1fr}.batch-list article{grid-template-columns:1fr auto}.batch-count{display:none}}
+.capability-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.capability-grid article{min-height:142px;padding:19px;display:grid;grid-template-columns:auto 1fr;align-content:space-between;gap:13px;border:1px solid var(--color-border);border-radius:15px;background:var(--color-surface);box-shadow:var(--shadow-low)}.capability-grid svg{color:var(--color-primary)}.capability-grid div{display:grid;gap:5px}.capability-grid span,.capability-grid small{color:var(--color-text-tertiary);font-size:var(--type-meta)}.capability-grid strong{color:var(--color-text);font-size:15px}.capability-grid small{grid-column:1/-1;align-self:end}
+.surface{border:1px solid var(--color-border);border-radius:16px;background:var(--color-surface);box-shadow:var(--shadow-low)}.recent>header{min-height:68px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:1px solid var(--color-border)}.recent header div{display:grid;gap:3px}.recent header span{font-size:var(--type-card);font-weight:700;color:var(--color-text)}.recent header small{font-size:var(--type-meta);color:var(--color-text-tertiary)}.recent header a{font-size:var(--type-meta);color:var(--color-primary);text-decoration:none}.batch-list article{min-height:64px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--color-border)}.batch-list article:last-child{border:0}.batch-list div{display:grid;gap:3px}.batch-list strong{font-size:var(--type-control);color:var(--color-text)}.batch-list div span,.batch-count{font-size:var(--type-meta);color:var(--color-text-tertiary)}.status{padding:5px 9px;border-radius:99px;font-size:var(--type-micro);font-weight:700;background:var(--color-surface-soft);color:var(--color-text-secondary)}.status.is-running{color:var(--color-primary);background:var(--color-primary-soft)}.status.is-completed{color:var(--color-success);background:#eaf8f2}.empty{min-height:190px;display:grid;place-content:center;justify-items:center;gap:8px;padding:34px 20px;text-align:center}.empty-icon{width:48px;height:48px;display:grid;place-items:center;border-radius:15px;color:var(--color-primary);background:var(--color-primary-soft)}.empty strong{color:var(--color-text);font-size:var(--type-card)}.empty p{margin:0;color:var(--color-text-secondary);font-size:var(--type-control)}
+@media(max-width:760px){.page-header{display:grid}.page-actions{display:grid;grid-template-columns:1fr 1fr}.capability-grid{grid-template-columns:1fr}.batch-list article{grid-template-columns:1fr auto}.batch-count{display:none}.title-line{align-items:flex-start;flex-direction:column}}
 </style>
