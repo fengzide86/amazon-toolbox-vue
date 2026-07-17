@@ -69,7 +69,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      expect(menuItems.length).toBe(11)
+      expect(menuItems.length).toBe(12)
     })
 
     it('应该显示正确的菜单标签', async () => {

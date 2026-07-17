@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.7.5",
+  "version": "1.7.6",
   "description": "面向跨境电商业务的桌面自动化效率工具箱",
   "author": "Amazon Toolbox Team",
   "private": true,
@@ -29,6 +29,7 @@
     "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.ts",
     "test:e2e:capture": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.capture.config.ts",
     "test:embedded-browser": "npm run electron:compile && electron dist-electron/electron/smoke/embedded-browser-smoke.cjs",
+    "test:amazon-navigation": "npm run electron:compile && electron dist-electron/electron/smoke/amazon-navigation-smoke.cjs",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\"",
     "security:audit": "python scripts/audit_secrets.py",
@@ -106,6 +107,7 @@
       "!**/*.map",
       "!**/*.ts",
       "!**/*.cts",
+      "!dist-electron/electron/smoke/**",
       "!**/test/**",
       "!**/tests/**",
       "!**/*.md"

@@ -164,7 +164,7 @@ export function useLicenseLogin() {
     if (handoffCode) {
       sessionStorage.removeItem('toolbox_login_handoff_code')
       authCode.value = handoffCode
-    } else if (typeof route.query.code === 'string') {
+    } else if (typeof route.query?.code === 'string') {
       // 兼容旧的内部测试链接；新管理端使用一次性 sessionStorage 交接，避免授权码留在地址栏。
       authCode.value = route.query.code
     }

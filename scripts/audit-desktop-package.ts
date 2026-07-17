@@ -19,6 +19,7 @@ const forbidden = entries.filter(entry => {
   const normalized = entry.replaceAll('\\', '/')
   if (/\.(?:ts|cts|map)$/i.test(normalized)) return true
   if (/(?:^|\/)(?:tests?|docs)(?:\/|$)/i.test(normalized)) return true
+  if (/(?:^|\/)smoke(?:\/|$)/i.test(normalized)) return true
   const runtimeScriptPath = normalized === '/dist-electron/electron/automation/scripts'
     || normalized.includes('/dist-electron/electron/automation/scripts/')
   if (/(?:^|\/)scripts(?:\/|$)/i.test(normalized) && !runtimeScriptPath) return true
