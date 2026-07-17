@@ -92,4 +92,28 @@ describe('ToolWorkspace 极简运行工作台', () => {
     expect(wrapper.find('.result-card.cancelled').text()).toContain('重新执行')
     wrapper.unmount()
   })
+
+  it('目标页面打开失败时提供安全重试，不直接暴露技术错误', async () => {
+    const wrapper = mountWorkspace()
+    await flushPromises()
+    const store = useTaskRunStore()
+    store.applyEvent({
+      type: AUTOMATION_EVENT.RUN_FAILED,
+      runId: store.runId,
+      stepId: 'open',
+      error: {
+        code: 'BROWSER_NAVIGATION_TIMEOUT',
+        message: 'net::ERR_TIMED_OUT',
+      },
+    })
+    await wrapper.vm.$nextTick()
+
+    const result = wrapper.find('.result-card.failed')
+    expect(result.text()).toContain('页面暂时没有打开')
+    expect(result.text()).toContain('重新打开并继续')
+    expect(wrapper.find('.browser-error-state').exists()).toBe(true)
+    expect(result.find('p').text()).not.toContain('net::ERR_TIMED_OUT')
+    expect(wrapper.find('.technical-details').text()).toContain('net::ERR_TIMED_OUT')
+    wrapper.unmount()
+  })
 })

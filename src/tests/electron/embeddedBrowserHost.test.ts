@@ -5,19 +5,21 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { EmbeddedBrowserHost } = require('../../../dist-electron/electron/automation/embedded-browser-host.cjs')
 
-function createGuest() {
+function createGuest(initialUrl = 'https://example.com/') {
   const guest = new EventEmitter() as EventEmitter & Record<string, unknown>
-  let url = 'https://example.com/'
+  let url = initialUrl
   let attached = false
   guest.id = 42
   guest.isDestroyed = () => false
   guest.getURL = () => url
+  guest.setURL = (nextUrl: string) => { url = nextUrl }
   guest.isLoading = () => false
   guest.loadURL = vi.fn(async nextUrl => {
     url = nextUrl
-    queueMicrotask(() => guest.emit('did-stop-loading'))
+    queueMicrotask(() => guest.emit('dom-ready'))
   })
   guest.executeJavaScript = vi.fn(async expression => {
+    if (expression === 'document.readyState') return 'complete'
     if (expression.includes('__toolbox_runner_overlay__')) return { matched: true, tagName: 'MAIN' }
     return { title: 'Example', url, forms: 1, inputs: 2, buttons: 3, links: 4 }
   })
@@ -57,5 +59,41 @@ describe('EmbeddedBrowserHost', () => {
 
     await expect(host.request('browser.navigate', { url: 'file:///etc/passwd' })).rejects.toMatchObject({ code: 'TARGET_URL_INVALID' })
     await expect(host.request('browser.eval', { code: 'alert(1)' })).rejects.toMatchObject({ code: 'BROWSER_ACTION_UNSUPPORTED' })
+  })
+
+  it('目标页面已经就绪时不重复导航', async () => {
+    const host = new EmbeddedBrowserHost()
+    const guest = createGuest('https://sellercentral.amazon.com/home')
+    host.register(guest)
+
+    const result = await host.request('browser.navigate', { url: 'https://sellercentral.amazon.com/' })
+
+    expect(guest.loadURL).not.toHaveBeenCalled()
+    expect(result).toMatchObject({
+      url: 'https://sellercentral.amazon.com/home',
+      reused: true,
+    })
+  })
+
+  it('允许 Amazon 登录链路重定向，并忽略 ERR_ABORTED', async () => {
+    const host = new EmbeddedBrowserHost()
+    const guest = createGuest('about:blank')
+    guest.loadURL = vi.fn(async () => {
+      queueMicrotask(() => {
+        ;(guest.setURL as (nextUrl: string) => void)('https://signin.amazon.com/ap/signin')
+        guest.emit('did-fail-load', {}, -3, 'ERR_ABORTED', 'https://sellercentral.amazon.com/', true)
+        guest.emit('did-redirect-navigation', {}, 'https://signin.amazon.com/ap/signin', false, true)
+        guest.emit('dom-ready')
+      })
+      throw Object.assign(new Error('ERR_ABORTED'), { errno: -3 })
+    })
+    host.register(guest)
+
+    await expect(host.request('browser.navigate', {
+      url: 'https://sellercentral.amazon.com/',
+    })).resolves.toMatchObject({
+      url: 'https://signin.amazon.com/ap/signin',
+      reused: false,
+    })
   })
 })

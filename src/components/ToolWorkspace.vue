@@ -39,8 +39,10 @@
 
           <div class="browser-viewport">
             <div v-if="browserLoading" class="browser-loading">
-              <LoaderCircle :size="28" class="spin" />
-              <strong>正在打开目标页面</strong>
+              <span class="loading-orbit"><LoaderCircle :size="25" class="spin" /></span>
+              <strong>正在打开亚马逊页面</strong>
+              <p>页面准备好后会自动开始处理</p>
+              <span class="loading-line"></span>
             </div>
 
             <webview
@@ -69,6 +71,12 @@
 
             <div v-if="interactionLocked && !browserLoading" class="interaction-shield">
               <div><LoaderCircle :size="16" class="spin" />正在自动处理，请不要操作页面</div>
+            </div>
+
+            <div v-if="isBrowserRetryableError" class="browser-error-state">
+              <span><CircleAlert :size="24" /></span>
+              <strong>页面暂时没有打开</strong>
+              <p>没有继续执行页面操作，可以在右侧安全地重新打开。</p>
             </div>
           </div>
         </div>
@@ -115,11 +123,18 @@
 
         <div v-else-if="runStatus === 'failed'" class="result-card failed">
           <div class="result-icon"><CircleAlert :size="27" /></div>
-          <h2>本次操作未完成</h2>
-          <p>系统已经停止后续操作，不会继续修改页面。</p>
+          <h2>{{ failureTitle }}</h2>
+          <p>{{ failureDescription }}</p>
           <div class="problem-code">问题编号：{{ problemCode }}</div>
-          <button class="primary-action" type="button" @click="restartRun">重新执行</button>
-          <button class="secondary-action" type="button" @click="openSupport">联系客服</button>
+          <button class="primary-action" type="button" @click="restartRun">
+            {{ isBrowserRetryableError ? '重新打开并继续' : '重新执行' }}
+          </button>
+          <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
+          <details class="technical-details">
+            <summary>查看问题详情</summary>
+            <p>{{ technicalError }}</p>
+            <button type="button" @click="openSupport">携带问题信息联系客服</button>
+          </details>
         </div>
 
         <div v-else class="result-card cancelled">
@@ -142,6 +157,7 @@ const {
   webviewRef, browserLoading, restarting, stageItems, toolName, toolUrl, isElectron,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
+  isBrowserRetryableError, failureTitle, failureDescription, technicalError,
   stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport,
 } = useSingleAutomationRun()
 </script>
@@ -238,10 +254,19 @@ const {
 .browser-note { margin-left: auto; color: var(--color-primary-hover); font-weight: 700; }
 .browser-viewport { position: relative; flex: 1; min-height: 0; }
 .workspace-webview { width: 100%; height: 100%; display: flex; }
-.browser-loading { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: rgba(255,255,255,.96); }
+.browser-loading { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; background: rgba(252,252,253,.97); }
+.browser-loading strong { font-size: var(--type-card); color: var(--color-text); }
+.browser-loading p { margin: 0; font-size: var(--type-control); color: var(--color-text-secondary); }
+.loading-orbit { width: 48px; height: 48px; display: grid; place-items: center; border: 1px solid rgba(45,95,202,.14); border-radius: 15px; color: var(--color-primary); background: var(--color-primary-soft); box-shadow: 0 12px 28px rgba(45,95,202,.1); }
+.loading-line { width: 132px; height: 2px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: var(--color-border); }
+.loading-line::after { content: ''; display: block; width: 45%; height: 100%; border-radius: inherit; background: var(--color-primary); animation: loadingTrack 1.6s ease-in-out infinite; }
 
 .interaction-shield { position: absolute; inset: 0; z-index: 5; display: flex; align-items: flex-start; justify-content: center; padding-top: 14px; background: rgba(255,255,255,.015); cursor: wait; }
 .interaction-shield div { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid rgba(14,165,233,.2); border-radius: 999px; color: var(--color-primary-hover); background: rgba(255,255,255,.96); box-shadow: var(--shadow-medium); font-size:var(--type-control); font-weight: 700; }
+.browser-error-state { position: absolute; inset: 0; z-index: 7; display: grid; place-content: center; justify-items: center; gap: 9px; padding: 24px; text-align: center; background: rgba(252,252,253,.97); animation: browserErrorIn var(--motion-normal) var(--ease-emphasized) both; }
+.browser-error-state > span { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 15px; color: var(--color-danger); background: var(--color-danger-soft); }
+.browser-error-state strong { font-size: var(--type-card); color: var(--color-text); }
+.browser-error-state p { max-width: 360px; margin: 0; font-size: var(--type-control); line-height: 1.65; color: var(--color-text-secondary); }
 
 .browser-mock { height: 100%; background: #f5f6f8; }
 .mock-site-header { height: 56px; display: flex; align-items: center; gap: 24px; padding: 0 22px; color: white; background: #111827; }
@@ -295,9 +320,15 @@ const {
 .primary-action, .secondary-action { width: 100%; min-height: 40px; border-radius: 8px; font-size:var(--type-control); font-weight: 800; cursor: pointer; }
 .primary-action { border: 0; color: white; background: var(--color-primary); }
 .secondary-action { margin-top: 9px; border: 1px solid var(--color-border); color: var(--color-text); background: white; }
+.technical-details { margin-top: 16px; text-align: left; border-top: 1px solid var(--color-border); color: var(--color-text-secondary); font-size: var(--type-meta); }
+.technical-details summary { padding: 14px 2px 4px; cursor: pointer; font-weight: 700; }
+.technical-details p { margin: 8px 0; padding: 10px; overflow-wrap: anywhere; border-radius: 8px; background: var(--color-surface-soft); font-size: var(--type-meta); line-height: 1.55; }
+.technical-details button { padding: 0; border: 0; color: var(--color-primary); background: transparent; font-size: var(--type-meta); font-weight: 700; cursor: pointer; }
 
 .spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes loadingTrack { 0% { transform: translateX(-110%); } 55%,100% { transform: translateX(240%); } }
+@keyframes browserErrorIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @keyframes ambientPulse { 50% { opacity: .42; transform: scale(.82); } }
 @keyframes workspaceTakeover { from { opacity: .82; transform: scale(.997); } to { opacity: 1; transform: none; } }
 @keyframes workspaceRail { to { transform: translateX(365%); } }
@@ -329,8 +360,10 @@ const {
   .status-pill.is-running::after,
   .status-pill.is-preparing::after,
   .user-action-card,
+  .browser-error-state,
   .success .result-icon { animation: none; }
 
   .tool-workspace::before { display: none; }
+  .loading-line::after { animation: none; width: 100%; }
 }
 </style>

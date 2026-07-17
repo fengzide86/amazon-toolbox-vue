@@ -57,6 +57,7 @@ const taskStarted = ref(false)
 const taskStarting = ref(false)
 const loggedRunIds = new Set<string>()
 let browserReadyFallback: ReturnType<typeof setTimeout> | null = null
+const webviewCleanup: Array<() => void> = []
 
 const stageItems = [
   { key: 'prepare', label: '准备', description: '正在打开并检查目标页面' },
@@ -72,6 +73,11 @@ const platformName = computed(() => appStore.currentTool?.platformKey === 'aliex
 const platformShortName = computed(() => platformName.value === '速卖通' ? 'AliExpress' : 'amazon seller')
 const isActiveRun = computed(() => ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
 const isTerminal = computed(() => ['completed', 'failed', 'cancelled'].includes(runStatus.value))
+const isBrowserRetryableError = computed(() => {
+  if (runStatus.value !== 'failed') return false
+  return ['BROWSER_NAVIGATION_FAILED', 'BROWSER_NAVIGATION_TIMEOUT', 'BROWSER_NOT_REGISTERED']
+    .includes(taskRunStore.error?.code || '')
+})
 const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
 const displayUrl = computed(() => {
   const value = browserUrl.value || toolUrl.value
@@ -110,6 +116,21 @@ const customerStatusText = computed(() => ({
 const problemCode = computed(() => {
   const source = taskRunStore.runId || taskRunStore.error?.code || 'UNKNOWN'
   return String(source).replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase() || 'UNKNOWN'
+})
+const failureTitle = computed(() => isBrowserRetryableError.value ? '页面暂时没有打开' : '本次操作未完成')
+const failureDescription = computed(() => {
+  if (isBrowserRetryableError.value) return '系统没有继续修改页面。你可以重新打开，并从安全位置继续处理。'
+  const stepId = currentStep.value?.id
+  if (stepId === 'prepare') return '工具在准备阶段停止，没有开始修改页面。'
+  if (stepId === 'open') return '目标页面没有正常打开，系统已经停止后续操作。'
+  if (stepId === 'inspect') return '系统在检查页面时停止，没有继续执行后续操作。'
+  if (stepId === 'verify' || stepId === 'summary') return '系统在核验页面结果时停止，请以左侧页面显示为准。'
+  return '系统已经停止后续操作，不会继续修改页面。'
+})
+const technicalError = computed(() => {
+  const code = taskRunStore.error?.code || 'AUTOMATION_FAILED'
+  const message = taskRunStore.error?.message || '未提供更多信息'
+  return `${code} · ${message}`
 })
 
 function stageState(index: number) {
@@ -236,10 +257,23 @@ function bindWebviewEvents() {
     startTaskWithBrowser()
     return
   }
-  webview.addEventListener('did-start-loading', () => { browserLoading.value = true })
-  webview.addEventListener('did-stop-loading', () => { browserLoading.value = false })
-  webview.addEventListener('did-fail-load', () => { browserLoading.value = false })
-  webview.addEventListener('dom-ready', startTaskWithBrowser, { once: true })
+  const onStart = () => { browserLoading.value = true }
+  const onStop = () => { browserLoading.value = false }
+  const onFail = () => { browserLoading.value = false }
+  const onReady = () => {
+    browserLoading.value = false
+    void startTaskWithBrowser()
+  }
+  webview.addEventListener('did-start-loading', onStart)
+  webview.addEventListener('did-stop-loading', onStop)
+  webview.addEventListener('did-fail-load', onFail)
+  webview.addEventListener('dom-ready', onReady, { once: true })
+  webviewCleanup.push(
+    () => webview.removeEventListener('did-start-loading', onStart),
+    () => webview.removeEventListener('did-stop-loading', onStop),
+    () => webview.removeEventListener('did-fail-load', onFail),
+    () => webview.removeEventListener('dom-ready', onReady),
+  )
   try {
     if (webview.getWebContentsId?.()) startTaskWithBrowser()
   } catch {
@@ -287,9 +321,15 @@ onMounted(() => {
 })
 
 watch(runStatus, recordTerminalRun)
+watch(runStatus, status => {
+  if (status === 'failed' || status === 'cancelled' || status === 'completed') {
+    browserLoading.value = false
+  }
+})
 
 onUnmounted(() => {
   if (browserReadyFallback) clearTimeout(browserReadyFallback)
+  webviewCleanup.splice(0).forEach(cleanup => cleanup())
   window.electronAPI?.automation?.unregisterBrowser?.()
   taskRunStore.reset()
 })
@@ -297,6 +337,7 @@ onUnmounted(() => {
     webviewRef, browserLoading, restarting, stageItems, toolName, toolUrl, isElectron,
     platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
     currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
+    isBrowserRetryableError, failureTitle, failureDescription, technicalError,
     stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport,
   }
 }

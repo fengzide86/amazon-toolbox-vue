@@ -1,12 +1,30 @@
 import type { Event, WebContents } from 'electron';
 
+type NavigationError = Error & {
+  code: string;
+  chromiumCode?: number;
+  url?: string;
+};
+
+type NavigationCleanup = {
+  attemptId: number;
+  cancel: (reason?: NavigationError) => void;
+};
+
+const NAVIGATION_TIMEOUT_MS = 30000;
+const TRANSIENT_NETWORK_CODES = new Set([-7, -21, -101, -102, -105, -106, -118, -130]);
+
 class EmbeddedBrowserHost {
   guest: WebContents | null;
   debuggerAttached: boolean;
+  navigationSequence: number;
+  activeNavigation: NavigationCleanup | null;
 
   constructor() {
     this.guest = null;
     this.debuggerAttached = false;
+    this.navigationSequence = 0;
+    this.activeNavigation = null;
   }
 
   register(guest: WebContents) {
@@ -49,30 +67,155 @@ class EmbeddedBrowserHost {
 
   async navigate(guest: WebContents, rawUrl: unknown) {
     const url = this.validUrl(rawUrl);
-    if (guest.getURL() === url && !guest.isLoading?.()) return { url };
+    const currentUrl = guest.getURL?.() || '';
+    if (await this.canReusePage(guest, currentUrl, url)) {
+      return { url: currentUrl, reused: true };
+    }
 
-    await new Promise<void>((resolve, reject) => {
+    let lastError: NavigationError | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const finalUrl = await this.navigateOnce(guest, url);
+        return { url: finalUrl, reused: false, retried: attempt > 0 };
+      } catch (error) {
+        lastError = error as NavigationError;
+        if (attempt > 0 || !this.isTransientNavigationError(lastError)) throw lastError;
+      }
+    }
+    throw lastError || this.navigationError('BROWSER_NAVIGATION_FAILED', '页面暂时没有打开', undefined, url);
+  }
+
+  async navigateOnce(guest: WebContents, url: string): Promise<string> {
+    this.cancelActiveNavigation();
+    const attemptId = ++this.navigationSequence;
+
+    return new Promise<string>((resolve, reject) => {
       let settled = false;
-      const finish = (error?: Error) => {
-        if (settled) return;
-        settled = true;
+      const isCurrent = () => this.activeNavigation?.attemptId === attemptId;
+      const removeListeners = () => {
         clearTimeout(timer);
-        guest.removeListener('did-stop-loading', onLoaded);
+        guest.removeListener('dom-ready', onDomReady);
+        guest.removeListener('did-frame-finish-load', onFrameFinished);
+        guest.removeListener('did-navigate', onNavigated);
+        guest.removeListener('did-redirect-navigation', onRedirect);
         guest.removeListener('did-fail-load', onFailed);
+      };
+      const finish = (error?: NavigationError) => {
+        if (settled || !isCurrent()) return;
+        settled = true;
+        removeListeners();
+        this.activeNavigation = null;
         if (error) reject(error);
-        else resolve();
+        else resolve(guest.getURL?.() || url);
       };
-      const onLoaded = () => finish();
-      const onFailed = (_event: Event, code: number, description: string, validatedUrl: string, isMainFrame: boolean) => {
+      const finishWhenDocumentReady = async () => {
+        if (settled || !isCurrent()) return;
+        const loadedUrl = guest.getURL?.() || '';
+        if (!this.isAllowedNavigationTarget(loadedUrl, url)) return;
+        if (await this.isDocumentReady(guest)) finish();
+      };
+      const onDomReady = () => { void finishWhenDocumentReady(); };
+      const onFrameFinished = (_event: Event, isMainFrame: boolean) => {
+        if (isMainFrame !== false) void finishWhenDocumentReady();
+      };
+      const onNavigated = (_event: Event, navigatedUrl: string) => {
+        if (this.isAllowedNavigationTarget(navigatedUrl, url)) void finishWhenDocumentReady();
+      };
+      const onRedirect = (
+        _event: Event,
+        navigatedUrl: string,
+        _isInPlace: boolean,
+        isMainFrame: boolean,
+      ) => {
+        if (isMainFrame !== false && this.isAllowedNavigationTarget(navigatedUrl, url)) {
+          void finishWhenDocumentReady();
+        }
+      };
+      const onFailed = (
+        _event: Event,
+        code: number,
+        description: string,
+        validatedUrl: string,
+        isMainFrame: boolean,
+      ) => {
         if (isMainFrame === false || code === -3) return;
-        finish(this.error('BROWSER_NAVIGATION_FAILED', description || `页面加载失败: ${validatedUrl}`));
+        finish(this.navigationError(
+          'BROWSER_NAVIGATION_FAILED',
+          description || '页面暂时没有打开',
+          code,
+          validatedUrl || url,
+        ));
       };
-      const timer = setTimeout(() => finish(this.error('BROWSER_NAVIGATION_TIMEOUT', '页面加载超时')), 45000);
-      guest.once('did-stop-loading', onLoaded);
+      const timer = setTimeout(() => {
+        finish(this.navigationError('BROWSER_NAVIGATION_TIMEOUT', '页面暂时没有打开', -7, guest.getURL?.() || url));
+      }, NAVIGATION_TIMEOUT_MS);
+
+      this.activeNavigation = {
+        attemptId,
+        cancel: (reason = this.navigationError('BROWSER_NAVIGATION_CANCELLED', '页面打开已取消')) => finish(reason),
+      };
+      guest.on('dom-ready', onDomReady);
+      guest.on('did-frame-finish-load', onFrameFinished);
+      guest.on('did-navigate', onNavigated);
+      guest.on('did-redirect-navigation', onRedirect);
       guest.on('did-fail-load', onFailed);
-      guest.loadURL(url).catch((error: Error) => finish(this.error('BROWSER_NAVIGATION_FAILED', error.message)));
+      guest.loadURL(url).catch((error: Error & { errno?: number }) => {
+        if (error?.errno === -3 || /ERR_ABORTED/i.test(error?.message || '')) return;
+        finish(this.navigationError('BROWSER_NAVIGATION_FAILED', error?.message || '页面暂时没有打开', error?.errno, url));
+      });
     });
-    return { url: guest.getURL() };
+  }
+
+  async canReusePage(guest: WebContents, currentUrl: string, targetUrl: string): Promise<boolean> {
+    if (guest.isLoading?.() || !this.isReusableNavigationTarget(currentUrl, targetUrl)) return false;
+    return this.isDocumentReady(guest);
+  }
+
+  isReusableNavigationTarget(currentUrl: string, targetUrl: string): boolean {
+    try {
+      const current = new URL(currentUrl);
+      const target = new URL(targetUrl);
+      const samePage = current.origin === target.origin
+        && current.pathname.replace(/\/+$/, '') === target.pathname.replace(/\/+$/, '')
+      return samePage || (this.isAmazonHost(current.hostname) && this.isAmazonHost(target.hostname));
+    } catch {
+      return false;
+    }
+  }
+
+  async isDocumentReady(guest: WebContents): Promise<boolean> {
+    try {
+      const state = await guest.executeJavaScript('document.readyState', true);
+      return state === 'interactive' || state === 'complete';
+    } catch {
+      return false;
+    }
+  }
+
+  isAllowedNavigationTarget(currentUrl: string, targetUrl: string): boolean {
+    try {
+      const current = new URL(currentUrl);
+      const target = new URL(targetUrl);
+      if (!['http:', 'https:'].includes(current.protocol)) return false;
+      if (current.origin === target.origin) return true;
+      return this.isAmazonHost(current.hostname) && this.isAmazonHost(target.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  isAmazonHost(hostname: string): boolean {
+    return /(^|\.)amazon\.[a-z.]+$/i.test(hostname);
+  }
+
+  isTransientNavigationError(error: NavigationError): boolean {
+    return error.code === 'BROWSER_NAVIGATION_TIMEOUT'
+      || (typeof error.chromiumCode === 'number' && TRANSIENT_NETWORK_CODES.has(error.chromiumCode));
+  }
+
+  cancelActiveNavigation(reason?: NavigationError): void {
+    this.activeNavigation?.cancel(reason);
+    this.activeNavigation = null;
   }
 
   async inspect(guest: WebContents): Promise<unknown> {
@@ -130,6 +273,7 @@ class EmbeddedBrowserHost {
   }
 
   release() {
+    this.cancelActiveNavigation();
     this.detach();
     this.guest = null;
     this.debuggerAttached = false;
@@ -161,6 +305,10 @@ class EmbeddedBrowserHost {
 
   error(code: string, message: string): Error & { code: string } {
     return Object.assign(new Error(message), { code });
+  }
+
+  navigationError(code: string, message: string, chromiumCode?: number, url?: string): NavigationError {
+    return Object.assign(new Error(message), { code, chromiumCode, url });
   }
 }
 
