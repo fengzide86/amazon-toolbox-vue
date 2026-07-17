@@ -100,10 +100,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(request_tracking_middleware)
     _register_routers(app)
 
-    @app.get("/api/health")
-    @limiter.limit("30/minute")
-    async def health_check(request: Request) -> dict[str, Any]:
-        del request
+    async def readiness_snapshot() -> dict[str, Any]:
         database = await check_db_health()
         health: dict[str, Any] = {
             "status": "ok" if database["status"] == "ok" else "degraded",
@@ -122,6 +119,24 @@ def create_app() -> FastAPI:
         health["checks"]["pool"] = (await get_db_stats()).get("pool", {})
         health["checks"]["tasks"] = {"pending": task_manager.pending_count}
         return health
+
+    @app.get("/api/health/live")
+    @limiter.limit("60/minute")
+    async def health_live(request: Request) -> dict[str, Any]:
+        del request
+        return {"status": "ok", "version": settings.APP_VERSION}
+
+    @app.get("/api/health/ready")
+    @limiter.limit("30/minute")
+    async def health_ready(request: Request) -> dict[str, Any]:
+        del request
+        return await readiness_snapshot()
+
+    @app.get("/api/health")
+    @limiter.limit("30/minute")
+    async def health_check(request: Request) -> dict[str, Any]:
+        del request
+        return await readiness_snapshot()
 
     @app.get("/api/system-info")
     @limiter.limit("10/minute")

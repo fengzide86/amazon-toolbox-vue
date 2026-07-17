@@ -197,7 +197,7 @@ describe('LoginView', () => {
       await flushPromises()
 
       expect(wrapper.find('.error-message').classes()).toContain('show')
-      expect(wrapper.find('.error-message span').text()).toContain('网络连接失败')
+      expect(wrapper.find('.error-message span').text()).toContain('网络暂时无法连接')
     })
 
     it('登录过程中按钮应该显示加载状态', async () => {

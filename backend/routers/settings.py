@@ -6,14 +6,13 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
 
+from core.dependencies import get_current_admin
+from core.logging import get_logger
+from core.security import hash_password_async
 from database import get_db
 from models import Setting
-from schemas import SettingUpdate, SettingResponse
-from core.logging import get_logger
-from core.security import hash_password
-from core.dependencies import get_current_admin
+from schemas import SettingResponse, SettingUpdate
 
 logger = get_logger(__name__)
 
@@ -61,7 +60,7 @@ async def get_public_settings(db: AsyncSession = Depends(get_db)):
 
 # ===== 管理员接口 =====
 
-@router.get("", response_model=List[SettingResponse])
+@router.get("", response_model=list[SettingResponse])
 async def get_all_settings(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
@@ -101,7 +100,7 @@ async def update_setting(
     value_to_store = req.value
     # 管理员密码修改时使用 bcrypt 哈希
     if req.key == "admin_password":
-        value_to_store = hash_password(req.value)
+        value_to_store = await hash_password_async(req.value)
         logger.info("管理员密码已更新")
     
     if setting:

@@ -13,8 +13,8 @@ from core.logging import get_logger
 from core.response import ErrorCodes, error_response, success_response
 from core.security import (
     create_access_token,
-    hash_password,
-    verify_password_fallback,
+    hash_password_async,
+    verify_password_fallback_async,
 )
 from models import AuthCode, AuthSeat, Device, Plan, Setting, User
 from services.entitlement_service import normalize_entitlements, resolve_product_access
@@ -322,11 +322,11 @@ class AuthService:
         setting = result.scalars().first()
         
         if setting and setting.value:
-            is_valid, needs_upgrade = verify_password_fallback(password, setting.value)
+            is_valid, needs_upgrade = await verify_password_fallback_async(password, setting.value)
             
             if is_valid:
                 if needs_upgrade:
-                    setting.value = hash_password(password)
+                    setting.value = await hash_password_async(password)
                     await self.db.commit()
                     logger.info("管理员密码已自动升级为 bcrypt 格式")
                 

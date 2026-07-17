@@ -1,8 +1,9 @@
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Auth, getDeviceId, getDeviceName, showToast } from '@/utils'
 import { api, verifyAuthCode } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
+import { useConnectionStore } from '@/stores/connection'
 import { saveRememberedUserCode } from '@/utils/credentialStore'
 import { licenseLoginResponseSchema, publicSettingsSchema } from './model'
 
@@ -33,6 +34,7 @@ export function useLicenseLogin() {
   const router = useRouter()
   const route = useRoute()
   const userStore = useUserStore()
+  const connection = useConnectionStore()
   const authCode = ref('')
   const authCodeInput = ref<HTMLInputElement | null>(null)
   const isLoading = ref(false)
@@ -42,26 +44,28 @@ export function useLicenseLogin() {
   const copySuccess = ref(false)
   const errorMessage = ref('')
   const inputFocused = ref(false)
-  const isOnline = ref(true)
   const deviceName = ref('')
   const deviceId = ref('')
   const wechatId = ref('AmazonToolbox_Support')
 
-  const connectionStatusClass = computed(() => ({ online: isOnline.value, offline: !isOnline.value }))
-  const connectionStatusText = computed(() => isOnline.value ? '服务已连接' : '服务连接中...')
-
-  function checkOnlineStatus() {
-    isOnline.value = navigator.onLine
-  }
+  const connectionStatusClass = computed(() => ({
+    online: connection.status === 'online',
+    offline: connection.status === 'offline',
+    connecting: connection.status === 'unknown' || connection.status === 'degraded' || connection.status === 'recovering',
+  }))
+  const connectionStatusText = computed(() => {
+    if (connection.status === 'online') return '服务可用'
+    if (connection.status === 'offline') return '连接不稳定，正在恢复'
+    return '正在连接服务'
+  })
 
   async function loadWechatId() {
     try {
       const settings = publicSettingsSchema.parse(await api.get('/api/settings/public'))
       const setting = settings.find(item => item.key === 'wechat_id' || item.key === 'service_wechat')
       if (setting?.value) wechatId.value = setting.value
-      isOnline.value = true
     } catch {
-      isOnline.value = false
+      // Contact information is optional and must not decide backend availability.
     }
   }
 
@@ -112,11 +116,25 @@ export function useLicenseLogin() {
         && result.data.entitlements?.batch_execution === true
         && result.data.entitlements?.multi_account_workspace === true
       await router.push(businessAccess ? '/business/overview' : '/user/tools')
-    } catch {
-      errorMessage.value = '网络连接失败，请检查后端服务'
+    } catch (error) {
+      const apiError = typeof error === 'object' && error !== null
+        ? error as { kind?: string; message?: string; requestId?: string | null }
+        : null
+      const rawMessage = apiError?.message || (error instanceof Error ? error.message : '')
+      const isNetworkFailure = apiError?.kind === 'timeout'
+        || apiError?.kind === 'network'
+        || /network|fetch|timeout/i.test(rawMessage)
+      if (isNetworkFailure) {
+        errorMessage.value = '网络暂时无法连接，请稍后重试'
+      } else if (apiError?.kind === 'parse' || apiError?.kind === 'validation') {
+        errorMessage.value = apiError.requestId
+          ? `服务响应异常，问题编号：${apiError.requestId}`
+          : '服务响应异常，请稍后重试'
+      } else {
+        errorMessage.value = rawMessage || '登录未完成，请稍后重试'
+      }
       showError.value = true
-      isOnline.value = false
-      showToast('网络连接失败', 'error')
+      showToast(errorMessage.value, 'error')
     } finally {
       isLoading.value = false
       if (showError.value) focusLoginInput()
@@ -171,9 +189,7 @@ export function useLicenseLogin() {
     deviceId.value = getDeviceId()
     deviceName.value = getDeviceName()
     void loadWechatId()
-    checkOnlineStatus()
-    window.addEventListener('online', checkOnlineStatus)
-    window.addEventListener('offline', checkOnlineStatus)
+    void connection.probe()
     const autoLoginError = localStorage.getItem('toolbox_auto_login_error')
     if (autoLoginError) {
       localStorage.removeItem('toolbox_auto_login_error')
@@ -181,11 +197,6 @@ export function useLicenseLogin() {
       showError.value = true
     }
     focusLoginInput()
-  })
-
-  onUnmounted(() => {
-    window.removeEventListener('online', checkOnlineStatus)
-    window.removeEventListener('offline', checkOnlineStatus)
   })
 
   return {

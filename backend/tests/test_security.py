@@ -2,20 +2,23 @@
 安全模块单元测试
 测试密码哈希、JWT Token、CORS 配置等安全功能
 """
-import pytest
 from datetime import timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
+import pytest
+
+from core.config import Settings
 from core.security import (
+    configure_cors,
+    create_access_token,
+    extract_token_from_header,
     hash_password,
+    hash_password_async,
     verify_password,
     verify_password_fallback,
-    create_access_token,
+    verify_password_fallback_async,
     verify_token,
-    extract_token_from_header,
-    configure_cors
 )
-from core.config import Settings
 
 
 class TestPasswordHashing:
@@ -84,6 +87,13 @@ class TestPasswordFallback:
         
         match, needs_upgrade = verify_password_fallback(password, hashed)
         
+        assert match is True
+        assert needs_upgrade is False
+
+    @pytest.mark.asyncio
+    async def test_async_password_helpers(self):
+        hashed = await hash_password_async("async-password")
+        match, needs_upgrade = await verify_password_fallback_async("async-password", hashed)
         assert match is True
         assert needs_upgrade is False
     

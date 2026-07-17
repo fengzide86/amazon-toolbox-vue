@@ -1,6 +1,11 @@
 import { generateCacheKey, getCache, setCache } from '../cache'
 import { authService } from '../auth'
 import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
+import { getApiBase } from '@/shared/api/base'
+import {
+  recordConnectionFailure,
+  recordConnectionSuccess,
+} from '@/features/connectivity/state'
 
 const CACHE_ENABLED = true
 const CACHE_TTL = 5 * 60 * 1000
@@ -11,60 +16,64 @@ const CACHE_PATTERNS = [
   /\/api\/settings$/,
   /\/api\/logs\/tools/,
 ]
+const DEFAULT_TIMEOUT_MS = 12_000
 
 export type ApiQueryValue = string | number | boolean | null | undefined
 export type ApiQueryParams = Record<string, ApiQueryValue>
+export type ApiErrorKind = 'network' | 'timeout' | 'http' | 'business' | 'validation' | 'parse' | 'cancelled'
+export type ApiRetryPolicy = 'none' | 'safe-read' | 'background'
 type ApiBody = unknown
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body' | 'headers'> {
   body?: ApiBody
   headers?: HeadersInit
+  timeoutMs?: number
+  retry?: ApiRetryPolicy
+  trackConnection?: boolean
 }
 
-export interface ApiGetOptions {
+export interface ApiGetOptions extends Pick<ApiRequestOptions, 'signal' | 'timeoutMs' | 'retry' | 'trackConnection'> {
   cache?: boolean
 }
-
-function shouldCache(url: string): boolean {
-  return CACHE_ENABLED && CACHE_PATTERNS.some(pattern => pattern.test(url))
-}
-
-function getApiBase(): string {
-  try {
-    const runtimeApiBase = window.electronAPI?.runtime?.controlApiBase
-    if (runtimeApiBase) return runtimeApiBase
-  } catch {
-    // 非 Electron 环境继续使用存储或构建配置。
-  }
-  try {
-    const controlApiBase = localStorage.getItem('toolbox_control_api_base')
-    if (controlApiBase) return controlApiBase
-    const electronApiBase = localStorage.getItem('toolbox_api_base')
-    if (electronApiBase) return electronApiBase
-  } catch {
-    // 存储不可用时继续使用构建配置。
-  }
-  return import.meta.env.VITE_CONTROL_API_BASE || import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-}
-
-export const API_BASE = getApiBase()
-const pendingRequests = new Map<string, Promise<unknown>>()
-const MAX_RETRIES = 3
-const RETRY_DELAY = 2000
 
 export class ApiError extends Error {
   readonly status: number
   readonly data: unknown
+  readonly kind: ApiErrorKind
+  readonly errorCode: number | string | null
+  readonly requestId: string | null
+  readonly retryable: boolean
 
-  constructor(message: string, status = 0, data: unknown = null) {
+  constructor(
+    message: string,
+    options: {
+      status?: number
+      data?: unknown
+      kind?: ApiErrorKind
+      errorCode?: number | string | null
+      requestId?: string | null
+      retryable?: boolean
+    } = {},
+  ) {
     super(message)
     this.name = 'ApiError'
-    this.status = status
-    this.data = data
+    this.status = options.status ?? 0
+    this.data = options.data ?? null
+    this.kind = options.kind ?? 'http'
+    this.errorCode = options.errorCode ?? null
+    this.requestId = options.requestId ?? null
+    this.retryable = options.retryable ?? false
   }
 }
 
+export const API_BASE = getApiBase()
+const pendingRequests = new Map<string, Promise<unknown>>()
+const activeControllers = new Set<AbortController>()
 const delay = (milliseconds: number): Promise<void> => new Promise(resolve => setTimeout(resolve, milliseconds))
+
+function shouldCache(url: string): boolean {
+  return CACHE_ENABLED && CACHE_PATTERNS.some(pattern => pattern.test(url))
+}
 
 function getAuthToken(): string | null {
   try {
@@ -92,11 +101,25 @@ function errorMessage(value: unknown, fallback: string): string {
   return fallback
 }
 
+function errorCodeFrom(value: unknown): number | string | null {
+  const errorCode = asRecord(value)?.error_code
+  return typeof errorCode === 'number' || typeof errorCode === 'string' ? errorCode : null
+}
+
 function createRequestInit(options: ApiRequestOptions, token: string | null): RequestInit {
+  const {
+    body: requestBody,
+    headers: requestHeaders,
+    timeoutMs: _timeoutMs,
+    retry: _retry,
+    trackConnection: _trackConnection,
+    signal: _signal,
+    ...fetchOptions
+  } = options
   const headers: Record<string, string> = toolboxVersionHeaders({ 'Content-Type': 'application/json' })
   if (token) headers.Authorization = `Bearer ${token}`
-  if (options.headers) {
-    new Headers(options.headers).forEach((value, key) => {
+  if (requestHeaders) {
+    new Headers(requestHeaders).forEach((value, key) => {
       const existing = Object.keys(headers).find(header => header.toLowerCase() === key.toLowerCase())
       if (existing) delete headers[existing]
       headers[key] = value
@@ -104,49 +127,120 @@ function createRequestInit(options: ApiRequestOptions, token: string | null): Re
   }
 
   let body: BodyInit | undefined
-  if (options.body !== undefined && options.body !== null) {
-    if (options.body instanceof FormData) {
-      body = options.body
+  if (requestBody !== undefined && requestBody !== null) {
+    if (requestBody instanceof FormData) {
+      body = requestBody
       delete headers['Content-Type']
     } else {
-      body = JSON.stringify(options.body)
+      body = JSON.stringify(requestBody)
     }
   }
+  return { ...fetchOptions, headers, body }
+}
 
-  return { ...options, headers, body }
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException
+    ? error.name === 'AbortError'
+    : typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+}
+
+function classifyFetchError(error: unknown, timedOut: boolean, externallyCancelled: boolean): ApiError {
+  if (error instanceof ApiError) return error
+  if (externallyCancelled || (isAbortError(error) && !timedOut)) {
+    return new ApiError('请求已取消', { kind: 'cancelled' })
+  }
+  if (timedOut) return new ApiError('请求超时', { kind: 'timeout', retryable: true })
+  return new ApiError('网络连接失败', { kind: 'network', retryable: true })
+}
+
+function maxAttempts(policy: ApiRetryPolicy): number {
+  if (policy === 'background') return 3
+  if (policy === 'safe-read') return 2
+  return 1
+}
+
+function retryDelay(attempt: number, policy: ApiRetryPolicy): number {
+  const base = policy === 'background' ? 1_000 : 450
+  return base * (attempt + 1) + Math.floor(Math.random() * 250)
+}
+
+function shouldRetry(error: ApiError): boolean {
+  return error.retryable
+    && (error.kind === 'network' || error.kind === 'timeout' || error.status >= 500)
+}
+
+export function cancelPendingApiRequests(): void {
+  for (const controller of activeControllers) controller.abort()
+  activeControllers.clear()
+  pendingRequests.clear()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('toolbox:auth-cleared', cancelPendingApiRequests)
 }
 
 export async function request<T = unknown>(url: string, options: ApiRequestOptions = {}): Promise<T> {
   const method = (options.method || 'GET').toUpperCase()
-  const isIdempotent = method === 'GET'
-  const key = `${method}:${url}`
+  const isIdempotent = method === 'GET' || method === 'HEAD'
+  const token = getAuthToken()
+  const retryPolicy = options.retry ?? (isIdempotent ? 'safe-read' : 'none')
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const trackConnection = options.trackConnection !== false
+  const key = `${method}:${url}:${token || 'anonymous'}`
   const existing = isIdempotent ? pendingRequests.get(key) : undefined
   if (existing) return existing as Promise<T>
 
-  const config = createRequestInit(options, getAuthToken())
+  const config = createRequestInit(options, token)
   const fetchPromise = (async (): Promise<unknown> => {
-    let lastError: unknown = new ApiError('请求失败')
-    const maxAttempts = isIdempotent ? MAX_RETRIES + 1 : 1
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let lastError = new ApiError('请求失败', { kind: 'network', retryable: true })
+    const attempts = maxAttempts(retryPolicy)
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      const controller = new AbortController()
+      activeControllers.add(controller)
       let timeoutId: ReturnType<typeof setTimeout> | undefined
+      let timedOut = false
+      let removeExternalAbort: (() => void) | undefined
       try {
-        const controller = new AbortController()
-        timeoutId = setTimeout(() => controller.abort(), 10000)
+        if (options.signal) {
+          const abortFromCaller = () => controller.abort()
+          if (options.signal.aborted) abortFromCaller()
+          else {
+            options.signal.addEventListener('abort', abortFromCaller, { once: true })
+            removeExternalAbort = () => options.signal?.removeEventListener('abort', abortFromCaller)
+          }
+        }
+        timeoutId = setTimeout(() => {
+          timedOut = true
+          controller.abort()
+        }, timeoutMs)
         const response = await fetch(`${getApiBase()}${url}`, { ...config, signal: controller.signal })
+        if (trackConnection) recordConnectionSuccess()
+        const requestId = response.headers?.get?.('X-Request-ID') || null
 
         let data: unknown
         try {
           data = await response.json()
         } catch {
-          throw new ApiError(`服务器返回非 JSON 响应: ${response.status}`, response.status)
+          if (!response.ok) {
+            throw new ApiError(`请求失败: ${response.status}`, {
+              status: response.status,
+              kind: 'http',
+              requestId,
+              retryable: response.status >= 500,
+            })
+          }
+          throw new ApiError('服务响应格式异常', {
+            status: response.status,
+            kind: 'parse',
+            requestId,
+          })
         }
 
         if (!response.ok) {
-          const record = asRecord(data)
-          const errorCode = typeof record?.error_code === 'number' ? record.error_code : null
+          const errorCode = errorCodeFrom(data)
           const authInvalidCodes = new Set([2000, 2001, 2002, 3000, 3001, 3002])
           const shouldClearAuth = response.status === 401
-            || (response.status === 403 && errorCode !== null && authInvalidCodes.has(errorCode))
+            || (response.status === 403 && typeof errorCode === 'number' && authInvalidCodes.has(errorCode))
           if (shouldClearAuth && authService.getAuth()) {
             const role = authService.getRole()
             authService.clear()
@@ -154,17 +248,28 @@ export async function request<T = unknown>(url: string, options: ApiRequestOptio
               window.location.hash = role === 'admin' ? '#/admin/login' : '#/user/login'
             }
           }
-          throw new ApiError(errorMessage(data, `请求失败: ${response.status}`), response.status, data)
+          throw new ApiError(errorMessage(data, `请求失败: ${response.status}`), {
+            status: response.status,
+            data,
+            kind: response.status >= 500 ? 'http' : errorCode !== null ? 'business' : 'http',
+            errorCode,
+            requestId,
+            retryable: response.status >= 500,
+          })
         }
         return data
       } catch (error) {
-        lastError = error
-        console.error(`API Error (attempt ${attempt + 1}/${maxAttempts}): ${url}`, error)
-        if (error instanceof ApiError && error.status >= 400 && error.status < 500) throw error
-        if (attempt < maxAttempts - 1) await delay(RETRY_DELAY)
+        lastError = classifyFetchError(error, timedOut, options.signal?.aborted === true)
+        if (!shouldRetry(lastError) || attempt >= attempts - 1) break
+        await delay(retryDelay(attempt, retryPolicy))
       } finally {
         if (timeoutId) clearTimeout(timeoutId)
+        removeExternalAbort?.()
+        activeControllers.delete(controller)
       }
+    }
+    if (trackConnection && (lastError.kind === 'network' || lastError.kind === 'timeout')) {
+      recordConnectionFailure()
     }
     throw lastError
   })()
@@ -194,39 +299,45 @@ export const api = {
       .map(([key, value]) => [key, String(value)] as [string, string])
     const queryString = new URLSearchParams(entries).toString()
     const fullUrl = queryString ? `${url}?${queryString}` : url
+    const requestOptions: ApiRequestOptions = {
+      method: 'GET',
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
+      retry: options.retry,
+      trackConnection: options.trackConnection,
+    }
 
     if (options.cache !== false && shouldCache(url)) {
       const cacheKey = generateCacheKey(fullUrl)
       const cached = getCache<T>(cacheKey)
       if (cached !== null) return cached
-      const response = await request(fullUrl, { method: 'GET' })
-      const result = unwrapData(response) as T
+      const result = unwrapData(await request(fullUrl, requestOptions)) as T
       setCache(cacheKey, result, CACHE_TTL)
       return result
     }
-    return unwrapData(await request(fullUrl, { method: 'GET' })) as T
+    return unwrapData(await request(fullUrl, requestOptions)) as T
   },
 
-  async post<T = unknown>(url: string, data: ApiBody = {}): Promise<T> {
-    const result = await request<T>(url, { method: 'POST', body: data })
+  async post<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+    const result = await request<T>(url, { ...options, method: 'POST', body: data })
     clearApiCache(invalidationPrefix(url))
     return result
   },
 
-  async put<T = unknown>(url: string, data: ApiBody = {}): Promise<T> {
-    const result = await request<T>(url, { method: 'PUT', body: data })
+  async put<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+    const result = await request<T>(url, { ...options, method: 'PUT', body: data })
     clearApiCache(invalidationPrefix(url))
     return result
   },
 
-  async patch<T = unknown>(url: string, data: ApiBody = {}): Promise<T> {
-    const result = await request(url, { method: 'PATCH', body: data })
+  async patch<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+    const result = await request(url, { ...options, method: 'PATCH', body: data })
     clearApiCache(invalidationPrefix(url))
     return unwrapData(result) as T
   },
 
-  async delete<T = unknown>(url: string): Promise<T> {
-    const result = await request<T>(url, { method: 'DELETE' })
+  async delete<T = unknown>(url: string, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+    const result = await request<T>(url, { ...options, method: 'DELETE' })
     clearApiCache(invalidationPrefix(url))
     return result
   },

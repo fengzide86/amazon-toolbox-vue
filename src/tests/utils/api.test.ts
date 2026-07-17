@@ -13,6 +13,7 @@ describe('API Utils', () => {
     vi.clearAllMocks()
     localStorage.clear()
     sessionStorage.clear()
+    mockedFetch.mockReset()
   })
 
   describe('api.get', () => {
@@ -154,6 +155,37 @@ describe('API Utils', () => {
         json: () => Promise.resolve({ detail: '服务异常' })
       })
       await expect(request('/api/orders', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError)
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('GET 网络错误只重试一次并返回可识别错误', async () => {
+      vi.useFakeTimers()
+      mockedFetch.mockRejectedValue(new TypeError('Failed to fetch'))
+      const result = request('/api/transient', { method: 'GET', trackConnection: false })
+      const rejection = expect(result).rejects.toMatchObject({
+        name: 'ApiError',
+        kind: 'network',
+        retryable: true,
+      })
+      await vi.runAllTimersAsync()
+      await rejection
+      expect(global.fetch).toHaveBeenCalledTimes(2)
+      vi.useRealTimers()
+    })
+
+    it('收到 HTTP 错误时不把业务错误当断网', async () => {
+      mockedFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        headers: new Headers({ 'X-Request-ID': 'req-422' }),
+        json: () => Promise.resolve({ message: '参数不完整', error_code: 4100 }),
+      })
+      await expect(request('/api/validation', { method: 'GET' })).rejects.toMatchObject({
+        kind: 'business',
+        status: 422,
+        requestId: 'req-422',
+        retryable: false,
+      })
       expect(global.fetch).toHaveBeenCalledTimes(1)
     })
   })

@@ -7,6 +7,7 @@ import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -30,11 +31,11 @@ engine_kwargs: dict[str, Any] = {
 if settings.DB_TYPE == "mysql":
     engine_kwargs.update({
         # ===== 连接池配置（针对1核2G服务器优化）=====
-        "pool_size": 10,              # 连接池大小（降低内存占用）
-        "max_overflow": 20,           # 最大溢出连接数（pool_size + max_overflow = 最大30连接）
-        "pool_recycle": 1800,         # 30分钟回收连接（防止 MySQL 8小时超时）
-        "pool_pre_ping": False,       # 关闭（aiomysql 兼容性问题，用 pool_recycle 代替）
-        "pool_timeout": 10,           # 获取连接超时时间（秒）- 缩短超时快速失败
+        "pool_size": 5,
+        "max_overflow": 5,
+        "pool_recycle": 900,
+        "pool_pre_ping": True,
+        "pool_timeout": 5,
         
         # ===== MySQL 连接参数 =====
         "connect_args": {
@@ -77,6 +78,9 @@ async def get_db() -> AsyncGenerator[AsyncSession]:
             # 记录慢查询
             if elapsed > SLOW_QUERY_THRESHOLD:
                 logger.warning(f"慢查询检测: 会话耗时 {elapsed:.2f}s")
+        except HTTPException:
+            await session.rollback()
+            raise
         except Exception as e:
             await session.rollback()
             logger.error(f"数据库会话异常: {e}", exc_info=True)

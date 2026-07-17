@@ -54,7 +54,7 @@ onMounted(async () => {
     if (typeof error === 'object' && error !== null && 'status' in error && error.status === 403) {
       await refreshAccess().catch(() => router.replace('/user/tools'))
     }
-    else throw error
+    // A transient control-plane failure must not destroy the whole business shell.
   }
   accessTimer = setInterval(() => refreshAccess().catch(() => {}), 30000)
   removeAfterEach = router.afterEach(() => { showSidebar.value = false })

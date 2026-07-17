@@ -55,6 +55,7 @@ const entries = new Set<string>([
   'electron/preload.cts',
   'electron/automation-runner.cts',
   'electron/smoke/embedded-browser-smoke.cts',
+  'electron/smoke/amazon-navigation-smoke.cts',
   ...[...sourceFiles].filter(file =>
     file.startsWith('scripts/')
     || file.startsWith('tests/')

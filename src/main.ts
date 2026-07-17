@@ -5,7 +5,6 @@ import App from './App.vue'
 import router from './router'
 import '@/assets/css/main.css'
 import { initSentry } from './utils/sentry'
-import { initPerformanceMonitoring } from './utils/performance'
 import { initializeRememberedLogin } from './utils/authBootstrap'
 
 // 不在启动时清除登录状态，由路由守卫和 token 过期机制管理登录态
@@ -20,11 +19,6 @@ async function bootstrap() {
 
 // 初始化 Sentry 错误监控（生产环境自动启用）
   initSentry(app, router)
-
-// 初始化性能监控（生产环境）
-  if (import.meta.env.PROD) {
-    initPerformanceMonitoring()
-  }
 
   app.mount('#app')
 }

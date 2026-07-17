@@ -26,6 +26,21 @@ class TestHealthCheck:
         assert data["checks"]["database"]["status"] == "ok"
 
     @pytest.mark.asyncio
+    async def test_liveness_check_has_no_dependency_payload(self, client: AsyncClient):
+        response = await client.get("/api/health/live")
+        assert response.status_code == 200
+        assert response.json()["status"] == "ok"
+        assert "checks" not in response.json()
+
+    @pytest.mark.asyncio
+    async def test_readiness_check_keeps_health_contract(self, client: AsyncClient):
+        response = await client.get("/api/health/ready")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+        assert data["checks"]["database"]["status"] == "ok"
+
+    @pytest.mark.asyncio
     async def test_desktop_cors_contract(self, client: AsyncClient):
         response = await client.options(
             "/api/settings/public",

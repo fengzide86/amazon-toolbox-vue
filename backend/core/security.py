@@ -2,6 +2,7 @@
 安全相关模块
 包含密码哈希、JWT认证、CORS配置等安全功能
 """
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -77,6 +78,16 @@ def verify_password_fallback(password: str, stored: str) -> tuple[bool, bool]:
         pass
     
     return False, False
+
+
+async def hash_password_async(password: str) -> str:
+    """Hash a password without blocking an async request worker."""
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_fallback_async(password: str, stored: str) -> tuple[bool, bool]:
+    """Verify a password without blocking an async request worker."""
+    return await asyncio.to_thread(verify_password_fallback, password, stored)
 
 
 # ===== JWT Token =====

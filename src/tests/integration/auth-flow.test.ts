@@ -226,7 +226,7 @@ describe('认证流程集成测试', () => {
       await flushPromises()
 
       expect(wrapper.find('.error-message').classes()).toContain('show')
-      expect(wrapper.find('.error-message span').text()).toContain('网络连接失败')
+      expect(wrapper.find('.error-message span').text()).toContain('网络暂时无法连接')
     })
 
     it('管理员登录：网络断开应该显示友好错误', async () => {

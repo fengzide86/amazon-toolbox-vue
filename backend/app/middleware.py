@@ -20,7 +20,8 @@ async def request_tracking_middleware(request: Request, call_next: CallNext) -> 
     try:
         response = await call_next(request)
         elapsed = time.time() - started_at
-        logger.info(
+        log_request = logger.warning if elapsed >= 1.0 else logger.info
+        log_request(
             "[%s] %s %s - 状态: %s - 耗时: %.3fs - IP: %s",
             request_id,
             request.method,

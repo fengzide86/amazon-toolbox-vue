@@ -2,8 +2,16 @@
   <div :class="['batch-workspace', { 'has-batch': store.isActive || store.snapshot.status === 'completed' }]">
     <template v-if="!store.isActive && store.snapshot.status !== 'completed'">
       <section v-if="!store.bootstrap" class="workspace-loading-state">
-        <span><LoaderCircle :size="24" class="spin" /></span>
-        <strong>正在准备专业工作台</strong>
+        <template v-if="store.error">
+          <span><CircleAlert :size="24" /></span>
+          <strong>专业工作台暂时无法载入</strong>
+          <small>连接恢复后可以直接重试，不会影响本机已有浏览器现场。</small>
+          <button type="button" @click="refreshTools"><RefreshCw :size="16" />重新载入</button>
+        </template>
+        <template v-else>
+          <span><LoaderCircle :size="24" class="spin" /></span>
+          <strong>正在准备专业工作台</strong>
+        </template>
       </section>
 
       <section v-else-if="!store.tools.length" class="workspace-ready-empty">
@@ -247,4 +255,5 @@ onMounted(() => { void store.init() })
 @media(max-width:560px){.workspace-ready-empty{padding:30px 18px}.workspace-ready-empty h1{font-size:23px}.ready-actions{width:100%;display:grid}.ready-actions button,.ready-actions a{width:100%}}
 .error-list button{width:max-content;margin-top:4px;padding:4px 7px;border:1px solid rgba(195,61,73,.18);border-radius:6px;color:var(--color-danger);background:#fff;font-size:var(--type-micro);cursor:pointer}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}.queue-item.is-waiting_user .queue-state{animation:none}.action-panel,.account-queue{transition:none}}
+.workspace-loading-state small{max-width:430px;color:var(--color-text-secondary);font-size:var(--type-meta);line-height:1.6}.workspace-loading-state button{height:40px;display:flex;align-items:center;gap:7px;padding:0 14px;border:1px solid var(--color-border);border-radius:10px;color:var(--color-primary);background:var(--color-surface);font-size:var(--type-control);cursor:pointer}
 </style>

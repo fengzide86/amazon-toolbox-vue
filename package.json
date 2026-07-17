@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.7.6",
+  "version": "1.7.7",
   "description": "面向跨境电商业务的桌面自动化效率工具箱",
   "author": "Amazon Toolbox Team",
   "private": true,
@@ -79,8 +79,7 @@
     "vitest": "^4.1.10",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
-    "vue-tsc": "^3.3.7",
-    "web-vitals": "^5.3.0"
+    "vue-tsc": "^3.3.7"
   },
   "overrides": {
     "exceljs": {

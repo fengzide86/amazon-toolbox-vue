@@ -196,19 +196,25 @@ function entitlementNumber(key: string, fallback: number): number {
 
 async function loadData() {
   loading.value = true
-  try {
-    const [plansResult, codesResult, settingsResult, toolsResult] = await Promise.all([
+  const results = await Promise.allSettled([
       getPlansAdmin({ page_size: 100 }),
       getAuthCodes(),
       getSettings(),
       getTools(),
-    ])
-    plans.value = adminPlansSchema.parse(plansResult)
-    authCodes.value = adminAuthCodesSchema.parse(codesResult)
-    tools.value = toolCatalogSchema.parse(toolsResult)
-    const settings = adminSettingsSchema.parse(settingsResult)
-    const setting = settings.find(item => item.key === 'business_workspace_enabled')
-    workspaceEnabled.value = String(setting?.value || '').toLowerCase() === 'true'
+  ])
+  try {
+    const [plansResult, codesResult, settingsResult, toolsResult] = results
+    if (plansResult.status === 'fulfilled') plans.value = adminPlansSchema.parse(plansResult.value)
+    if (codesResult.status === 'fulfilled') authCodes.value = adminAuthCodesSchema.parse(codesResult.value)
+    if (toolsResult.status === 'fulfilled') tools.value = toolCatalogSchema.parse(toolsResult.value)
+    if (settingsResult.status === 'fulfilled') {
+      const settings = adminSettingsSchema.parse(settingsResult.value)
+      const setting = settings.find(item => item.key === 'business_workspace_enabled')
+      workspaceEnabled.value = String(setting?.value || '').toLowerCase() === 'true'
+    }
+    if (results.every(result => result.status === 'rejected')) {
+      showToast('专业工作台状态加载失败', 'error')
+    }
   } catch {
     showToast('专业工作台状态加载失败', 'error')
   } finally {

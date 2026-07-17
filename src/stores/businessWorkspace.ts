@@ -39,6 +39,23 @@ const STATUS_MESSAGE: Record<string, string> = {
 }
 
 const historySchema = z.array(serverBatchHistorySchema)
+const OUTBOX_RETRY_DELAYS = [2_000, 5_000, 15_000, 30_000] as const
+
+interface PendingItemSync {
+  batchId: string | number
+  itemId: string
+  payload: Record<string, unknown>
+}
+
+interface PendingBatchSync {
+  batchId: string | number
+  payload: Record<string, unknown>
+}
+
+interface PendingFinishSync {
+  batchId: string | number
+  status: string
+}
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -69,7 +86,13 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   let removeEventListener: (() => void) | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setTimeout> | null = null
+  let outboxRetryTimer: ReturnType<typeof setTimeout> | null = null
+  let outboxRetryIndex = 0
+  let flushingOutbox: Promise<void> | null = null
   const provisioning = new Set<string>()
+  const itemOutbox = new Map<string, PendingItemSync>()
+  let batchOutbox: PendingBatchSync | null = null
+  let finishOutbox: PendingFinishSync | null = null
 
   const entitlements = computed(() => bootstrap.value?.entitlements || {})
   const tools = computed(() => bootstrap.value?.tools || [])
@@ -89,6 +112,9 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     const localSnapshot = await batch?.getSnapshot()
     if (localSnapshot) applySnapshot(localSnapshot)
     startHeartbeat()
+    window.addEventListener('online', handleReconnect)
+    window.addEventListener('focus', handleReconnect)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return bootstrap.value
   }
 
@@ -111,7 +137,11 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   async function loadHistory(): Promise<ServerBatchHistory[]> {
-    history.value = historySchema.parse(await getBusinessBatches({ limit: 30 }))
+    try {
+      history.value = historySchema.parse(await getBusinessBatches({ limit: 30 }))
+    } catch (historyError) {
+      error.value = errorMessage(historyError, '执行记录暂时无法加载')
+    }
     return history.value
   }
 
@@ -241,7 +271,10 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   async function cancelBatch(status = 'cancelled'): Promise<void> {
     const serverBatchId = snapshot.value.serverBatchId
     applySnapshot(await requireBatchApi().cancel(status))
-    if (serverBatchId !== undefined) await finishBusinessBatch(serverBatchId, status).catch(() => undefined)
+    if (serverBatchId !== undefined) {
+      finishOutbox = { batchId: serverBatchId, status }
+      await flushOutboxWithin(1_500)
+    }
   }
 
   async function resetWorkspace(): Promise<void> {
@@ -264,7 +297,10 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     if (event.type === 'batch.finished') {
       const finalStatus = event.snapshot?.status === 'completed' ? 'completed' : 'cancelled'
       const serverBatchId = event.snapshot?.serverBatchId
-      if (serverBatchId !== undefined) void finishBusinessBatch(serverBatchId, finalStatus).catch(() => undefined)
+      if (serverBatchId !== undefined) {
+        finishOutbox = { batchId: serverBatchId, status: finalStatus }
+        void flushOutbox()
+      }
     }
     scheduleSummarySync()
   }
@@ -281,22 +317,21 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     }
   }
 
-  async function syncItem(itemId: string): Promise<void> {
+  function syncItem(itemId: string): void {
     const batchId = snapshot.value.serverBatchId
     const item = items.value.find(candidate => candidate.itemId === itemId)
     if (batchId === undefined || !item) return
-    syncState.value = 'syncing'
-    try {
-      await updateBusinessBatchItem(batchId, itemId, {
+    itemOutbox.set(itemId, {
+      batchId,
+      itemId,
+      payload: {
         account_label_masked: item.accountLabelMasked,
         status: item.status,
         intervention_type: item.interventionType || undefined,
         customer_message: item.message || undefined,
-      })
-      syncState.value = 'synced'
-    } catch {
-      syncState.value = 'offline'
-    }
+      },
+    })
+    void flushOutbox()
   }
 
   function scheduleSummarySync(): void {
@@ -304,39 +339,118 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     syncTimer = setTimeout(() => { void syncSummary() }, 250)
   }
 
-  async function syncSummary(): Promise<void> {
+  function syncSummary(): void {
     const batchId = snapshot.value.serverBatchId
     if (batchId === undefined || snapshot.value.status === 'idle') return
     const counts = snapshot.value.counts
-    try {
-      await updateBusinessBatch(batchId, {
+    batchOutbox = {
+      batchId,
+      payload: {
         status: snapshot.value.status === 'completed' ? 'completed' : 'running',
         pending_count: counts.pending || 0,
         running_count: counts.running || 0,
         waiting_count: counts.waiting || 0,
         completed_count: counts.completed || 0,
         failed_count: counts.failed || 0,
-      })
-      syncState.value = 'synced'
-    } catch {
-      syncState.value = 'offline'
+      },
     }
+    void flushOutbox()
+  }
+
+  function hasPendingSync(): boolean {
+    return itemOutbox.size > 0 || batchOutbox !== null || finishOutbox !== null
+  }
+
+  function clearOutboxRetry(): void {
+    if (outboxRetryTimer) clearTimeout(outboxRetryTimer)
+    outboxRetryTimer = null
+  }
+
+  function scheduleOutboxRetry(): void {
+    if (outboxRetryTimer || !hasPendingSync()) return
+    const delay = OUTBOX_RETRY_DELAYS[Math.min(outboxRetryIndex, OUTBOX_RETRY_DELAYS.length - 1)]
+    outboxRetryIndex += 1
+    outboxRetryTimer = setTimeout(() => {
+      outboxRetryTimer = null
+      void flushOutbox()
+    }, delay)
+  }
+
+  async function flushOutbox(): Promise<void> {
+    if (flushingOutbox) return flushingOutbox
+    if (!hasPendingSync()) {
+      syncState.value = 'synced'
+      return
+    }
+    clearOutboxRetry()
+    syncState.value = 'syncing'
+    let completedWithoutError = false
+    flushingOutbox = (async () => {
+      try {
+        for (const [key, pending] of [...itemOutbox.entries()]) {
+          await updateBusinessBatchItem(pending.batchId, pending.itemId, pending.payload)
+          if (itemOutbox.get(key) === pending) itemOutbox.delete(key)
+        }
+        const pendingBatch = batchOutbox
+        if (pendingBatch) {
+          await updateBusinessBatch(pendingBatch.batchId, pendingBatch.payload)
+          if (batchOutbox === pendingBatch) batchOutbox = null
+        }
+        const pendingFinish = finishOutbox
+        if (pendingFinish) {
+          await finishBusinessBatch(pendingFinish.batchId, pendingFinish.status)
+          if (finishOutbox === pendingFinish) finishOutbox = null
+        }
+        outboxRetryIndex = 0
+        syncState.value = hasPendingSync() ? 'syncing' : 'synced'
+        completedWithoutError = true
+      } catch {
+        syncState.value = 'offline'
+        scheduleOutboxRetry()
+      } finally {
+        flushingOutbox = null
+        if (completedWithoutError && hasPendingSync()) void flushOutbox()
+      }
+    })()
+    return flushingOutbox
+  }
+
+  async function flushOutboxWithin(timeoutMs: number): Promise<boolean> {
+    await Promise.race([
+      flushOutbox(),
+      new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
+    ])
+    return !hasPendingSync()
+  }
+
+  function handleReconnect(): void {
+    clearOutboxRetry()
+    if (hasPendingSync()) void flushOutbox()
+  }
+
+  function handleVisibilityChange(): void {
+    if (document.visibilityState === 'visible') handleReconnect()
   }
 
   function startHeartbeat(): void {
     if (heartbeatTimer) return
     heartbeatTimer = setInterval(() => {
-      if (isActive.value) void syncSummary()
+      if (isActive.value) syncSummary()
     }, 30000)
   }
 
   function dispose(): void {
+    if (hasPendingSync()) void flushOutboxWithin(1_500)
     removeEventListener?.()
     removeEventListener = null
     if (heartbeatTimer) clearInterval(heartbeatTimer)
     if (syncTimer) clearTimeout(syncTimer)
+    clearOutboxRetry()
     heartbeatTimer = null
     syncTimer = null
+    window.removeEventListener('online', handleReconnect)
+    window.removeEventListener('focus', handleReconnect)
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
 
   const statusText = (status: string): string => STATUS_MESSAGE[status] || status
@@ -345,7 +459,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     bootstrap, history, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error,
     entitlements, tools, items, openItems, isActive,
     init, refreshBootstrap, loadHistory, chooseTool, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
-    completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, dispose,
+    completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,
   }
 })
 

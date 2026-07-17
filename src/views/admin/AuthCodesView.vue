@@ -458,18 +458,27 @@ async function saveMaxDevices() {
 }
 
 async function loadData() {
+  const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
+  const params = platformKey ? { platform_key: platformKey } : {}
+  const [codesResult, plansResult] = await Promise.allSettled([
+    getAuthCodes(params),
+    getPlansAdmin({ page_size: 100 }),
+  ])
   try {
-    const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
-    const params = platformKey ? { platform_key: platformKey } : {}
-    const [codesRes, plansRes] = await Promise.all([getAuthCodes(params), getPlansAdmin({ page_size: 100 })])
-    const parsedCodes = adminAuthCodesSchema.parse(codesRes)
-    const parsedPlans = adminPlansSchema.parse(plansRes)
-    authCodes.value = parsedCodes
-    plans.value = parsedPlans
-    const preferredPlan = parsedPlans.find(plan =>
-      plan.product_type === generatorProductType.value && plan.status === 'active')
-    if (preferredPlan) selectedPlanId.value = preferredPlan.id
-    parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
+    if (codesResult.status === 'fulfilled') {
+      authCodes.value = adminAuthCodesSchema.parse(codesResult.value)
+    }
+    if (plansResult.status === 'fulfilled') {
+      const parsedPlans = adminPlansSchema.parse(plansResult.value)
+      plans.value = parsedPlans
+      const preferredPlan = parsedPlans.find(plan =>
+        plan.product_type === generatorProductType.value && plan.status === 'active')
+      if (preferredPlan) selectedPlanId.value = preferredPlan.id
+      parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
+    }
+    if (codesResult.status === 'rejected' && plansResult.status === 'rejected') {
+      showToast('数据加载失败', 'error')
+    }
   } catch (err) {
     showToast('数据加载失败', 'error')
   }

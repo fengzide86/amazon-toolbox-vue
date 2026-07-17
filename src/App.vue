@@ -12,9 +12,20 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
 import AppUpdateHost from '@/features/updates/AppUpdateHost.vue'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import AppTransition from '@/components/AppTransition.vue'
+import { useConnectionStore } from '@/stores/connection'
+
+const connection = useConnectionStore()
+let disposeConnectivity: (() => void) | undefined
+
+onMounted(() => {
+  disposeConnectivity = connection.initialize()
+})
+
+onUnmounted(() => disposeConnectivity?.())
 </script>
 
 <style>

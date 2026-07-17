@@ -89,16 +89,16 @@ const profitRatiosText = computed(() => {
 })
 
 async function loadData() {
-  try {
-    const [plansRes, settingsRes, toolsRes, releasesRes] = await Promise.all([
-      getPlansAdmin(), getSettings(), getTools(), getToolReleases()
-    ])
-    plans.value = adminPlansSchema.parse(plansRes)
-    const parsedSettings = adminSettingsSchema.parse(settingsRes)
+  const results = await Promise.allSettled([
+    getPlansAdmin(), getSettings(), getTools(), getToolReleases(),
+  ])
+  const [plansResult, settingsResult, toolsResult, releasesResult] = results
+  if (plansResult.status === 'fulfilled') plans.value = adminPlansSchema.parse(plansResult.value)
+  if (toolsResult.status === 'fulfilled') tools.value = toolCatalogSchema.parse(toolsResult.value)
+  if (releasesResult.status === 'fulfilled') toolReleases.value = toolReleasesSchema.parse(releasesResult.value)
+  if (settingsResult.status === 'fulfilled') {
+    const parsedSettings = adminSettingsSchema.parse(settingsResult.value)
     settings.value = parsedSettings
-    tools.value = toolCatalogSchema.parse(toolsRes)
-    toolReleases.value = toolReleasesSchema.parse(releasesRes)
-
     const wxSetting = parsedSettings.find((setting) => setting.key === 'wechat_id')
     const profitSetting = parsedSettings.find((setting) => setting.key === 'profit_ratios')
     const businessSetting = parsedSettings.find((setting) => setting.key === 'business_workspace_enabled')
@@ -115,7 +115,8 @@ async function loadData() {
         // 使用默认值
       }
     }
-  } catch {
+  }
+  if (results.every(result => result.status === 'rejected')) {
     showToast('数据加载失败', 'error')
   }
 }
