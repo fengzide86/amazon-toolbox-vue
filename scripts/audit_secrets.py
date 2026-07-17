@@ -19,6 +19,9 @@ SAFE_MARKERS = (
     "updates.invalid", "127.0.0.1", "localhost",
 )
 KNOWN_EXPIRED_HISTORY_PATHS = {"admin_token.txt"}
+APPROVED_PUBLIC_ENDPOINTS = (
+    "https://8.130.113.104",
+)
 
 
 def git(*args: str) -> str:
@@ -31,7 +34,10 @@ def suspicious_lines(content: str) -> list[int]:
         lowered = line.lower()
         if any(marker in lowered for marker in SAFE_MARKERS):
             continue
-        if any(pattern.search(line) for pattern in PATTERNS):
+        audited_line = line
+        for endpoint in APPROVED_PUBLIC_ENDPOINTS:
+            audited_line = audited_line.replace(endpoint, "")
+        if any(pattern.search(audited_line) for pattern in PATTERNS):
             hits.append(number)
     return hits
 

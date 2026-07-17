@@ -7,9 +7,9 @@ const { resolveRuntimeConfig } = require('../../dist-electron/electron/core/runt
 describe('desktop runtime configuration', () => {
   it('uses the packaged HTTPS control plane by default', () => {
     expect(resolveRuntimeConfig({}, {
-      toolbox: { controlApiUrl: 'https://8-130-113-104.sslip.io/' },
+      toolbox: { controlApiUrl: 'https://8.130.113.104/' },
     })).toEqual({
-      controlApiBase: 'https://8-130-113-104.sslip.io',
+      controlApiBase: 'https://8.130.113.104',
       useBundledBackend: false,
     })
   })

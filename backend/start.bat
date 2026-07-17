@@ -7,31 +7,39 @@ set "PROJECT_ROOT=%~dp0.."
 set "VENV_DIR=%PROJECT_ROOT%\venv"
 set "PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "PIP=%VENV_DIR%\Scripts\pip.exe"
-set "TOOLBOX_RUNTIME_DIR=D:\AmazonToolboxData"
+if not defined TOOLBOX_RUNTIME_DIR set "TOOLBOX_RUNTIME_DIR=%LOCALAPPDATA%\AmazonToolboxData"
 
 echo ============================================
 echo   Amazon Toolbox - Local Backend
 echo ============================================
 
 if not exist "%PYTHON%" (
-    echo [ERROR] Python virtual environment was not found:
-    echo         %VENV_DIR%
-    echo Run: python -m venv "%VENV_DIR%"
-    pause
-    exit /b 1
+    where py >nul 2>&1
+    if not errorlevel 1 (
+        echo [INFO] Creating Python virtual environment...
+        py -3 -m venv "%VENV_DIR%"
+    ) else (
+        where python >nul 2>&1
+        if errorlevel 1 (
+            echo [ERROR] Python 3 was not found.
+            goto :failed
+        )
+        echo [INFO] Creating Python virtual environment...
+        python -m venv "%VENV_DIR%"
+    )
+    if errorlevel 1 goto :failed
 )
 
-if not exist "%TOOLBOX_RUNTIME_DIR%" mkdir "%TOOLBOX_RUNTIME_DIR%"
+if not exist "%TOOLBOX_RUNTIME_DIR%" (
+    mkdir "%TOOLBOX_RUNTIME_DIR%"
+    if errorlevel 1 goto :failed
+)
 
 "%PYTHON%" -c "import fastapi, uvicorn, sqlalchemy, aiosqlite" >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Installing backend dependencies...
     "%PIP%" install -r requirements.txt
-    if errorlevel 1 (
-        echo [ERROR] Dependency installation failed.
-        pause
-        exit /b 1
-    )
+    if errorlevel 1 goto :failed
 )
 
 set "DEBUG=false"
@@ -44,3 +52,8 @@ echo.
 echo [INFO] Backend stopped with exit code %EXIT_CODE%.
 pause
 exit /b %EXIT_CODE%
+
+:failed
+echo [ERROR] Local backend could not be started.
+if not defined TOOLBOX_NO_PAUSE pause
+exit /b 1

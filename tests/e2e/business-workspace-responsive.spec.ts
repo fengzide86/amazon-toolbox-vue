@@ -25,7 +25,7 @@ async function mockControlPlane(page: Page, role: 'business' | 'consumer' | 'adm
     sessionStorage.setItem('toolbox_role', role === 'admin' ? 'admin' : 'user')
     localStorage.setItem('toolbox_user', JSON.stringify(user))
   }, { user, role })
-  await page.route(/^http:\/\/(localhost|127\.0\.0\.1):8000\/api\//, async route => {
+  await page.route('**/api/**', async route => {
     const url = route.request().url()
     let data: unknown = []
     if (url.includes('/api/business/bootstrap')) data = { ...businessUser, tools: [batchTool] }
@@ -51,8 +51,7 @@ for (const width of [1365, 1024, 768]) {
     await mockControlPlane(page, 'business')
     await page.setViewportSize({ width, height: 768 })
     for (const path of ['overview', 'workspace', 'records', 'license']) {
-      await page.goto(`/#/business/${path}`)
-      await page.waitForLoadState('domcontentloaded')
+      await page.goto(`/#/business/${path}`, { waitUntil: 'domcontentloaded' })
       await expect(page.locator('.business-layout')).toBeVisible()
       await expectNoOverflow(page)
     }
@@ -62,7 +61,7 @@ for (const width of [1365, 1024, 768]) {
 test('C端即使工具配置支持批量，也不出现批量入口', async ({ page }) => {
   await mockControlPlane(page, 'consumer')
   await page.setViewportSize({ width: 1024, height: 768 })
-  await page.goto('/#/user/tools')
+  await page.goto('/#/user/tools', { waitUntil: 'domcontentloaded' })
   await expect(page.locator('.toolbox-page')).toBeVisible()
   await expect(page.getByText('批量工作台')).toHaveCount(0)
   await expect(page.getByText('成功率')).toHaveCount(0)
@@ -73,7 +72,7 @@ test('管理员行动中心在 1024 和 768 下保持完整卡片矩阵', async 
   await mockControlPlane(page, 'admin')
   for (const width of [1024, 768]) {
     await page.setViewportSize({ width, height: 768 })
-    await page.goto('/#/admin/dashboard')
+    await page.goto('/#/admin/dashboard', { waitUntil: 'domcontentloaded' })
     await expect(page.locator('.summary-card')).toHaveCount(4)
     await expect(page.getByText('工具成功率')).toHaveCount(0)
     await expectNoOverflow(page)
