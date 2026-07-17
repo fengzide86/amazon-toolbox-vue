@@ -10,8 +10,13 @@ import { readFileSync } from 'node:fs'
 
 const packageMetadata = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const desktopBuild = process.env.TOOLBOX_BUILD_TARGET === 'electron'
+  // Declaration files are checked into the repository for type tooling.
+  // Rewriting them during every production build can race with Windows
+  // Defender/indexers and fail with EBUSY/UNKNOWN even though runtime output
+  // is otherwise valid. Only the interactive Vite server refreshes them.
+  const declarationOutput = command === 'serve'
   return {
     plugins: [
       vue(),
@@ -19,12 +24,12 @@ export default defineConfig(({ mode }) => {
       AutoImport({
         imports: ['vue', 'vue-router', 'pinia'],
         resolvers: [ElementPlusResolver()],
-        dts: 'src/auto-imports.d.ts',
+        dts: declarationOutput ? 'src/auto-imports.d.ts' : false,
       }),
       // 自动导入 Element Plus 组件
       Components({
         resolvers: [ElementPlusResolver()],
-        dts: 'src/components.d.ts',
+        dts: declarationOutput ? 'src/components.d.ts' : false,
       }),
       // Service Worker 只属于明确的 Web 构建，桌面壳使用自身更新与缓存策略。
       !desktopBuild && VitePWA({
