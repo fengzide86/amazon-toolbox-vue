@@ -111,11 +111,11 @@ async function loadData() {
           const updates = Object.fromEntries(Object.entries(ratios).filter(([, value]) => typeof value === 'number'))
           profitRatios.value = { ...profitRatios.value, ...updates }
         }
-      } catch (e) {
+      } catch {
         // 使用默认值
       }
     }
-  } catch (err) {
+  } catch {
     showToast('数据加载失败', 'error')
   }
 }
@@ -133,7 +133,7 @@ async function savePassword() {
     })
     showToast('密码已更新', 'success')
     adminPassword.value = ''
-  } catch (err) {
+  } catch {
     showToast('更新失败', 'error')
   }
 }
@@ -146,7 +146,7 @@ async function saveWechat() {
       description: '客服微信号' 
     })
     showToast('已保存', 'success')
-  } catch (err) {
+  } catch {
     showToast('保存失败', 'error')
   }
 }
@@ -175,7 +175,7 @@ async function savePlan(_plan: unknown) {
     showToast('套餐已更新', 'success')
     editingPlan.value = null
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('更新失败', 'error')
   }
 }
@@ -227,7 +227,7 @@ async function togglePlanStatus(rawPlan: unknown) {
     await api.put(`/api/plans/${plan.id}`, { status: newStatus })
     showToast(newStatus === 'active' ? '已启用' : '已禁用', 'success')
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('操作失败', 'error')
   }
 }
@@ -252,7 +252,7 @@ async function addPlan() {
     showAddPlan.value = false
     newPlan.value = { name: '', price: 0, duration_days: 7, features: '', product_type: 'consumer', entitlements: defaultEntitlements() }
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('添加失败', 'error')
   }
 }
@@ -536,7 +536,7 @@ async function saveProfitRatios() {
     })
     showToast('分润比例已更新', 'success')
     showProfitModal.value = false
-  } catch (err) {
+  } catch {
     showToast('保存失败', 'error')
   }
 }

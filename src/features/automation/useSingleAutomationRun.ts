@@ -122,7 +122,7 @@ function stageState(index: number) {
 async function completeUserAction() {
   try {
     await taskRunStore.completeUserAction()
-  } catch (error) {
+  } catch {
     showToast('暂时无法继续，请重试', 'error')
   }
 }
@@ -222,7 +222,7 @@ async function startTaskWithBrowser() {
   if (browserReadyFallback) clearTimeout(browserReadyFallback)
   try {
     await taskRunStore.start({ ...(appStore.currentTool || {}), targetUrl: toolUrl.value })
-  } catch (error) {
+  } catch {
     showToast('自动处理启动失败，你可以重新执行或联系客服', 'error')
   } finally {
     taskStarting.value = false
@@ -242,7 +242,9 @@ function bindWebviewEvents() {
   webview.addEventListener('dom-ready', startTaskWithBrowser, { once: true })
   try {
     if (webview.getWebContentsId?.()) startTaskWithBrowser()
-  } catch {}
+  } catch {
+    // webContents id is unavailable until the first DOM-ready event on some Electron versions.
+  }
 }
 
 async function recordTerminalRun(status: RunStatus) {
