@@ -108,10 +108,11 @@ jobs:
         env:
           PLAYWRIGHT_PREBUILT: '1'
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: failure()
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: responsive-e2e-failure
+          path: test-results/business-responsive/
+          if-no-files-found: ignore
           retention-days: 7
 
   internal-acceptance-e2e:
@@ -134,10 +135,11 @@ jobs:
         env:
           PLAYWRIGHT_PREBUILT: '1'
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: failure()
         with:
           name: internal-acceptance-artifacts
           path: test-results/internal-acceptance/
+          if-no-files-found: ignore
           retention-days: 7
 
   desktop-package:
