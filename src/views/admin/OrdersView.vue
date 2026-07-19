@@ -35,7 +35,7 @@
       </template>
       <div class="form-row">
         <label class="order-field order-field--wide"><span>套餐</span><el-select v-model="newOrder.plan_id" placeholder="选择启用套餐"><el-option v-for="plan in activePlans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" /></el-select></label>
-        <label class="order-field order-field--wide"><span>渠道</span><el-input v-model="newOrder.channel" placeholder="如微信/支付宝" /></label>
+        <label class="order-field order-field--wide"><span>人工收款渠道</span><el-input v-model="newOrder.channel" placeholder="如微信转账 / 银行转账 / 线下收款" /></label>
         <label class="order-field"><span>负责人</span><el-input v-model="newOrder.responsible" placeholder="负责人" /></label>
         <div class="order-submit"><el-button type="primary" @click="createOrder" :loading="isLoading">{{ isLoading ? '创建中...' : '创建订单' }}</el-button></div>
       </div>
@@ -488,7 +488,7 @@ onMounted(loadData)
   .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .order-submit { grid-column: 1 / -1; }
 }
-@media (max-width: 899px) { .order-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 899px) { .order-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; } }
 @media (max-width: 560px) {
   .order-stats, .form-row { grid-template-columns: 1fr; }
   .order-submit { grid-column: auto; }

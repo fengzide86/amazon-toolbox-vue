@@ -256,12 +256,14 @@ async function loadData() {
   loadError.value = ''
   staleError.value = ''
   try {
-    tools.value = toolCatalogSchema.parse(await getTools({ platform_key: platformStore.currentPlatform })).map(tool => ({
-      ...tool,
-      availability: 'demo_only' as const,
-      supports_demo_single: true,
-      supports_live_single: false,
-    }))
+    tools.value = toolCatalogSchema
+      .parse(await getTools({ platform_key: platformStore.currentPlatform }))
+      .filter(tool => tool.supports_demo_single)
+      .map(tool => ({
+        ...tool,
+        availability: 'demo_only' as const,
+        supports_live_single: false,
+      }))
   } catch (error) {
     const message = errorMessage(error, '请检查网络连接后重试。')
     if (hadData) staleError.value = message

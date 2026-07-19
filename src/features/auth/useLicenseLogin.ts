@@ -8,18 +8,18 @@ import { saveRememberedUserCode } from '@/utils/credentialStore'
 import { licenseLoginResponseSchema, publicSettingsSchema } from './model'
 
 const stats = [
-  { value: '90', unit: '%', desc: '操作提效 · 一键完成物料/发货' },
-  { value: '10', unit: 'x', desc: '上品速度 · 批量处理告别手动' },
-  { value: '24', unit: 'h', desc: 'AI 客服 · 问题秒级响应' },
+  { value: '本地', unit: '', desc: '演示流程 · 不登录真实店铺' },
+  { value: '授权', unit: '', desc: '套餐与设备边界清晰' },
+  { value: '记录', unit: '', desc: '演示过程可查看回顾' },
 ]
 
-const featureTags = ['自动上品', '物流模板', '自动发货', 'FBA/AGL', '广告脚本', '批量操作']
+const featureTags = ['流程演示', '本地表格', '授权控制', '执行记录', '工具帮助', '人工支持']
 
 const helpSteps = [
-  '购买套餐后，您会收到一个授权码',
+  '联系人工客服确认套餐后，您会收到一个授权码',
   '在此页面输入授权码进行激活',
   '系统会自动绑定您的 Windows 设备',
-  '激活成功后即可使用当前套餐包含的工具',
+  '激活成功后即可体验当前套餐包含的演示工具',
 ]
 
 function validateAuthCode(code: string): { valid: true } | { valid: false; message: string } {

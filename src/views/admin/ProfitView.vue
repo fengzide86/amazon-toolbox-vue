@@ -8,7 +8,7 @@
       <el-col :xs="12" :sm="8" :md="4" v-for="(item, index) in profitItems" :key="item.key" style="display: flex;">
         <el-card class="stat-card" style="width: 100%; min-height: 120px;">
           <div class="stat-icon" :style="{ background: item.bgColor }">
-            <span style="font-size: 1.5rem;">{{ item.icon }}</span>
+            <component :is="item.icon" :size="20" :stroke-width="1.8" :style="{ color: item.color }" />
           </div>
           <div class="stat-content">
             <div class="stat-label">{{ item.label }} ({{ profitRatios[item.key] }}%)</div>
@@ -45,7 +45,7 @@
       <div class="ratio-bars">
         <div v-for="item in profitItems" :key="item.key" class="ratio-bar-row">
           <div class="ratio-bar-label">
-            <span class="ratio-bar-icon">{{ item.icon }}</span>
+            <component :is="item.icon" class="ratio-bar-icon" :size="15" :stroke-width="1.8" :style="{ color: item.color }" />
             <span>{{ item.label }}</span>
           </div>
           <div class="ratio-bar-track">
@@ -59,11 +59,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, type Component } from 'vue'
 import { getProfitPolicy, getProfitSummary } from '@/utils/api'
 import { usePlatformStore } from '@/stores/platform'
 import { authService } from '@/utils/auth'
 import { Setting } from '@element-plus/icons-vue'
+import { ClipboardList, FilePenLine, Headphones, Megaphone, Package, Wrench } from '@lucide/vue'
 import { profitPolicySchema, profitSummarySchema } from '@/features/admin/model'
 import { hasStaffPermission } from '@/features/auth/permissions'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
@@ -74,7 +75,7 @@ type ProfitAmountKey = 'total_tech' | 'total_market' | 'total_product' | 'total_
 interface ProfitItem {
   key: ProfitKey
   label: string
-  icon: string
+  icon: Component
   amountKey: ProfitAmountKey
   color: string
   bgColor: string
@@ -97,12 +98,12 @@ const profitRatios = ref<Record<ProfitKey, number>>({
 const platformStore = usePlatformStore()
 const canEditPolicy = computed(() => hasStaffPermission(authService.getRole(), 'profit.policy.write'))
 const profitItems = computed<ProfitItem[]>(() => [
-  { key: 'tech', label: '技术', icon: '🔧', amountKey: 'total_tech', color: '#6366F1', bgColor: 'rgba(99,102,241,0.1)', barColor: '#6366F1' },
-  { key: 'market', label: '市场', icon: '📢', amountKey: 'total_market', color: '#10B981', bgColor: 'rgba(16,185,129,0.1)', barColor: '#10B981' },
-  { key: 'product', label: '产品', icon: '📦', amountKey: 'total_product', color: '#F59E0B', bgColor: 'rgba(245,158,11,0.1)', barColor: '#F59E0B' },
-  { key: 'service', label: '客服', icon: '🎧', amountKey: 'total_service', color: '#EC4899', bgColor: 'rgba(236,72,153,0.1)', barColor: '#EC4899' },
-  { key: 'coordination', label: '统筹', icon: '📋', amountKey: 'total_coordination', color: '#8B5CF6', bgColor: 'rgba(139,92,246,0.1)', barColor: '#8B5CF6' },
-  { key: 'record', label: '记录', icon: '📝', amountKey: 'total_record', color: '#D97706', bgColor: 'rgba(217,119,6,0.1)', barColor: '#D97706' }
+  { key: 'tech', label: '技术', icon: Wrench, amountKey: 'total_tech', color: '#6366F1', bgColor: 'rgba(99,102,241,0.1)', barColor: '#6366F1' },
+  { key: 'market', label: '市场', icon: Megaphone, amountKey: 'total_market', color: '#10B981', bgColor: 'rgba(16,185,129,0.1)', barColor: '#10B981' },
+  { key: 'product', label: '产品', icon: Package, amountKey: 'total_product', color: '#F59E0B', bgColor: 'rgba(245,158,11,0.1)', barColor: '#F59E0B' },
+  { key: 'service', label: '客服', icon: Headphones, amountKey: 'total_service', color: '#EC4899', bgColor: 'rgba(236,72,153,0.1)', barColor: '#EC4899' },
+  { key: 'coordination', label: '统筹', icon: ClipboardList, amountKey: 'total_coordination', color: '#8B5CF6', bgColor: 'rgba(139,92,246,0.1)', barColor: '#8B5CF6' },
+  { key: 'record', label: '记录', icon: FilePenLine, amountKey: 'total_record', color: '#D97706', bgColor: 'rgba(217,119,6,0.1)', barColor: '#D97706' }
 ])
 
 async function loadData() {
@@ -182,14 +183,17 @@ onMounted(loadData)
 }
 
 .total-card {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
+  --el-card-bg-color: #2d5fca;
+  background-color: #2d5fca !important;
+  background-image: linear-gradient(135deg, #214fae 0%, #2d5fca 58%, #527bd0 100%) !important;
+  border-color: transparent;
   margin-bottom: 1.5rem;
   text-align: center;
-  color: white;
+  color: #fff;
 }
 
 .total-card :deep(.el-card__body) {
-  background: transparent;
+  background: transparent !important;
 }
 
 .total-content {
@@ -200,18 +204,21 @@ onMounted(loadData)
 }
 
 .total-label {
+  color: #fff;
   font-size: 0.9rem;
   opacity: 0.9;
   font-weight: 500;
 }
 
 .total-value {
+  color: #fff;
   font-size: 2.5rem;
   font-weight: 800;
   font-family: var(--font-family);
 }
 
 .total-empty {
+  color: rgba(255, 255, 255, 0.86);
   margin-top: 1rem;
   font-size: 0.85rem;
   opacity: 0.8;
