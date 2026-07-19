@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import yaml
 from fastapi import HTTPException, UploadFile
@@ -298,7 +298,8 @@ class UpdateReleaseService:
                 if os.name == "nt":
                     import msvcrt
 
-                    msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                    msvcrt_api: Any = msvcrt
+                    msvcrt_api.locking(descriptor, msvcrt_api.LK_NBLCK, 1)
                 else:
                     import fcntl
 
@@ -314,7 +315,8 @@ class UpdateReleaseService:
                     if os.name == "nt":
                         import msvcrt
 
-                        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                        msvcrt_api = msvcrt
+                        msvcrt_api.locking(descriptor, msvcrt_api.LK_UNLCK, 1)
                     else:
                         import fcntl
 
