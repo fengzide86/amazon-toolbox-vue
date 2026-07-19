@@ -11,8 +11,8 @@ jobs:
     name: Frontend and Electron contracts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.18.0'
           cache: npm
@@ -24,7 +24,7 @@ jobs:
       - run: npm test
       - name: Build web bundle
         run: npm run build:web
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: dist/
@@ -34,8 +34,8 @@ jobs:
     name: Backend domains and API
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           cache: pip
@@ -75,8 +75,8 @@ jobs:
     env:
       MARIADB_TEST_URL: mysql+aiomysql://toolbox_test:toolbox-test-only@127.0.0.1:3306/toolbox_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           cache: pip
@@ -93,13 +93,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.18.0'
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: dist
@@ -107,7 +107,7 @@ jobs:
       - run: npx playwright test --config=playwright.business.config.ts
         env:
           PLAYWRIGHT_PREBUILT: '1'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -119,13 +119,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.18.0'
           cache: npm
       - run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: dist
@@ -133,7 +133,7 @@ jobs:
       - run: npx playwright test --config=playwright.internal.config.ts
         env:
           PLAYWRIGHT_PREBUILT: '1'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: internal-acceptance-artifacts
@@ -145,12 +145,12 @@ jobs:
     runs-on: windows-latest
     needs: [frontend, backend]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22.18.0'
           cache: npm
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: pip
@@ -162,7 +162,7 @@ jobs:
       - run: npm run build:desktop
       - run: npx electron-builder --win --dir
       - run: npm run package:audit
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-unpacked-smoke
           path: release/win-unpacked/
