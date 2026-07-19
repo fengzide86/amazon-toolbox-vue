@@ -3,16 +3,19 @@
 包含 Dashboard 统计、图表数据等业务逻辑
 支持 Redis 缓存提升性能
 """
-from datetime import datetime, timedelta
-from typing import Dict, Any
-from sqlalchemy import select, func, case, desc
-from sqlalchemy.ext.asyncio import AsyncSession
 import calendar
+from datetime import datetime, timedelta
+from typing import Any
 
-from models import Order, AuthCode, User, RunLog, Feedback, Plan
+from sqlalchemy import case, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.cache import CacheKeys, cache
 from core.logging import get_logger
 from core.response import success_response
-from core.cache import cache, CacheKeys
+from models import AuthCode, Feedback, Order, Plan, RunLog, User
+from models.demo import DemoBatch, DemoRun
+from models.feedback import ExecutionVerification
 
 logger = get_logger(__name__)
 
@@ -23,7 +26,7 @@ class DashboardService:
     def __init__(self, db: AsyncSession):
         self.db = db
     
-    async def get_dashboard_stats(self, platform_key: str = None) -> Dict[str, Any]:
+    async def get_dashboard_stats(self, platform_key: str = None) -> dict[str, Any]:
         """获取数据总览（带缓存）"""
         # 尝试缓存（按平台区分）
         cache_key = CacheKeys.dashboard_stats(platform_key)
@@ -31,13 +34,17 @@ class DashboardService:
         if cached:
             return cached
         
-        # 构建平台过滤条件（兼容旧数据：platform_key 为空视为全部）
-        run_log_filter = []
+        # 真实执行只统计已核验记录；历史日志不进入真实业务指标。
+        run_log_filter = [RunLog.verification_state == ExecutionVerification.VERIFIED]
+        demo_run_filter = []
+        demo_batch_filter = []
         feedback_filter = []
         if platform_key:
             from sqlalchemy import or_
             platform_cond = or_(RunLog.platform_key == platform_key, RunLog.platform_key.is_(None))
             run_log_filter.append(platform_cond)
+            demo_run_filter.append(DemoRun.platform_key == platform_key)
+            demo_batch_filter.append(DemoBatch.platform_key == platform_key)
             feedback_cond = or_(Feedback.platform_key == platform_key, Feedback.platform_key.is_(None))
             feedback_filter.append(feedback_cond)
         
@@ -50,7 +57,7 @@ class DashboardService:
             auth_code_filter.append(or_(AuthCode.platform_scope.contains(platform_key), AuthCode.platform_scope.is_(None)))
         
         # 总收入（按平台过滤）
-        revenue_query = select(func.sum(Order.amount)).where(Order.status.in_(["paid", "refunded"]))
+        revenue_query = select(func.sum(Order.amount)).where(Order.status == "paid")
         for cond in order_filter:
             revenue_query = revenue_query.where(cond)
         revenue_result = await self.db.execute(revenue_query)
@@ -81,6 +88,16 @@ class DashboardService:
             today_query = today_query.where(cond)
         today_runs_result = await self.db.execute(today_query)
         today_runs = today_runs_result.scalar() or 0
+
+        # 演示指标与真实执行独立，只表示流程播放活动。
+        today_demo_runs_query = select(func.count(DemoRun.id)).where(func.date(DemoRun.created_at) == today)
+        today_demo_batches_query = select(func.count(DemoBatch.id)).where(func.date(DemoBatch.created_at) == today)
+        for cond in demo_run_filter:
+            today_demo_runs_query = today_demo_runs_query.where(cond)
+        for cond in demo_batch_filter:
+            today_demo_batches_query = today_demo_batches_query.where(cond)
+        today_demo_runs = (await self.db.execute(today_demo_runs_query)).scalar() or 0
+        today_demo_batches = (await self.db.execute(today_demo_batches_query)).scalar() or 0
         
         # 待处理工单数（按平台过滤）
         pending_query = select(func.count(Feedback.id)).where(Feedback.status == "pending")
@@ -96,11 +113,11 @@ class DashboardService:
         logs_result = await self.db.execute(logs_query)
         recent_logs = [
             {
-                "id": l.id, "tool_name": l.tool_name, "module": l.module,
-                "status": l.status, "created_at": l.created_at.isoformat() if l.created_at else None,
-                "platform_key": getattr(l, 'platform_key', None),
+                "id": log.id, "tool_name": log.tool_name, "module": log.module,
+                "status": log.status, "created_at": log.created_at.isoformat() if log.created_at else None,
+                "platform_key": getattr(log, 'platform_key', None),
             }
-            for l in logs_result.scalars().all()
+            for log in logs_result.scalars().all()
         ]
         
         result = success_response(data={
@@ -109,6 +126,11 @@ class DashboardService:
             "active_codes": active_codes,
             "total_users": total_users,
             "today_runs": today_runs,
+            "real_execution": {"today_count": today_runs, "recent": recent_logs},
+            "demo_activity": {
+                "today_single_count": today_demo_runs,
+                "today_batch_count": today_demo_batches,
+            },
             "pending_tickets": pending_tickets,
             "recent_logs": recent_logs,
         })
@@ -118,7 +140,7 @@ class DashboardService:
         
         return result
     
-    async def get_dashboard_charts(self, platform_key: str = None) -> Dict[str, Any]:
+    async def get_dashboard_charts(self, platform_key: str = None) -> dict[str, Any]:
         """获取图表数据（带缓存）"""
         # 尝试缓存（按平台区分）
         cache_key = CacheKeys.dashboard_charts(platform_key)
@@ -132,7 +154,7 @@ class DashboardService:
         start_date = (now - timedelta(days=6)).date()
         revenue_where = [
             func.date(Order.created_at) >= start_date,
-            Order.status.in_(["paid", "refunded"])
+            Order.status == "paid"
         ]
         if platform_key:
             from sqlalchemy import or_
@@ -172,7 +194,9 @@ class DashboardService:
         tool_query = select(
             RunLog.tool_name,
             func.count(RunLog.id),
-            func.sum(case((RunLog.status == "success", 1), else_=0))
+            func.sum(case((RunLog.status.in_(["success", "succeeded"]), 1), else_=0))
+        ).where(
+            RunLog.verification_state == ExecutionVerification.VERIFIED
         ).group_by(RunLog.tool_name)
         
         if platform_key:

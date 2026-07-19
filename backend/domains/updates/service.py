@@ -8,6 +8,8 @@ import re
 import shutil
 import threading
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
@@ -19,6 +21,14 @@ SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
 ALLOWED_SUFFIXES = {".exe": 300 * 1024 * 1024, ".blockmap": 20 * 1024 * 1024, ".yml": 256 * 1024}
 
 
+def get_update_releases_dir() -> Path:
+    """Return the writable release directory shared with the HTTPS server."""
+    configured = os.getenv("UPDATE_RELEASE_DIR", "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (Path(__file__).resolve().parents[2] / "updates").resolve()
+
+
 class StagedFile(TypedDict):
     name: str
     size: int
@@ -28,10 +38,44 @@ class StagedFile(TypedDict):
 class UpdateReleaseService:
     def __init__(self, releases_dir: str | Path):
         self.releases_dir = Path(releases_dir).resolve()
-        self.staging_dir = self.releases_dir / ".staging"
+        self.staging_dir = self.releases_dir.parent / ".updates-staging"
         self.releases_dir.mkdir(parents=True, exist_ok=True)
+        if self.staging_dir.is_symlink():
+            raise RuntimeError("更新暂存目录不能是符号链接")
+        self._migrate_legacy_staging()
         self.staging_dir.mkdir(parents=True, exist_ok=True)
-        self._publish_lock = threading.Lock()
+        self._mutation_lock = threading.Lock()
+        self._lock_path = self.staging_dir / ".release.lock"
+
+    def _migrate_legacy_staging(self) -> None:
+        legacy = self.releases_dir / ".staging"
+        if not legacy.exists() and not legacy.is_symlink():
+            return
+        if legacy.is_symlink() or not legacy.is_dir():
+            legacy.unlink()
+            return
+        if not self.staging_dir.exists():
+            os.replace(legacy, self.staging_dir)
+            return
+
+        quarantine = self.releases_dir.parent / f".updates-staging-migrate-{uuid.uuid4().hex}"
+        os.replace(legacy, quarantine)
+        collisions: list[str] = []
+        for entry in quarantine.iterdir():
+            if entry.name == ".release.lock":
+                entry.unlink(missing_ok=True)
+                continue
+            target = self.staging_dir / entry.name
+            if target.exists():
+                collisions.append(entry.name)
+                continue
+            os.replace(entry, target)
+        if collisions:
+            raise RuntimeError(
+                "旧更新暂存目录已移出公开目录，但存在待人工处理的版本冲突："
+                + ", ".join(sorted(collisions))
+            )
+        quarantine.rmdir()
 
     async def stage(self, version: str | None, files: list[UploadFile]) -> dict[str, object]:
         if not files:
@@ -41,9 +85,13 @@ class UpdateReleaseService:
         temp.mkdir(parents=True)
 
         staged: list[StagedFile] = []
+        staged_names: set[str] = set()
         try:
             for upload in files:
                 name = self._safe_name(upload.filename)
+                if name.lower() in staged_names:
+                    raise HTTPException(422, f"更新文件名重复：{name}")
+                staged_names.add(name.lower())
                 suffix = Path(name).suffix.lower()
                 if suffix not in ALLOWED_SUFFIXES:
                     raise HTTPException(400, f"不支持的更新文件：{name}")
@@ -53,8 +101,9 @@ class UpdateReleaseService:
 
             manifest_path = next((temp / item["name"] for item in staged if item["name"].lower() == "latest.yml"), None)
             installer = next((item for item in staged if item["name"].lower().endswith(".exe")), None)
-            if not manifest_path or not installer:
-                raise HTTPException(400, "暂存发布必须同时包含 latest.yml 和 Windows 安装包")
+            blockmap = next((item for item in staged if item["name"].lower().endswith(".blockmap")), None)
+            if not manifest_path or not installer or not blockmap:
+                raise HTTPException(400, "暂存发布必须同时包含 latest.yml、Windows 安装包和 blockmap")
             inferred_version = self._manifest_version(manifest_path)
             if version and version != inferred_version:
                 raise HTTPException(400, "提交版本与 latest.yml 版本不一致")
@@ -71,9 +120,10 @@ class UpdateReleaseService:
                 "staged_at": datetime.now(timezone.utc).isoformat(),
             }
             (temp / "stage.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
-            if target.exists():
-                shutil.rmtree(target)
-            os.replace(temp, target)
+            with self._mutation_lock, self._file_lock():
+                if target.exists():
+                    raise HTTPException(409, f"v{resolved_version} 已暂存，请先删除后再重新上传")
+                os.replace(temp, target)
             return metadata
         except Exception:
             if temp.exists():
@@ -81,7 +131,7 @@ class UpdateReleaseService:
             raise
 
     def publish(self, version: str) -> dict[str, object]:
-        with self._publish_lock:
+        with self._mutation_lock, self._file_lock():
             return self._publish_locked(version)
 
     def _publish_locked(self, version: str) -> dict[str, object]:
@@ -93,27 +143,59 @@ class UpdateReleaseService:
             raise HTTPException(404, "暂存版本不存在")
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         files = metadata.get("files") or []
-        manifest_name = next((item["name"] for item in files if item["name"].lower() == "latest.yml"), None)
+        if not isinstance(files, list):
+            raise HTTPException(409, "暂存版本文件清单无效")
+        manifest_name = next((
+            item.get("name") for item in files
+            if isinstance(item, dict) and str(item.get("name") or "").lower() == "latest.yml"
+        ), None)
         if not manifest_name:
             raise HTTPException(409, "暂存版本缺少 latest.yml")
+        # stage.json 只是暂存时的记录。发布前必须重新读取磁盘中的实物，
+        # 防止暂存后损坏或被替换的文件进入线上更新源。
+        verified_files = self._verify_staged_files(source, files)
+        self._validate_manifest(source / manifest_name, version, verified_files)
+
         current_version = self._current_version()
-        if current_version and self._semver_key(version) <= self._semver_key(current_version):
-            raise HTTPException(409, f"发布版本必须高于当前线上版本 v{current_version}")
+        if current_version:
+            version_key = self._semver_key(version)
+            current_key = self._semver_key(current_version)
+            if version_key < current_key:
+                raise HTTPException(409, f"发布版本必须高于当前线上版本 v{current_version}")
+            if version_key == current_key:
+                if not self._published_files_match(verified_files, manifest_name):
+                    raise HTTPException(409, f"v{version} 已发布，但线上文件与暂存内容不一致")
+                published_path = source / "published.json"
+                published = (
+                    json.loads(published_path.read_text(encoding="utf-8"))
+                    if published_path.exists()
+                    else {}
+                )
+                return {
+                    "version": version,
+                    "status": "published",
+                    "files": verified_files,
+                    "published_at": published.get("published_at"),
+                    "is_latest": True,
+                }
 
         # 安装包和 blockmap 先就位；manifest 最后原子替换，客户端不会看到半发布状态。
-        for item in files:
+        for item in verified_files:
             name = self._safe_name(item["name"])
             if name == manifest_name:
                 continue
-            shutil.copy2(source / name, self.releases_dir / name)
+            published_file = self.releases_dir / name
+            shutil.copy2(source / name, published_file)
+            os.chmod(published_file, 0o640)
         manifest_temp = self.releases_dir / ".latest.yml.tmp"
         shutil.copy2(source / manifest_name, manifest_temp)
+        os.chmod(manifest_temp, 0o640)
         os.replace(manifest_temp, self.releases_dir / "latest.yml")
         published_at = datetime.now(timezone.utc).isoformat()
         (source / "published.json").write_text(
             json.dumps({"version": version, "published_at": published_at}, ensure_ascii=False), encoding="utf-8"
         )
-        return {"version": version, "status": "published", "files": files, "published_at": published_at, "is_latest": True}
+        return {"version": version, "status": "published", "files": verified_files, "published_at": published_at, "is_latest": True}
 
     def list_releases(self) -> list[dict[str, object]]:
         releases: list[dict[str, object]] = []
@@ -136,19 +218,12 @@ class UpdateReleaseService:
         self._validate_version(version)
         target = (self.staging_dir / version).resolve()
         self._assert_within(target, self.staging_dir)
-        if not target.exists():
-            raise HTTPException(404, "暂存版本不存在")
-        shutil.rmtree(target)
-
-    async def legacy_upload(self, upload: UploadFile) -> dict[str, object]:
-        name = self._safe_name(upload.filename)
-        suffix = Path(name).suffix.lower()
-        if suffix not in ALLOWED_SUFFIXES:
-            raise HTTPException(400, "只允许上传 .yml、.exe 或 .blockmap 文件")
-        target = (self.releases_dir / name).resolve()
-        self._assert_within(target, self.releases_dir)
-        size, sha512 = await self._stream_upload(upload, target, ALLOWED_SUFFIXES[suffix])
-        return {"filename": name, "size": size, "sha512": sha512}
+        with self._mutation_lock, self._file_lock():
+            if not target.exists():
+                raise HTTPException(404, "暂存版本不存在")
+            if (target / "published.json").exists():
+                raise HTTPException(409, "已发布版本不能删除")
+            shutil.rmtree(target)
 
     async def _stream_upload(self, upload: UploadFile, target: Path, limit: int) -> tuple[int, str]:
         digest = hashlib.sha512()
@@ -163,6 +238,90 @@ class UpdateReleaseService:
                 digest.update(chunk)
                 output.write(chunk)
         return size, base64.b64encode(digest.digest()).decode("ascii")
+
+    def _verify_staged_files(self, source: Path, files: list[object]) -> list[StagedFile]:
+        verified: list[StagedFile] = []
+        seen: set[str] = set()
+        for raw in files:
+            if not isinstance(raw, dict):
+                raise HTTPException(409, "暂存版本文件清单无效")
+            name_value = raw.get("name")
+            name = self._safe_name(name_value if isinstance(name_value, str) else None)
+            if name.lower() in seen:
+                raise HTTPException(409, f"暂存版本文件名重复：{name}")
+            seen.add(name.lower())
+            candidate = (source / name).resolve()
+            self._assert_within(candidate, source)
+            if not candidate.is_file():
+                raise HTTPException(409, f"暂存文件不存在：{name}")
+            size, sha512 = self._hash_file(candidate)
+            try:
+                expected_size = int(raw.get("size", -1))
+            except (TypeError, ValueError):
+                expected_size = -1
+            if expected_size != size or raw.get("sha512") != sha512:
+                raise HTTPException(409, f"暂存文件发布前校验失败：{name}")
+            verified.append({"name": name, "size": size, "sha512": sha512})
+        return verified
+
+    @staticmethod
+    def _hash_file(path: Path) -> tuple[int, str]:
+        digest = hashlib.sha512()
+        size = 0
+        with path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                size += len(chunk)
+                digest.update(chunk)
+        return size, base64.b64encode(digest.digest()).decode("ascii")
+
+    def _published_files_match(self, files: list[StagedFile], manifest_name: str) -> bool:
+        for item in files:
+            published_name = "latest.yml" if item["name"] == manifest_name else item["name"]
+            candidate = (self.releases_dir / published_name).resolve()
+            self._assert_within(candidate, self.releases_dir)
+            if not candidate.is_file():
+                return False
+            size, sha512 = self._hash_file(candidate)
+            if size != item["size"] or sha512 != item["sha512"]:
+                return False
+        return True
+
+    @contextmanager
+    def _file_lock(self) -> Iterator[None]:
+        descriptor = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        acquired = False
+        try:
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b"0")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
+                acquired = True
+            except OSError as error:
+                raise HTTPException(409, "更新发布正在处理中，请稍后重试") from error
+            yield
+        finally:
+            if acquired:
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(descriptor, fcntl.LOCK_UN)  # type: ignore[attr-defined]
+                except OSError:
+                    pass
+            os.close(descriptor)
 
     def _validate_manifest(self, path: Path, version: str, files: list[StagedFile]) -> dict[str, object]:
         try:

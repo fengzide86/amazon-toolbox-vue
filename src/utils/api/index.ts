@@ -85,6 +85,24 @@ function getAuthToken(): string | null {
   }
 }
 
+function tokenFingerprint(value: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36)
+}
+
+function cacheIdentityScope(): string {
+  const role = authService.getRole()
+  const user = authService.getUser()
+  const owner = user?.id ?? user?.auth_code_id ?? user?.username
+  if (owner !== undefined) return `${role}:${String(owner)}`
+  const token = getAuthToken()
+  return `${role}:${token ? tokenFingerprint(token) : 'anonymous'}`
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : null
 }
@@ -244,8 +262,8 @@ export async function request<T = unknown>(url: string, options: ApiRequestOptio
           if (shouldClearAuth && authService.getAuth()) {
             const role = authService.getRole()
             authService.clear()
-            if (!window.location.hash.includes('/login')) {
-              window.location.hash = role === 'admin' ? '#/admin/login' : '#/user/login'
+            if (typeof window !== 'undefined' && !window.location.hash.includes('/login')) {
+              window.location.hash = role !== 'user' ? '#/admin/login' : '#/user/login'
             }
           }
           throw new ApiError(errorMessage(data, `请求失败: ${response.status}`), {
@@ -308,7 +326,7 @@ export const api = {
     }
 
     if (options.cache !== false && shouldCache(url)) {
-      const cacheKey = generateCacheKey(fullUrl)
+      const cacheKey = generateCacheKey(`${cacheIdentityScope()}:${fullUrl}`)
       const cached = getCache<T>(cacheKey)
       if (cached !== null) return cached
       const result = unwrapData(await request(fullUrl, requestOptions)) as T
@@ -345,8 +363,8 @@ export const api = {
 
 export { verifyAuthCode, adminLogin, checkAuthStatus, getCurrentUser } from './auth'
 export { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode } from './auth-codes'
-export { getPlans, getPlansAdmin } from './plans'
-export { getOrders, exportOrders, createOrder, updateOrder, refundOrder } from './orders'
+export { getPlans, getPlansAdmin, createPlan, updatePlan, enablePlan, disablePlan, archivePlan } from './plans'
+export { getOrders, exportOrders, createOrder, updateOrder, markOrderPaid, cancelOrder, refundOrder } from './orders'
 export { getUsers, updateUser } from './users'
 export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices'
 export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from './knowledge'
@@ -356,6 +374,9 @@ export { getTools, getToolCategories, updateTools, updateToolCategories, createT
 export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases'
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback'
 export { getLogs, exportLogs, getLogTools, createLog } from './logs'
-export { getDashboard, getDashboardCharts, getProfit, getProfitSummary } from './dashboard'
+export { createDemoRun, updateDemoRun, finishDemoRun, cancelDemoRun, getDemoRuns, createDemoBatch, updateDemoBatch, updateDemoBatchItem, finishDemoBatch, getDemoBatches } from './demo'
+export { getExecutions, getExecution } from './executions'
+export { getStaffAccounts, createStaffAccount, updateStaffAccount, resetStaffPassword, changeStaffPassword, logoutStaff } from './staff'
+export { getDashboard, getDashboardCharts, getProfit, getProfitSummary, getProfitPolicy, updateProfitPolicy } from './dashboard'
 export { getBusinessBootstrap, getBusinessTools, getBusinessBatches, getBusinessBatch, createBusinessBatch, updateBusinessBatch, updateBusinessBatchItem, finishBusinessBatch, getAdminActionCenter, getAdminBusinessBatch } from './business'
 export { getSettings, updateSetting } from './settings'

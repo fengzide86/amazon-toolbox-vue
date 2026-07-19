@@ -5,7 +5,9 @@
       <button class="refresh-button" :disabled="loading" @click="loadData"><RefreshCw :size="15" :class="{ spin: loading }" />刷新</button>
     </header>
 
-    <section class="summary-grid" aria-label="待处理事项摘要">
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载行动中心…" @retry="loadData" />
+
+    <section v-if="loadState !== 'loading' && loadState !== 'error'" class="summary-grid" aria-label="待处理事项摘要">
       <button v-for="card in summaryCards" :key="card.key" :class="['summary-card', `tone-${card.tone}`]" @click="scrollToSection(card.key)">
         <span class="summary-icon"><component :is="card.icon" :size="20" /></span>
         <span><small>{{ card.label }}</small><strong>{{ card.value }}</strong><em>{{ card.hint }}</em></span>
@@ -13,7 +15,7 @@
       </button>
     </section>
 
-    <section class="priority-grid">
+    <section v-if="loadState !== 'loading' && loadState !== 'error'" class="priority-grid">
       <article id="waiting_interventions" class="action-panel primary-panel">
         <header><div><span>优先处理</span><h3>需要人工介入的执行</h3></div><span class="count-badge warning">{{ data.waiting_interventions?.length || 0 }}</span></header>
         <div v-if="data.waiting_interventions?.length" class="action-list">
@@ -39,7 +41,7 @@
       </article>
     </section>
 
-    <section class="operations-grid">
+    <section v-if="loadState !== 'loading' && loadState !== 'error'" class="operations-grid">
       <article id="expiring_authorizations" class="action-panel">
         <header><div><span>7 天内</span><h3>即将到期授权</h3></div><router-link to="/admin/authcodes">全部授权</router-link></header>
         <div v-if="data.expiring_authorizations?.length" class="simple-list">
@@ -86,6 +88,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { CheckCircle2, ChevronRight, KeyRound, LoaderCircle, MessageSquareText, MonitorSmartphone, RefreshCw, ShieldAlert, ShieldCheck, TicketCheck, TimerReset, UserRoundCheck, WifiOff } from '@lucide/vue'
 import EmptyState from '@/components/EmptyState.vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { getAdminActionCenter, getAdminBusinessBatch } from '@/utils/api'
 import { showToast } from '@/utils'
 import {
@@ -94,6 +97,7 @@ import {
   type AdminActionCenter,
   type AdminBatchDetail,
 } from '@/features/admin/model'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 
 const data = ref<AdminActionCenter>(adminActionCenterSchema.parse({
   summary: {},
@@ -104,6 +108,9 @@ const data = ref<AdminActionCenter>(adminActionCenterSchema.parse({
   stale_batches: [],
 }))
 const loading = ref(false)
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
+const hasLoaded = ref(false)
 const batchLoading = ref(false)
 const batchDrawerVisible = ref(false)
 const batchDetail = ref<AdminBatchDetail | null>(null)
@@ -117,8 +124,22 @@ const summaryCards = computed(() => [
 
 async function loadData() {
   loading.value = true
-  try { data.value = adminActionCenterSchema.parse(await getAdminActionCenter()) }
-  catch { showToast('行动中心加载失败，请稍后重试', 'error') }
+  loadState.value = hasLoaded.value ? 'data' : 'loading'
+  loadError.value = ''
+  try {
+    data.value = adminActionCenterSchema.parse(await getAdminActionCenter())
+    hasLoaded.value = true
+    const itemCount = (data.value.expiring_authorizations?.length || 0)
+      + (data.value.device_anomalies?.length || 0)
+      + (data.value.pending_tickets?.length || 0)
+      + (data.value.waiting_interventions?.length || 0)
+      + (data.value.stale_batches?.length || 0)
+    loadState.value = settledDataState(itemCount)
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '行动中心加载失败，请稍后重试'
+    loadState.value = failedDataState(hasLoaded.value)
+    showToast('行动中心加载失败，请稍后重试', 'error')
+  }
   finally { loading.value = false }
 }
 

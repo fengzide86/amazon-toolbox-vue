@@ -57,7 +57,7 @@ async function loginAdmin(page: Page): Promise<void> {
     return
   }
   await page.reload()
-  await page.locator('#adminPassword').fill('admin123')
+  await page.locator('#adminPassword').fill(process.env.E2E_STAFF_PASSWORD || 'Test-only-pass-123')
   const responsePromise = page.waitForResponse(
     response => response.url().includes('/api/auth/admin-login') && response.request().method() === 'POST',
     { timeout: 15000 }

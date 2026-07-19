@@ -3,7 +3,7 @@
     <PageHeader
       eyebrow="BUSINESS OPERATIONS"
       title="专业工作台"
-      description="管理 B 端开放状态、专业套餐、内部授权和批量工具接入"
+      description="管理 B 端演示入口、专业套餐与内部验证授权"
     >
       <template #actions>
         <router-link class="secondary-link" to="/admin/authcodes?product=business">查看 B 端授权码</router-link>
@@ -17,7 +17,7 @@
         <h2>{{ releaseStatusTitle }}</h2>
         <p>{{ releaseStatusDescription }}</p>
       </div>
-      <div class="hero-switch">
+      <div v-if="canManageSettings" class="hero-switch">
         <span>{{ workspaceEnabled ? 'B 端登录已开放' : 'B 端登录未开放' }}</span>
         <el-switch
           v-model="workspaceEnabled"
@@ -28,6 +28,7 @@
           @change="saveWorkspaceEnabled"
         />
       </div>
+      <div v-else class="hero-switch readonly">发布开关仅超级管理员可查看和修改</div>
     </section>
 
     <section class="readiness-grid" aria-label="专业工作台准备状态">
@@ -43,8 +44,8 @@
       </article>
       <article>
         <span class="card-icon"><Boxes :size="20" /></span>
-        <div><span>已接入批量工具</span><strong>{{ batchTools.length }} 个</strong></div>
-        <small>{{ batchTools.length ? '只展示真实开放的脚本' : '脚本将按业务逐个接入' }}</small>
+        <div><span>可演示批量工具</span><strong>{{ batchTools.length }} 个</strong></div>
+        <small>{{ batchTools.length ? '全部按演示模式呈现' : '演示脚本将按验证范围逐个加入' }}</small>
       </article>
     </section>
 
@@ -88,10 +89,10 @@
         <article>
           <span class="step-number">03</span>
           <div>
-            <strong>逐个接入业务脚本</strong>
-            <p>只有脚本真正支持批量时，才在 B 端出现对应工具和导入入口。</p>
+            <strong>复核演示边界</strong>
+            <p>确认表格只在本地解析，队列结果仅作为流程案例，不访问真实平台。</p>
           </div>
-          <router-link to="/admin/settings?section=tools">配置工具</router-link>
+          <span class="operation-note">演示流程 · 不访问真实平台</span>
         </article>
       </div>
     </section>
@@ -110,11 +111,11 @@
     </section>
 
     <section class="limits-surface">
-      <header><div><span>授权边界</span><h3>当前专业套餐</h3></div><router-link to="/admin/settings">套餐设置</router-link></header>
+      <header><div><span>授权边界</span><h3>当前专业套餐</h3></div><router-link v-if="canManageSettings" to="/admin/settings">套餐设置</router-link></header>
       <div v-if="activeBusinessPlan" class="limits-grid">
         <article><span>套餐</span><strong>{{ activeBusinessPlan.name }}</strong><small>专业 B 端</small></article>
         <article><span>单批次上限</span><strong>{{ entitlementNumber('max_batch_rows', 50) }}</strong><small>有效导入行</small></article>
-        <article><span>浏览器现场</span><strong>{{ entitlementNumber('max_open_sessions', 6) }}</strong><small>等待操作时保留</small></article>
+        <article><span>并行演示槽位</span><strong>{{ entitlementNumber('max_open_sessions', 6) }}</strong><small>仅用于本地流程播放</small></article>
       </div>
       <div v-else class="empty-plan">还没有可用的 B 端套餐，请先在套餐设置中建立。</div>
     </section>
@@ -157,6 +158,7 @@ const plans = ref<AdminPlan[]>([])
 const authCodes = ref<AdminAuthCode[]>([])
 const tools = ref<ToolCatalogItem[]>([])
 const generatedCode = ref('')
+const canManageSettings = computed(() => authService.isSuperAdmin())
 
 const businessPlans = computed(() => plans.value.filter(plan => plan.product_type === 'business'))
 const activeBusinessPlan = computed(() =>
@@ -164,18 +166,21 @@ const activeBusinessPlan = computed(() =>
 const businessCodes = computed(() => authCodes.value.filter(code => code.product_type === 'business'))
 const batchTools = computed(() => tools.value.filter(tool => tool.supports_batch))
 const releaseStatusTitle = computed(() => {
+  if (!canManageSettings.value) return '内部演示授权准备'
   if (!workspaceEnabled.value) return '等待内部开放'
   if (!activeBusinessPlan.value) return '还缺少专业套餐'
   if (!batchTools.value.length) return '内部验证中'
   return '专业工作台已开放'
 })
 const releaseStatusDescription = computed(() => {
+  if (!canManageSettings.value) return '运营可生成内部验证授权；全局入口状态由超级管理员控制。'
   if (!workspaceEnabled.value) return 'B 端授权不会进入专业工作台，普通 C 端不受影响。'
   if (!activeBusinessPlan.value) return '开启状态已经保存，但仍需要一个有效的 B 端套餐。'
   if (!batchTools.value.length) return '授权与前端已经就绪，批量脚本会根据真实业务能力逐个接入。'
   return 'B 端授权可以登录，已开放的批量工具会出现在专业工作台。'
 })
 const nextActionTitle = computed(() => {
+  if (!canManageSettings.value) return activeBusinessPlan.value ? '生成内部演示授权' : '等待超级管理员配置专业套餐'
   if (!workspaceEnabled.value) return '开启 B 端内部验证'
   if (!activeBusinessPlan.value) return '配置一个有效的 B 端套餐'
   if (!businessCodes.value.length) return '生成第一个内部验证授权'
@@ -183,6 +188,7 @@ const nextActionTitle = computed(() => {
   return '使用真实授权验证批量业务路径'
 })
 const nextActionDescription = computed(() => {
+  if (!canManageSettings.value) return '运营账号可验证授权发放与演示入口，不可修改全局发布设置。'
   if (!workspaceEnabled.value) return '开启后也不会自动开放任何批量工具。'
   if (!activeBusinessPlan.value) return '套餐必须同时具备批量执行和多账号工作台权限。'
   if (!businessCodes.value.length) return '内部授权只用于验证，不对普通客户展示。'
@@ -199,7 +205,7 @@ async function loadData() {
   const results = await Promise.allSettled([
       getPlansAdmin({ page_size: 100 }),
       getAuthCodes(),
-      getSettings(),
+      canManageSettings.value ? getSettings() : Promise.resolve([]),
       getTools(),
   ])
   try {
@@ -207,12 +213,12 @@ async function loadData() {
     if (plansResult.status === 'fulfilled') plans.value = adminPlansSchema.parse(plansResult.value)
     if (codesResult.status === 'fulfilled') authCodes.value = adminAuthCodesSchema.parse(codesResult.value)
     if (toolsResult.status === 'fulfilled') tools.value = toolCatalogSchema.parse(toolsResult.value)
-    if (settingsResult.status === 'fulfilled') {
+    if (canManageSettings.value && settingsResult.status === 'fulfilled') {
       const settings = adminSettingsSchema.parse(settingsResult.value)
       const setting = settings.find(item => item.key === 'business_workspace_enabled')
       workspaceEnabled.value = String(setting?.value || '').toLowerCase() === 'true'
     }
-    if (results.every(result => result.status === 'rejected')) {
+    if (results.slice(0, 2).every(result => result.status === 'rejected') && toolsResult.status === 'rejected') {
       showToast('专业工作台状态加载失败', 'error')
     }
   } catch {
@@ -223,6 +229,7 @@ async function loadData() {
 }
 
 async function saveWorkspaceEnabled(rawValue: string | number | boolean) {
+  if (!canManageSettings.value) return
   const enabled = rawValue === true
   switchSaving.value = true
   try {
@@ -291,6 +298,7 @@ onMounted(loadData)
 .hero-copy h2 { margin: 0; color: var(--color-text); font-size: 22px; letter-spacing: -.03em; }
 .hero-copy p { margin: 0; color: var(--color-text-secondary); font-size: var(--type-control); line-height: 1.6; }
 .hero-switch { display: flex; align-items: center; gap: 12px; color: var(--color-text-secondary); font-size: var(--type-meta); }
+.hero-switch.readonly { max-width: 220px; line-height: 1.55; text-align: right; }
 .readiness-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
 .readiness-grid article { min-height: 132px; display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 13px; padding: 18px; border: 1px solid var(--color-border); border-radius: 15px; background: var(--color-surface); box-shadow: var(--shadow-low); }
 .card-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft); }
@@ -315,6 +323,7 @@ onMounted(loadData)
 .action-grid button,.action-grid a { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; align-self: end; padding: 0 13px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text); background: var(--color-surface-soft); font-size: var(--type-control); font-weight: 700; text-decoration: none; cursor: pointer; }
 .action-grid .primary-operation button { border: 0; color: white; background: var(--color-primary); }
 .action-grid button:disabled { opacity: .45; cursor: not-allowed; }
+.operation-note { align-self: end; color: var(--color-primary); font-size: var(--type-meta); font-weight: 700; }
 .generated-license { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 14px; padding: 18px 20px; border: 1px solid rgba(22,138,99,.2); border-radius: 15px; background: #edf8f4; }
 .generated-check { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: white; background: var(--color-success); }
 .generated-license > div:nth-child(2) { display: grid; gap: 3px; }

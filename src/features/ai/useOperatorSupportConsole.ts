@@ -16,6 +16,7 @@ import {
   type SandboxMessage,
 } from '@/features/ai/model'
 import { formatChatTime as formatTime, supportSessionStatusLabel as getStatusText } from './presentation'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 
 
 export function useOperatorSupportConsole() {
@@ -44,6 +45,9 @@ const transferRules = ref({
   account_direct_transfer: false
 })
 const saving = ref(false)
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
+const hasLoaded = ref(false)
 
 // 对话记录
 const sessions = ref<ChatSessionSummary[]>([])
@@ -70,29 +74,25 @@ function getStatusTagType(status?: string | null): 'primary' | 'success' | 'warn
 }
 
 async function loadConfig() {
+  const res = aiConfigSchema.parse(await getAIChatConfig())
+  config.value = res
   try {
-    const res = aiConfigSchema.parse(await getAIChatConfig())
-    config.value = res
-    try {
-      const parsed: unknown = JSON.parse(res.suggested_questions || '[]')
-      suggestedQuestions.value = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : ['']
-    } catch {
-      suggestedQuestions.value = ['']
-    }
-    try {
-      const parsed: unknown = JSON.parse(res.transfer_rules || '{}')
-      if (typeof parsed !== 'object' || parsed === null) throw new Error('invalid transfer rules')
-      transferRules.value = { ...transferRules.value, ...parsed as Partial<TransferRules> }
-    } catch {
-      transferRules.value = {
-        refund_direct_transfer: true,
-        complaint_direct_transfer: true,
-        auto_transfer_after_retries: true,
-        account_direct_transfer: false
-      }
-    }
+    const parsed: unknown = JSON.parse(res.suggested_questions || '[]')
+    suggestedQuestions.value = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : ['']
   } catch {
-    showToast('加载配置失败', 'error')
+    suggestedQuestions.value = ['']
+  }
+  try {
+    const parsed: unknown = JSON.parse(res.transfer_rules || '{}')
+    if (typeof parsed !== 'object' || parsed === null) throw new Error('invalid transfer rules')
+    transferRules.value = { ...transferRules.value, ...parsed as Partial<TransferRules> }
+  } catch {
+    transferRules.value = {
+      refund_direct_transfer: true,
+      complaint_direct_transfer: true,
+      auto_transfer_after_retries: true,
+      account_direct_transfer: false
+    }
   }
 }
 
@@ -115,17 +115,13 @@ async function saveConfig() {
 }
 
 async function loadSessions() {
-  try {
-    const res = chatHistorySchema.parse(await getAdminChatSessions({
-      status: sessionFilter.value || undefined,
-      page: currentPage.value,
-      page_size: pageSize
-    }))
-    sessions.value = res.items
-    totalSessions.value = res.total
-  } catch {
-    showToast('加载对话记录失败', 'error')
-  }
+  const res = chatHistorySchema.parse(await getAdminChatSessions({
+    status: sessionFilter.value || undefined,
+    page: currentPage.value,
+    page_size: pageSize
+  }))
+  sessions.value = res.items
+  totalSessions.value = res.total
 }
 
 async function viewSession(rawSession: unknown) {
@@ -140,10 +136,19 @@ async function viewSession(rawSession: unknown) {
 }
 
 async function loadStats() {
+  stats.value = aiStatsSchema.parse(await getAIChatStats())
+}
+
+async function loadAll() {
+  loadState.value = hasLoaded.value ? (sessions.value.length ? 'data' : 'empty') : 'loading'
+  loadError.value = ''
   try {
-    stats.value = aiStatsSchema.parse(await getAIChatStats())
-  } catch {
-    showToast('加载统计数据失败', 'error')
+    await Promise.all([loadConfig(), loadSessions(), loadStats()])
+    hasLoaded.value = true
+    loadState.value = settledDataState(sessions.value.length)
+  } catch (error) {
+    loadError.value = errorMessage(error, '客服规则、对话与统计暂时无法加载')
+    loadState.value = failedDataState(hasLoaded.value)
   }
 }
 
@@ -181,14 +186,11 @@ async function sendTest() {
   }
 }
 
-onMounted(() => {
-  loadConfig()
-  loadSessions()
-  loadStats()
-})
+onMounted(loadAll)
   return {
     config, suggestedQuestions, transferRules, saving, sessions, currentSession, stats,
     testMessage, sandboxMessages, sendingTest, lastDebug, debugPlatform,
+    loadState, loadError, loadAll,
     getStatusTagType, getStatusText, formatTime, saveConfig, viewSession, sendTest,
   }
 }

@@ -1,11 +1,12 @@
 <template>
   <div :class="['batch-workspace', { 'has-batch': store.isActive || store.snapshot.status === 'completed' }]">
+    <AsyncStateNotice v-if="store.bootstrapStale" state="stale" :message="store.error || ''" @retry="refreshTools" />
     <template v-if="!store.isActive && store.snapshot.status !== 'completed'">
       <section v-if="!store.bootstrap" class="workspace-loading-state">
         <template v-if="store.error">
           <span><CircleAlert :size="24" /></span>
-          <strong>专业工作台暂时无法载入</strong>
-          <small>连接恢复后可以直接重试，不会影响本机已有浏览器现场。</small>
+          <strong>批量演示工作台暂时无法载入</strong>
+          <small>连接恢复后可以直接重试，不会影响已经完成的本地预览。</small>
           <button type="button" @click="refreshTools"><RefreshCw :size="16" />重新载入</button>
         </template>
         <template v-else>
@@ -18,13 +19,13 @@
         <div class="ready-brand"><span>BUSINESS WORKSPACE</span><strong>专业工作台</strong></div>
         <div class="ready-symbol"><Boxes :size="30" /></div>
         <h1>当前还没有开放的批量工具</h1>
-        <p>前端、授权和本地浏览器能力已经准备好。业务工具会根据实际脚本能力逐个接入。</p>
-        <div class="ready-flow" aria-label="未来批量处理方式">
+        <p>前端、授权和演示框架已经准备好。业务工具会按内部验证范围逐个加入。</p>
+        <div class="ready-flow" aria-label="批量演示方式">
           <article><FileSpreadsheet :size="19" /><div><strong>本地导入</strong><span>客户表格只在本机解析</span></div></article>
           <i></i>
-          <article><Layers3 :size="19" /><div><strong>独立现场</strong><span>每个账号使用独立浏览器</span></div></article>
+          <article><Layers3 :size="19" /><div><strong>队列播放</strong><span>逐行呈现模拟步骤</span></div></article>
           <i></i>
-          <article><CircleAlert :size="19" /><div><strong>需要时提醒</strong><span>登录和验证时再操作</span></div></article>
+          <article><CircleAlert :size="19" /><div><strong>案例提示</strong><span>只展示演示中的注意事项</span></div></article>
         </div>
         <div class="ready-actions">
           <button type="button" :disabled="store.loading" @click="refreshTools">
@@ -39,13 +40,13 @@
 
       <section v-else class="batch-setup">
         <header class="setup-header">
-          <div><span>NEW BATCH</span><h1>建立一个批量任务</h1><p>选择工具并导入客户数据。账号登录会在各自独立的浏览器现场中完成。</p></div>
-          <div class="privacy-mark"><ShieldCheck :size="16" />数据只在本机解析</div>
+          <div><span>DEMO BATCH</span><h1>体验批量流程演示</h1><p>选择工具并导入本地 Excel，查看批量队列、提示和演示案例。</p></div>
+          <div class="privacy-mark"><ShieldCheck :size="16" />不含真实客户数据</div>
         </header>
 
         <div class="setup-section">
           <div class="section-number">01</div>
-          <div class="section-copy"><strong>选择批量工具</strong><span>这里只显示后台明确开放批量能力的工具</span></div>
+          <div class="section-copy"><strong>选择演示工具</strong><span>当前仅展示后台配置的批量演示场景</span></div>
           <div class="business-tools">
             <button v-for="tool in store.tools" :key="tool.id" :class="{ selected: store.selectedTool?.id === tool.id }" @click="store.chooseTool(tool)">
               <span class="tool-icon"><Boxes :size="19" /></span>
@@ -58,15 +59,15 @@
 
         <div class="setup-section" :class="{ disabled: !store.selectedTool }">
           <div class="section-number">02</div>
-          <div class="section-copy"><strong>导入客户数据</strong><span>支持 .xlsx 和 .csv，不支持密码、公式和宏</span></div>
+          <div class="section-copy"><strong>导入本地 Excel</strong><span>只在本机解析；原始单元格、账号和 Cookie 均不会上传</span></div>
           <div class="import-zone">
             <button class="import-button" :disabled="!store.selectedTool || store.loading" @click="chooseFile">
               <FileSpreadsheet :size="20" />
-              <span><strong>{{ store.importPreview?.fileName || '选择 Excel 或 CSV 文件' }}</strong><small>最多 {{ store.entitlements.max_batch_rows || 50 }} 个有效账号</small></span>
+              <span><strong>{{ store.importPreview?.fileName || '选择 .xlsx 演示表格' }}</strong><small>本次最多演示 {{ store.entitlements.max_batch_rows || 50 }} 项</small></span>
               <Upload :size="16" />
             </button>
             <div v-if="store.importPreview" class="import-result">
-              <span class="valid"><CheckCircle2 :size="15" />{{ store.importPreview.validCount }} 行可执行</span>
+              <span class="valid"><CheckCircle2 :size="15" />{{ store.importPreview.validCount }} 个演示项</span>
               <span v-if="store.importPreview.errorCount" class="invalid"><CircleAlert :size="15" />{{ store.importPreview.errorCount }} 行需要修正</span>
             </div>
             <div v-if="store.importPreview?.rows?.length" class="preview-list">
@@ -83,9 +84,9 @@
         </div>
 
         <footer class="setup-footer">
-          <div><strong>执行方式</strong><span>系统按顺序处理；需要人工操作的账号会保留现场并让后续账号继续。</span></div>
+          <div><strong>演示方式</strong><span>系统按顺序播放模拟案例；所有状态均不代表真实平台处理结果。</span></div>
           <button :disabled="!store.importPreview?.validCount || store.loading" @click="beginBatch">
-            <LoaderCircle v-if="store.loading" :size="16" class="spin" /><Play v-else :size="16" />开始批量处理
+            <LoaderCircle v-if="store.loading" :size="16" class="spin" /><Play v-else :size="16" />开始批量演示
           </button>
         </footer>
       </section>
@@ -93,11 +94,11 @@
 
     <template v-else>
       <header class="workspace-header">
-        <div class="batch-identity"><span class="professional-badge">BUSINESS</span><div><strong>{{ store.snapshot.tool?.name }}</strong><small>{{ store.snapshot.counts?.total || 0 }} 个账号</small></div></div>
+        <div class="batch-identity"><span class="professional-badge">模拟批次</span><div><strong>{{ store.snapshot.tool?.name }}</strong><small>{{ store.snapshot.counts?.total || 0 }} 个演示项</small></div></div>
         <div class="batch-counts">
-          <span><small>已处理</small><strong>{{ processedCount }}</strong></span>
-          <span><small>正在处理</small><strong>{{ store.snapshot.counts?.running || 0 }}</strong></span>
-          <span :class="{ attention: store.snapshot.counts?.waiting }"><small>需要操作</small><strong>{{ store.snapshot.counts?.waiting || 0 }}</strong></span>
+          <span><small>已演示</small><strong>{{ processedCount }}</strong></span>
+          <span><small>演示中</small><strong>{{ store.snapshot.counts?.running || 0 }}</strong></span>
+          <span :class="{ attention: store.snapshot.counts?.waiting }"><small>模拟提示</small><strong>{{ store.snapshot.counts?.waiting || 0 }}</strong></span>
         </div>
         <div class="header-actions">
           <span :class="['sync-state', `is-${store.syncState}`]">{{ syncText }}</span>
@@ -108,7 +109,7 @@
 
       <div class="workspace-grid">
         <aside :class="['account-queue', { 'mobile-open': queueOpen }]">
-          <header><div><strong>账号队列</strong><small>系统会自动继续</small></div><button class="mobile-close" @click="queueOpen=false"><X :size="16" /></button></header>
+          <header><div><strong>演示队列</strong><small>系统会自动继续</small></div><button class="mobile-close" @click="queueOpen=false"><X :size="16" /></button></header>
           <div class="queue-list">
             <button v-for="item in store.items" :key="item.itemId" :class="['queue-item', `is-${item.status}`, { selected: store.selectedItemId === item.itemId }]" @click="store.selectItem(item.itemId)">
               <span class="queue-state">
@@ -128,22 +129,15 @@
           <div class="browser-shell">
             <div class="browser-toolbar"><span class="traffic"><i></i><i></i><i></i></span><LockKeyhole :size="13" /><span>{{ displayUrl }}</span><small>{{ store.selectedItem?.accountLabelMasked || '选择一个账号' }}</small></div>
             <div class="browser-viewport">
-              <template v-if="isElectron">
-                <webview
-                  v-for="item in store.openItems"
-                  :key="item.itemId"
-                  v-show="store.selectedItemId === item.itemId"
-                  :src="targetUrl"
-                  :partition="partitionFor(item.itemId)"
-                  class="batch-webview"
-                  @dom-ready="registerBrowser(item, $event)"
-                ></webview>
-              </template>
-              <div v-else class="desktop-required"><MonitorUp :size="36" /><strong>请在桌面客户端使用批量工作台</strong><span>多账号浏览器隔离依赖本机 Electron 环境。</span></div>
-              <div v-if="store.selectedItem && !store.selectedItem.browserReady && store.selectedItem.itemId !== store.snapshot.provisioningItemId" class="browser-placeholder">
-                <Layers3 :size="34" /><strong>{{ store.statusText(store.selectedItem.status) }}</strong><span>轮到该账号时，系统会在这里打开独立浏览器。</span>
+              <div class="demo-browser-preview">
+                <Layers3 :size="36" />
+                <strong>批量流程模拟界面</strong>
+                <span>当前展示的是虚拟演示项，不会打开、访问或修改真实店铺。</span>
               </div>
-              <div v-if="store.selectedItem?.status === 'running'" class="automation-shield"><LoaderCircle :size="15" class="spin" />正在自动处理，请不要操作这个页面</div>
+              <div v-if="store.selectedItem && !store.selectedItem.browserReady && store.selectedItem.itemId !== store.snapshot.provisioningItemId" class="browser-placeholder">
+                <Layers3 :size="34" /><strong>{{ store.statusText(store.selectedItem.status) }}</strong><span>轮到该演示项时，系统会在这里播放对应的模拟步骤。</span>
+              </div>
+              <div v-if="store.selectedItem?.status === 'running'" class="automation-shield"><LoaderCircle :size="15" class="spin" />正在播放模拟步骤</div>
             </div>
           </div>
         </main>
@@ -159,7 +153,7 @@
             <div class="business-stage"><span>业务阶段</span><div><i :class="{done: stageIndex>0,active:stageIndex===0}"></i><i :class="{done:stageIndex>1,active:stageIndex===1}"></i><i :class="{done:stageIndex>2,active:stageIndex===2}"></i><i :class="{done:stageIndex>3,active:stageIndex===3}"></i></div><small>准备 · 执行 · 核验 · 完成</small></div>
             <button v-if="store.selectedItem.status === 'waiting_user'" class="primary-action warning" @click="completeAction">我已完成，继续处理</button>
             <button v-else-if="store.selectedItem.status === 'failed'" class="primary-action" @click="restartItem">重新发起此账号</button>
-            <div class="security-note"><ShieldCheck :size="15" /><span>该浏览器只属于当前账号，不会与其他账号共享登录状态。</span></div>
+            <div class="security-note"><ShieldCheck :size="15" /><span>这是模拟流程，不包含真实账号或登录状态。</span></div>
           </template>
         </aside>
       </div>
@@ -171,39 +165,29 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { Boxes, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3, FileSpreadsheet, Layers3, List, LoaderCircle, LockKeyhole, MonitorUp, PanelRight, Play, Plus, RefreshCw, ShieldCheck, Square, Upload, X } from '@lucide/vue'
+import { Boxes, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3, FileSpreadsheet, Layers3, List, LoaderCircle, LockKeyhole, PanelRight, Play, Plus, RefreshCw, ShieldCheck, Square, Upload, X } from '@lucide/vue'
 import { showToast } from '@/utils'
-import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
-import type { BatchItem } from '@/features/business/model'
+import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 
-interface EmbeddedWebviewElement extends HTMLElement {
-  getWebContentsId?: () => number
-}
-
-const store = useBusinessWorkspaceStore()
+const store = useBusinessDemoWorkspaceStore()
 const queueOpen = ref(false)
 const actionOpen = ref(false)
-const registered = new Set<string>()
 const syncLabels: Record<string, string> = { synced: '状态已同步', syncing: '正在同步', offline: '本地继续处理中' }
 
 const errorMessage = (error: unknown, fallback: string): string => error instanceof Error && error.message ? error.message : fallback
-const isElectron = computed(() => Boolean(window.electronAPI?.batch))
 const processedCount = computed(() => (store.snapshot.counts.completed || 0) + (store.snapshot.counts.failed || 0))
-const targetUrl = computed(() => store.snapshot.tool?.target_url || store.snapshot.tool?.targetUrl || 'https://sellercentral.amazon.com/')
-const displayUrl = computed(() => { try { return new URL(targetUrl.value).host } catch { return targetUrl.value } })
+const displayUrl = '演示流程 · 不访问真实平台'
 const syncText = computed(() => syncLabels[store.syncState] || '')
 const actionDescription = computed(() => {
   const item = store.selectedItem
   if (!item) return ''
-  if (item.status === 'waiting_user') return item.message || '请在左侧页面完成提示的操作'
-  if (item.status === 'running') return '脚本正在自动处理当前账号'
-  if (item.status === 'completed') return '这个账号已经处理完成'
-  if (item.status === 'failed') return item.message || '本次处理未完成，可以查看页面后重新发起'
-  return '系统会在轮到该账号时自动开始'
+  if (item.status === 'running') return '正在播放该演示项的模拟步骤'
+  if (item.status === 'completed') return item.message || '该演示项已经播放完成'
+  if (item.status === 'failed') return item.message || '演示播放中断，可以新建批次重试'
+  return '系统会在轮到该演示项时自动播放'
 })
 const stageIndex = computed<number>(() => store.selectedItem?.status === 'completed' ? 4 : store.selectedItem?.status === 'running' || store.selectedItem?.status === 'waiting_user' ? 1 : 0)
-const partitionFor = (id: string): string => `batch-${String(store.snapshot.batchId || 'draft').replace(/[^a-zA-Z0-9_-]/g, '_')}-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
-
 async function chooseFile() { try { await store.selectImportFile() } catch (error) { showToast(errorMessage(error, '导入失败'), 'error') } }
 async function refreshTools() {
   try {
@@ -215,14 +199,6 @@ async function refreshTools() {
 }
 async function exportErrors() { try { const result = await store.exportImportErrors(); if (result) showToast('问题清单已导出', 'success') } catch (error) { showToast(errorMessage(error, '导出失败'), 'error') } }
 async function beginBatch() { try { await store.startBatch() } catch (error) { showToast(errorMessage(error, '无法开始批次'), 'error') } }
-async function registerBrowser(item: BatchItem, event: Event) {
-  if (registered.has(item.itemId)) return
-  const view = event.currentTarget as EmbeddedWebviewElement | null
-  if (!view?.getWebContentsId) return
-  registered.add(item.itemId)
-  try { await store.registerBrowser(item.itemId, view.getWebContentsId()) }
-  catch (error) { registered.delete(item.itemId); showToast(errorMessage(error, '浏览器准备失败'), 'error') }
-}
 async function completeAction() {
   const itemId = store.selectedItemId
   if (!itemId) return
@@ -232,18 +208,18 @@ async function completeAction() {
 async function restartItem() {
   const itemId = store.selectedItemId
   if (!itemId) return
-  try { registered.delete(itemId); await store.restartItem(itemId) }
+  try { await store.restartItem(itemId) }
   catch (error) { showToast(errorMessage(error, '无法重新发起'), 'error') }
 }
 async function endBatch() {
   try {
-    await ElMessageBox.confirm('结束后会关闭所有客户浏览器并清理本机导入数据，不能从通用检查点继续。', '结束当前批次？', { confirmButtonText: '结束批次', cancelButtonText: '继续使用', type: 'warning' })
+    await ElMessageBox.confirm('结束后会停止当前演示并清理本次本地预览状态。', '结束当前演示？', { confirmButtonText: '结束演示', cancelButtonText: '继续播放', type: 'warning' })
     await store.cancelBatch('cancelled')
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') showToast(errorMessage(error, '结束失败'), 'error')
   }
 }
-async function newBatch() { try { registered.clear(); await store.resetWorkspace() } catch (error) { showToast(errorMessage(error, '暂时不能新建批次'), 'error') } }
+async function newBatch() { try { await store.resetWorkspace() } catch (error) { showToast(errorMessage(error, '暂时不能新建批次'), 'error') } }
 onMounted(() => { void store.init() })
 </script>
 
@@ -256,4 +232,6 @@ onMounted(() => { void store.init() })
 .error-list button{width:max-content;margin-top:4px;padding:4px 7px;border:1px solid rgba(195,61,73,.18);border-radius:6px;color:var(--color-danger);background:#fff;font-size:var(--type-micro);cursor:pointer}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}.queue-item.is-waiting_user .queue-state{animation:none}.action-panel,.account-queue{transition:none}}
 .workspace-loading-state small{max-width:430px;color:var(--color-text-secondary);font-size:var(--type-meta);line-height:1.6}.workspace-loading-state button{height:40px;display:flex;align-items:center;gap:7px;padding:0 14px;border:1px solid var(--color-border);border-radius:10px;color:var(--color-primary);background:var(--color-surface);font-size:var(--type-control);cursor:pointer}
+.demo-browser-preview{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;padding:24px;text-align:center;color:var(--color-primary);background:linear-gradient(145deg,#f7f9ff,#eef3ff)}
+.demo-browser-preview strong{color:var(--color-text)}.demo-browser-preview span{max-width:420px;color:var(--color-text-secondary);font-size:var(--type-meta);line-height:1.6}
 </style>

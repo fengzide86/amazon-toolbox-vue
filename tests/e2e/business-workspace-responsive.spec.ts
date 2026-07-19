@@ -17,12 +17,17 @@ const batchTool = {
   batch_input_schema: [{ key: 'account_label', label: '客户简称', type: 'text', required: true }],
 }
 
-async function mockControlPlane(page: Page, role: 'business' | 'consumer' | 'admin' = 'business'): Promise<void> {
-  const user = role === 'business' ? businessUser : { role: 'user', product_type: 'consumer', business_workspace_enabled: false, plan_name: '普通版', entitlements: {} }
+async function mockControlPlane(page: Page, role: 'business' | 'consumer' | 'super_admin' = 'business'): Promise<void> {
+  const user = role === 'business'
+    ? businessUser
+    : role === 'super_admin'
+      ? { id: 'super-admin-1', staff_id: 'super-admin-1', username: 'acceptance_admin', display_name: '超级管理员', role, status: 'active', force_password_reset: false }
+      : { role: 'user', product_type: 'consumer', business_workspace_enabled: false, plan_name: '普通版', entitlements: {} }
   await page.addInitScript(({ user, role }) => {
-    sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'visual-token' }))
+    const sessionRole = role === 'super_admin' ? 'super_admin' : 'user'
+    sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'visual-token', role: sessionRole }))
     sessionStorage.setItem('toolbox_token', 'visual-token')
-    sessionStorage.setItem('toolbox_role', role === 'admin' ? 'admin' : 'user')
+    sessionStorage.setItem('toolbox_role', sessionRole)
     localStorage.setItem('toolbox_user', JSON.stringify(user))
   }, { user, role })
   await page.route('**/api/**', async route => {
@@ -30,7 +35,7 @@ async function mockControlPlane(page: Page, role: 'business' | 'consumer' | 'adm
     let data: unknown = []
     if (url.includes('/api/business/bootstrap')) data = { ...businessUser, tools: [batchTool] }
     else if (url.includes('/api/business/batches')) data = []
-    else if (url.includes('/api/auth/me')) data = role === 'admin' ? { role: 'admin' } : user
+    else if (url.includes('/api/auth/me') || url.includes('/api/staff/auth/me')) data = user
     else if (url.includes('/api/tools')) data = [{ ...batchTool, capability_tags: ['自动填报', '页面核验', '结果确认'] }]
     else if (url.includes('/api/admin/action-center')) data = {
       summary: { expiring_authorizations: 2, device_anomalies: 1, pending_tickets: 3, waiting_interventions: 1, stale_batches: 0 },
@@ -69,7 +74,7 @@ test('C端即使工具配置支持批量，也不出现批量入口', async ({ p
 })
 
 test('管理员行动中心在 1024 和 768 下保持完整卡片矩阵', async ({ page }) => {
-  await mockControlPlane(page, 'admin')
+  await mockControlPlane(page, 'super_admin')
   for (const width of [1024, 768]) {
     await page.setViewportSize({ width, height: 768 })
     await page.goto('/#/admin/dashboard', { waitUntil: 'domcontentloaded' })

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, status
 from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit import log_admin_action
 from domains.announcements.schemas import AnnouncementCreate, AnnouncementUpdate
 from models import Announcement, AnnouncementReceipt
 from services.entitlement_service import resolve_product_access
@@ -136,25 +138,70 @@ async def release_notes(
     return [serialize(item) for item in result.scalars().all()]
 
 
-async def create(db: AsyncSession, data: AnnouncementCreate) -> Announcement:
+async def create(
+    db: AsyncSession,
+    data: AnnouncementCreate,
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
+) -> Announcement:
     announcement = Announcement(**_normalized_values(data))
     db.add(announcement)
+    await db.flush()
+    if actor:
+        await log_admin_action(
+            db,
+            user_id=actor.get("staff_id"),
+            user_name=actor.get("username"),
+            action="announcement_create",
+            target_type="announcement",
+            target_id=announcement.id,
+            detail={
+                "role": actor.get("role"),
+                "before": None,
+                "after": serialize(announcement),
+                "reason": None,
+            },
+            request=request,
+        )
     await db.commit()
     await db.refresh(announcement)
     return announcement
 
 
-async def update(db: AsyncSession, announcement_id: int, data: AnnouncementUpdate) -> Announcement:
+async def update(
+    db: AsyncSession,
+    announcement_id: int,
+    data: AnnouncementUpdate,
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
+) -> Announcement:
     result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
     announcement = result.scalar_one_or_none()
     if not announcement:
         raise HTTPException(status_code=404, detail="公告不存在")
+    before = serialize(announcement)
     values = _normalized_values(data, announcement)
     meaningful = {"title", "content", "audience", "category", "severity", "presentation", "app_version", "starts_at", "expires_at"}
     if any(key in values and values[key] != getattr(announcement, key) for key in meaningful):
         announcement.revision = (announcement.revision or 1) + 1
     for key, value in values.items():
         setattr(announcement, key, value)
+    if actor:
+        await log_admin_action(
+            db,
+            user_id=actor.get("staff_id"),
+            user_name=actor.get("username"),
+            action="announcement_update",
+            target_type="announcement",
+            target_id=announcement.id,
+            detail={
+                "role": actor.get("role"),
+                "before": before,
+                "after": serialize(announcement),
+                "reason": None,
+            },
+            request=request,
+        )
     await db.commit()
     await db.refresh(announcement)
     return announcement

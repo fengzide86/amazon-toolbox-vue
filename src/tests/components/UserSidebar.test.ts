@@ -12,6 +12,7 @@ import UserSidebar from '@/components/UserSidebar.vue'
 const mockRouter = createRouter({
   history: createWebHashHistory(),
   routes: [
+    { path: '/', redirect: '/user/tools' },
     { path: '/user/dashboard', name: 'UserDashboard', component: { template: '<div />' } },
     { path: '/user/tools', name: 'UserTools', component: { template: '<div />' } },
     { path: '/user/logs', name: 'UserLogs', component: { template: '<div />' } },

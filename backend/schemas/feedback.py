@@ -26,6 +26,7 @@ class LogResponse(BaseModel):
     error_code: Optional[str] = None
     detail: Optional[str] = None
     created_at: Optional[datetime] = None
+    verification_state: str = "legacy_unverified"
 
     model_config = ConfigDict(from_attributes=True)
 

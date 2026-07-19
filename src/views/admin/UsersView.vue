@@ -1,13 +1,22 @@
 <template>
   <div>
     <PageHeader title="用户管理" description="维护用户资料与设备席位信息" />
+    <AsyncStateNotice
+      :state="loadState"
+      :message="loadError"
+      loading-text="正在加载用户…"
+      @retry="loadData"
+    />
 
-    <DataToolbar label="用户筛选">
-      <el-input 
-        v-model="searchText" 
-        placeholder="搜索用户/设备..." 
+    <DataToolbar
+      v-if="loadState !== 'loading' && loadState !== 'error'"
+      label="用户筛选"
+    >
+      <el-input
+        v-model="searchText"
+        placeholder="搜索用户/设备..."
         clearable
-        style="min-width: 240px;"
+        style="min-width: 240px"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
@@ -16,57 +25,66 @@
       <template #summary>共 {{ filteredUsers.length }} 个用户</template>
     </DataToolbar>
 
-    <el-card class="table-card" shadow="never">
+    <el-card
+      v-if="loadState !== 'loading' && loadState !== 'error'"
+      class="table-card"
+      shadow="never"
+    >
       <el-table :data="filteredUsers" stripe style="width: 100%">
         <el-table-column v-if="!isCompact" prop="id" label="ID" width="80" />
         <el-table-column label="用户名" min-width="140">
           <template #default="{ row }">
-            <el-input 
+            <el-input
               v-if="!isCompact && editingUser?.id === row.id"
               v-model="editingUser!.name"
               size="small"
-              style="width: 120px;"
+              style="width: 120px"
             />
-            <span v-else>{{ row.name || '-' }}</span>
+            <span v-else>{{ row.name || "-" }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isCompact" label="手机号" width="140">
           <template #default="{ row }">
-            <el-input 
-              v-if="editingUser?.id === row.id" 
+            <el-input
+              v-if="editingUser?.id === row.id"
               v-model="editingUser!.phone"
               size="small"
-              style="width: 120px;"
+              style="width: 120px"
             />
-            <span v-else>{{ row.phone || '-' }}</span>
+            <span v-else>{{ row.phone || "-" }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="device_name" label="设备名" min-width="140" show-overflow-tooltip />
+        <el-table-column
+          prop="device_name"
+          label="设备名"
+          min-width="140"
+          show-overflow-tooltip
+        />
         <el-table-column v-if="!isCompact" label="设备ID" min-width="160">
           <template #default="{ row }">
-            <span class="mono-text">{{ row.device_id || '-' }}</span>
+            <span class="mono-text">{{ row.device_id || "-" }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isCompact" label="席位数" width="100">
           <template #default="{ row }">
-            <el-input-number 
-              v-if="editingUser?.id === row.id" 
+            <el-input-number
+              v-if="editingUser?.id === row.id"
               v-model="editingUser!.total_seats"
               size="small"
               :min="1"
-              style="width: 80px;"
+              style="width: 80px"
             />
             <span v-else>{{ row.total_seats }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isCompact" label="额外设备" width="100">
           <template #default="{ row }">
-            <el-input-number 
-              v-if="editingUser?.id === row.id" 
+            <el-input-number
+              v-if="editingUser?.id === row.id"
               v-model="editingUser!.extra_devices"
               size="small"
               :min="0"
-              style="width: 80px;"
+              style="width: 80px"
             />
             <span v-else>{{ row.extra_devices }}</span>
           </template>
@@ -76,18 +94,36 @@
             <span class="time-text">{{ formatTime(row.created_at) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" :width="isCompact ? 136 : 160" fixed="right">
+        <el-table-column
+          label="操作"
+          :width="isCompact ? 136 : 160"
+          fixed="right"
+        >
           <template #default="{ row }">
             <template v-if="isCompact">
-              <el-button size="small" @click="openUserDrawer(row, false)">详情</el-button>
-              <el-button size="small" @click="openUserDrawer(row, true)">编辑</el-button>
+              <el-button size="small" @click="openUserDrawer(row, false)"
+                >详情</el-button
+              >
+              <el-button
+                v-if="canWrite"
+                size="small"
+                @click="openUserDrawer(row, true)"
+                >编辑</el-button
+              >
             </template>
             <template v-else-if="editingUser?.id === row.id">
-              <el-button type="primary" size="small" @click="saveUser(row)">保存</el-button>
-              <el-button size="small" @click="editingUser = null">取消</el-button>
+              <el-button type="primary" size="small" @click="saveUser(row)"
+                >保存</el-button
+              >
+              <el-button size="small" @click="editingUser = null"
+                >取消</el-button
+              >
             </template>
             <template v-else>
-              <el-button size="small" @click="startEdit(row)">编辑</el-button>
+              <el-button v-if="canWrite" size="small" @click="startEdit(row)"
+                >编辑</el-button
+              >
+              <span v-else class="readonly-label">只读</span>
             </template>
           </template>
         </el-table-column>
@@ -97,118 +133,194 @@
       </el-table>
     </el-card>
 
-    <AdminDetailDrawer v-model="showUserDrawer" :title="drawerEditing ? '编辑用户' : '用户详情'">
+    <AdminDetailDrawer
+      v-model="showUserDrawer"
+      :title="drawerEditing ? '编辑用户' : '用户详情'"
+    >
       <div v-if="detailUser" class="user-detail-list">
-        <label><span>用户名</span><el-input v-if="drawerEditing" v-model="detailUser.name" /><strong v-else>{{ detailUser.name || '-' }}</strong></label>
-        <label><span>手机号</span><el-input v-if="drawerEditing" v-model="detailUser.phone" /><strong v-else>{{ detailUser.phone || '-' }}</strong></label>
-        <label><span>设备名</span><strong>{{ detailUser.device_name || '-' }}</strong></label>
-        <label><span>设备 ID</span><strong class="mono-text">{{ detailUser.device_id || '-' }}</strong></label>
-        <label><span>席位数</span><el-input-number v-if="drawerEditing" v-model="detailUser.total_seats" :min="1" /><strong v-else>{{ detailUser.total_seats }}</strong></label>
-        <label><span>额外设备</span><el-input-number v-if="drawerEditing" v-model="detailUser.extra_devices" :min="0" /><strong v-else>{{ detailUser.extra_devices }}</strong></label>
-        <label><span>注册时间</span><strong>{{ formatTime(detailUser.created_at) }}</strong></label>
+        <label
+          ><span>用户名</span
+          ><el-input v-if="drawerEditing" v-model="detailUser.name" /><strong
+            v-else
+            >{{ detailUser.name || "-" }}</strong
+          ></label
+        >
+        <label
+          ><span>手机号</span
+          ><el-input v-if="drawerEditing" v-model="detailUser.phone" /><strong
+            v-else
+            >{{ detailUser.phone || "-" }}</strong
+          ></label
+        >
+        <label
+          ><span>设备名</span
+          ><strong>{{ detailUser.device_name || "-" }}</strong></label
+        >
+        <label
+          ><span>设备 ID</span
+          ><strong class="mono-text">{{
+            detailUser.device_id || "-"
+          }}</strong></label
+        >
+        <label
+          ><span>席位数</span
+          ><el-input-number
+            v-if="drawerEditing"
+            v-model="detailUser.total_seats"
+            :min="1"
+          /><strong v-else>{{ detailUser.total_seats }}</strong></label
+        >
+        <label
+          ><span>额外设备</span
+          ><el-input-number
+            v-if="drawerEditing"
+            v-model="detailUser.extra_devices"
+            :min="0"
+          /><strong v-else>{{ detailUser.extra_devices }}</strong></label
+        >
+        <label
+          ><span>注册时间</span
+          ><strong>{{ formatTime(detailUser.created_at) }}</strong></label
+        >
       </div>
       <template #footer>
-        <el-button @click="showUserDrawer = false">{{ drawerEditing ? '取消' : '关闭' }}</el-button>
-        <el-button v-if="drawerEditing" type="primary" @click="saveDrawerUser">保存</el-button>
+        <el-button @click="showUserDrawer = false">{{
+          drawerEditing ? "取消" : "关闭"
+        }}</el-button>
+        <el-button
+          v-if="drawerEditing && canWrite"
+          type="primary"
+          @click="saveDrawerUser"
+          >保存</el-button
+        >
       </template>
     </AdminDetailDrawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { getUsers, updateUser } from '@/utils/api'
-import { showToast } from '@/utils'
-import { Search } from '@element-plus/icons-vue'
-import DataToolbar from '@/components/DataToolbar.vue'
-import PageHeader from '@/components/PageHeader.vue'
-import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
-import { useCompactLayout } from '@/composables/useCompactLayout'
-import { adminUserSchema, adminUsersSchema, type AdminUser } from '@/features/admin/model'
+import { ref, computed, onMounted } from "vue";
+import { getUsers, updateUser } from "@/utils/api";
+import { showToast } from "@/utils";
+import { Search } from "@element-plus/icons-vue";
+import DataToolbar from "@/components/DataToolbar.vue";
+import PageHeader from "@/components/PageHeader.vue";
+import AdminDetailDrawer from "@/components/AdminDetailDrawer.vue";
+import AsyncStateNotice from "@/components/AsyncStateNotice.vue";
+import { useCompactLayout } from "@/composables/useCompactLayout";
+import {
+  adminUserSchema,
+  adminUsersSchema,
+  type AdminUser,
+} from "@/features/admin/model";
+import { hasStaffPermission } from "@/features/auth/permissions";
+import { authService } from "@/utils/auth";
+import {
+  failedDataState,
+  settledDataState,
+  type AsyncDataState,
+} from "@/features/async/state";
 
-const users = ref<AdminUser[]>([])
-const searchText = ref('')
-const editingUser = ref<AdminUser | null>(null)
-const isCompact = useCompactLayout()
-const showUserDrawer = ref(false)
-const drawerEditing = ref(false)
-const detailUser = ref<AdminUser | null>(null)
+const users = ref<AdminUser[]>([]);
+const searchText = ref("");
+const editingUser = ref<AdminUser | null>(null);
+const isCompact = useCompactLayout();
+const showUserDrawer = ref(false);
+const drawerEditing = ref(false);
+const detailUser = ref<AdminUser | null>(null);
+const canWrite = computed(() =>
+  hasStaffPermission(authService.getRole(), "users.write"),
+);
+const loadState = ref<AsyncDataState>("loading");
+const loadError = ref("");
 
 const filteredUsers = computed(() => {
-  if (!searchText.value) return users.value
-  const q = searchText.value.toLowerCase()
-  return users.value.filter(u =>
-    (u.name && u.name.toLowerCase().includes(q)) ||
-    (u.device_name && u.device_name.toLowerCase().includes(q)) ||
-    (u.device_id && u.device_id.toLowerCase().includes(q)) ||
-    (u.phone && u.phone.includes(q))
-  )
-})
+  if (!searchText.value) return users.value;
+  const q = searchText.value.toLowerCase();
+  return users.value.filter(
+    (u) =>
+      (u.name && u.name.toLowerCase().includes(q)) ||
+      (u.device_name && u.device_name.toLowerCase().includes(q)) ||
+      (u.device_id && u.device_id.toLowerCase().includes(q)) ||
+      (u.phone && u.phone.includes(q)),
+  );
+});
 
 function formatTime(timeStr?: string | null) {
-  if (!timeStr) return '-'
-  const d = new Date(timeStr)
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+  if (!timeStr) return "-";
+  const d = new Date(timeStr);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function startEdit(user: unknown) {
-  editingUser.value = { ...adminUserSchema.parse(user) }
+  if (!canWrite.value) return;
+  editingUser.value = { ...adminUserSchema.parse(user) };
 }
 
 async function saveUser(user: unknown) {
-  if (!editingUser.value) return
-  const selectedUser = adminUserSchema.parse(user)
+  if (!canWrite.value || !editingUser.value) return;
+  const selectedUser = adminUserSchema.parse(user);
   try {
     await updateUser(selectedUser.id, {
       name: editingUser.value.name,
       phone: editingUser.value.phone,
       total_seats: editingUser.value.total_seats,
-      extra_devices: editingUser.value.extra_devices
-    })
-    showToast('用户信息已更新', 'success')
-    editingUser.value = null
-    await loadData()
-  } catch (err) {
-    showToast('更新失败', 'error')
+      extra_devices: editingUser.value.extra_devices,
+    });
+    showToast("用户信息已更新", "success");
+    editingUser.value = null;
+    await loadData();
+  } catch {
+    showToast("更新失败", "error");
   }
 }
 
 function openUserDrawer(user: unknown, editing: boolean) {
-  detailUser.value = { ...adminUserSchema.parse(user) }
-  drawerEditing.value = editing
-  showUserDrawer.value = true
+  detailUser.value = { ...adminUserSchema.parse(user) };
+  drawerEditing.value = editing && canWrite.value;
+  showUserDrawer.value = true;
 }
 
 async function saveDrawerUser() {
-  if (!detailUser.value) return
+  if (!canWrite.value || !detailUser.value) return;
   try {
     await updateUser(detailUser.value.id, {
       name: detailUser.value.name,
       phone: detailUser.value.phone,
       total_seats: detailUser.value.total_seats,
       extra_devices: detailUser.value.extra_devices,
-    })
-    showToast('用户信息已更新', 'success')
-    showUserDrawer.value = false
-    await loadData()
-  } catch (err) {
-    showToast('更新失败', 'error')
+    });
+    showToast("用户信息已更新", "success");
+    showUserDrawer.value = false;
+    await loadData();
+  } catch {
+    showToast("更新失败", "error");
   }
 }
 
 async function loadData() {
+  loadState.value = users.value.length ? "data" : "loading";
+  loadError.value = "";
   try {
-    users.value = adminUsersSchema.parse((await getUsers()) || [])
-  } catch (err) {
-    showToast('数据加载失败', 'error')
+    users.value = adminUsersSchema.parse((await getUsers()) || []);
+    loadState.value = settledDataState(users.value.length);
+  } catch (error) {
+    loadError.value =
+      error instanceof Error && error.message
+        ? error.message
+        : "用户数据暂时无法加载";
+    loadState.value = failedDataState(users.value.length > 0);
+    showToast("数据加载失败", "error");
   }
 }
 
-onMounted(loadData)
+onMounted(loadData);
 </script>
 
 <style scoped>
-.data-toolbar-v6 { margin-bottom: 1rem; }
+.data-toolbar-v6 {
+  margin-bottom: 1rem;
+}
 
 .table-card {
   background: var(--color-surface);
@@ -216,7 +328,7 @@ onMounted(loadData)
 }
 
 .mono-text {
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-family: "SF Mono", Monaco, "Cascadia Code", monospace;
   font-size: 0.8rem;
   color: var(--color-text-secondary);
 }
@@ -242,8 +354,30 @@ onMounted(loadData)
   width: 100%;
 }
 
-.user-detail-list { display: grid; gap: 14px; }
-.user-detail-list label { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
-.user-detail-list label > span { color: var(--color-text-secondary); font-size: 13px; }
-.user-detail-list strong { min-width: 0; color: var(--color-text); overflow-wrap: anywhere; }
+.readonly-label {
+  color: var(--color-text-tertiary);
+  font-size: var(--type-meta);
+}
+
+.user-detail-list {
+  display: grid;
+  gap: 14px;
+}
+.user-detail-list label {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+.user-detail-list label > span {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.user-detail-list strong {
+  min-width: 0;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
 </style>

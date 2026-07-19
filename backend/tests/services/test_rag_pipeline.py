@@ -17,8 +17,8 @@ async def test_faq_hit_skips_embedding_and_model(db_session):
     ))
     await db_session.commit()
 
-    with patch("domains.knowledge.chat_service.ai_provider.get_embedding", new=AsyncMock()) as embedding, \
-         patch("domains.knowledge.chat_service.ai_provider.chat_completion", new=AsyncMock()) as chat:
+    with patch("domains.knowledge.provider.get_embedding", new=AsyncMock()) as embedding, \
+         patch("domains.knowledge.provider.chat_completion", new=AsyncMock()) as chat:
         result = await ai_chat_service.answer_question(db_session, "工具箱如何安装？", "amazon")
 
     assert result["answer_mode"] == "faq"
@@ -29,18 +29,16 @@ async def test_faq_hit_skips_embedding_and_model(db_session):
 
 
 @pytest.mark.asyncio
-async def test_rag_miss_calls_embedding_and_model_once(db_session):
-    with patch("domains.knowledge.chat_service.ai_provider.has_api_key", return_value=True), \
-         patch("domains.knowledge.chat_service.ai_provider.get_embedding", new=AsyncMock(return_value=[0.1, 0.2])) as embedding, \
-         patch("domains.knowledge.chat_service.vector_store.search_knowledge", new=AsyncMock(return_value=[])) as search, \
-         patch("domains.knowledge.chat_service.ai_provider.chat_completion", new=AsyncMock(return_value="AI 回答")) as chat:
+async def test_rule_miss_never_calls_embedding_or_model(db_session):
+    with patch("domains.knowledge.provider.get_embedding", new=AsyncMock()) as embedding, \
+         patch("domains.knowledge.provider.chat_completion", new=AsyncMock()) as chat:
         result = await ai_chat_service.answer_question(db_session, "一个未收录的问题", "amazon")
 
-    assert result["answer_mode"] == "rag"
-    assert result["reply"] == "AI 回答"
-    embedding.assert_awaited_once()
-    search.assert_awaited_once()
-    chat.assert_awaited_once()
+    assert result["answer_mode"] == "fallback"
+    assert result["ai_used"] is False
+    assert result["fallback_reason"] == "no_rule_match"
+    embedding.assert_not_awaited()
+    chat.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -58,17 +56,13 @@ async def test_faq_platform_isolation(db_session):
 @pytest.mark.asyncio
 async def test_admin_debug_does_not_create_session(client, db_session, admin_token):
     before = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
-    fake = {
-        "reply": "测试", "answer_mode": "faq", "ai_used": False,
-        "knowledge_refs": [], "fallback_reason": None, "diagnostics": {"total_ms": 1},
-    }
-    with patch("domains.knowledge.chat_service.answer_question", new=AsyncMock(return_value=fake)):
-        response = await client.post(
-            "/api/ai-chat/admin/debug", json={"message": "测试"},
-            headers={"Authorization": f"Bearer {admin_token}"},
-        )
+    response = await client.post(
+        "/api/ai-chat/admin/debug", json={"message": "测试"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
     after = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
-    assert response.status_code == 200
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "FEATURE_DISABLED"
     assert before == after
 
 
@@ -103,8 +97,10 @@ async def test_user_message_response_hides_internal_ai_diagnostics(client, db_se
         "reply": "请重新登录后再试。",
         "knowledge_refs": [],
         "answer_mode": "fallback",
-        "fallback_reason": "no_api_key",
-        "diagnostics": {"provider": "qwen", "total_ms": 12},
+        "ai_used": False,
+        "should_transfer": True,
+        "fallback_reason": "no_rule_match",
+        "diagnostics": {"provider": None, "total_ms": 12},
     }
 
     with patch(
@@ -121,6 +117,9 @@ async def test_user_message_response_hides_internal_ai_diagnostics(client, db_se
     assert response.json() == {
         "session_id": session["session_id"],
         "reply": "请重新登录后再试。",
+        "answer_mode": "fallback",
+        "ai_used": False,
+        "should_transfer": True,
         "knowledge_refs": [],
     }
 

@@ -3,7 +3,7 @@
     <!-- 品牌区 -->
     <div class="sidebar-brand-zone">
       <div class="brand-badge">管</div>
-      <span class="brand-text">运营控制中心</span>
+      <span class="brand-text">运营控制中心<small>{{ roleLabel }}</small></span>
     </div>
 
     <!-- 导航菜单 -->
@@ -16,7 +16,7 @@
         <Key :size="14" class="menu-icon" />
         <span class="menu-label">授权码管理</span>
       </router-link>
-      <router-link to="/admin/business-access" class="menu-nav-item" active-class="is-active">
+      <router-link v-if="role !== 'support'" to="/admin/business-access" class="menu-nav-item" active-class="is-active">
         <BriefcaseBusiness :size="14" class="menu-icon" />
         <span class="menu-label">专业工作台</span>
       </router-link>
@@ -24,7 +24,7 @@
         <Receipt :size="14" class="menu-icon" />
         <span class="menu-label">订单与套餐</span>
       </router-link>
-      <router-link to="/admin/profit" class="menu-nav-item" active-class="is-active">
+      <router-link v-if="can('profit.read')" to="/admin/profit" class="menu-nav-item" active-class="is-active">
         <Percent :size="14" class="menu-icon" />
         <span class="menu-label">分润管理</span>
       </router-link>
@@ -40,21 +40,25 @@
         <BookOpen :size="14" class="menu-icon" />
         <span class="menu-label">知识库管理</span>
       </router-link>
-      <router-link to="/admin/ai-chat" class="menu-nav-item" active-class="is-active">
+      <router-link v-if="can('rules.write')" to="/admin/ai-chat" class="menu-nav-item" active-class="is-active">
         <MessageSquare :size="14" class="menu-icon" />
-        <span class="menu-label">AI 客服管理</span>
+        <span class="menu-label">客服规则管理</span>
       </router-link>
       <router-link to="/admin/announcements" class="menu-nav-item" active-class="is-active">
         <Megaphone :size="14" class="menu-icon" />
         <span class="menu-label">公告管理</span>
       </router-link>
-      <router-link to="/admin/updates" class="menu-nav-item" active-class="is-active">
+      <router-link v-if="can('updates.manage')" to="/admin/updates" class="menu-nav-item" active-class="is-active">
         <PackageCheck :size="14" class="menu-icon" />
         <span class="menu-label">应用更新</span>
       </router-link>
-      <router-link to="/admin/settings" class="menu-nav-item" active-class="is-active">
+      <router-link v-if="can('settings.manage')" to="/admin/settings" class="menu-nav-item" active-class="is-active">
         <Settings :size="14" class="menu-icon" />
         <span class="menu-label">系统设置</span>
+      </router-link>
+      <router-link v-if="can('staff.manage')" to="/admin/staff-accounts" class="menu-nav-item" active-class="is-active">
+        <ShieldUser :size="14" class="menu-icon" />
+        <span class="menu-label">后台账号管理</span>
       </router-link>
     </nav>
 
@@ -62,10 +66,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { authService } from '@/utils/auth'
+import { hasStaffPermission, staffRoleLabel, type StaffPermission } from '@/features/auth/permissions'
 import {
   LayoutDashboard, Key, BriefcaseBusiness, Receipt, Percent, Users, Wrench,
-  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings
+  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser
 } from '@lucide/vue'
+
+const role = computed(() => authService.getRole())
+const roleLabel = computed(() => staffRoleLabel(role.value))
+const can = (permission: StaffPermission): boolean => hasStaffPermission(role.value, permission)
 </script>
 
 <style scoped>
@@ -109,7 +120,8 @@ import {
   box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
 }
 
-.brand-text { color: var(--color-text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.brand-text { display:grid; gap:1px; color: var(--color-text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.brand-text small { color: var(--color-text-tertiary); font-size: var(--type-micro); font-weight: 700; letter-spacing: .08em; }
 
 .sidebar-menu-nav {
   flex-grow: 1;

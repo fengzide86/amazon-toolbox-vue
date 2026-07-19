@@ -6,11 +6,13 @@
       description="为普通工具箱和专业工作台生成独立授权"
     >
       <template #actions>
-        <router-link class="business-center-link" to="/admin/business-access">专业工作台</router-link>
+        <router-link v-if="canWrite" class="business-center-link" to="/admin/business-access">专业工作台</router-link>
       </template>
     </PageHeader>
 
-    <el-card :class="['table-card', 'generator-card', { 'is-business': generatorProductType === 'business' }]">
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载授权码…" @retry="loadData" />
+
+    <el-card v-if="canWrite" :class="['table-card', 'generator-card', { 'is-business': generatorProductType === 'business' }]">
       <template #header>
         <div class="card-header">
           <div>
@@ -44,7 +46,7 @@
         <ul>
           <li>专业工作台</li>
           <li>本地批量导入</li>
-          <li>多账号浏览器现场</li>
+          <li>多账号模拟批次</li>
         </ul>
       </div>
       <div class="generate-form">
@@ -94,7 +96,7 @@
       </div>
     </el-card>
 
-    <el-card class="table-card">
+    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="table-card">
       <template #header>
         <div class="card-header">
           <h3>授权码列表</h3>
@@ -158,7 +160,7 @@
         <el-table-column v-if="!isCompact" label="设备数" width="100">
           <template #default="{ row }">
             <el-tag :type="getDeviceType(row)" size="small" class="device-badge" 
-                    @click="editMaxDevices(row)" style="cursor: pointer;">
+                    @click="canWrite && editMaxDevices(row)" :style="{ cursor: canWrite ? 'pointer' : 'default' }">
               {{ row.device_used || getDeviceCount(row) }}/{{ row.max_devices || 1 }}
             </el-tag>
           </template>
@@ -171,20 +173,20 @@
         <el-table-column label="操作" :width="isCompact ? 136 : 280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openDetail(row)">详情</el-button>
-            <el-dropdown v-if="isCompact" trigger="click" @command="command => handleCodeCommand(command, row)">
+            <el-dropdown v-if="isCompact && canWrite" trigger="click" @command="command => handleCodeCommand(command, row)">
               <el-button size="small">更多</el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item command="freeze" :disabled="row.status === 'expired'">{{ row.status === 'frozen' ? '解冻' : '冻结' }}</el-dropdown-item>
                   <el-dropdown-item command="extend" :disabled="row.status === 'deleted'">延期</el-dropdown-item>
-                  <el-dropdown-item command="delete" :disabled="row.status === 'deleted'" divided>删除</el-dropdown-item>
+                  <el-dropdown-item v-if="canDelete" command="delete" :disabled="row.status === 'deleted'" divided>删除</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <template v-else>
+            <template v-else-if="canWrite">
               <el-button size="small" @click="toggleFreeze(row)" :disabled="row.status === 'expired'">{{ row.status === 'frozen' ? '解冻' : '冻结' }}</el-button>
               <el-button size="small" @click="openExtend(row)" :disabled="row.status === 'deleted'">延期</el-button>
-              <el-button size="small" type="danger" @click="deleteCode(row.id)" :disabled="row.status === 'deleted'">删除</el-button>
+              <el-button v-if="canDelete" size="small" type="danger" @click="deleteCode(row.id)" :disabled="row.status === 'deleted'">删除</el-button>
             </template>
           </template>
         </el-table-column>
@@ -310,8 +312,19 @@
         <div v-if="detailData.devices && detailData.devices.length" class="detail-section">
           <div class="detail-label" style="margin-bottom: 0.5rem;">绑定设备</div>
           <div v-for="dev in detailData.devices" :key="dev.id" class="device-item">
-            {{ dev.device_name || dev.device_id }} 
-            <span class="text-muted text-small">{{ formatDate(dev.created_at) }}</span>
+            <div class="device-item-info">
+              <strong>{{ dev.device_name || dev.device_id }}</strong>
+              <span class="text-muted text-small">{{ formatDate(dev.created_at) }}</span>
+            </div>
+            <el-button
+              v-if="canUnbindDevice"
+              :data-testid="`unbind-device-${dev.id}`"
+              size="small"
+              type="danger"
+              plain
+              :loading="String(unbindingDeviceId) === String(dev.id)"
+              @click="handleUnbindDevice(dev)"
+            >解绑</el-button>
           </div>
         </div>
       </div>
@@ -325,15 +338,20 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, Copy } from '@lucide/vue'
-import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlansAdmin, api } from '@/utils/api'
+import { ElMessageBox } from 'element-plus'
+import { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode, getPlansAdmin, unbindDevice, api } from '@/utils/api'
 import { showToast } from '@/utils'
 import { authService } from '@/utils/auth'
+import { hasStaffPermission } from '@/features/auth/permissions'
 import { usePlatformStore } from '@/stores/platform'
 import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import { normalizeDeviceUnbindReason } from '@/features/admin/deviceUnbind'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 import {
   adminAuthCodeSchema,
   adminAuthCodesSchema,
@@ -362,6 +380,9 @@ const planNameMap = reactive<Record<string, string>>({})
 const router = useRouter()
 const platformStore = usePlatformStore()
 const isCompact = useCompactLayout()
+const canWrite = computed(() => hasStaffPermission(authService.getRole(), 'auth_codes.write'))
+const canDelete = computed(() => hasStaffPermission(authService.getRole(), 'auth_codes.delete'))
+const canUnbindDevice = computed(() => hasStaffPermission(authService.getRole(), 'devices.unbind'))
 const showGeneratedDrawer = ref(false)
 
 // 设备数弹窗
@@ -377,6 +398,9 @@ const extendDays = ref(30)
 // 详情弹窗
 const showDetailModal = ref(false)
 const detailData = ref<AdminAuthCode | null>(null)
+const unbindingDeviceId = ref<string | number | null>(null)
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
 
 const availablePlans = computed(() =>
   plans.value.filter(plan => plan.product_type === generatorProductType.value && plan.status === 'active'),
@@ -452,12 +476,14 @@ async function saveMaxDevices() {
     showToast('设备数已更新', 'success')
     showDeviceModal.value = false
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('更新失败', 'error')
   }
 }
 
 async function loadData() {
+  loadState.value = authCodes.value.length ? 'data' : 'loading'
+  loadError.value = ''
   const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
   const params = platformKey ? { platform_key: platformKey } : {}
   const [codesResult, plansResult] = await Promise.allSettled([
@@ -467,6 +493,12 @@ async function loadData() {
   try {
     if (codesResult.status === 'fulfilled') {
       authCodes.value = adminAuthCodesSchema.parse(codesResult.value)
+      loadState.value = settledDataState(authCodes.value.length)
+    } else {
+      loadError.value = codesResult.reason instanceof Error && codesResult.reason.message
+        ? codesResult.reason.message
+        : '授权码数据暂时无法加载'
+      loadState.value = failedDataState(authCodes.value.length > 0)
     }
     if (plansResult.status === 'fulfilled') {
       const parsedPlans = adminPlansSchema.parse(plansResult.value)
@@ -479,7 +511,9 @@ async function loadData() {
     if (codesResult.status === 'rejected' && plansResult.status === 'rejected') {
       showToast('数据加载失败', 'error')
     }
-  } catch (err) {
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '授权码数据暂时无法加载'
+    loadState.value = failedDataState(authCodes.value.length > 0)
     showToast('数据加载失败', 'error')
   }
 }
@@ -517,7 +551,7 @@ async function handleGenerate() {
       showToast(`成功生成 ${res.count} 个授权码`, 'success')
       await loadData()
     }
-  } catch (err) {
+  } catch {
     showToast('生成失败', 'error')
   }
   isLoading.value = false
@@ -530,7 +564,7 @@ async function toggleFreeze(rawCode: unknown) {
     await updateAuthCode(code.id, { status: newStatus })
     showToast(newStatus === 'frozen' ? '已冻结' : '已解冻', 'success')
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('操作失败', 'error')
   }
 }
@@ -565,7 +599,7 @@ async function confirmExtend() {
     showToast(`已延期 ${extendDays.value} 天`, 'success')
     showExtendModal.value = false
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('延期失败', 'error')
   }
 }
@@ -581,7 +615,7 @@ async function deleteCode(id: string | number) {
     await deleteAuthCode(id)
     showToast('已删除', 'success')
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('删除失败', 'error')
   }
 }
@@ -624,8 +658,52 @@ async function openDetail(rawCode: unknown) {
   try {
     detailData.value = adminAuthCodeSchema.parse(await api.get(`/api/auth-codes/${code.id}`))
     showDetailModal.value = true
-  } catch (err) {
+  } catch {
     showToast('获取详情失败', 'error')
+  }
+}
+
+async function promptDeviceUnbindReason(deviceName: string): Promise<string | null> {
+  try {
+    const result = await ElMessageBox.prompt(`请输入解绑“${deviceName}”的原因。该原因会写入审计记录。`, '解绑设备', {
+      confirmButtonText: '确认解绑',
+      cancelButtonText: '取消',
+      inputPlaceholder: '请填写至少 2 个字的原因',
+      inputValidator: (value: string) => {
+        try {
+          normalizeDeviceUnbindReason(value)
+          return true
+        } catch (error) {
+          return error instanceof Error ? error.message : '请输入有效原因'
+        }
+      },
+      type: 'warning',
+      closeOnClickModal: false,
+    })
+    return normalizeDeviceUnbindReason(result.value)
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return null
+    throw error
+  }
+}
+
+async function handleUnbindDevice(device: AdminAuthCode['devices'][number]) {
+  if (!canUnbindDevice.value || unbindingDeviceId.value !== null) return
+  try {
+    const reason = await promptDeviceUnbindReason(device.device_name || device.device_id)
+    if (!reason) return
+    unbindingDeviceId.value = device.id
+    await unbindDevice(device.id, reason)
+    await loadData()
+    const codeId = detailData.value?.id
+    if (codeId !== null && codeId !== undefined) {
+      detailData.value = adminAuthCodeSchema.parse(await api.get(`/api/auth-codes/${codeId}`, {}, { cache: false }))
+    }
+    showToast('设备已解绑', 'success')
+  } catch {
+    showToast('设备解绑失败', 'error')
+  } finally {
+    unbindingDeviceId.value = null
   }
 }
 
@@ -929,12 +1007,17 @@ onMounted(() => {
 }
 
 .device-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   padding: 0.5rem;
   background: var(--color-canvas);
   border-radius: 6px;
   margin-bottom: 0.5rem;
   font-size: 0.85rem;
 }
+.device-item-info { display: flex; min-width: 0; flex-direction: column; gap: .2rem; }
 
 :deep(.el-table) {
   --el-table-border-color: var(--color-border);

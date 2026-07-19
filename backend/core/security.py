@@ -12,6 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 
+_PASSWORD_HASH_ROUNDS = 4 if settings.APP_ENV == "test" else 12
+
 # ===== CORS 配置 =====
 
 def configure_cors(app: FastAPI) -> None:
@@ -41,7 +43,10 @@ def hash_password(password: str) -> str:
     Returns:
         哈希后的密码字符串
     """
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    return bcrypt.hashpw(
+        password.encode('utf-8'),
+        bcrypt.gensalt(rounds=_PASSWORD_HASH_ROUNDS),
+    ).decode('utf-8')
 
 
 def verify_password(password: str, hashed: str) -> bool:

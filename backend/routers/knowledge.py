@@ -1,19 +1,14 @@
 """
 知识库管理路由模块
-提供知识库 CRUD、批量导入、向量同步等 API
+提供规则式知识库 CRUD 与批量导入 API
 """
-import time
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.audit import log_admin_action
 from core.dependencies import get_current_admin
 from database import get_db
-from domains.knowledge import provider as ai_provider
 from domains.knowledge import service as knowledge_service
-from domains.knowledge import vector_store
 
 router = APIRouter()
 
@@ -64,25 +59,12 @@ async def retrieval_test(
     req: RetrievalTestRequest,
     _admin: dict = Depends(get_current_admin),
 ):
-    """管理员单条召回调试，不写入正式会话。"""
-    if not ai_provider.has_api_key():
-        raise HTTPException(status_code=503, detail="当前 AI 提供商未配置 API Key")
-    started = time.perf_counter()
-    embedding = await ai_provider.get_embedding(req.query)
-    if not embedding:
-        raise HTTPException(status_code=503, detail="Embedding 服务不可用或未配置")
-    results = await vector_store.search_knowledge(
-        embedding, top_k=req.top_k, min_score=req.min_score,
-        platform_key=req.platform_key, capability_key=req.capability_key,
+    """Vector retrieval is not part of the internal rules build."""
+    del req, _admin
+    raise HTTPException(
+        status_code=409,
+        detail={"code": "FEATURE_DISABLED", "message": "当前为规则式客服模式"},
     )
-    return {
-        "query": req.query,
-        "filters": {"platform_key": req.platform_key, "capability_key": req.capability_key},
-        "top_k": req.top_k,
-        "min_score": req.min_score,
-        "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
-        "results": results,
-    }
 
 @router.get("")
 async def get_knowledge_list(
@@ -122,7 +104,7 @@ async def get_stats(
     return await knowledge_service.get_stats(db)
 
 
-@router.get("/{knowledge_id}")
+@router.get("/{knowledge_id:int}")
 async def get_knowledge(
     knowledge_id: int,
     db: AsyncSession = Depends(get_db),
@@ -152,25 +134,14 @@ async def create_knowledge(
         priority=req.priority,
         platform_key=req.platform_key,
         capability_key=req.capability_key,
-    )
-    
-    # 审计日志
-    await log_admin_action(
-        db,
-        user_id=_admin.get("user_id"),
-        user_name=_admin.get("name", "admin"),
-        action="create_knowledge",
-        target_type="knowledge",
-        target_id=result.get("id") if result else None,
-        detail={"title": req.title, "category": req.category},
+        actor=_admin,
         request=request,
     )
-    await db.commit()
-    
+
     return result
 
 
-@router.put("/{knowledge_id}")
+@router.put("/{knowledge_id:int}")
 async def update_knowledge(
     knowledge_id: int,
     req: KnowledgeUpdate,
@@ -189,27 +160,16 @@ async def update_knowledge(
         status=req.status,
         platform_key=req.platform_key,
         capability_key=req.capability_key,
+        actor=_admin,
+        request=request,
     )
     if not item:
         raise HTTPException(status_code=404, detail="知识条目不存在")
-    
-    # 审计日志
-    await log_admin_action(
-        db,
-        user_id=_admin.get("user_id"),
-        user_name=_admin.get("name", "admin"),
-        action="update_knowledge",
-        target_type="knowledge",
-        target_id=knowledge_id,
-        detail={"title": req.title, "changes": req.model_dump(exclude_none=True)},
-        request=request,
-    )
-    await db.commit()
-    
+
     return item
 
 
-@router.delete("/{knowledge_id}")
+@router.delete("/{knowledge_id:int}")
 async def delete_knowledge(
     knowledge_id: int,
     request: Request,
@@ -217,39 +177,28 @@ async def delete_knowledge(
     _admin: dict = Depends(get_current_admin),
 ):
     """删除知识条目"""
-    # 先获取标题用于审计日志
-    item = await knowledge_service.get_by_id(db, knowledge_id)
-    title = item.get("title") if item else None
-    
-    success = await knowledge_service.delete(db, knowledge_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="知识条目不存在")
-    
-    # 审计日志
-    await log_admin_action(
+    success = await knowledge_service.delete(
         db,
-        user_id=_admin.get("user_id"),
-        user_name=_admin.get("name", "admin"),
-        action="delete_knowledge",
-        target_type="knowledge",
-        target_id=knowledge_id,
-        detail={"title": title},
+        knowledge_id,
+        actor=_admin,
         request=request,
     )
-    await db.commit()
-    
+    if not success:
+        raise HTTPException(status_code=404, detail="知识条目不存在")
+
     return {"message": "删除成功"}
 
 
 @router.post("/batch-import")
 async def batch_import(
     items: list[BatchImportItem],
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
+    actor: dict = Depends(get_current_admin),
 ):
     """批量导入知识条目"""
     data = [item.model_dump() for item in items]
-    return await knowledge_service.batch_import(db, data)
+    return await knowledge_service.batch_import(db, data, actor=actor, request=request)
 
 
 @router.post("/sync-vector")
@@ -257,5 +206,9 @@ async def sync_to_vector(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
-    """全量同步知识库到向量库"""
-    return await knowledge_service.sync_all_to_vector(db)
+    """Vector synchronization is disabled in rules mode."""
+    del db, _admin
+    raise HTTPException(
+        status_code=409,
+        detail={"code": "FEATURE_DISABLED", "message": "当前为规则式客服模式"},
+    )

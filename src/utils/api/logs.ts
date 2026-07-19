@@ -13,7 +13,11 @@ function queryString(params: ApiQueryParams): string {
 }
 
 export const getLogs = (userIdOrParams: number | ApiQueryParams = {}): Promise<unknown> =>
-  api.get('/api/logs', typeof userIdOrParams === 'number' ? { user_id: userIdOrParams } : userIdOrParams)
+  api.get('/api/logs', {
+    page: 1,
+    page_size: 100,
+    ...(typeof userIdOrParams === 'number' ? { user_id: userIdOrParams } : userIdOrParams),
+  })
 
 export async function exportLogs(params: ApiQueryParams = {}): Promise<Blob> {
   const query = queryString(params)

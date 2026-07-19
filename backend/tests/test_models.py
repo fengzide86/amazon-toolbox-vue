@@ -2,16 +2,27 @@
 数据模型单元测试
 测试 SQLAlchemy ORM 模型的定义和关系
 """
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import (
-    Setting, Plan, AuthCode, Device, Order, 
-    User, RunLog, Feedback, ProfitRecord,
-    AuthCodeStatus, OrderStatus, PlanStatus, 
-    FeedbackStatus, LogStatus
+    AuthCode,
+    AuthCodeStatus,
+    Device,
+    Feedback,
+    FeedbackStatus,
+    LogStatus,
+    Order,
+    OrderStatus,
+    Plan,
+    PlanStatus,
+    ProfitRecord,
+    RunLog,
+    Setting,
+    User,
 )
 
 
@@ -424,12 +435,14 @@ class TestStatusConstants:
         assert OrderStatus.PENDING == "pending"
         assert OrderStatus.PAID == "paid"
         assert OrderStatus.REFUNDED == "refunded"
+        assert OrderStatus.CANCELLED == "cancelled"
     
     def test_plan_status_values(self):
         """测试套餐状态常量"""
         assert PlanStatus.ACTIVE == "active"
         assert PlanStatus.DISABLED == "disabled"
-        assert PlanStatus.DELETED == "deleted"
+        assert PlanStatus.ARCHIVED == "archived"
+        assert PlanStatus.DELETED == PlanStatus.ARCHIVED
     
     def test_feedback_status_values(self):
         """测试工单状态常量"""

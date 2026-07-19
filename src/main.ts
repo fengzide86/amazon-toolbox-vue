@@ -14,7 +14,12 @@ async function bootstrap() {
   const pinia = createPinia()
 
   app.use(pinia)
-  await initializeRememberedLogin()
+  try {
+    await initializeRememberedLogin()
+  } catch (error) {
+    console.error('启动时恢复登录状态失败:', error)
+    localStorage.setItem('toolbox_auto_login_error', '登录状态恢复失败，请手动登录')
+  }
   app.use(router)
 
 // 初始化 Sentry 错误监控（生产环境自动启用）

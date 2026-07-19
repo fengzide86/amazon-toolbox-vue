@@ -30,10 +30,10 @@
           </svg>
         </div>
         <h1>管理员登录</h1>
-        <p>请输入管理员密码进入后台</p>
+        <p>使用管理账号和密码进入后台</p>
       </div>
 
-      <div class="error-message" :class="{ show: showError }" role="alert">
+        <div class="error-message" :class="{ show: showError }" role="alert" aria-live="assertive">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -42,9 +42,27 @@
 
       <form @submit.prevent="handleLogin">
         <div class="form-group">
+          <label for="adminUsername">管理账号</label>
+          <div class="input-wrapper">
+            <span class="input-icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.1a7.5 7.5 0 0115 0"/></svg>
+            </span>
+            <input
+              ref="usernameInput"
+              id="adminUsername"
+              v-model="username"
+              type="text"
+              placeholder="请输入管理账号"
+              autocomplete="username"
+              autofocus
+              required
+            >
+          </div>
+        </div>
+        <div class="form-group">
           <label for="adminPassword">管理员密码</label>
           <div class="input-wrapper">
-            <span class="input-icon">
+          <span class="input-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
               </svg>
@@ -56,7 +74,6 @@
               v-model="password"
               placeholder="请输入管理员密码"
               autocomplete="current-password"
-              autofocus
               required
             >
             <button type="button" class="toggle-password" @mousedown.prevent @click="togglePasswordVisibility" :aria-label="showPassword ? '隐藏密码' : '显示密码'" :title="showPassword ? '隐藏密码' : '显示密码'">
@@ -100,13 +117,20 @@ const adminLoginResponseSchema = z.object({
   message: z.string().default('登录失败'),
   data: z.object({
     token: z.string(),
-    role: z.literal('admin').default('admin'),
+    role: z.enum(['super_admin', 'operator', 'support']),
+    username: z.string().optional(),
+    display_name: z.string().optional(),
+    staff_id: z.union([z.string(), z.number()]).optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+    force_password_reset: z.boolean().default(false),
   }).passthrough().optional(),
 }).passthrough()
 
 const router = useRouter()
 const userStore = useUserStore()
+const username = ref('')
 const password = ref('')
+const usernameInput = ref<HTMLInputElement | null>(null)
 const passwordInput = ref<HTMLInputElement | null>(null)
 const showPassword = ref(false)
 const isLoading = ref(false)
@@ -123,6 +147,10 @@ function focusPasswordInput() {
   })
 }
 
+function focusUsernameInput() {
+  nextTick(() => usernameInput.value?.focus({ preventScroll: true }))
+}
+
 function togglePasswordVisibility() {
   showPassword.value = !showPassword.value
   focusPasswordInput()
@@ -131,6 +159,11 @@ function togglePasswordVisibility() {
 function handleLogin() {
   showError.value = false
 
+  if (!username.value.trim()) {
+    showToast('请输入管理账号', 'error')
+    focusUsernameInput()
+    return
+  }
   if (!password.value.trim()) {
     showToast('请输入密码', 'error')
     focusPasswordInput()
@@ -139,7 +172,7 @@ function handleLogin() {
 
   isLoading.value = true
 
-  adminLogin(password.value.trim())
+  adminLogin(username.value.trim(), password.value)
     .then((response) => {
       const res = adminLoginResponseSchema.parse(response)
       if (res.success) {
@@ -147,16 +180,17 @@ function handleLogin() {
         // 使用 Pinia store 管理登录状态
         userStore.setLogin({
           token: res.data.token,
-          role: 'admin',
-          auth_code: 'admin',
-          user: res.data,
+          role: res.data.role,
+          auth_code: 'backoffice',
+          user: { ...res.data, username: res.data.username || username.value.trim() },
         })
         
         // 保持 Auth 工具类的兼容性
-        Auth.set('admin')
+        Auth.set('backoffice')
         
         window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
-        Promise.resolve(router.push('/admin/dashboard')).catch(() => {
+        const destination = res.data.force_password_reset ? '/admin/change-password' : '/admin/dashboard'
+        Promise.resolve(router.push(destination)).catch(() => {
           isLoading.value = false
           focusPasswordInput()
         })
@@ -168,10 +202,13 @@ function handleLogin() {
         focusPasswordInput()
       }
     })
-    .catch(() => {
-      errorMessage.value = '无法连接到后端服务，请检查后端是否运行'
+    .catch((error: unknown) => {
+      const rawMessage = error instanceof Error ? error.message : ''
+      errorMessage.value = /failed to fetch|networkerror|network request failed/i.test(rawMessage)
+        ? '无法连接到后端服务，请检查网络或稍后重试'
+        : rawMessage || '管理登录失败，请稍后重试'
       showError.value = true
-      showToast('连接失败', 'error')
+      showToast(errorMessage.value, 'error')
       isLoading.value = false
       focusPasswordInput()
     })
@@ -181,7 +218,7 @@ function goToUserLogin() {
   router.push('/user/login')
 }
 
-onMounted(focusPasswordInput)
+onMounted(focusUsernameInput)
 </script>
 
 <style scoped>

@@ -16,6 +16,9 @@ export interface ActiveTool extends UnknownRecord {
   category?: string
   platformKey?: string
   targetUrl?: string
+  executionMode?: 'demo' | 'live'
+  scenarioId?: string
+  demoRunId?: string
 }
 
 export const useAppStore = defineStore('app', () => {

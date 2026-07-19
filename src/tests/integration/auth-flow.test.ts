@@ -38,6 +38,8 @@ describe('认证流程集成测试', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
+    sessionStorage.clear()
+    localStorage.clear()
     mockGetSettings.mockResolvedValue([])
   })
 
@@ -119,25 +121,26 @@ describe('认证流程集成测试', () => {
     })
   })
 
-  describe('管理员密码登录流程', () => {
-    it('完整流程：输入密码 → 验证 → 保存Token → 跳转管理后台', async () => {
+  describe('后台账号登录流程', () => {
+    it('完整流程：输入账号与密码 → 验证 → 保存Token → 跳转管理后台', async () => {
       const wrapper = mountWithPinia(AdminLoginView)
 
-      // 输入密码
-      await wrapper.find('#adminPassword').setValue('admin123')
+      await wrapper.find('#adminUsername').setValue('owner')
+      await wrapper.find('#adminPassword').setValue('Test-only-pass-123')
 
       // 模拟成功响应
       mockAdminLogin.mockResolvedValue({
         success: true,
-        data: { token: 'admin-jwt-token' }
+        message: '登录成功',
+        data: { token: 'admin-jwt-token', role: 'super_admin', username: 'owner' }
       })
 
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
       // 验证
-      expect(mockAdminLogin).toHaveBeenCalledWith('admin123')
-      expect(sessionStorage.getItem('toolbox_role')).toBe('admin')
+      expect(mockAdminLogin).toHaveBeenCalledWith('owner', 'Test-only-pass-123')
+      expect(sessionStorage.getItem('toolbox_role')).toBe('super_admin')
       expect(sessionStorage.getItem('toolbox_token')).toBe('admin-jwt-token')
       expect(wrapper.find('.success-message').exists()).toBe(false)
       expect(mockPush).toHaveBeenCalledWith('/admin/dashboard')
@@ -146,6 +149,7 @@ describe('认证流程集成测试', () => {
     it('错误流程：密码错误 → 显示错误 → 可重试', async () => {
       const wrapper = mountWithPinia(AdminLoginView)
 
+      await wrapper.find('#adminUsername').setValue('owner')
       await wrapper.find('#adminPassword').setValue('wrong-password')
       mockAdminLogin.mockResolvedValue({
         success: false,
@@ -161,10 +165,10 @@ describe('认证流程集成测试', () => {
       // 重试
       mockAdminLogin.mockResolvedValue({
         success: true,
-        data: { token: 'admin-token' }
+        data: { token: 'admin-token', role: 'super_admin', username: 'owner' }
       })
 
-      await wrapper.find('#adminPassword').setValue('admin123')
+      await wrapper.find('#adminPassword').setValue('Test-only-pass-123')
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
@@ -208,6 +212,7 @@ describe('认证流程集成测试', () => {
 
     it('管理员登录：空密码不能提交', async () => {
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       await wrapper.find('form').trigger('submit')
       await flushPromises()
 
@@ -231,7 +236,8 @@ describe('认证流程集成测试', () => {
 
     it('管理员登录：网络断开应该显示友好错误', async () => {
       const wrapper = mountWithPinia(AdminLoginView)
-      await wrapper.find('#adminPassword').setValue('admin123')
+      await wrapper.find('#adminUsername').setValue('owner')
+      await wrapper.find('#adminPassword').setValue('Test-only-pass-123')
 
       mockAdminLogin.mockRejectedValue(new Error('Failed to fetch'))
       await wrapper.find('form').trigger('submit')

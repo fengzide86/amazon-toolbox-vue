@@ -13,6 +13,7 @@ from core.logging import get_logger
 from core.response import error_response, success_response
 from database import get_db
 from domains.knowledge import faq_service
+from domains.knowledge.chat_service import RULE_FALLBACK_REPLY
 from models import KnowledgeBase
 
 logger = get_logger(__name__)
@@ -60,22 +61,26 @@ async def query_help(
             "matched": True,
             "ai_used": False,
             "source": "faq",
+            "answer_mode": "faq",
             "answer": faq_result["content"],
             "faq_id": faq_result["id"],
             "faq_title": faq_result["title"],
-            "need_ai": False
+            "knowledge_refs": [faq_result],
+            "need_ai": False,
         })
     
-    # 2. 未匹配到 FAQ，返回需要 AI 兜底
+    # 2. 未匹配时直接返回规则式兜底；内部版永远不询问或调用外部 AI。
     return success_response({
         "matched": False,
         "ai_used": False,
-        "source": None,
-        "answer": None,
+        "source": "fallback",
+        "answer_mode": "fallback",
+        "answer": RULE_FALLBACK_REPLY,
         "faq_id": None,
         "faq_title": None,
-        "need_ai": True,
-        "message": "FAQ 暂未命中，是否使用 AI 诊断？"
+        "knowledge_refs": [],
+        "need_ai": False,
+        "message": RULE_FALLBACK_REPLY,
     })
 
 

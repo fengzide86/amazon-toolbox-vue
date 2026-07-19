@@ -4,7 +4,7 @@
       <div>
         <span class="eyebrow">PROFESSIONAL OPERATIONS</span>
         <div class="title-line"><h1>专业工作台已就绪</h1><span>内部验证版</span></div>
-        <p>{{ hasTools ? '选择已经开放的业务工具，系统会按顺序处理多个账号。' : '批量工具会根据真实业务脚本逐个开放。' }}</p>
+        <p>{{ hasTools ? '选择演示工具，体验多个虚拟项目按顺序推进的流程。' : '批量演示工具会根据验证场景逐个开放。' }}</p>
       </div>
       <div class="page-actions">
         <router-link class="primary-link" to="/business/workspace"><ArrowRight :size="16" />查看工作台</router-link>
@@ -13,27 +13,28 @@
     </header>
     <section class="attention-card" v-if="waitingCount">
       <div class="attention-icon"><BellRing :size="20" /></div>
-      <div><strong>{{ waitingCount }} 个账号需要你操作</strong><p>浏览器现场已经保留，其他账号仍会继续处理。</p></div>
+      <div><strong>{{ waitingCount }} 个演示项等待确认</strong><p>本地模拟状态已经暂存，其他演示项仍会继续播放。</p></div>
       <router-link to="/business/workspace">去处理</router-link>
     </section>
     <section class="capability-grid">
-      <article><FileSpreadsheet :size="20" /><div><span>本地批量导入</span><strong>最多 {{ store.entitlements.max_batch_rows || 50 }} 个账号</strong></div><small>原始表格不会上传</small></article>
-      <article><PanelsTopLeft :size="20" /><div><span>独立浏览器现场</span><strong>最多保留 {{ store.entitlements.max_open_sessions || 6 }} 个</strong></div><small>账号登录状态互不串线</small></article>
-      <article><ShieldCheck :size="20" /><div><span>需要操作时提醒</span><strong>不用一直盯着页面</strong></div><small>登录和验证时再回来处理</small></article>
+      <article><FileSpreadsheet :size="20" /><div><span>内置演示样例</span><strong>最多 {{ store.entitlements.max_batch_rows || 50 }} 个演示项</strong></div><small>不读取真实客户资料</small></article>
+      <article><PanelsTopLeft :size="20" /><div><span>批量队列演示</span><strong>按顺序播放流程</strong></div><small>所有页面与结果均为模拟</small></article>
+      <article><ShieldCheck :size="20" /><div><span>模拟人工提示</span><strong>展示完整交互状态</strong></div><small>不会登录或修改真实平台</small></article>
     </section>
     <section class="surface recent">
-      <header><div><span>最近批次</span><small>只展示业务状态，不展示内部脚本指标</small></div><router-link to="/business/records">全部记录</router-link></header>
-      <div v-if="store.history.length" class="batch-list">
-        <article v-for="batch in store.history.slice(0, 5)" :key="batch.id">
-          <div><strong>{{ batch.tool_name }}</strong><span>{{ formatDate(batch.started_at) }}</span></div>
-          <span class="batch-count">{{ batch.completed_count + batch.failed_count }}/{{ batch.total_count }} 已处理</span>
+      <header><div><span>最近演示批次</span><small>模拟记录不计入真实执行统计</small></div><router-link to="/business/records">全部记录</router-link></header>
+      <AsyncStateNotice :state="historyState" :message="store.error || ''" loading-text="正在加载演示记录..." @retry="loadHistory" />
+      <div v-if="(historyState === 'data' || historyState === 'stale') && store.demoHistory.length" class="batch-list">
+        <article v-for="batch in store.demoHistory.slice(0, 5)" :key="batch.id">
+          <div><strong>{{ batch.tool_name_snapshot }}</strong><span>{{ formatDate(batch.started_at || batch.created_at) }}</span></div>
+          <span class="batch-count">{{ batch.played_count + batch.skipped_count }}/{{ batch.row_count }} 已演示</span>
           <span :class="['status', `is-${batch.status}`]">{{ batchStatus(batch.status) }}</span>
         </article>
       </div>
-      <div v-else class="empty">
+      <div v-else-if="historyState === 'empty'" class="empty">
         <span class="empty-icon"><Layers3 :size="24" /></span>
-        <strong>还没有执行记录</strong>
-        <p>完成第一个真实批次后，业务结果会保存在这里。</p>
+        <strong>还没有批量演示记录</strong>
+        <p>完成第一个模拟批次后，演示结果会保存在这里。</p>
       </div>
     </section>
   </div>
@@ -42,18 +43,26 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { ArrowRight, BellRing, FileSpreadsheet, Layers3, PanelsTopLeft, ShieldCheck } from '@lucide/vue'
-import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
-const store = useBusinessWorkspaceStore()
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import type { AsyncDataState } from '@/features/async/state'
+import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
+const store = useBusinessDemoWorkspaceStore()
 const waitingCount = computed(() => store.snapshot.counts?.waiting || 0)
 const hasTools = computed(() => store.tools.length > 0)
+const historyState = computed<AsyncDataState>(() => {
+  if (store.loading) return 'loading'
+  if (store.error) return store.demoHistory.length ? 'stale' : 'error'
+  return store.demoHistory.length ? 'data' : 'empty'
+})
 const formatDate = (value: string | null | undefined): string => value
   ? new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
   : '-'
 const statusLabels: Record<string, string> = {
-  running: '处理中', completed: '已完成', cancelled: '已结束', interrupted: '已中断',
+  created: '待演示', running: '演示中', completed: '演示完成', cancelled: '已退出', error: '演示异常', interrupted: '已中断',
 }
 const batchStatus = (value: string): string => statusLabels[value] || value
-onMounted(() => store.loadHistory())
+const loadHistory = (): void => { void store.loadDemoHistory().catch(() => undefined) }
+onMounted(loadHistory)
 </script>
 
 <style scoped>

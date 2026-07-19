@@ -1,177 +1,160 @@
-"""
-分润计算测试
-测试分润记录的 CRUD、汇总计算、平台过滤等核心逻辑
-"""
+from decimal import Decimal
+
 import pytest
-from sqlalchemy import select
-from models import Order, Plan, ProfitRecord
-from tests.conftest import get_data
+
+from models import Order, ProfitRecord, StaffRole
 
 
 @pytest.mark.asyncio
-async def test_get_profit_records_empty(client, auth_headers):
-    """测试空分润记录列表"""
-    response = await client.get("/api/profit", headers=auth_headers)
-    assert response.status_code == 200
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) == 0
-
-
-@pytest.mark.asyncio
-async def test_get_profit_summary_empty(client, auth_headers):
-    """测试空分润汇总"""
-    response = await client.get("/api/profit/summary", headers=auth_headers)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["total_tech"] == 0
-    assert data["total_market"] == 0
-    assert data["total_product"] == 0
-    assert data["total_service"] == 0
-    assert data["total_coordination"] == 0
-    assert data["total_record"] == 0
-    assert data["grand_total"] == 0
-
-
-@pytest.mark.asyncio
-async def test_profit_summary_calculation(client, auth_headers, db_session):
-    """测试分润汇总计算是否正确
-    
-    创建订单和分润记录，验证汇总金额计算
-    """
-    # 创建套餐
-    plan = Plan(name="测试套餐", price=100, duration_days=30, status="active")
-    db_session.add(plan)
-    await db_session.flush()
-    
-    # 创建订单
-    order = Order(
-        order_no="ORD-TEST-001",
-        plan_id=plan.id,
-        amount=100.0,
-        channel="微信",
-        responsible="张三",
-        status="paid",
-    )
-    db_session.add(order)
-    await db_session.flush()
-    
-    # 创建分润记录（按默认比例 30/25/15/15/10/5）
-    profit = ProfitRecord(
-        order_id=order.id,
-        tech_share=30.0,       # 30%
-        market_share=25.0,     # 25%
-        product_share=15.0,    # 15%
-        service_share=15.0,    # 15%
-        coordination_share=10.0,  # 10%
-        record_share=5.0,      # 5%
-    )
-    db_session.add(profit)
-    await db_session.commit()
-    
-    # 验证汇总
-    response = await client.get("/api/profit/summary", headers=auth_headers)
-    assert response.status_code == 200
-    data = response.json()
-    
-    assert data["total_tech"] == 30.0
-    assert data["total_market"] == 25.0
-    assert data["total_product"] == 15.0
-    assert data["total_service"] == 15.0
-    assert data["total_coordination"] == 10.0
-    assert data["total_record"] == 5.0
-    assert data["grand_total"] == 100.0
-
-
-@pytest.mark.asyncio
-async def test_profit_summary_multiple_records(client, auth_headers, db_session):
-    """测试多条分润记录的汇总"""
-    # 创建两个订单和分润记录
-    for i, amount in enumerate([100, 200]):
-        plan = Plan(name=f"套餐{i}", price=amount, duration_days=30, status="active")
-        db_session.add(plan)
-        await db_session.flush()
-        
-        order = Order(
-            order_no=f"ORD-MULTI-{i:03d}",
-            plan_id=plan.id,
-            amount=float(amount),
-            channel="微信",
-            responsible="张三",
-            status="paid",
-        )
+async def test_profit_records_are_paginated(client, auth_headers, db_session):
+    for index in range(3):
+        order = Order(order_no=f"PROFIT-{index}", amount=10, status="paid")
         db_session.add(order)
         await db_session.flush()
-        
-        # 分润：tech=30%, 其他=0
-        profit = ProfitRecord(
-            order_id=order.id,
-            tech_share=amount * 0.3,
-            market_share=0,
-            product_share=0,
-            service_share=0,
-            coordination_share=0,
-            record_share=0,
+        db_session.add(
+            ProfitRecord(
+                order_id=order.id,
+                order_amount_snapshot=10,
+                tech_share=3,
+                market_share=2.5,
+                product_share=1.5,
+                service_share=1.5,
+                coordination_share=1,
+                record_share=.5,
+            )
         )
-        db_session.add(profit)
-    
     await db_session.commit()
-    
-    # 验证汇总：100*0.3 + 200*0.3 = 30 + 60 = 90
-    response = await client.get("/api/profit/summary", headers=auth_headers)
-    data = response.json()
-    assert data["total_tech"] == 90.0
-    assert data["grand_total"] == 90.0
-
-
-@pytest.mark.asyncio
-async def test_profit_records_pagination(client, auth_headers, db_session):
-    """测试分润记录分页"""
-    # 创建 5 条分润记录
-    for i in range(5):
-        plan = Plan(name=f"分页套餐{i}", price=50, duration_days=30, status="active")
-        db_session.add(plan)
-        await db_session.flush()
-        
-        order = Order(
-            order_no=f"ORD-PAGE-{i:03d}",
-            plan_id=plan.id,
-            amount=50.0,
-            channel="微信",
-            responsible="张三",
-            status="paid",
-        )
-        db_session.add(order)
-        await db_session.flush()
-        
-        profit = ProfitRecord(
-            order_id=order.id,
-            tech_share=15.0,
-            market_share=12.5,
-            product_share=7.5,
-            service_share=7.5,
-            coordination_share=5.0,
-            record_share=2.5,
-        )
-        db_session.add(profit)
-    
-    await db_session.commit()
-    
-    # 第一页，每页 2 条
     response = await client.get("/api/profit?page=1&page_size=2", headers=auth_headers)
     assert response.status_code == 200
-    data = response.json()
-    assert len(data) == 2
-    
-    # 第三页，每页 2 条（应该只有 1 条）
-    response = await client.get("/api/profit?page=3&page_size=2", headers=auth_headers)
-    data = response.json()
-    assert len(data) == 1
+    assert len(response.json()["data"]) == 2
+    assert response.json()["total"] == 3
+    assert (await client.get("/api/profit?page_size=101", headers=auth_headers)).status_code == 422
 
 
 @pytest.mark.asyncio
-async def test_profit_summary_requires_auth(client):
-    """测试分润汇总需要认证"""
-    response = await client.get("/api/profit/summary")
-    # 未认证访问管理员端点应返回 401 或 403
-    assert response.status_code in [401, 403]
+async def test_profit_summary_only_counts_active_ledger(client, auth_headers, db_session):
+    active_order = Order(order_no="ACTIVE-PROFIT", amount=100, status="paid")
+    reversed_order = Order(order_no="REVERSED-PROFIT", amount=50, status="refunded")
+    db_session.add_all([active_order, reversed_order])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            ProfitRecord(
+                order_id=active_order.id,
+                status="active",
+                order_amount_snapshot=100,
+                tech_share=30,
+                market_share=25,
+                product_share=15,
+                service_share=15,
+                coordination_share=10,
+                record_share=5,
+            ),
+            ProfitRecord(
+                order_id=reversed_order.id,
+                status="reversed",
+                order_amount_snapshot=50,
+                tech_share=15,
+                market_share=12.5,
+                product_share=7.5,
+                service_share=7.5,
+                coordination_share=5,
+                record_share=2.5,
+            ),
+        ]
+    )
+    await db_session.commit()
+    summary = (await client.get("/api/profit/summary", headers=auth_headers)).json()
+    assert summary["grand_total"] == 100
+    assert summary["reversed_total"] == 50
+    assert summary["gross_total"] == 150
+    assert summary["active"] == {
+        "tech": 30.0,
+        "market": 25.0,
+        "product": 15.0,
+        "service": 15.0,
+        "coordination": 10.0,
+        "record": 5.0,
+        "grand_total": 100.0,
+    }
+    assert summary["reversed"] == {
+        "tech": 15.0,
+        "market": 12.5,
+        "product": 7.5,
+        "service": 7.5,
+        "coordination": 5.0,
+        "record": 2.5,
+        "grand_total": 50.0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_profit_policy_is_versioned_and_decimal_safe(client, auth_headers):
+    initial = await client.get("/api/profit/policy", headers=auth_headers)
+    assert initial.status_code == 200
+    assert initial.json()["data"]["version"] == 1
+
+    updated = await client.put(
+        "/api/profit/policy",
+        headers=auth_headers,
+        json={
+            "ratios": {
+                "tech": "0.20",
+                "market": "0.20",
+                "product": "0.20",
+                "service": "0.20",
+                "coordination": "0.10",
+                "record": "0.10",
+            }
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["data"]["version"] == 2
+    assert Decimal(updated.json()["data"]["ratios"]["tech"]) == Decimal("0.20")
+
+
+@pytest.mark.asyncio
+async def test_profit_policy_rejects_invalid_sum(client, auth_headers):
+    response = await client.put(
+        "/api/profit/policy",
+        headers=auth_headers,
+        json={
+            "ratios": {
+                "tech": "0.50",
+                "market": "0.50",
+                "product": "0.50",
+                "service": "0",
+                "coordination": "0",
+                "record": "0",
+            }
+        },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_profit_permissions(client, staff_headers_factory):
+    operator = await staff_headers_factory(StaffRole.OPERATOR, "profit-operator")
+    support = await staff_headers_factory(StaffRole.SUPPORT, "profit-support")
+    assert (await client.get("/api/profit", headers=operator)).status_code == 200
+    assert (await client.get("/api/profit", headers=support)).status_code == 403
+    response = await client.put(
+        "/api/profit/policy",
+        headers=operator,
+        json={
+            "ratios": {
+                "tech": ".30",
+                "market": ".25",
+                "product": ".15",
+                "service": ".15",
+                "coordination": ".10",
+                "record": ".05",
+            }
+        },
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_profit_requires_authentication(client):
+    assert (await client.get("/api/profit/summary")).status_code == 401

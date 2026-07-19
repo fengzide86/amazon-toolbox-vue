@@ -1,43 +1,68 @@
 <template>
   <div>
-    <PageHeader title="订单管理" description="创建订单并维护付款与退款状态" />
+  <PageHeader title="订单管理" description="创建订单并维护人工收款与退款状态" />
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载订单…" @retry="loadData" />
 
-    <section class="order-stats" aria-label="订单统计">
+    <section v-if="loadState !== 'loading' && loadState !== 'error'" class="order-stats" aria-label="订单统计">
       <article class="stat-card">
           <div class="stat-label">总订单数</div>
           <div class="stat-value" style="color: var(--color-primary);">{{ stats.total }}</div>
       </article>
       <article class="stat-card">
-          <div class="stat-label">已付款</div>
+          <div class="stat-label">已收款</div>
           <div class="stat-value">{{ stats.paid }}</div>
       </article>
       <article class="stat-card">
-          <div class="stat-label">待确认</div>
+          <div class="stat-label">待收款</div>
           <div class="stat-value" style="color: var(--color-warning);">{{ stats.pending }}</div>
       </article>
       <article class="stat-card">
           <div class="stat-label">已退款</div>
           <div class="stat-value" style="color: var(--color-danger);">{{ stats.refunded }}</div>
       </article>
+      <article class="stat-card">
+          <div class="stat-label">已取消</div>
+          <div class="stat-value">{{ stats.cancelled }}</div>
+      </article>
     </section>
 
     <!-- 创建订单 -->
-    <el-card class="table-card" style="margin-bottom: 1.5rem;">
+    <el-card v-if="canWrite && loadState !== 'loading' && loadState !== 'error'" class="table-card" style="margin-bottom: 1.5rem;">
       <template #header>
         <div class="card-header">
           <h3>创建新订单</h3>
         </div>
       </template>
       <div class="form-row">
-        <label class="order-field order-field--wide"><span>套餐</span><el-select v-model="newOrder.plan_id" placeholder="选择套餐"><el-option v-for="plan in plans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" /></el-select></label>
+        <label class="order-field order-field--wide"><span>套餐</span><el-select v-model="newOrder.plan_id" placeholder="选择启用套餐"><el-option v-for="plan in activePlans" :key="plan.id" :label="`${plan.name} - ¥${plan.price}`" :value="plan.id" /></el-select></label>
         <label class="order-field order-field--wide"><span>渠道</span><el-input v-model="newOrder.channel" placeholder="如微信/支付宝" /></label>
         <label class="order-field"><span>负责人</span><el-input v-model="newOrder.responsible" placeholder="负责人" /></label>
-        <label class="order-field"><span>初始状态</span><el-select v-model="newOrder.status"><el-option label="待确认" value="pending" /><el-option label="已付款" value="paid" /></el-select></label>
         <div class="order-submit"><el-button type="primary" @click="createOrder" :loading="isLoading">{{ isLoading ? '创建中...' : '创建订单' }}</el-button></div>
       </div>
     </el-card>
 
-    <el-card class="table-card">
+    <el-card v-if="canReadPlans && loadState !== 'loading' && loadState !== 'error'" class="table-card plan-overview-card">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <h3>套餐概览</h3>
+            <small class="card-hint">三类后台角色均可查看；订单只能选择启用中的套餐</small>
+          </div>
+          <el-button v-if="canManageSettings" size="small" type="primary" @click="goPlanSettings">管理套餐</el-button>
+        </div>
+      </template>
+      <el-table :data="plans" size="small" style="width:100%">
+        <el-table-column prop="name" label="套餐" min-width="140" />
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }"><el-tag :type="getPlanStatusType(row.status)" size="small">{{ getPlanStatusText(row.status) }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="价格" width="110"><template #default="{ row }">¥{{ row.price }}</template></el-table-column>
+        <el-table-column label="时长" width="100"><template #default="{ row }">{{ row.duration_days }} 天</template></el-table-column>
+        <el-table-column label="类型" width="120"><template #default="{ row }">{{ row.product_type === 'business' ? '专业 B 端' : '普通 C 端' }}</template></el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="table-card">
       <template #header>
         <div class="card-header">
           <h3>全部订单</h3>
@@ -45,9 +70,10 @@
       </template>
       <DataToolbar label="订单筛选">
         <el-select v-model="filterStatus" placeholder="全部状态" clearable style="width: 150px;">
-          <el-option label="已付款" value="paid" />
-          <el-option label="待确认" value="pending" />
+              <el-option label="已收款" value="paid" />
+              <el-option label="待收款" value="pending" />
           <el-option label="已退款" value="refunded" />
+          <el-option label="已取消" value="cancelled" />
         </el-select>
         <template #summary>共 {{ filteredOrders.length }} 笔</template>
         <template #actions>
@@ -95,15 +121,16 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" :width="isCompact ? 136 : 220" fixed="right">
+        <el-table-column label="操作" :width="isCompact ? 136 : 270" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openOrderDetail(row)">详情</el-button>
-            <el-dropdown v-if="isCompact && row.status !== 'refunded'" trigger="click" @command="command => handleOrderCommand(command, row)">
+            <el-dropdown v-if="canWrite && isCompact && (row.status === 'pending' || row.status === 'paid')" trigger="click" @command="command => handleOrderCommand(command, row)">
               <el-button size="small">更多</el-button>
-              <template #dropdown><el-dropdown-menu><el-dropdown-item v-if="row.status === 'pending'" command="paid">确认付款</el-dropdown-item><el-dropdown-item v-if="row.status === 'paid'" command="refund">退款</el-dropdown-item></el-dropdown-menu></template>
+                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-if="row.status === 'pending'" command="paid">标记已收款</el-dropdown-item><el-dropdown-item v-if="row.status === 'pending'" command="cancel">取消订单</el-dropdown-item><el-dropdown-item v-if="row.status === 'paid'" command="refund">退款</el-dropdown-item></el-dropdown-menu></template>
             </el-dropdown>
-            <template v-else-if="!isCompact">
-              <el-button v-if="row.status === 'pending'" size="small" @click="markPaid(row)">确认付款</el-button>
+            <template v-else-if="canWrite && !isCompact">
+              <el-button v-if="row.status === 'pending'" size="small" @click="markPaid(row)">标记已收款</el-button>
+              <el-button v-if="row.status === 'pending'" size="small" type="warning" @click="cancel(row)">取消</el-button>
               <el-button v-if="row.status === 'paid'" size="small" type="danger" @click="refund(row)">退款</el-button>
             </template>
           </template>
@@ -131,14 +158,21 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { getOrders, createOrder as apiCreateOrder, updateOrder, refundOrder, getPlans, exportOrders, API_BASE } from '@/utils/api'
+import { useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
+import { getOrders, createOrder as apiCreateOrder, markOrderPaid, cancelOrder, refundOrder, getPlansAdmin, exportOrders } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import { authService } from '@/utils/auth'
+import { hasStaffPermission } from '@/features/auth/permissions'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
+import { buildPendingOrderPayload } from '@/features/admin/orderLifecycle'
 import {
   adminOrderSchema,
   adminOrdersSchema,
@@ -149,22 +183,30 @@ import {
 
 const orders = ref<AdminOrder[]>([])
 const plans = ref<AdminPlan[]>([])
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
 const isLoading = ref(false)
 const filterStatus = ref('')
 const planNameMap = reactive<Record<string, string>>({})
 
 const platformStore = usePlatformStore()
+const router = useRouter()
 const isCompact = useCompactLayout()
+const canWrite = computed(() => hasStaffPermission(authService.getRole(), 'orders.write'))
+const canReadPlans = computed(() => hasStaffPermission(authService.getRole(), 'plans.read'))
+const canManageSettings = computed(() => hasStaffPermission(authService.getRole(), 'settings.manage'))
 const showDetailDrawer = ref(false)
 const detailOrder = ref<AdminOrder | null>(null)
 
-const newOrder = ref<{ plan_id: string | number | null; amount: number; channel: string; responsible: string; status: string }>({ plan_id: null, amount: 0, channel: '', responsible: '', status: 'pending' })
+const newOrder = ref<{ plan_id: string | number | null; amount: number; channel: string; responsible: string }>({ plan_id: null, amount: 0, channel: '', responsible: '' })
+const activePlans = computed(() => plans.value.filter((plan) => plan.status === 'active'))
 
 const stats = computed(() => ({
   total: orders.value.length,
   paid: orders.value.filter(o => o.status === 'paid').length,
   pending: orders.value.filter(o => o.status === 'pending').length,
   refunded: orders.value.filter(o => o.status === 'refunded').length,
+  cancelled: orders.value.filter(o => o.status === 'cancelled').length,
 }))
 
 const filteredOrders = computed(() => {
@@ -177,13 +219,26 @@ function getPlanName(planId?: string | number | null) {
 }
 
 function getStatusType(status?: string | null): 'warning' | 'success' | 'danger' | 'info' {
-  const map: Record<string, 'warning' | 'success' | 'danger'> = { pending: 'warning', paid: 'success', refunded: 'danger' }
+  const map: Record<string, 'warning' | 'success' | 'danger' | 'info'> = { pending: 'warning', paid: 'success', refunded: 'danger', cancelled: 'info' }
   return status ? map[status] || 'info' : 'info'
 }
 
 function getStatusText(status?: string | null) {
-  const map: Record<string, string> = { pending: '待确认', paid: '已完成', refunded: '已退款' }
+  const map: Record<string, string> = { pending: '待收款', paid: '已收款', refunded: '已退款', cancelled: '已取消' }
   return status ? map[status] || status : '-'
+}
+
+function getPlanStatusText(status?: string | null) {
+  return status === 'active' ? '启用' : status === 'disabled' ? '禁用' : status === 'archived' ? '已归档' : '-'
+}
+
+function getPlanStatusType(status?: string | null): 'success' | 'danger' | 'info' {
+  return status === 'active' ? 'success' : status === 'disabled' ? 'danger' : 'info'
+}
+
+function goPlanSettings() {
+  if (!canManageSettings.value) return
+  void router.push('/admin/settings')
 }
 
 function formatTime(timeStr?: string | null) {
@@ -193,64 +248,110 @@ function formatTime(timeStr?: string | null) {
 }
 
 async function loadData() {
+  loadState.value = orders.value.length || plans.value.length ? 'data' : 'loading'
+  loadError.value = ''
   try {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
     const params = platformKey ? { platform_key: platformKey } : {}
-    const [ordersRes, plansRes] = await Promise.all([getOrders(params), getPlans()])
+    const [ordersRes, plansRes] = await Promise.all([getOrders(params), getPlansAdmin({ page_size: 100 })])
     const parsedOrders = adminOrdersSchema.parse(ordersRes)
     const parsedPlans = adminPlansSchema.parse(plansRes)
     orders.value = parsedOrders
     plans.value = parsedPlans
-    if (parsedPlans.length && !newOrder.value.plan_id) {
-      newOrder.value.plan_id = parsedPlans[0]?.id ?? null
-      newOrder.value.amount = parsedPlans[0]?.price ?? 0
+    const selectedPlan = parsedPlans.find((plan) => plan.status === 'active')
+    if (!parsedPlans.some((plan) => plan.id === newOrder.value.plan_id && plan.status === 'active')) {
+      newOrder.value.plan_id = selectedPlan?.id ?? null
+      newOrder.value.amount = selectedPlan?.price ?? 0
     }
     parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
-  } catch (err) {
-    showToast('数据加载失败', 'error')
+    loadState.value = settledDataState(parsedOrders.length)
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '订单与套餐数据暂时无法加载'
+    loadState.value = failedDataState(orders.value.length > 0 || plans.value.length > 0)
   }
 }
 
 watch(() => platformStore.adminPlatform, () => { loadData() })
 
 async function createOrder() {
+  if (!canWrite.value) return
   if (!newOrder.value.plan_id) { showToast('请选择套餐', 'error'); return }
   if (!newOrder.value.amount || newOrder.value.amount <= 0) { showToast('订单金额必须大于0', 'error'); return }
   isLoading.value = true
   try {
-    await apiCreateOrder(newOrder.value)
+    await apiCreateOrder(buildPendingOrderPayload(
+      { ...newOrder.value, plan_id: newOrder.value.plan_id },
+      platformStore.adminPlatform === 'all' ? undefined : platformStore.adminPlatform,
+    ))
     showToast('订单创建成功', 'success')
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('创建失败', 'error')
   }
   isLoading.value = false
 }
 
 async function markPaid(order: unknown) {
+  if (!canWrite.value) return
   const selectedOrder = adminOrderSchema.parse(order)
+  if (selectedOrder.status !== 'pending') return
+  if (!await confirmAction({
+    title: '确认订单已人工收款？',
+    message: `确认 ${selectedOrder.order_no} 已收款后，系统会按当前策略生成分润记录。`,
+    confirmText: '确认已收款',
+  })) return
   try {
-    await updateOrder(selectedOrder.id, { status: 'paid' })
-    showToast('已确认付款', 'success')
+    await markOrderPaid(selectedOrder.id)
+    showToast('已标记为收款', 'success')
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('操作失败', 'error')
   }
 }
 
-async function refund(order: unknown) {
-  const selectedOrder = adminOrderSchema.parse(order)
-  if (!await confirmAction({
-    title: '确认退款？',
-    message: `将记录退款 ¥${selectedOrder.amount}，请确认金额和订单无误。`,
-    confirmText: '确认退款',
-    danger: true,
-  })) return
+async function promptTransitionReason(title: string, message: string): Promise<string | null> {
   try {
-    await refundOrder(selectedOrder.id)
+    const result = await ElMessageBox.prompt(message, title, {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      inputPlaceholder: '请填写至少 2 个字的原因',
+      inputValidator: (value: string) => value.trim().length >= 2 || '原因至少需要 2 个字',
+      type: 'warning',
+      closeOnClickModal: false,
+    })
+    return String(result.value || '').trim()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return null
+    throw error
+  }
+}
+
+async function cancel(order: unknown) {
+  if (!canWrite.value) return
+  const selectedOrder = adminOrderSchema.parse(order)
+  if (selectedOrder.status !== 'pending') return
+  try {
+    const reason = await promptTransitionReason('取消订单', `请输入取消 ${selectedOrder.order_no} 的原因。`)
+    if (!reason) return
+    await cancelOrder(selectedOrder.id, reason)
+    showToast('订单已取消', 'success')
+    await loadData()
+  } catch {
+    showToast('取消订单失败', 'error')
+  }
+}
+
+async function refund(order: unknown) {
+  if (!canWrite.value) return
+  const selectedOrder = adminOrderSchema.parse(order)
+  if (selectedOrder.status !== 'paid') return
+  try {
+    const reason = await promptTransitionReason('确认退款', `将退款 ¥${selectedOrder.amount}，请输入退款原因。`)
+    if (!reason) return
+    await refundOrder(selectedOrder.id, reason)
     showToast('退款成功', 'success')
     await loadData()
-  } catch (err) {
+  } catch {
     showToast('退款失败', 'error')
   }
 }
@@ -261,8 +362,10 @@ function openOrderDetail(order: unknown) {
 }
 
 function handleOrderCommand(command: string, order: unknown) {
-  if (command === 'paid') markPaid(order)
-  if (command === 'refund') refund(order)
+  if (!canWrite.value) return
+  if (command === 'paid') void markPaid(order)
+  if (command === 'cancel') void cancel(order)
+  if (command === 'refund') void refund(order)
 }
 
 // 选择套餐时自动填充金额
@@ -283,7 +386,7 @@ async function exportOrdersData() {
     a.click()
     URL.revokeObjectURL(url)
     showToast('导出成功', 'success')
-  } catch (err) {
+  } catch {
     showToast('导出失败', 'error')
   }
 }
@@ -300,7 +403,7 @@ onMounted(loadData)
   background: var(--color-surface);
 }
 
-.order-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 1.5rem; }
+.order-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-bottom: 1.5rem; }
 
 .stat-label {
   font-size: 0.85rem;
@@ -336,10 +439,12 @@ onMounted(loadData)
 
 .form-row {
   display: grid;
-  grid-template-columns: 1.35fr 1.25fr .8fr .8fr auto;
+  grid-template-columns: 1.35fr 1.25fr .8fr auto;
   gap: 14px;
   align-items: end;
 }
+.plan-overview-card { margin-bottom: 1.5rem; }
+.card-hint { display: block; margin-top: .25rem; color: var(--color-text-secondary); font-size: .78rem; font-weight: 400; }
 
 .order-field {
   display: flex;

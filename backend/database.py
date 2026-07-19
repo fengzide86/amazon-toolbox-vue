@@ -1,8 +1,6 @@
-"""
-数据库连接配置（优化版）
-支持 SQLite（本地开发）和 MySQL（生产环境）
-包含连接池优化、健康检查、慢查询日志等功能
-"""
+"""Database engine, sessions, schema gate and health checks."""
+from __future__ import annotations
+
 import time
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -17,300 +15,107 @@ from models.base import Base
 
 logger = get_logger(__name__)
 
-# 从配置获取数据库 URL
 DATABASE_URL = settings.get_database_url()
+SCHEMA_REVISION = "20260718_audit_target_id_string"
 
-logger.info(f"数据库类型: {settings.DB_TYPE}")
-logger.info(f"数据库连接: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}")
+logger.info("数据库类型: %s", settings.DB_TYPE)
+logger.info("数据库连接: %s", DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL)
 
-# 创建异步引擎
-engine_kwargs: dict[str, Any] = {
-    "echo": False,
-}
-
+engine_kwargs: dict[str, Any] = {"echo": False}
 if settings.DB_TYPE == "mysql":
     engine_kwargs.update({
-        # ===== 连接池配置（针对1核2G服务器优化）=====
         "pool_size": 5,
         "max_overflow": 5,
         "pool_recycle": 900,
         "pool_pre_ping": True,
         "pool_timeout": 5,
-        
-        # ===== MySQL 连接参数 =====
-        "connect_args": {
-            "connect_timeout": 10,    # 连接超时
-            "charset": "utf8mb4",
-        },
+        "connect_args": {"connect_timeout": 10, "charset": "utf8mb4"},
     })
 elif settings.DB_TYPE == "sqlite":
-    engine_kwargs.update({
-        "connect_args": {
-            "timeout": 30,  # SQLite 锁等待超时
-        },
-    })
+    engine_kwargs.update({"connect_args": {"timeout": 30}})
 
 engine = create_async_engine(DATABASE_URL, **engine_kwargs)
-
-# 会话工厂
 async_session_maker = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
-    autoflush=False,  # 手动控制 flush
+    autoflush=False,
 )
 
-# ===== 慢查询阈值（秒）=====
-SLOW_QUERY_THRESHOLD = 1.0  # 1秒
+SLOW_QUERY_THRESHOLD = 1.0
 
 
 async def get_db() -> AsyncGenerator[AsyncSession]:
-    """获取数据库会话（依赖注入用）
-    
-    包含慢查询日志记录
-    """
+    """Yield one transactional request session."""
     async with async_session_maker() as session:
         try:
-            start_time = time.time()
+            started = time.time()
             yield session
-            elapsed = time.time() - start_time
-            
-            # 记录慢查询
+            elapsed = time.time() - started
             if elapsed > SLOW_QUERY_THRESHOLD:
-                logger.warning(f"慢查询检测: 会话耗时 {elapsed:.2f}s")
+                logger.warning("慢查询检测: 会话耗时 %.2fs", elapsed)
         except HTTPException:
             await session.rollback()
             raise
-        except Exception as e:
+        except Exception as error:
             await session.rollback()
-            logger.error(f"数据库会话异常: {e}", exc_info=True)
+            logger.error("数据库会话异常: %s", error, exc_info=True)
             raise
         finally:
             await session.close()
 
 
-async def init_db():
-    """初始化数据库（创建所有表）"""
-    # 确保所有模型已导入注册到 Base.metadata
-    import models  # noqa: F401
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("数据库表初始化完成")
-    
-    # 执行数据库迁移（添加缺失的列）
-    await run_migrations()
+async def init_db() -> None:
+    """Create tables only for local development/tests; gate deployed schemas.
 
-
-async def run_migrations():
-    """执行数据库迁移 - 自动添加缺失的列
-    
-    用于兼容旧版本数据库，自动添加新增的字段
+    Internal and production services must be migrated by Alembic before
+    systemd starts the new process. The application never runs ad-hoc ALTER
+    statements and never silently starts against a stale schema.
     """
-    if settings.DB_TYPE == "sqlite":
-        await _migrate_sqlite()
-    else:
-        await _migrate_mysql()
-    logger.info("数据库迁移检查完成")
+    if settings.APP_ENV in {"development", "test"}:
+        import models  # noqa: F401
 
-
-async def _migrate_sqlite():
-    """SQLite 数据库迁移"""
-    import os
-    import sqlite3
-    
-    # 获取 SQLite 数据库路径
-    db_path = settings.DB_PATH
-    
-    if not os.path.exists(db_path):
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        logger.info("开发/测试数据库表已就绪")
         return
-    
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # 定义需要添加的列: (表名, 列名, 列定义)
-    # 注意: SQLite 添加列时不支持 DEFAULT CURRENT_TIMESTAMP，使用 NULL 代替
-    migrations = [
-        # plans 表
-        ("plans", "code_prefix", "VARCHAR(20)"),
-        ("plans", "sort_order", "INTEGER DEFAULT 0"),
-        ("plans", "updated_at", "DATETIME"),
-        ("plans", "product_type", "VARCHAR(20) DEFAULT 'consumer'"),
-        ("plans", "entitlements", "TEXT DEFAULT '{}'"),
-        # orders 表
-        ("orders", "updated_at", "DATETIME"),
-        ("orders", "platform_key", "VARCHAR(50)"),
-        # users 表
-        ("users", "updated_at", "DATETIME"),
-        ("users", "is_active", "BOOLEAN DEFAULT 1"),
-        ("users", "last_active_at", "DATETIME"),
-        ("users", "extra_devices", "INTEGER DEFAULT 0"),
-        # auth_codes 表
-        ("auth_codes", "max_devices", "INTEGER DEFAULT 1"),
-        # feedback 表
-        ("feedback", "priority", "VARCHAR(10) DEFAULT 'normal'"),
-        ("feedback", "status_history", "TEXT"),
-        ("feedback", "admin_reply", "TEXT"),
-        ("feedback", "replied_at", "DATETIME"),
-        ("feedback", "screenshots", "TEXT"),
-        ("feedback", "updated_at", "DATETIME"),
-        # ===== 1.5 新增字段 =====
-        # auth_codes 表 - 平台权限、场景、席位
-        ("auth_codes", "platform_scope", "TEXT"),
-        ("auth_codes", "scene_type", "VARCHAR(50)"),
-        ("auth_codes", "seat_limit", "INTEGER DEFAULT 1"),
-        # run_logs 表 - 平台化字段
-        ("run_logs", "auth_code_id", "INTEGER"),
-        ("run_logs", "platform_key", "VARCHAR(50)"),
-        ("run_logs", "capability_key", "VARCHAR(100)"),
-        ("run_logs", "script_key", "VARCHAR(100)"),
-        ("run_logs", "tool_id", "VARCHAR(100)"),
-        # feedback 表 - 平台化字段
-        ("feedback", "platform_key", "VARCHAR(50)"),
-        ("feedback", "capability_key", "VARCHAR(100)"),
-        ("feedback", "tool_id", "VARCHAR(100)"),
-        ("feedback", "run_log_id", "INTEGER"),
-        # knowledge_base 表 - 平台化字段
-        ("knowledge_base", "platform_key", "VARCHAR(50)"),
-        ("knowledge_base", "capability_key", "VARCHAR(100)"),
-        # chat_sessions 表 - 平台化字段
-        ("chat_sessions", "platform_key", "VARCHAR(50)"),
-        ("chat_sessions", "capability_key", "VARCHAR(100)"),
-        ("launch_tokens", "execution_mode", "VARCHAR(20) DEFAULT 'single'"),
-        ("launch_tokens", "client_batch_id", "VARCHAR(100)"),
-        ("launch_tokens", "client_item_id", "VARCHAR(100)"),
-        ("launch_tokens", "idempotency_key", "VARCHAR(200)"),
-    ]
-    
-    for table, column, definition in migrations:
-        try:
-            # 检查列是否已存在
-            cursor.execute(f"PRAGMA table_info({table})")
-            existing_columns = [row[1] for row in cursor.fetchall()]
-            
-            if column not in existing_columns:
-                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
-                logger.info(f"迁移: 添加 {table}.{column}")
-        except Exception as e:
-            logger.warning(f"迁移 {table}.{column} 失败: {e}")
-    
-    conn.commit()
-    conn.close()
+
+    try:
+        async with async_session_maker() as session:
+            revision = (
+                await session.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+            ).scalar_one_or_none()
+    except Exception as error:
+        raise RuntimeError("数据库尚未由 Alembic 管理，拒绝启动") from error
+    if revision != SCHEMA_REVISION:
+        raise RuntimeError(
+            f"数据库版本不匹配: current={revision or 'none'}, required={SCHEMA_REVISION}"
+        )
+    logger.info("数据库迁移版本已校验: %s", revision)
 
 
-async def _migrate_mysql():
-    """MySQL 数据库迁移"""
-    # 定义需要添加的列: (表名, 列名, 列定义)
-    migrations = [
-        # plans 表
-        ("plans", "code_prefix", "VARCHAR(20)"),
-        ("plans", "sort_order", "INT DEFAULT 0"),
-        ("plans", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-        ("plans", "product_type", "VARCHAR(20) DEFAULT 'consumer'"),
-        ("plans", "entitlements", "TEXT"),
-        # orders 表
-        ("orders", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-        ("orders", "platform_key", "VARCHAR(50)"),
-        # users 表
-        ("users", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-        ("users", "is_active", "BOOLEAN DEFAULT TRUE"),
-        ("users", "last_active_at", "DATETIME"),
-        ("users", "extra_devices", "INT DEFAULT 0"),
-        # auth_codes 表
-        ("auth_codes", "max_devices", "INT DEFAULT 1"),
-        # feedback 表
-        ("feedback", "priority", "VARCHAR(10) DEFAULT 'normal'"),
-        ("feedback", "status_history", "TEXT"),
-        ("feedback", "admin_reply", "TEXT"),
-        ("feedback", "replied_at", "DATETIME"),
-        ("feedback", "screenshots", "TEXT"),
-        ("feedback", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"),
-        # ===== 1.5 新增字段 =====
-        # auth_codes 表 - 平台权限、场景、席位
-        ("auth_codes", "platform_scope", "TEXT"),
-        ("auth_codes", "scene_type", "VARCHAR(50)"),
-        ("auth_codes", "seat_limit", "INT DEFAULT 1"),
-        # run_logs 表 - 平台化字段
-        ("run_logs", "auth_code_id", "INT"),
-        ("run_logs", "platform_key", "VARCHAR(50)"),
-        ("run_logs", "capability_key", "VARCHAR(100)"),
-        ("run_logs", "script_key", "VARCHAR(100)"),
-        ("run_logs", "tool_id", "VARCHAR(100)"),
-        # feedback 表 - 平台化字段
-        ("feedback", "platform_key", "VARCHAR(50)"),
-        ("feedback", "capability_key", "VARCHAR(100)"),
-        ("feedback", "tool_id", "VARCHAR(100)"),
-        ("feedback", "run_log_id", "INT"),
-        # knowledge_base 表 - 平台化字段
-        ("knowledge_base", "platform_key", "VARCHAR(50)"),
-        ("knowledge_base", "capability_key", "VARCHAR(100)"),
-        # chat_sessions 表 - 平台化字段
-        ("chat_sessions", "platform_key", "VARCHAR(50)"),
-        ("chat_sessions", "capability_key", "VARCHAR(100)"),
-        ("launch_tokens", "execution_mode", "VARCHAR(20) DEFAULT 'single'"),
-        ("launch_tokens", "client_batch_id", "VARCHAR(100)"),
-        ("launch_tokens", "client_item_id", "VARCHAR(100)"),
-        ("launch_tokens", "idempotency_key", "VARCHAR(200)"),
-    ]
-    
-    async with async_session_maker() as session:
-        for table, column, definition in migrations:
-            try:
-                # 检查列是否已存在
-                result = await session.execute(text(
-                    f"SELECT COUNT(*) FROM information_schema.COLUMNS "
-                    f"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{table}' AND COLUMN_NAME = '{column}'"
-                ))
-                exists = result.scalar() > 0
-                
-                if not exists:
-                    await session.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
-                    await session.commit()
-                    logger.info(f"迁移: 添加 {table}.{column}")
-            except Exception as e:
-                logger.warning(f"迁移 {table}.{column} 失败: {e}")
-                await session.rollback()
-
-
-async def check_db_health() -> dict:
-    """数据库健康检查
-    
-    Returns:
-        健康状态字典
-    """
+async def check_db_health() -> dict[str, Any]:
     result: dict[str, Any] = {
         "status": "ok",
         "type": settings.DB_TYPE,
         "latency_ms": None,
     }
-    
     try:
-        start = time.time()
+        started = time.time()
         async with async_session_maker() as session:
             await session.execute(text("SELECT 1"))
-        latency = (time.time() - start) * 1000
-        result["latency_ms"] = round(latency, 2)
-        
-        if latency > 1000:  # 超过1秒视为异常
+        result["latency_ms"] = round((time.time() - started) * 1000, 2)
+        if result["latency_ms"] > 1000:
             result["status"] = "slow"
-    except Exception as e:
+    except Exception as error:
         result["status"] = "error"
-        result["error"] = str(e)
-        logger.error(f"数据库健康检查失败: {e}")
-    
+        result["error"] = str(error)
+        logger.error("数据库健康检查失败: %s", error)
     return result
 
 
-async def get_db_stats() -> dict:
-    """获取数据库统计信息
-    
-    Returns:
-        连接池统计等
-    """
-    stats = {
-        "type": settings.DB_TYPE,
-        "pool": {},
-    }
-    
+async def get_db_stats() -> dict[str, Any]:
+    stats: dict[str, Any] = {"type": settings.DB_TYPE, "pool": {}}
     if settings.DB_TYPE == "mysql":
         pool: Any = engine.pool
         stats["pool"] = {
@@ -319,5 +124,4 @@ async def get_db_stats() -> dict:
             "checked_out": pool.checkedout(),
             "overflow": pool.overflow(),
         }
-    
     return stats

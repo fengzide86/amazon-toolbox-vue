@@ -3,9 +3,9 @@
     <!-- 左侧品牌区 -->
     <div class="login-brand">
       <!-- 动态背景网格 -->
-      <div class="grid-bg"></div>
+      <div class="grid-bg" aria-hidden="true"></div>
       <!-- 装饰几何图形 -->
-      <div class="brand-shapes">
+      <div class="brand-shapes" aria-hidden="true">
         <div class="shape shape-circle-1"></div>
         <div class="shape shape-circle-2"></div>
         <div class="shape shape-circle-3"></div>
@@ -57,14 +57,14 @@
       </div>
       
       <!-- 扫描线效果 -->
-      <div class="scan-line"></div>
+      <div class="scan-line" aria-hidden="true"></div>
     </div>
 
     <!-- 右侧登录区 -->
     <div class="login-form-section">
       <div class="login-form-card">
         <!-- 顶部装饰 -->
-        <div class="card-accent"></div>
+        <div class="card-accent" aria-hidden="true"></div>
 
         <div class="logo-section">
           <div class="logo-icon">
@@ -75,13 +75,13 @@
         </div>
 
         <!-- 错误消息 -->
-        <div class="error-message" :class="{ show: showError }">
+        <div class="error-message" :class="{ show: showError }" role="alert" aria-live="assertive">
           <CircleAlert :size="18" />
           <span>{{ errorMessage }}</span>
         </div>
 
         <!-- 连接状态 -->
-        <div class="connection-status" :class="connectionStatusClass">
+        <div class="connection-status" :class="connectionStatusClass" aria-live="polite">
           <span class="status-dot"></span>
           <span>{{ connectionStatusText }}</span>
         </div>
@@ -90,7 +90,7 @@
           <div class="form-group">
             <label for="authCode">授权码</label>
             <div class="input-wrapper">
-              <span class="input-icon">
+              <span class="input-icon" aria-hidden="true">
                 <KeyRound :size="18" />
               </span>
               <input

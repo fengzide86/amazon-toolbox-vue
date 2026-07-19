@@ -3,14 +3,17 @@
 包含工单 CRUD、状态管理、分页查询等业务逻辑
 """
 from datetime import datetime
-from typing import Optional, Dict, Any
-from sqlalchemy import select, func, desc
+from typing import Any
+
+from fastapi import Request
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Feedback, User
+from core.audit import log_admin_action
 from core.logging import get_logger
-from core.response import success_response, error_response, ErrorCodes
 from core.pagination import PaginationParams, paginate
+from core.response import ErrorCodes, error_response, success_response
+from models import Feedback
 
 logger = get_logger(__name__)
 
@@ -23,11 +26,11 @@ class FeedbackService:
     
     async def get_feedback_list(
         self,
-        status: Optional[str] = None,
-        user_id: Optional[int] = None,
-        platform_key: Optional[str] = None,
-        pagination: Optional[PaginationParams] = None
-    ) -> Dict[str, Any]:
+        status: str | None = None,
+        user_id: int | None = None,
+        platform_key: str | None = None,
+        pagination: PaginationParams | None = None
+    ) -> dict[str, Any]:
         """获取工单列表（支持过滤和分页）"""
         query = select(Feedback).order_by(desc(Feedback.created_at))
         
@@ -58,7 +61,7 @@ class FeedbackService:
                 data=[self._serialize_feedback(f) for f in feedbacks]
             )
     
-    async def get_feedback_by_id(self, feedback_id: int) -> Dict[str, Any]:
+    async def get_feedback_by_id(self, feedback_id: int) -> dict[str, Any]:
         """根据 ID 获取工单详情"""
         result = await self.db.execute(
             select(Feedback).where(Feedback.id == feedback_id)
@@ -70,7 +73,7 @@ class FeedbackService:
         
         return success_response(data=self._serialize_feedback(feedback, detailed=True))
     
-    async def create_feedback(self, data: dict) -> Dict[str, Any]:
+    async def create_feedback(self, data: dict) -> dict[str, Any]:
         """创建工单"""
         feedback = Feedback(
             user_id=data.get("user_id"),
@@ -98,7 +101,13 @@ class FeedbackService:
         logger.info(f"创建工单: {feedback.title} (ID: {feedback.id})")
         return success_response(data=self._serialize_feedback(feedback), message="创建成功")
     
-    async def update_feedback(self, feedback_id: int, data: dict) -> Dict[str, Any]:
+    async def update_feedback(
+        self,
+        feedback_id: int,
+        data: dict,
+        actor: dict | None = None,
+        request: Request | None = None,
+    ) -> dict[str, Any]:
         """更新工单"""
         result = await self.db.execute(
             select(Feedback).where(Feedback.id == feedback_id)
@@ -107,7 +116,8 @@ class FeedbackService:
         
         if not feedback:
             return error_response("工单不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
+
+        before = self._serialize_feedback(feedback, detailed=True)
         # 更新字段
         updatable_fields = ["title", "content", "status", "priority", "admin_reply"]
         for field in updatable_fields:
@@ -119,6 +129,22 @@ class FeedbackService:
             feedback.replied_at = datetime.now()
         
         try:
+            if actor:
+                await log_admin_action(
+                    self.db,
+                    user_id=actor.get("staff_id"),
+                    user_name=actor.get("username"),
+                    action="feedback_update",
+                    target_type="feedback",
+                    target_id=feedback.id,
+                    detail={
+                        "role": actor.get("role"),
+                        "before": before,
+                        "after": self._serialize_feedback(feedback, detailed=True),
+                        "reason": None,
+                    },
+                    request=request,
+                )
             await self.db.commit()
             await self.db.refresh(feedback)
         except Exception as e:
@@ -129,7 +155,12 @@ class FeedbackService:
         logger.info(f"更新工单: {feedback.id} -> {feedback.status}")
         return success_response(data=self._serialize_feedback(feedback), message="更新成功")
     
-    async def delete_feedback(self, feedback_id: int) -> Dict[str, Any]:
+    async def delete_feedback(
+        self,
+        feedback_id: int,
+        actor: dict | None = None,
+        request: Request | None = None,
+    ) -> dict[str, Any]:
         """删除工单"""
         result = await self.db.execute(
             select(Feedback).where(Feedback.id == feedback_id)
@@ -138,9 +169,26 @@ class FeedbackService:
         
         if not feedback:
             return error_response("工单不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
+
+        before = self._serialize_feedback(feedback, detailed=True)
         try:
             await self.db.delete(feedback)
+            if actor:
+                await log_admin_action(
+                    self.db,
+                    user_id=actor.get("staff_id"),
+                    user_name=actor.get("username"),
+                    action="feedback_delete",
+                    target_type="feedback",
+                    target_id=feedback.id,
+                    detail={
+                        "role": actor.get("role"),
+                        "before": before,
+                        "after": {"deleted": True},
+                        "reason": None,
+                    },
+                    request=request,
+                )
             await self.db.commit()
         except Exception as e:
             await self.db.rollback()
@@ -150,7 +198,7 @@ class FeedbackService:
         logger.info(f"删除工单: {feedback.id}")
         return success_response(message="删除成功")
     
-    async def get_feedback_stats(self) -> Dict[str, Any]:
+    async def get_feedback_stats(self) -> dict[str, Any]:
         """获取工单统计"""
         # 各状态数量
         stats_result = await self.db.execute(

@@ -9,6 +9,13 @@ set "PYTHON=%VENV_DIR%\Scripts\python.exe"
 set "PIP=%VENV_DIR%\Scripts\pip.exe"
 if not defined TOOLBOX_RUNTIME_DIR set "TOOLBOX_RUNTIME_DIR=%LOCALAPPDATA%\AmazonToolboxData"
 
+rem This launcher is the explicit local development profile. Internal/release
+rem builds continue to use the remote FastAPI service and never bundle this backend.
+set "APP_ENV=development"
+set "TOOL_EXECUTION_MODE=demo"
+set "AI_SUPPORT_MODE=rules"
+set "BUNDLED_BACKEND_ENABLED=false"
+
 echo ============================================
 echo   Amazon Toolbox - Local Backend
 echo ============================================
@@ -50,7 +57,7 @@ echo.
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.
 echo [INFO] Backend stopped with exit code %EXIT_CODE%.
-pause
+if not defined TOOLBOX_NO_PAUSE pause
 exit /b %EXIT_CODE%
 
 :failed

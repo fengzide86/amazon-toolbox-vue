@@ -19,6 +19,7 @@ function subscribe(channel: string, callback: UnknownCallback): Unsubscribe {
 const controlApiBase = readRuntimeArgument('toolbox-control-api-base').replace(/\/$/, '')
 const deviceId = readRuntimeArgument('toolbox-device-id')
 const deviceName = decodeURIComponent(readRuntimeArgument('toolbox-device-name'))
+const automationEnabled = readRuntimeArgument('toolbox-automation-enabled') === 'true'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   runtime: { controlApiBase, deviceId, deviceName },
@@ -31,12 +32,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     defer: (request?: { phase: UpdateDeferPhase }): Promise<UpdateSnapshot> => ipcRenderer.invoke('updates:defer', request),
     onState: (callback: (snapshot: UpdateSnapshot) => void): Unsubscribe => subscribe('updates:state', data => callback(data as UpdateSnapshot)),
   },
+  demoActivity: {
+    setActive: (token: string, active: boolean): Promise<void> => ipcRenderer.invoke('demo-activity:set-active', token, active),
+  },
   credentialStore: {
     saveUserCode: (code: string): Promise<unknown> => ipcRenderer.invoke('credential-save-user-code', code),
     loadUserCode: (): Promise<unknown> => ipcRenderer.invoke('credential-load-user-code'),
     clearUserCode: (): Promise<unknown> => ipcRenderer.invoke('credential-clear-user-code'),
   },
-  automation: {
+  ...(automationEnabled ? { automation: {
     start: (tool: unknown): Promise<unknown> => ipcRenderer.invoke('automation:start', tool),
     pause: (): Promise<unknown> => ipcRenderer.invoke('automation:pause'),
     resume: (): Promise<unknown> => ipcRenderer.invoke('automation:resume'),
@@ -45,8 +49,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     registerBrowser: (webContentsId: number): Promise<unknown> => ipcRenderer.invoke('automation:register-browser', webContentsId),
     unregisterBrowser: (): Promise<unknown> => ipcRenderer.invoke('automation:unregister-browser'),
     onEvent: (callback: UnknownCallback): Unsubscribe => subscribe('automation:event', callback),
-  },
-  batch: {
+  }, batch: {
     selectImportFile: (options: unknown): Promise<unknown> => ipcRenderer.invoke('batch:select-import-file', options),
     parseImportFile: (options: unknown): Promise<unknown> => ipcRenderer.invoke('batch:parse-import-file', options),
     exportImportErrors: (errors: unknown): Promise<unknown> => ipcRenderer.invoke('batch:export-import-errors', errors),
@@ -62,9 +65,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     unregisterBrowser: (itemId: string): Promise<unknown> => ipcRenderer.invoke('batch:unregister-browser', itemId),
     onEvent: (callback: UnknownCallback): Unsubscribe => subscribe('batch:event', callback),
   },
-  notifications: { onFocus: (callback: UnknownCallback): Unsubscribe => subscribe('toolbox:notification-focus', callback) },
   launchTool: (data: unknown): void => ipcRenderer.send('launch-tool', data),
   onLaunchToolError: (callback: UnknownCallback): Unsubscribe => subscribe('launch-tool-error', callback),
   onLaunchToolSuccess: (callback: UnknownCallback): Unsubscribe => subscribe('launch-tool-success', callback),
+  } : {}),
+  notifications: { onFocus: (callback: UnknownCallback): Unsubscribe => subscribe('toolbox:notification-focus', callback) },
   openExternal: (url: string): Promise<unknown> => ipcRenderer.invoke('open-external', url),
 })

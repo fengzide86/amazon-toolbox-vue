@@ -4,9 +4,10 @@ Revision ID: 20260715_business_workspace
 Revises:
 Create Date: 2026-07-15
 """
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
+from models import Base
 
 revision = "20260715_business_workspace"
 down_revision = None
@@ -20,6 +21,10 @@ def _columns(inspector, table):
 
 def upgrade():
     bind = op.get_bind()
+    # This repository historically created its core schema at application
+    # startup. Converge a fresh database into Alembic ownership before applying
+    # the additive migrations below; existing tables are left untouched.
+    Base.metadata.create_all(bind=bind, checkfirst=True)
     inspector = sa.inspect(bind)
     tables = set(inspector.get_table_names())
 

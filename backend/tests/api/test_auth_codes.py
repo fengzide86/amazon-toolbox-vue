@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Plan, AuthCode
+from models import AuthCode, Plan
 from tests.conftest import get_data
 
 
@@ -88,7 +88,7 @@ class TestPlanCodePrefix:
 
     async def test_plan_has_code_prefix(self, client: AsyncClient, db_session: AsyncSession):
         """套餐响应包含 code_prefix"""
-        plans = await seed_plans(db_session)
+        await seed_plans(db_session)
         resp = await client.get("/api/plans")
         assert resp.status_code == 200
         data = get_data(resp)
@@ -97,7 +97,7 @@ class TestPlanCodePrefix:
 
     async def test_plan_null_prefix(self, client: AsyncClient, db_session: AsyncSession):
         """无前缀的套餐 code_prefix 为 null"""
-        plans = await seed_plans(db_session)
+        await seed_plans(db_session)
         resp = await client.get("/api/plans")
         data = get_data(resp)
         basic = next(p for p in data if p["price"] == 99)
@@ -112,7 +112,7 @@ async def test_admin_auth_code_list_exposes_business_product_context(
 ):
     plan = Plan(
         name="B端内部验证版",
-        price=0,
+        price=1,
         duration_days=30,
         status="active",
         product_type="business",
@@ -126,7 +126,7 @@ async def test_admin_auth_code_list_exposes_business_product_context(
     response = await client.get("/api/auth-codes", headers=auth_headers)
 
     assert response.status_code == 200
-    business_code = next(item for item in response.json() if item["code"] == "BUSINESS-INTERNAL-001")
+    business_code = next(item for item in get_data(response) if item["code"] == "BUSINESS-INTERNAL-001")
     assert business_code["product_type"] == "business"
     assert business_code["plan_name"] == "B端内部验证版"
     assert business_code["entitlements"]["batch_execution"] is True

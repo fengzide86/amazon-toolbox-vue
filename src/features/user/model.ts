@@ -9,9 +9,24 @@ export const deviceSchema = z.object({
 export const deviceListSchema = z.array(deviceSchema)
 export type DeviceSummary = z.infer<typeof deviceSchema>
 
+export const liveExecutionStatusSchema = z.enum([
+  'queued',
+  'running',
+  'waiting_user',
+  'verifying',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'interrupted',
+  'inconclusive',
+])
+
 export const executionRecordSchema = z.object({
   id: z.union([z.string(), z.number()]),
-  status: z.string().default('cancelled'),
+  record_kind: z.literal('live').default('live'),
+  status: liveExecutionStatusSchema.default('cancelled'),
+  verification: z.enum(['verified', 'inconclusive', 'unverified']).default('unverified'),
+  tool_id: z.union([z.string(), z.number()]).nullable().optional(),
   tool_name: z.string().nullable().optional(),
   created_at: z.string().nullable().optional(),
   detail: z.string().nullable().optional(),

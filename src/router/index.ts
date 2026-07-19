@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { authService } from '@/utils/auth'
 import { hasBusinessWorkspaceAccess } from '@/features/auth/model'
+import type { BackofficeRole } from '@/features/auth/model'
 
 const routes = [
   // 用户端路由
@@ -76,6 +77,12 @@ const routes = [
     ]
   },
   {
+    path: '/admin/change-password',
+    name: 'AdminChangePassword',
+    component: () => import('@/views/admin/ChangePasswordView.vue'),
+    meta: { title: '修改后台密码', roles: ['super_admin', 'operator', 'support'] },
+  },
+  {
     path: '/business',
     component: () => import('@/layouts/BusinessLayout.vue'),
     redirect: { name: 'BusinessOverview' },
@@ -117,76 +124,88 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/DashboardView.vue'),
-        meta: { title: '数据总览看板', skeleton: 'dashboard' }
+        meta: { title: '数据总览看板', skeleton: 'dashboard', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'authcodes',
         name: 'AdminAuthCodes',
         component: () => import('@/views/admin/AuthCodesView.vue'),
-        meta: { title: '授权码管理', skeleton: 'table' }
+        meta: { title: '授权码管理', skeleton: 'table', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'business-access',
         name: 'AdminBusinessAccess',
         component: () => import('@/views/admin/BusinessAccessView.vue'),
-        meta: { title: '专业工作台', skeleton: 'dashboard' }
+        meta: { title: '专业工作台', skeleton: 'dashboard', roles: ['super_admin', 'operator'] }
       },
       {
         path: 'orders',
         name: 'AdminOrders',
         component: () => import('@/views/admin/OrdersView.vue'),
-        meta: { title: '订单与套餐权限', skeleton: 'table' }
+        meta: { title: '订单与套餐权限', skeleton: 'table', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'profit',
         name: 'AdminProfit',
         component: () => import('@/views/admin/ProfitView.vue'),
-        meta: { title: '分润管理', skeleton: 'table' }
+        meta: { title: '分润管理', skeleton: 'table', roles: ['super_admin', 'operator'] }
       },
       {
         path: 'settings',
         name: 'AdminSettings',
         component: () => import('@/views/admin/SettingsView.vue'),
-        meta: { title: '系统设置', skeleton: 'default' }
+        meta: { title: '系统设置', skeleton: 'default', roles: ['super_admin'] }
       },
       {
         path: 'users',
         name: 'AdminUsers',
         component: () => import('@/views/admin/UsersView.vue'),
-        meta: { title: '用户管理', skeleton: 'table' }
+        meta: { title: '用户管理', skeleton: 'table', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'feedback',
         name: 'AdminFeedback',
         component: () => import('@/views/admin/FeedbackView.vue'),
-        meta: { title: '工单管理', skeleton: 'table' }
+        meta: { title: '工单管理', skeleton: 'table', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'knowledge',
         name: 'AdminKnowledge',
         component: () => import('@/views/admin/KnowledgeView.vue'),
-        meta: { title: '知识库管理', skeleton: 'table' }
+        meta: { title: '知识库管理', skeleton: 'table', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'ai-chat',
         name: 'AdminAIChat',
         component: () => import('@/views/admin/AIChatView.vue'),
-        meta: { title: 'AI 客服管理', skeleton: 'default' }
+        meta: { title: '客服规则管理', skeleton: 'default', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'announcements',
         name: 'AdminAnnouncements',
         component: () => import('@/views/admin/AnnouncementsView.vue'),
-        meta: { title: '公告管理', skeleton: 'table' }
+        meta: { title: '公告管理', skeleton: 'table', roles: ['super_admin', 'operator', 'support'] }
       },
       {
         path: 'updates',
         name: 'AdminUpdates',
         component: () => import('@/views/admin/UpdateReleasesView.vue'),
-        meta: { title: '应用更新', skeleton: 'table' }
+        meta: { title: '应用更新', skeleton: 'table', roles: ['super_admin'] }
+      },
+      {
+        path: 'staff-accounts',
+        name: 'AdminStaffAccounts',
+        component: () => import('@/views/admin/StaffAccountsView.vue'),
+        meta: { title: '后台账号管理', skeleton: 'table', roles: ['super_admin'] }
       }
     ]
-  }
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/NotFoundView.vue'),
+    meta: { title: '页面未找到', public: true },
+  },
 ]
 
 const router = createRouter({
@@ -202,15 +221,20 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   try {
     const isAuthenticated = authService.isAuthenticated()
-    const isAdmin = authService.isAdmin()
+    const isBackoffice = authService.isBackoffice()
+    const role = authService.getRole()
     const user = authService.getUser() || {}
     const hasBusinessAccess = hasBusinessWorkspaceAccess(user)
     
     // 登录页不需要验证
-    if (to.name === 'UserLogin' || to.name === 'AdminLogin' || to.name === 'UserTerms') {
+    if (to.name === 'UserTerms' || to.name === 'NotFound') {
+      next()
+      return
+    }
+    if (to.name === 'UserLogin' || to.name === 'AdminLogin') {
       if (isAuthenticated) {
         // 已登录，根据角色跳转
-        next({ name: isAdmin ? 'AdminDashboard' : hasBusinessAccess ? 'BusinessOverview' : 'UserTools' })
+        next({ name: isBackoffice ? (user.force_password_reset ? 'AdminChangePassword' : 'AdminDashboard') : hasBusinessAccess ? 'BusinessOverview' : 'UserTools' })
       } else {
         next()
       }
@@ -223,8 +247,17 @@ router.beforeEach((to, from, next) => {
         next({ name: 'AdminLogin' })
         return
       }
-      if (!isAdmin) {
+      if (!isBackoffice) {
         next({ name: 'UserTools' })
+        return
+      }
+      if (user.force_password_reset && to.name !== 'AdminChangePassword') {
+        next({ name: 'AdminChangePassword' })
+        return
+      }
+      const allowedRoles = Array.isArray(to.meta.roles) ? to.meta.roles as BackofficeRole[] : ['super_admin', 'operator', 'support']
+      if (!allowedRoles.includes(role)) {
+        next({ name: 'AdminDashboard', query: { access: 'role-required' } })
         return
       }
       next()
@@ -236,7 +269,7 @@ router.beforeEach((to, from, next) => {
         next({ name: 'UserLogin' })
         return
       }
-      if (isAdmin) {
+      if (isBackoffice) {
         next({ name: 'AdminDashboard' })
         return
       }
@@ -253,7 +286,7 @@ router.beforeEach((to, from, next) => {
       next({ name: 'UserLogin' })
       return
     }
-    if (!isAdmin && hasBusinessAccess && to.path.startsWith('/user')) {
+    if (!isBackoffice && hasBusinessAccess && to.path.startsWith('/user')) {
       next({ name: to.name === 'UserPlans' ? 'BusinessLicense' : 'BusinessOverview' })
       return
     }
@@ -265,6 +298,19 @@ router.beforeEach((to, from, next) => {
     authService.clear()
     next({ name: 'UserLogin' })
   }
+})
+
+router.afterEach((to) => {
+  if (typeof document === 'undefined') return
+  document.title = `${String(to.meta.title || '工具箱')} · 跨境电商工具箱`
+  const focusRoute = () => {
+    const target = document.querySelector<HTMLElement>('[data-route-focus], main')
+    if (!target) return
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1')
+    target.focus({ preventScroll: true })
+  }
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(focusRoute)
+  else setTimeout(focusRoute, 0)
 })
 
 export default router

@@ -2,23 +2,23 @@
 授权码管理路由模块
 包含授权码的生成、查询、更新、删除等接口
 """
-from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select, func, delete
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
-from typing import List
-from datetime import datetime, timedelta
 import random
 import string
+from datetime import datetime, timedelta
 
-from database import get_db
-from models import AuthCode, Plan, Device, AuthSeat
-from schemas import AuthCodeGenerate, AuthCodeUpdate, AuthCodeResponse
-from core.logging import get_logger
-from core.exceptions import NotFoundException, ConflictException
-from core.dependencies import get_current_admin
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from core.audit import log_admin_action
+from core.dependencies import get_current_admin
+from core.exceptions import ConflictException, NotFoundException
+from core.logging import get_logger
+from database import get_db
+from models import AuthCode, AuthSeat, Device, Plan
+from schemas import AuthCodeGenerate, AuthCodeResponse, AuthCodeUpdate
 from services.entitlement_service import normalize_entitlements
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-def _parse_platform_scope(scope_str: str) -> List[str]:
+def _parse_platform_scope(scope_str: str) -> list[str]:
     """将 platform_scope 字符串转为数组，空值兼容为 ['amazon']"""
     if not scope_str:
         return ["amazon"]
@@ -58,10 +58,10 @@ def generate_random_code(length: int = 6) -> str:
     return ''.join(random.choices(chars, k=length))
 
 
-@router.get("", response_model=List[AuthCodeResponse])
+@router.get("")
 async def get_auth_codes(
-    page: int = 1,
-    page_size: int = 100,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=100),
     platform_key: str = None,
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
@@ -99,9 +99,12 @@ async def get_auth_codes(
     query = query.outerjoin(device_subquery, AuthCode.id == device_subquery.c.auth_code_id)
     query = query.outerjoin(Plan, AuthCode.plan_id == Plan.id)
     
+    count_query = select(func.count(AuthCode.id))
     if platform_key:
         query = query.where(AuthCode.platform_scope.contains(platform_key))
-    
+        count_query = count_query.where(AuthCode.platform_scope.contains(platform_key))
+
+    count_result = await db.execute(count_query)
     query = query.order_by(AuthCode.created_at.desc()).offset(offset).limit(page_size)
     result = await db.execute(query)
     rows = result.all()
@@ -133,7 +136,12 @@ async def get_auth_codes(
         }
         response_list.append(AuthCodeResponse(**code_dict))
     
-    return response_list
+    return {
+        "data": response_list,
+        "page": page,
+        "page_size": page_size,
+        "total": int(count_result.scalar() or 0),
+    }
 
 
 @router.get("/{code_id}", response_model=AuthCodeResponse)
@@ -248,20 +256,27 @@ async def batch_generate_codes(req: AuthCodeGenerate, request: Request, db: Asyn
         db.add(code_obj)
         codes.append(code_str)
 
-    await db.commit()
-    logger.info(f"批量生成 {req.count} 个授权码，前缀: {code_prefix or plan_name}")
-    
-    # 审计日志
+    await db.flush()
     await log_admin_action(
         db,
-        user_id=_admin.get("user_id"),
-        user_name=_admin.get("name", "admin"),
+        user_id=_admin.get("staff_id"),
+        user_name=_admin.get("username"),
         action="batch_create_auth_codes",
         target_type="auth_code",
-        detail={"count": req.count, "prefix": code_prefix or plan_name, "codes": codes[:5]},
+        detail={
+            "role": _admin.get("role"),
+            "before": None,
+            "after": {
+                "count": req.count,
+                "prefix": code_prefix or plan_name,
+                "codes": codes[:5],
+            },
+            "reason": None,
+        },
         request=request,
     )
     await db.commit()
+    logger.info(f"批量生成 {req.count} 个授权码，前缀: {code_prefix or plan_name}")
     
     return {"success": True, "codes": codes, "count": req.count}
 
@@ -275,27 +290,42 @@ async def update_auth_code(code_id: int, req: AuthCodeUpdate, request: Request, 
     code_obj = result.scalars().first()
     if not code_obj:
         raise NotFoundException("授权码不存在")
-    
+
+    before = {
+        "code": code_obj.code,
+        "plan_id": code_obj.plan_id,
+        "status": code_obj.status,
+        "expires_at": code_obj.expires_at,
+        "max_devices": code_obj.max_devices,
+        "platform_scope": code_obj.platform_scope,
+        "scene_type": code_obj.scene_type,
+        "seat_limit": code_obj.seat_limit,
+    }
     for k, v in req.model_dump(exclude_none=True).items():
         if k == "expires_at" and isinstance(v, str):
             v = datetime.fromisoformat(v)
         setattr(code_obj, k, v)
-    await db.commit()
-    await db.refresh(code_obj)
-    logger.info(f"更新授权码: {code_obj.code}")
-    
-    # 审计日志
     await log_admin_action(
         db,
-        user_id=_admin.get("user_id"),
-        user_name=_admin.get("name", "admin"),
+        user_id=_admin.get("staff_id"),
+        user_name=_admin.get("username"),
         action="update_auth_code",
         target_type="auth_code",
         target_id=code_id,
-        detail={"code": code_obj.code, "changes": req.model_dump(exclude_none=True)},
+        detail={
+            "role": _admin.get("role"),
+            "before": before,
+            "after": {
+                **before,
+                **req.model_dump(exclude_none=True),
+            },
+            "reason": None,
+        },
         request=request,
     )
     await db.commit()
+    await db.refresh(code_obj)
+    logger.info(f"更新授权码: {code_obj.code}")
     
     return code_obj
 
@@ -315,17 +345,22 @@ async def delete_auth_code(code_id: int, request: Request, db: AsyncSession = De
         # 审计日志
         await log_admin_action(
             db,
-            user_id=_admin.get("user_id"),
-            user_name=_admin.get("name", "admin"),
+            user_id=_admin.get("staff_id"),
+            user_name=_admin.get("username"),
             action="delete_auth_code",
             target_type="auth_code",
             target_id=code_id,
-            detail={"code": code_obj.code},
+            detail={
+                "role": _admin.get("role"),
+                "before": {"code": code_obj.code, "status": code_obj.status},
+                "after": {"deleted": True},
+                "reason": None,
+            },
             request=request,
         )
         await db.commit()
         logger.info(f"删除授权码: {code_obj.code}")
         return {"success": True}
-    except IntegrityError:
+    except IntegrityError as error:
         await db.rollback()
-        raise ConflictException("该授权码存在关联数据，无法删除")
+        raise ConflictException("该授权码存在关联数据，无法删除") from error

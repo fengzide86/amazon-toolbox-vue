@@ -1,10 +1,12 @@
 <template>
   <div class="announcement-admin">
     <PageHeader title="公告中心" subtitle="面向 C 端与专业批量工作台发布可追踪、可回看的产品消息">
-      <template #actions><el-button type="primary" @click="openCreate">新建公告</el-button></template>
+      <template #actions><el-button v-if="canWrite" type="primary" @click="openCreate">新建公告</el-button></template>
     </PageHeader>
 
-    <AppSurface class="announcement-table" tone="default">
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载公告…" @retry="load" />
+
+    <AppSurface v-if="loadState !== 'loading' && loadState !== 'error'" class="announcement-table" tone="default">
       <DataToolbar label="公告筛选">
         <el-select v-model="filters.status" placeholder="全部状态" clearable><el-option label="草稿" value="draft" /><el-option label="已发布" value="published" /><el-option label="已过期" value="expired" /></el-select>
         <el-select v-model="filters.audience" placeholder="全部人群" clearable><el-option label="全部用户" value="all" /><el-option label="C 端" value="consumer" /><el-option label="B 端" value="business" /></el-select>
@@ -22,7 +24,7 @@
         <el-table-column v-if="!compact" prop="severity" label="级别" width="100"><template #default="{ row }"><StatusBadge :status="severityTone(row.severity)">{{ severityLabel(row.severity) }}</StatusBadge></template></el-table-column>
         <el-table-column prop="status" label="状态" width="100"><template #default="{ row }"><StatusBadge :status="statusTone(row.status)">{{ statusLabel(row.status) }}</StatusBadge></template></el-table-column>
         <el-table-column v-if="!compact" label="生效时间" width="170"><template #default="{ row }">{{ formatDate(row.starts_at || row.published_at || row.created_at) }}</template></el-table-column>
-        <el-table-column label="操作" width="132" fixed="right">
+        <el-table-column v-if="canWrite" label="操作" width="132" fixed="right">
           <template #default="{ row }">
             <el-dropdown trigger="click" @command="command => handleCommand(command, row)" @click.stop>
               <el-button size="small">处理</el-button>
@@ -89,8 +91,12 @@ import DataToolbar from '@/components/DataToolbar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { createAnnouncement, deleteAnnouncement, getAnnouncements, updateAnnouncement } from '@/utils/api'
 import { useCompactLayout } from '@/composables/useCompactLayout'
+import { hasStaffPermission } from '@/features/auth/permissions'
+import { authService } from '@/utils/auth'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 
 type Audience = 'all' | 'consumer' | 'business'
 type Category = 'system' | 'update' | 'activity' | 'maintenance'
@@ -101,8 +107,11 @@ interface AnnouncementRow { id: number; title: string; content: string; audience
 interface AnnouncementForm { id: number | null; title: string; content: string; audience: Audience; category: Category; severity: Severity; presentation: Presentation; app_version: string; starts_at: Date | null; expires_at: Date | null }
 
 const compact = useCompactLayout()
+const canWrite = computed(() => hasStaffPermission(authService.getRole(), 'announcements.write'))
 const loading = ref(false), saving = ref(false), editorOpen = ref(false), detailOpen = ref(false)
 const items = ref<AnnouncementRow[]>([]), detail = ref<AnnouncementRow | null>(null)
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
 const filters = reactive<{ status: AnnouncementStatus | ''; audience: Audience | ''; category: Category | '' }>({ status: '', audience: '', category: '' })
 const emptyForm = (): AnnouncementForm => ({ id: null, title: '', content: '', audience: 'all', category: 'system', severity: 'important', presentation: 'modal', app_version: '', starts_at: null, expires_at: null })
 const form = reactive<AnnouncementForm>(emptyForm())
@@ -110,10 +119,23 @@ const audienceOptions = [{ label: '全部用户', value: 'all' }, { label: '仅 
 const categoryOptions: Array<{ label: string; value: Category }> = [{ label: '系统消息', value: 'system' }, { label: '版本更新', value: 'update' }, { label: '活动通知', value: 'activity' }, { label: '维护通知', value: 'maintenance' }]
 const filtered = computed(() => items.value.filter(item => (!filters.status || item.status === filters.status) && (!filters.audience || item.audience === filters.audience) && (!filters.category || item.category === filters.category)))
 
-async function load(): Promise<void> { loading.value = true; try { items.value = (await getAnnouncements()) as AnnouncementRow[] } finally { loading.value = false } }
+async function load(): Promise<void> {
+  loading.value = true
+  loadState.value = items.value.length ? 'data' : 'loading'
+  loadError.value = ''
+  try {
+    items.value = (await getAnnouncements()) as AnnouncementRow[]
+    loadState.value = settledDataState(items.value.length)
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '公告暂时无法加载'
+    loadState.value = failedDataState(items.value.length > 0)
+  } finally {
+    loading.value = false
+  }
+}
 function resetForm(value?: AnnouncementRow): void { Object.assign(form, emptyForm(), value ? { ...value, starts_at: value.starts_at ? new Date(value.starts_at) : null, expires_at: value.expires_at ? new Date(value.expires_at) : null, app_version: value.app_version || '' } : {}) }
-function openCreate(): void { resetForm(); editorOpen.value = true }
-function openEdit(row: AnnouncementRow): void { resetForm(row); editorOpen.value = true }
+function openCreate(): void { if (!canWrite.value) return; resetForm(); editorOpen.value = true }
+function openEdit(row: AnnouncementRow): void { if (!canWrite.value) return; resetForm(row); editorOpen.value = true }
 function showDetails(row: Record<string, unknown>): void {
   if (typeof row.id !== 'number' || typeof row.title !== 'string') return
   detail.value = row as unknown as AnnouncementRow
@@ -121,6 +143,7 @@ function showDetails(row: Record<string, unknown>): void {
 }
 function normalizePresentation(): void { if (form.severity === 'critical') form.presentation = 'modal' }
 async function save(status: 'draft' | 'published'): Promise<void> {
+  if (!canWrite.value) return
   if (!form.title.trim() || !form.content.trim()) { ElMessage.warning('请填写标题和正文'); return }
   if (form.category === 'update' && form.app_version && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(form.app_version)) { ElMessage.warning('应用版本请使用 SemVer，例如 1.8.0'); return }
   saving.value = true
@@ -128,6 +151,7 @@ async function save(status: 'draft' | 'published'): Promise<void> {
   try { if (form.id) await updateAnnouncement(form.id, payload); else await createAnnouncement(payload); editorOpen.value = false; ElMessage.success(status === 'published' ? '公告已发布' : '草稿已保存'); await load() } finally { saving.value = false }
 }
 async function handleCommand(command: string, rawRow: Record<string, unknown>): Promise<void> {
+  if (!canWrite.value) return
   if (typeof rawRow.id !== 'number' || typeof rawRow.status !== 'string') return
   const row = rawRow as unknown as AnnouncementRow
   if (command === 'edit') openEdit(row)

@@ -2,18 +2,26 @@
   <div class="toolbox-page">
     <header class="toolbox-header">
       <div>
-        <span class="toolbox-eyebrow">自动化工作台</span>
-        <h2>选择一个工具开始</h2>
-        <p>选择需要完成的业务，点击后系统会自动打开并处理。</p>
+        <span class="toolbox-eyebrow">流程演示工具箱</span>
+        <h2>选择一个工具体验演示</h2>
+        <p>当前工具仅展示模拟流程，不会登录、读取或修改真实店铺数据。</p>
       </div>
       <router-link class="plan-chip" to="/user/plans">
         <ShieldCheck :size="15" />
         {{ currentPlanName }}
       </router-link>
     </header>
+    <AsyncStateNotice v-if="staleError" state="stale" :message="staleError" @retry="loadData" />
 
     <div v-if="loading" class="tool-grid" aria-label="工具加载中">
       <div v-for="item in 6" :key="item" class="tool-card skeleton-card"></div>
+    </div>
+
+    <div v-else-if="loadError" class="empty-state error-state" role="alert">
+      <CircleAlert :size="44" :stroke-width="1.5" />
+      <h3>工具列表暂时无法加载</h3>
+      <p>{{ loadError }}</p>
+      <button type="button" @click="loadData">重新加载</button>
     </div>
 
     <div v-else-if="tools.length" class="tool-grid">
@@ -23,14 +31,16 @@
         type="button"
         :class="['tool-card', `is-${toolState(tool)}`, { 'is-launching': launchingToolId === tool.id, 'is-focused': route.query?.tool === tool.id }]"
         :disabled="launchingToolId !== null || toolState(tool) === 'maintenance'"
+        :aria-label="`${tool.name}，${toolState(tool) === 'available' ? '打开能力说明并开始演示' : toolState(tool) === 'locked' ? '查看可用套餐' : '暂时不可用'}`"
         :data-testid="'tool-card-' + tool.name"
-        @click="handleToolClick(tool)"
+        @click="hasToolDetails(tool) ? openDetails(tool) : handleToolClick(tool)"
       >
         <span v-if="launchingToolId === tool.id" class="launch-rail" aria-hidden="true"></span>
         <span class="tool-card-top">
           <span class="tool-icon"><component :is="toolIcon(tool)" :size="21" /></span>
           <span v-if="toolState(tool) === 'locked'" class="state-badge locked"><LockKeyhole :size="12" /> 当前套餐未包含</span>
           <span v-else-if="toolState(tool) === 'maintenance'" class="state-badge maintenance">暂时不可用</span>
+          <span v-else class="state-badge demo">演示模式</span>
         </span>
 
         <span class="tool-copy">
@@ -45,11 +55,6 @@
           <span
             v-if="hasToolDetails(tool)"
             class="learn-more"
-            role="button"
-            tabindex="0"
-            @click.stop="openDetails(tool)"
-            @keydown.enter.stop.prevent="openDetails(tool)"
-            @keydown.space.stop.prevent="openDetails(tool)"
           >了解能力</span>
           <span class="action-label">
           <template v-if="launchingToolId === tool.id">
@@ -60,7 +65,7 @@
           </template>
           <template v-else-if="toolState(tool) === 'maintenance'">维护中</template>
           <template v-else>
-            一键启动 <ArrowRight :size="16" />
+            开始演示 <ArrowRight :size="16" />
           </template>
           </span>
         </span>
@@ -94,7 +99,7 @@
           <span class="section-label">什么时候需要你操作</span>
           <ul><li v-for="scenario in normalizedList(detailsTool.intervention_scenarios)" :key="scenario">{{ scenario }}</li></ul>
         </section>
-        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>系统会自动处理；确实需要你操作时，才会明确提醒。</span></div>
+        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>这是模拟演示，不会访问或修改真实平台数据。</span></div>
       </div>
       <template #footer>
         <button class="drawer-primary" :disabled="Boolean(detailsTool && toolState(detailsTool) === 'maintenance')" @click="launchFromDetails">
@@ -107,12 +112,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowRight,
   BadgeDollarSign,
   Boxes,
   CheckCircle2,
+  CircleAlert,
   LoaderCircle,
   LockKeyhole,
   Megaphone,
@@ -125,19 +132,18 @@ import {
   Wrench,
   Zap,
 } from '@lucide/vue'
-import { getTools, createToolLaunchGrant } from '@/utils/api'
+import { createDemoRun, getTools, updateDemoRun } from '@/utils/api'
 import { showToast } from '@/utils'
 import { useAppStore } from '@/stores/app'
 import { usePlatformStore } from '@/stores/platform'
 import { readStoredLicense } from '@/features/user/model'
 import {
-  errorCode,
   errorMessage,
   toolCatalogItemSchema,
   toolCatalogSchema,
-  toolLaunchResponseSchema,
   type ToolCatalogItem,
 } from '@/features/tools/model'
+import { demoRunSchema, unwrapApiData } from '@/features/demo/model'
 
 const router = useRouter() || { push: () => {} }
 const route = useRoute() || { query: {} }
@@ -145,6 +151,8 @@ const appStore = useAppStore()
 const platformStore = usePlatformStore()
 const tools = ref<ToolCatalogItem[]>([])
 const loading = ref(true)
+const loadError = ref('')
+const staleError = ref('')
 const launchingToolId = ref<string | number | null>(null)
 const detailsVisible = ref(false)
 const detailsTool = ref<ToolCatalogItem | null>(null)
@@ -211,7 +219,7 @@ const detailsActionText = computed(() => {
   if (!detailsTool.value) return '关闭'
   if (toolState(detailsTool.value) === 'locked') return '查看可用套餐'
   if (toolState(detailsTool.value) === 'maintenance') return '当前维护中'
-  return '开始处理'
+  return '开始演示'
 })
 
 function launchFromDetails() {
@@ -243,11 +251,21 @@ function handleToolClick(rawTool: unknown) {
 }
 
 async function loadData() {
-  loading.value = true
+  const hadData = tools.value.length > 0
+  loading.value = !hadData
+  loadError.value = ''
+  staleError.value = ''
   try {
-    tools.value = toolCatalogSchema.parse(await getTools({ platform_key: platformStore.currentPlatform }))
+    tools.value = toolCatalogSchema.parse(await getTools({ platform_key: platformStore.currentPlatform })).map(tool => ({
+      ...tool,
+      availability: 'demo_only' as const,
+      supports_demo_single: true,
+      supports_live_single: false,
+    }))
   } catch (error) {
-    showToast('工具加载失败，请稍后重试', 'error')
+    const message = errorMessage(error, '请检查网络连接后重试。')
+    if (hadData) staleError.value = message
+    else loadError.value = message
   } finally {
     loading.value = false
   }
@@ -258,50 +276,51 @@ async function runTool(tool: ToolCatalogItem) {
   launchingToolId.value = tool.id
   try {
     const platformKey = platformStore.currentPlatform
-    const deviceId = localStorage.getItem('toolbox_device_id') || ''
-    const response = toolLaunchResponseSchema.parse(await createToolLaunchGrant(tool.id, { platformKey, deviceId }))
-    const grant = response?.launch_data || response?.grant
-    if (!grant?.token || !grant?.target_url) throw new Error('工具启动数据不完整，请重试')
-
+    const clientDemoRunId = `demo_run_${Date.now()}_${cryptoRandom()}`
+    const demoRun = demoRunSchema.parse(unwrapApiData(await createDemoRun({
+      client_demo_run_id: clientDemoRunId,
+      tool_id: String(tool.id),
+      tool_name: tool.name,
+      platform_key: platformKey,
+      scenario_id: tool.demo_scenario_id,
+      total_step_count: 6,
+    })))
+    await updateDemoRun(String(demoRun.id), {
+      event_seq: 1,
+      status: 'running',
+      current_step_id: 'prepare',
+      completed_step_count: 0,
+    })
     appStore.openTool({
-      id: grant.tool_id || tool.id,
-      name: grant.tool_name || tool.name,
-      module: grant.tool_module || tool.module,
-      category: grant.category || tool.category,
-      platformKey: grant.platform_key || platformKey,
+      id: tool.id,
+      name: tool.name,
+      module: tool.module,
+      category: tool.category,
+      platformKey,
       capabilityKey: tool.capability_key,
-      targetUrl: grant.target_url,
-      launchGrant: {
-        token: grant.token,
-        expiresAt: grant.expires_at || response.expires_at,
-        expiresIn: response.expires_in,
-        scriptKey: grant.script_key,
-        runnerApiVersion: grant.runner_api_version || 1,
-        toolVersion: grant.tool_version || '1.0.0',
-        toolManifest: grant.tool_manifest,
-        toolSignature: grant.tool_signature,
-        signingKeyId: grant.signing_key_id,
-        signatureRequired: Boolean(grant.signature_required),
-      },
+      targetUrl: `demo://${platformKey}/${encodeURIComponent(String(tool.id))}`,
+      executionMode: 'demo',
+      scenarioId: tool.demo_scenario_id,
+      demoRunId: String(demoRun.id),
     })
   } catch (error) {
-    const code = errorCode(error)
-    if (code === 3006) {
-      showToast('当前套餐暂未包含该工具', 'warning')
-      router.push({ path: '/user/plans', query: { tool: tool.id } })
-    } else if (code === 3007) {
-      showToast('当前授权暂未包含该平台，请联系客服', 'warning')
-    } else if (code === 3003) {
-      showToast('当前设备尚未获得授权，请管理设备或联系客服', 'warning')
-    } else {
-      showToast(errorMessage(error, '暂时无法启动，请重试'), 'error')
-    }
+    showToast(errorMessage(error, '暂时无法启动演示，请重试'), 'error')
   } finally {
     launchingToolId.value = null
   }
 }
 
-watch(() => platformStore.currentPlatform, loadData)
+function cryptoRandom(): string {
+  if (globalThis.crypto?.getRandomValues) {
+    return Array.from(globalThis.crypto.getRandomValues(new Uint32Array(2)), value => value.toString(16)).join('')
+  }
+  return Math.random().toString(16).slice(2)
+}
+
+watch(() => platformStore.currentPlatform, () => {
+  tools.value = []
+  void loadData()
+})
 onMounted(loadData)
 </script>
 
@@ -440,6 +459,11 @@ onMounted(loadData)
 .state-badge.maintenance {
   color: var(--color-text-secondary);
   background: var(--color-surface-soft);
+}
+
+.state-badge.demo {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
 .tool-copy {
@@ -622,6 +646,19 @@ onMounted(loadData)
 .empty-state p {
   font-size: 13px;
 }
+
+.empty-state button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.error-state > svg { color: var(--color-danger); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes shimmer { to { background-position: -200% 0; } }

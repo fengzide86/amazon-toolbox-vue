@@ -9,32 +9,26 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
 
+from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit import log_admin_action
 from core.config import settings
 from core.logging import get_logger
 from models import ChatConfig, ChatMessage, ChatSession, Feedback, User
 
-from . import faq_service, vector_store
-from . import provider as ai_provider
+from . import faq_service
 
 logger = get_logger(__name__)
 
 # ===== AI 回退提示 =====
-FALLBACK_REPLIES = {
-    "no_api_key": "暂时没有找到与你的问题完全匹配的说明。你可以换一种说法再试一次，或直接转人工并保留当前问题。",
-    "timeout": "AI 响应超时，请稍后再试。如问题持续，请提交工单联系人工客服。",
-    "rate_limit": "当前咨询人数较多，AI 暂时繁忙。请稍后再试或提交工单。",
-    "provider_error": "AI 服务暂时不可用，请稍后再试。您也可以查看 FAQ 或提交工单。",
-    "invalid_config": "AI 配置异常，请联系管理员或提交工单。",
-    "unknown_error": "AI 诊断暂时不可用。您可以查看 FAQ 或提交工单联系人工客服。",
-}
+RULE_FALLBACK_REPLY = "暂时没有找到完全匹配的说明。你可以换一种说法再试一次，或直接转人工并保留当前问题。"
 
 # ===== 敏感内容检测 =====
 SENSITIVE_KEYWORDS = ["暴力", "色情", "赌博", "毒品", "诈骗", "政治敏感", "反动"]
-SENSITIVE_CONTENT_REPLY = "AI 诊断仅支持工具、授权、安装、报错和平台操作问题。如涉及其他问题，请提交工单联系人工客服。"
+SENSITIVE_CONTENT_REPLY = "工具帮助仅支持工具、授权、安装、报错和平台操作问题。如涉及其他问题，请提交工单联系人工客服。"
 
 
 def _check_sensitive_content(message: str) -> bool:
@@ -47,6 +41,16 @@ def _check_sensitive_content(message: str) -> bool:
     message_lower = message.lower()
     return any(kw in message_lower for kw in SENSITIVE_KEYWORDS)
 
+
+def _config_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    try:
+        parsed = json.loads(value or "[]")
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return [str(item).strip() for item in parsed if str(item).strip()] if isinstance(parsed, list) else []
+
 # 默认配置
 DEFAULT_CONFIG = {
     "welcome_message": "你好！我是亚马逊工具箱智能客服 🤖\n请问有什么可以帮你的？",
@@ -57,13 +61,13 @@ DEFAULT_CONFIG = {
         "物流模板怎么生成？",
         "套餐有什么区别？",
     ], ensure_ascii=False),
-    "ai_model": "qwen-turbo",
-    "reply_style": "concise",
-    "max_retries": "2",
+    "support_mode": "rules",
+    "max_unmatched": "2",
+    "transfer_keywords": json.dumps(["退款", "投诉", "人工", "账号异常"], ensure_ascii=False),
     "transfer_rules": json.dumps({
         "refund_direct_transfer": True,
         "complaint_direct_transfer": True,
-        "auto_transfer_after_retries": True,
+        "auto_transfer_after_unmatched": True,
         "account_direct_transfer": False,
     }),
 }
@@ -86,8 +90,14 @@ async def get_config(db: AsyncSession) -> dict[str, Any]:
     return merged
 
 
-async def update_config(db: AsyncSession, updates: dict[str, Any]) -> dict[str, Any]:
+async def update_config(
+    db: AsyncSession,
+    updates: dict[str, Any],
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
+) -> dict[str, Any]:
     """更新AI客服配置"""
+    before = await get_config(db)
     for key, value in updates.items():
         if key not in DEFAULT_CONFIG:
             continue
@@ -100,6 +110,26 @@ async def update_config(db: AsyncSession, updates: dict[str, Any]) -> dict[str, 
         else:
             db.add(ChatConfig(key=key, value=str(value) if not isinstance(value, str) else value))
 
+    after = {
+        **before,
+        **{key: value for key, value in updates.items() if key in DEFAULT_CONFIG},
+    }
+    if actor:
+        await log_admin_action(
+            db,
+            user_id=actor.get("staff_id"),
+            user_name=actor.get("username"),
+            action="rules_support_config_update",
+            target_type="chat_config",
+            target_id="rules",
+            detail={
+                "role": actor.get("role"),
+                "before": before,
+                "after": after,
+                "reason": None,
+            },
+            request=request,
+        )
     await db.commit()
     return await get_config(db)
 
@@ -185,14 +215,23 @@ async def answer_question(
     top_k: int = 5,
     min_score: float = 0.3,
 ) -> dict[str, Any]:
-    """FAQ 优先、RAG 兜底的统一回答内核；本函数本身不写会话。"""
+    """Answer exclusively from the local rule/FAQ knowledge base.
+
+    No provider, embedding service or vector store is contacted in the
+    internal build.  Keeping the response shape stable lets the existing
+    clients migrate without pretending that a model was used.
+    """
     started = time.perf_counter()
+    config = await get_config(db)
+    transfer_keywords = _config_list(config.get("transfer_keywords"))
+    keyword_transfer = any(keyword in user_message for keyword in transfer_keywords)
     faq = await faq_service.match_faq(db, user_message, platform_key, capability_key)
     if faq:
         elapsed = round((time.perf_counter() - started) * 1000, 2)
         return {
             "reply": faq["content"], "answer_mode": "faq", "ai_used": False,
             "knowledge_refs": [faq], "fallback_reason": None,
+            "should_transfer": keyword_transfer,
             "diagnostics": {"retrieval_ms": elapsed, "generation_ms": 0, "total_ms": elapsed,
                             "provider": None, "model": None},
         }
@@ -201,70 +240,36 @@ async def answer_question(
         return {
             "reply": SENSITIVE_CONTENT_REPLY, "answer_mode": "fallback", "ai_used": False,
             "knowledge_refs": [], "fallback_reason": "sensitive_content",
+            "should_transfer": True,
             "diagnostics": {"total_ms": round((time.perf_counter() - started) * 1000, 2)},
         }
 
-    if not ai_provider.has_api_key():
-        return {
-            "reply": FALLBACK_REPLIES["no_api_key"], "answer_mode": "fallback", "ai_used": False,
-            "knowledge_refs": [], "fallback_reason": "no_api_key",
-            "diagnostics": {"total_ms": round((time.perf_counter() - started) * 1000, 2),
-                            "provider": settings.AI_PROVIDER, "model": None},
-        }
-
-    retrieval_started = time.perf_counter()
-    knowledge_results = []
-    retrieval_error = None
     try:
-        query_embedding = await ai_provider.get_embedding(user_message)
-        if query_embedding:
-            knowledge_results = await vector_store.search_knowledge(
-                query_embedding=query_embedding, top_k=top_k, min_score=min_score,
-                platform_key=platform_key, capability_key=capability_key,
+        max_unmatched = max(1, min(int(config.get("max_unmatched", 2)), 10))
+    except (TypeError, ValueError):
+        max_unmatched = 2
+    previous_unmatched = 0
+    if session_id and max_unmatched > 1:
+        recent = (
+            await db.execute(
+                select(ChatMessage)
+                .where(ChatMessage.session_id == session_id, ChatMessage.role == "ai")
+                .order_by(ChatMessage.created_at.desc())
+                .limit(max_unmatched - 1)
             )
-        else:
-            retrieval_error = "embedding_unavailable"
-    except Exception as exc:
-        retrieval_error = "retrieval_error"
-        logger.warning(f"知识库检索失败: {exc}")
-    retrieval_ms = round((time.perf_counter() - retrieval_started) * 1000, 2)
-
-    config = await get_config(db)
-    messages = await _build_ai_messages(db, session_id, user_message, knowledge_results, config)
-    model = config.get("ai_model") or settings.QWEN_MODEL
-    max_retries = max(0, min(int(config.get("max_retries", 2)), 3))
-    generation_started = time.perf_counter()
-    ai_reply = None
-    error_type = None
-    for attempt in range(max_retries + 1):
-        try:
-            ai_reply = await ai_provider.chat_completion(messages, model=model)
-            break
-        except Exception as exc:
-            error_str = str(exc).lower()
-            if not ai_provider.has_api_key():
-                error_type = "no_api_key"
-            elif "timeout" in error_str or "timed out" in error_str:
-                error_type = "timeout"
-            elif "rate limit" in error_str or "429" in error_str:
-                error_type = "rate_limit"
-            elif "invalid" in error_str or "config" in error_str:
-                error_type = "invalid_config"
-            else:
-                error_type = "provider_error"
-            logger.warning(f"AI 对话第 {attempt + 1} 次失败: {exc}")
-
-    answer_mode = "rag" if ai_reply else "fallback"
-    if not ai_reply:
-        ai_reply = FALLBACK_REPLIES.get(error_type or "unknown_error", FALLBACK_REPLIES["unknown_error"])
-    generation_ms = round((time.perf_counter() - generation_started) * 1000, 2)
+        ).scalars().all()
+        for message in recent:
+            if message.knowledge_ids:
+                break
+            previous_unmatched += 1
+    total_ms = round((time.perf_counter() - started) * 1000, 2)
     return {
-        "reply": ai_reply, "answer_mode": answer_mode, "ai_used": answer_mode == "rag",
-        "knowledge_refs": knowledge_results, "fallback_reason": error_type or retrieval_error,
+        "reply": RULE_FALLBACK_REPLY, "answer_mode": "fallback", "ai_used": False,
+        "knowledge_refs": [], "fallback_reason": "no_rule_match",
+        "should_transfer": keyword_transfer or previous_unmatched + 1 >= max_unmatched,
         "diagnostics": {
-            "retrieval_ms": retrieval_ms, "generation_ms": generation_ms,
-            "total_ms": round((time.perf_counter() - started) * 1000, 2),
-            "provider": settings.AI_PROVIDER, "model": model,
+            "retrieval_ms": total_ms, "generation_ms": 0, "total_ms": total_ms,
+            "provider": None, "model": None,
         },
     }
 
@@ -276,7 +281,7 @@ async def send_message(
     platform_key: str | None = None,
     capability_key: str | None = None,
 ) -> dict[str, Any]:
-    """发送消息并持久化 FAQ/RAG 的统一回答。"""
+    """Persist one local rule/FAQ answer."""
     user_msg = ChatMessage(
         session_id=session_id,
         role="user",
@@ -317,74 +322,18 @@ async def send_message_stream(
     db: AsyncSession,
     session_id: str,
     user_message: str,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
 ) -> AsyncGenerator[str]:
-    """发送消息（流式返回）"""
-    # 保存用户消息
-    user_msg = ChatMessage(
-        session_id=session_id,
-        role="user",
-        content=user_message,
+    """Keep the SSE-compatible path without contacting an external model."""
+    result = await send_message(
+        db,
+        session_id,
+        user_message,
+        platform_key=platform_key,
+        capability_key=capability_key,
     )
-    db.add(user_msg)
-    await db.execute(
-        sql_update(ChatSession)
-        .where(ChatSession.session_id == session_id)
-        .values(message_count=ChatSession.message_count + 1)
-    )
-    await db.commit()
-
-    # 检索知识库
-    knowledge_results = []
-    try:
-        query_embedding = await ai_provider.get_embedding(user_message)
-        if query_embedding:
-            knowledge_results = await vector_store.search_knowledge(
-                query_embedding=query_embedding,
-                top_k=5,
-                min_score=0.3,
-            )
-    except Exception as e:
-        logger.warning(f"知识库检索失败: {e}")
-
-    # 构建 AI 消息
-    config = await get_config(db)
-    messages = await _build_ai_messages(db, session_id, user_message, knowledge_results, config)
-
-    # 流式调用 AI
-    full_reply = ""
-    try:
-        async for chunk in ai_provider.chat_completion_stream(messages):
-            full_reply += chunk
-            yield chunk
-    except Exception as e:
-        logger.error(f"AI 流式对话失败: {e}")
-        error_msg = '抱歉，AI 服务暂时不可用，请稍后再试或点击「转人工」联系人工客服。'
-        full_reply = error_msg
-        yield error_msg
-
-    # 保存 AI 消息
-    knowledge_ids = [str(r["knowledge_id"]) for r in knowledge_results if r.get("knowledge_id")]
-    ai_msg = ChatMessage(
-        session_id=session_id,
-        role="ai",
-        content=full_reply,
-        knowledge_ids=json.dumps(knowledge_ids) if knowledge_ids else None,
-    )
-    db.add(ai_msg)
-    await db.execute(
-        sql_update(ChatSession)
-        .where(ChatSession.session_id == session_id)
-        .values(message_count=ChatSession.message_count + 1)
-    )
-    await db.commit()
-
-    # 最后发送知识引用信息（SSE data: 格式）
-    if knowledge_results:
-        refs_data = json.dumps({
-            "type": "knowledge_refs",
-            "refs": [{"id": r["knowledge_id"], "title": r["title"]} for r in knowledge_results[:3]]
-        }, ensure_ascii=False)
-        yield f"data: {refs_data}\n\n"
+    yield result["reply"]
 
 
 async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int | None = None) -> bool:
@@ -477,15 +426,17 @@ async def get_user_history(db: AsyncSession, user_id: int, page: int = 1, page_s
     )
     sessions = result.scalars().all()
 
-    return {
-        "items": [{
+    items = [{
             "session_id": s.session_id,
             "status": s.status,
             "message_count": s.message_count,
             "ai_resolved": s.ai_resolved,
             "satisfaction": s.satisfaction,
             "created_at": s.created_at.isoformat() if s.created_at else None,
-        } for s in sessions],
+        } for s in sessions]
+    return {
+        "data": items,
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -536,7 +487,13 @@ async def get_admin_sessions(db: AsyncSession, status: str | None = None, page: 
             "resolved_at": s.resolved_at.isoformat() if s.resolved_at else None,
         })
 
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
+    return {
+        "data": items,
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 async def get_admin_stats(db: AsyncSession) -> dict[str, Any]:

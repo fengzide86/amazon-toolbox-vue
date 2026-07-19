@@ -2,31 +2,34 @@
 Pydantic Schema 单元测试
 测试请求/响应数据模型的验证逻辑
 """
-import pytest
 from datetime import datetime
+
+import pytest
 from pydantic import ValidationError
 
 from schemas import (
-    # Auth
-    VerifyRequest, AdminLoginRequest, VerifyResponse, AdminLoginResponse,
-    # Plans
-    PlanCreate, PlanUpdate, PlanResponse,
-    # Auth Codes
-    AuthCodeGenerate, AuthCodeUpdate, AuthCodeResponse, DeviceResponse,
-    # Orders
-    OrderCreate, OrderUpdate, OrderResponse,
-    # Users
-    UserUpdate, UserResponse,
-    # Logs
-    LogCreate, LogResponse,
-    # Feedback
-    FeedbackCreate, FeedbackUpdate, FeedbackResponse,
-    # Profit
-    ProfitRecordResponse,
-    # Settings
-    SettingUpdate, SettingResponse,
+    AdminLoginRequest,
+    AuthCodeGenerate,
+    AuthCodeUpdate,
     # Dashboard
-    DashboardData
+    DashboardData,
+    DeviceResponse,
+    # Feedback
+    FeedbackCreate,
+    FeedbackUpdate,
+    # Logs
+    LogCreate,
+    OrderCreate,
+    OrderUpdate,
+    # Plans
+    PlanCreate,
+    PlanResponse,
+    PlanUpdate,
+    # Profit
+    SettingUpdate,
+    UserUpdate,
+    # Auth
+    VerifyRequest,
 )
 
 
@@ -65,8 +68,8 @@ class TestAdminLoginRequest:
     
     def test_valid_login(self):
         """测试有效的登录请求"""
-        request = AdminLoginRequest(password="admin123")
-        assert request.password == "admin123"
+        request = AdminLoginRequest(password="Test-only-pass-123")
+        assert request.password == "Test-only-pass-123"
     
     def test_empty_password(self):
         """测试空密码（Pydantic 允许空字符串，业务层处理）"""
@@ -89,12 +92,11 @@ class TestPlanCreate:
             price=99.00,
             duration_days=30,
             features='["功能1", "功能2"]',
-            status="active"
         )
         assert plan.name == "月度套餐"
         assert plan.price == 99.00
         assert plan.duration_days == 30
-        assert plan.status == "active"
+        assert "status" not in plan.model_fields_set
     
     def test_plan_with_defaults(self):
         """测试套餐默认值"""
@@ -104,25 +106,17 @@ class TestPlanCreate:
             duration_days=7
         )
         assert plan.features is None
-        assert plan.status == "active"
+        assert "status" not in plan.model_dump()
     
     def test_plan_negative_price(self):
-        """测试负数价格（应该允许，业务层处理）"""
-        plan = PlanCreate(
-            name="测试套餐",
-            price=-10.00,
-            duration_days=30
-        )
-        assert plan.price == -10.00
+        """价格必须严格大于零。"""
+        with pytest.raises(ValidationError):
+            PlanCreate(name="测试套餐", price=-10.00, duration_days=30)
     
     def test_plan_zero_duration(self):
-        """测试零天数"""
-        plan = PlanCreate(
-            name="测试套餐",
-            price=0.00,
-            duration_days=0
-        )
-        assert plan.duration_days == 0
+        """价格和时长都必须严格大于零。"""
+        with pytest.raises(ValidationError):
+            PlanCreate(name="测试套餐", price=0.00, duration_days=0)
 
 
 class TestPlanUpdate:
@@ -142,11 +136,10 @@ class TestPlanUpdate:
             price=199.00,
             duration_days=90,
             features='["新功能"]',
-            status="disabled"
         )
         assert update.name == "新名称"
         assert update.price == 199.00
-        assert update.status == "disabled"
+        assert "status" not in update.model_dump()
 
 
 class TestPlanResponse:
@@ -241,31 +234,30 @@ class TestOrderCreate:
             amount=99.00,
             channel="微信支付",
             responsible="张三",
-            status="pending"
         )
         assert order.amount == 99.00
         assert order.channel == "微信支付"
     
     def test_create_order_defaults(self):
         """测试订单默认值"""
-        order = OrderCreate(amount=49.00)
-        assert order.plan_id is None
+        order = OrderCreate(plan_id=1, amount=49.00)
+        assert order.plan_id == 1
         assert order.channel is None
-        assert order.status == "pending"
+        assert "status" not in order.model_dump()
 
 
 class TestOrderUpdate:
     """OrderUpdate Schema 测试"""
     
     def test_update_status(self):
-        """测试更新订单状态"""
-        update = OrderUpdate(status="paid")
-        assert update.status == "paid"
+        """状态只能通过独立动作接口改变。"""
+        with pytest.raises(ValidationError):
+            OrderUpdate(status="paid")
     
     def test_update_refund(self):
-        """测试更新退款"""
-        update = OrderUpdate(status="refunded", refund_amount=50.00)
-        assert update.refund_amount == 50.00
+        """退款金额和状态不能从通用 PATCH 注入。"""
+        with pytest.raises(ValidationError):
+            OrderUpdate(status="refunded", refund_amount=50.00)
 
 
 class TestUserUpdate:

@@ -3,6 +3,8 @@ import { app } from 'electron'
 import { readFileSync, rmSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CancellationToken, autoUpdater, type ProgressInfo, type UpdateInfo } from 'electron-updater'
+import { assertTrustedSender } from '../ipc/sender-guard.js'
+import { normalizeUpdateErrorCode, type StableUpdateErrorCode } from './update-errors.js'
 
 type UpdateStatus =
   | 'idle'
@@ -41,7 +43,7 @@ interface UpdateManagerOptions {
   ipcMain: IpcMain
   getWindow: () => BrowserWindow | null | undefined
   hasActiveWork: () => boolean
-  beforeInstall: () => void
+  beforeInstall: () => void | Promise<void>
   updater?: typeof autoUpdater
 }
 
@@ -66,24 +68,20 @@ function normalizeReleaseNotes(notes: UpdateInfo['releaseNotes']): string[] {
     .filter(Boolean)
 }
 
-function errorCode(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string') return error.code
-  if (error instanceof Error) return error.name || 'UPDATE_ERROR'
-  return 'UPDATE_ERROR'
-}
-
 export class UpdateManager {
   private readonly ipcMain: IpcMain
   private readonly getWindow: () => BrowserWindow | null | undefined
   private readonly hasActiveWork: () => boolean
-  private readonly beforeInstall: () => void
+  private readonly beforeInstall: () => void | Promise<void>
   private readonly updater: typeof autoUpdater
   private checking: Promise<UpdateSnapshot> | null = null
   private cancellationToken: CancellationToken | null = null
   private updateInfo: UpdateInfo | null = null
   private manualCheckRequested = false
   private preferences: UpdatePreferences
-  private cleanupStarted = false
+  private cleanupPromise: Promise<void> | null = null
+  private installOnQuitApproved = false
+  private installPreparing = false
   private checkGeneration = 0
   private activeCheckGeneration = 0
   private acceptCheckEvents = false
@@ -105,7 +103,9 @@ export class UpdateManager {
     }
     if (this.snapshot.supported) {
       this.updater.autoDownload = false
-      this.updater.autoInstallOnAppQuit = true
+      // Downloading an update is not consent to install it. Installation only
+      // starts after an explicit immediate-restart or install-on-exit action.
+      this.updater.autoInstallOnAppQuit = false
       this.bindUpdaterEvents()
     }
     this.registerIpc()
@@ -113,6 +113,14 @@ export class UpdateManager {
 
   getState(): UpdateSnapshot {
     return { ...this.snapshot, releaseNotes: [...this.snapshot.releaseNotes] }
+  }
+
+  shouldInstallOnQuit(): boolean {
+    return this.installOnQuitApproved && ['downloaded', 'restart_deferred'].includes(this.snapshot.status)
+  }
+
+  isInstalling(): boolean {
+    return this.installPreparing || this.snapshot.status === 'installing'
   }
 
   async check(options: { manual?: boolean } = {}): Promise<UpdateSnapshot> {
@@ -142,7 +150,7 @@ export class UpdateManager {
       .catch((error: unknown) => {
         if (this.activeCheckGeneration !== generation) return this.getState()
         this.acceptCheckEvents = false
-        if (options.manual) this.setState({ status: 'error', errorCode: errorCode(error) })
+        if (options.manual) this.setState({ status: 'error', errorCode: normalizeUpdateErrorCode(error, 'CHECK_FAILED') })
         else {
           console.warn('[Update] Automatic update check failed:', error)
           this.setState({ status: 'idle', errorCode: undefined, lastCheckedAt: new Date().toISOString() })
@@ -169,7 +177,7 @@ export class UpdateManager {
       if (this.cancellationToken?.cancelled) {
         this.setState({ status: 'cancelled', errorCode: undefined })
       } else {
-        this.setState({ status: 'error', errorCode: errorCode(error) })
+        this.setState({ status: 'error', errorCode: normalizeUpdateErrorCode(error, 'DOWNLOAD_FAILED') })
       }
     } finally {
       this.cancellationToken = null
@@ -191,36 +199,66 @@ export class UpdateManager {
       this.setState({ promptSuppressedUntil })
     }
     if (request.phase === 'install' && this.snapshot.status === 'downloaded') {
+      this.installOnQuitApproved = true
       this.setState({ status: 'restart_deferred', canRestart: !this.hasActiveWork() })
     }
     return this.getState()
   }
 
-  install(): UpdateSnapshot {
+  async install(): Promise<UpdateSnapshot> {
     if (!['downloaded', 'restart_deferred'].includes(this.snapshot.status)) return this.getState()
+    if (this.installPreparing) return this.getState()
     if (this.hasActiveWork()) {
-      this.setState({ status: 'restart_deferred', canRestart: false })
+      this.setState({ status: 'restart_deferred', canRestart: false, errorCode: 'INSTALL_BUSY' })
       return this.getState()
     }
-    this.setState({ status: 'installing', canRestart: false })
-    this.prepareForInstall()
-    setImmediate(() => this.updater.quitAndInstall(false, true))
+    this.installPreparing = true
+    this.setState({ status: 'restart_deferred', canRestart: false, errorCode: undefined })
+    try {
+      await this.prepareForInstall()
+      if (this.hasActiveWork()) {
+        throw Object.assign(new Error('Application work remained active after cleanup'), { code: 'INSTALL_BUSY' })
+      }
+    } catch (error) {
+      this.installPreparing = false
+      this.cleanupPromise = null
+      const errorCode = normalizeUpdateErrorCode(error, 'INSTALL_QUIESCE_FAILED')
+      this.setState({
+        status: errorCode === 'INSTALL_BUSY' ? 'restart_deferred' : 'error',
+        canRestart: false,
+        errorCode,
+      })
+      return this.getState()
+    }
+    this.installPreparing = false
+    this.setState({ status: 'installing', canRestart: false, errorCode: undefined })
+    this.installOnQuitApproved = false
+    setImmediate(() => {
+      try {
+        this.updater.quitAndInstall(false, true)
+      } catch (error) {
+        this.setState({ status: 'error', canRestart: false, errorCode: normalizeUpdateErrorCode(error, 'INSTALL_LAUNCH_FAILED') })
+      }
+    })
     return this.getState()
   }
 
   activityChanged(): void {
     if (!['downloaded', 'restart_deferred'].includes(this.snapshot.status)) return
     const canRestart = !this.hasActiveWork()
-    this.setState({ status: canRestart ? 'downloaded' : 'restart_deferred', canRestart })
+    this.setState({ status: canRestart ? 'downloaded' : 'restart_deferred', canRestart, errorCode: undefined })
   }
 
   private bindUpdaterEvents(): void {
     const lifecycleUpdater = this.updater as unknown as {
       on(event: 'before-quit-for-update', listener: () => void): void
     }
-    lifecycleUpdater.on('before-quit-for-update', () => this.prepareForInstall())
+    lifecycleUpdater.on('before-quit-for-update', () => {
+      void this.prepareForInstall().catch(error => console.error('[Update] Pre-install cleanup failed:', error))
+    })
     this.updater.on('update-available', (info: UpdateInfo) => {
       if (!this.acceptCheckEvents) return
+      this.installOnQuitApproved = false
       this.updateInfo = info
       const promptSuppressedUntil = this.suppressionFor(info.version)
       this.setState({
@@ -236,6 +274,7 @@ export class UpdateManager {
     })
     this.updater.on('update-not-available', () => {
       if (!this.acceptCheckEvents) return
+      this.installOnQuitApproved = false
       this.updateInfo = null
       this.setState({
         status: 'idle', availableVersion: undefined, releaseDate: undefined, releaseNotes: [],
@@ -250,6 +289,7 @@ export class UpdateManager {
       totalBytes: progress.total,
     }))
     this.updater.on('update-downloaded', (info: UpdateInfo) => {
+      this.installOnQuitApproved = false
       this.updateInfo = info
       const canRestart = !this.hasActiveWork()
       this.setState({
@@ -260,6 +300,7 @@ export class UpdateManager {
         downloadBytes: info.files.find(file => typeof file.size === 'number')?.size,
         percent: 100,
         promptSuppressedUntil: undefined,
+        errorCode: undefined,
         canRestart,
       })
     })
@@ -269,7 +310,8 @@ export class UpdateManager {
       if (this.snapshot.status === 'checking' && !this.manualCheckRequested) {
         this.setState({ status: 'idle', errorCode: undefined, canRestart: false, lastCheckedAt: new Date().toISOString() })
       } else {
-        this.setState({ status: 'error', errorCode: errorCode(error), canRestart: false })
+        const fallback: StableUpdateErrorCode = this.snapshot.status === 'downloading' ? 'DOWNLOAD_FAILED' : 'UPDATE_ERROR'
+        this.setState({ status: 'error', errorCode: normalizeUpdateErrorCode(error, fallback), canRestart: false })
       }
     })
   }
@@ -277,7 +319,7 @@ export class UpdateManager {
   private registerIpc(): void {
     const register = (channel: string, handler: (event: IpcMainInvokeEvent, request?: UpdateDeferRequest) => UpdateSnapshot | Promise<UpdateSnapshot>) => {
       this.ipcMain.handle(channel, (event: IpcMainInvokeEvent, request?: UpdateDeferRequest) => {
-        this.assertTrustedSender(event)
+        assertTrustedSender(event, this.getWindow, !app.isPackaged)
         return handler(event, request)
       })
     }
@@ -289,23 +331,17 @@ export class UpdateManager {
     register(CHANNELS.defer, (_event, request) => this.defer(request))
   }
 
-  private assertTrustedSender(event: IpcMainInvokeEvent): void {
-    const window = this.getWindow()
-    if (!window || window.isDestroyed() || event.sender.id !== window.webContents.id) {
-      throw new Error('拒绝来自未知窗口的更新请求')
-    }
-  }
-
   private setState(patch: Partial<UpdateSnapshot>): void {
     this.snapshot = { ...this.snapshot, ...patch }
     const window = this.getWindow()
     if (window && !window.isDestroyed()) window.webContents.send(CHANNELS.state, this.getState())
   }
 
-  private prepareForInstall(): void {
-    if (this.cleanupStarted) return
-    this.cleanupStarted = true
-    this.beforeInstall()
+  private prepareForInstall(): Promise<void> {
+    if (!this.cleanupPromise) {
+      this.cleanupPromise = Promise.resolve().then(() => this.beforeInstall())
+    }
+    return this.cleanupPromise
   }
 
   private preferencesPath(): string {

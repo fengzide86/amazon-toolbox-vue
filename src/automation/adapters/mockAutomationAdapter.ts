@@ -15,10 +15,10 @@ export interface MockAutomationOptions {
   stepDelay?: number
 }
 
-export function createMockSteps(tool: AutomationTool = {}): AutomationStep[] {
+export function createMockSteps(tool: AutomationTool = { executionMode: 'demo' }): AutomationStep[] {
   const toolName = tool.name || '自动化工具'
   const platformName = tool.platformKey === 'aliexpress' ? '速卖通' : '亚马逊'
-  const targetUrl = tool.targetUrl || 'https://sellercentral.amazon.com'
+  const targetUrl = tool.targetUrl || `demo://${tool.platformKey || 'amazon'}/${encodeURIComponent(String(tool.id || 'tool'))}`
   let displayUrl = targetUrl
   try {
     const parsed = new URL(targetUrl)
@@ -28,12 +28,12 @@ export function createMockSteps(tool: AutomationTool = {}): AutomationStep[] {
   }
 
   return [
-    { id: 'prepare', title: '初始化工具环境', detail: '正在准备浏览器和本次任务配置。', action: '检查运行环境与工具配置' },
-    { id: 'open', title: '打开目标平台', detail: `进入${platformName}目标页面。`, action: `正在访问 ${displayUrl}` },
-    { id: 'inspect', title: '检查页面状态', detail: '确认页面已正常加载并准备执行任务。', action: '正在检查页面状态' },
-    { id: 'execute', title: `执行${toolName}`, detail: '按照预设流程处理当前任务。', action: '正在处理业务信息' },
-    { id: 'verify', title: '检查执行结果', detail: '核对页面状态，确认流程是否完整。', action: '正在核验页面反馈' },
-    { id: 'summary', title: '整理任务结果', detail: '生成本次任务的结果摘要。', action: '正在生成结果报告' },
+    { id: 'prepare', title: '初始化演示场景', detail: '正在准备本地演示步骤与示例数据。', action: '检查演示配置' },
+    { id: 'open', title: '展示平台界面示例', detail: `播放${platformName}本地模拟画面，不访问真实平台。`, action: `正在载入 ${displayUrl}` },
+    { id: 'inspect', title: '展示状态检查', detail: '通过示例状态说明正式工具阶段的检查过程。', action: '正在播放状态检查示例' },
+    { id: 'execute', title: `演示${toolName}`, detail: '按照预设脚本播放示例流程，不处理真实业务数据。', action: '正在播放业务步骤示例' },
+    { id: 'verify', title: '展示结果核对', detail: '通过模拟反馈说明结果核对位置。', action: '正在播放反馈核对示例' },
+    { id: 'summary', title: '整理演示结果', detail: '仅生成本次演示播放摘要。', action: '正在生成演示摘要' },
   ]
 }
 
@@ -64,7 +64,7 @@ export class MockAutomationAdapter implements AutomationAdapter {
   start(tool: AutomationTool): string {
     this.disposeTimer()
     runSequence += 1
-    this.runId = `mock_run_${Date.now()}_${runSequence}`
+    this.runId = tool.demoRunId || `demo_run_local_${Date.now()}_${runSequence}`
     this.tool = { ...tool }
     this.steps = createMockSteps(tool)
     this.currentIndex = 0
@@ -102,7 +102,7 @@ export class MockAutomationAdapter implements AutomationAdapter {
     if (this.currentIndex >= this.steps.length - 1) {
       this.status = RUN_STATUS.COMPLETED
       this.emit(AUTOMATION_EVENT.RUN_COMPLETED, {
-        result: { summary: '任务已完成', completedSteps: this.steps.length },
+        result: { summary: '演示流程已走完', completedSteps: this.steps.length, recordKind: 'demo' },
       })
       this.disposeTimer()
       return
@@ -146,3 +146,6 @@ export class MockAutomationAdapter implements AutomationAdapter {
     this.listeners.clear()
   }
 }
+
+/** 明确命名的演示适配器；旧名称仅保留给已有测试和开发调用。 */
+export class DemoAutomationAdapter extends MockAutomationAdapter {}

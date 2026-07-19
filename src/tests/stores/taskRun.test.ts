@@ -1,13 +1,14 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { AUTOMATION_EVENT, MockAutomationAdapter } from '@/automation'
+import { MockAutomationAdapter } from '@/automation'
 import { useTaskRunStore } from '@/stores/taskRun'
 
 const tool = {
   id: 'tool_listing',
-  name: '自动上品脚本',
+  name: '自动上品演示',
   platformKey: 'amazon',
-  targetUrl: 'https://sellercentral.amazon.com/listing',
+  targetUrl: 'demo://amazon/tool_listing',
+  executionMode: 'demo' as const,
 }
 
 describe('taskRun store', () => {
@@ -38,7 +39,8 @@ describe('taskRun store', () => {
     expect(store.status).toBe('completed')
     expect(store.completedCount).toBe(6)
     expect(store.progressPercent).toBe(100)
-    expect(store.result.summary).toBe('任务已完成')
+    expect(store.result.summary).toBe('演示流程已走完')
+    expect(store.result.recordKind).toBe('demo')
   })
 
   it('暂停后不推进步骤，恢复后继续执行', async () => {
@@ -91,10 +93,9 @@ describe('taskRun store', () => {
     expect(store.steps[0].status).toBe('active')
   })
 
-  it('在 Electron 中把完整工具授权交给本地 Runner Adapter', () => {
-    let listener
+  it('internal 模式即使存在 Electron Bridge 也只使用显式 Demo Adapter', () => {
     const automation = {
-      onEvent: vi.fn(callback => { listener = callback; return vi.fn() }),
+      onEvent: vi.fn(() => vi.fn()),
       start: vi.fn(() => Promise.resolve({ runId: 'local_run_1' })),
       pause: vi.fn(),
       resume: vi.fn(),
@@ -105,21 +106,11 @@ describe('taskRun store', () => {
     }
     window.electronAPI = { automation }
     const store = useTaskRunStore()
-    const toolWithGrant = {
-      ...tool,
-      launchGrant: { token: 'one-time-token', scriptKey: 'amazon.listing.v1', runnerApiVersion: 1 },
-    }
 
-    store.start(toolWithGrant)
-    expect(automation.start).toHaveBeenCalledWith(toolWithGrant)
+    store.start(tool)
 
-    listener({
-      type: AUTOMATION_EVENT.RUN_STARTED,
-      runId: 'local_run_1',
-      tool: toolWithGrant,
-      steps: [{ id: 'prepare', title: '准备' }],
-    })
+    expect(automation.start).not.toHaveBeenCalled()
     expect(store.status).toBe('running')
-    expect(store.runId).toBe('local_run_1')
+    expect(store.runId).toMatch(/^demo_run_local_/)
   })
 })

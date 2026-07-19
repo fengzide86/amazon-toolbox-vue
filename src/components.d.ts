@@ -17,6 +17,7 @@ declare module 'vue' {
     AppHeader: typeof import('./components/AppHeader.vue')['default']
     AppSurface: typeof import('./components/AppSurface.vue')['default']
     AppTransition: typeof import('./components/AppTransition.vue')['default']
+    AsyncStateNotice: typeof import('./components/AsyncStateNotice.vue')['default']
     Breadcrumb: typeof import('./components/Breadcrumb.vue')['default']
     BusinessSidebar: typeof import('./components/BusinessSidebar.vue')['default']
     DataToolbar: typeof import('./components/DataToolbar.vue')['default']

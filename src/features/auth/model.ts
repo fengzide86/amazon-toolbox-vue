@@ -1,6 +1,9 @@
 import { z } from 'zod'
 
-export const authRoleSchema = z.enum(['user', 'admin'])
+export const backofficeRoleSchema = z.enum(['super_admin', 'operator', 'support'])
+export type BackofficeRole = z.infer<typeof backofficeRoleSchema>
+
+export const authRoleSchema = z.union([z.literal('user'), backofficeRoleSchema])
 export type AuthRole = z.infer<typeof authRoleSchema>
 
 export const entitlementValueSchema = z.union([
@@ -16,6 +19,12 @@ export type Entitlements = z.infer<typeof entitlementsSchema>
 export const authenticatedUserSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   name: z.string().optional(),
+  display_name: z.string().optional(),
+  username: z.string().optional(),
+  role: authRoleSchema.optional(),
+  staff_id: z.union([z.string(), z.number()]).optional(),
+  status: z.enum(['active', 'disabled']).optional(),
+  force_password_reset: z.boolean().optional(),
   phone: z.string().optional(),
   auth_code_id: z.union([z.string(), z.number()]).optional(),
   product_type: z.enum(['consumer', 'business']).optional(),
@@ -92,4 +101,12 @@ export function hasBusinessWorkspaceAccess(user: AuthenticatedUser | null): bool
     && user.business_workspace_enabled === true
     && user.entitlements?.batch_execution === true
     && user.entitlements?.multi_account_workspace === true
+}
+
+export function isBackofficeRole(role: AuthRole | null | undefined): role is BackofficeRole {
+  return backofficeRoleSchema.safeParse(role).success
+}
+
+export function isSuperAdminRole(role: AuthRole | null | undefined): boolean {
+  return role === 'super_admin'
 }

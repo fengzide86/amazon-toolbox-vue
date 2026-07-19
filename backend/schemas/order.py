@@ -1,36 +1,58 @@
-"""
-订单相关 Schema
-"""
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
+"""Validated schemas for the internal order state machine."""
+
 from datetime import datetime
+from decimal import Decimal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class OrderCreate(BaseModel):
-    plan_id: Optional[int] = None
-    amount: float
-    channel: Optional[str] = None
-    responsible: Optional[str] = None
-    status: str = "pending"
+    plan_id: int = Field(gt=0)
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
+    channel: str | None = Field(default=None, max_length=100)
+    responsible: str | None = Field(default=None, max_length=100)
+    platform_key: str | None = Field(default=None, max_length=50)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class OrderUpdate(BaseModel):
-    status: Optional[str] = None
-    refund_amount: Optional[float] = None
+    plan_id: int | None = Field(default=None, gt=0)
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
+    channel: str | None = Field(default=None, max_length=100)
+    responsible: str | None = Field(default=None, max_length=100)
+    platform_key: str | None = Field(default=None, max_length=50)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class OrderTransitionRequest(BaseModel):
+    reason: str = Field(min_length=2, max_length=500)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class OrderResponse(BaseModel):
     id: int
     order_no: str
-    plan_id: Optional[int] = None
-    amount: float
-    channel: Optional[str] = None
-    responsible: Optional[str] = None
+    plan_id: int | None = None
+    plan_name_snapshot: str
+    plan_price_snapshot: Decimal
+    plan_duration_days_snapshot: int
+    amount: Decimal
+    channel: str | None = None
+    responsible: str | None = None
     status: str
-    refund_amount: float
-    platform_key: Optional[str] = None
-    created_at: Optional[datetime] = None
-    paid_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    refund_amount: Decimal
+    platform_key: str | None = None
+    refund_reason: str | None = None
+    cancel_reason: str | None = None
+    created_by_staff_id: int | None = None
+    updated_by_staff_id: int | None = None
+    created_at: datetime | None = None
+    paid_at: datetime | None = None
+    refunded_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

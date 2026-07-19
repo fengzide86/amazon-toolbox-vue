@@ -12,8 +12,10 @@ import AdminSidebar from '@/components/AdminSidebar.vue'
 const mockRouter = createRouter({
   history: createWebHashHistory(),
   routes: [
+    { path: '/', redirect: '/admin/dashboard' },
     { path: '/admin/dashboard', name: 'AdminDashboard', component: { template: '<div />' } },
     { path: '/admin/authcodes', name: 'AdminAuthCodes', component: { template: '<div />' } },
+    { path: '/admin/business-access', name: 'AdminBusinessAccess', component: { template: '<div />' } },
     { path: '/admin/orders', name: 'AdminOrders', component: { template: '<div />' } },
     { path: '/admin/profit', name: 'AdminProfit', component: { template: '<div />' } },
     { path: '/admin/users', name: 'AdminUsers', component: { template: '<div />' } },
@@ -23,6 +25,7 @@ const mockRouter = createRouter({
     { path: '/admin/announcements', name: 'AdminAnnouncements', component: { template: '<div />' } },
     { path: '/admin/updates', name: 'AdminUpdates', component: { template: '<div />' } },
     { path: '/admin/settings', name: 'AdminSettings', component: { template: '<div />' } },
+    { path: '/admin/staff-accounts', name: 'AdminStaffAccounts', component: { template: '<div />' } },
     { path: '/admin/login', name: 'AdminLogin', component: { template: '<div />' } },
   ]
 })
@@ -36,6 +39,9 @@ vi.mock('@/utils', () => ({
 describe('AdminSidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sessionStorage.clear()
+    localStorage.clear()
+    sessionStorage.setItem('toolbox_role', 'super_admin')
     setActivePinia(createPinia())
     mockRouter.push('/admin/dashboard')
   })
@@ -57,7 +63,8 @@ describe('AdminSidebar', () => {
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-text').text()).toBe('运营控制中心')
+      expect(wrapper.find('.brand-text').text()).toContain('运营控制中心')
+      expect(wrapper.find('.brand-text small').text()).toBe('超级管理员')
     })
   })
 
@@ -69,7 +76,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      expect(menuItems.length).toBe(12)
+      expect(menuItems.length).toBe(13)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -86,11 +93,28 @@ describe('AdminSidebar', () => {
       expect(labels).toContain('用户管理')
       expect(labels).toContain('工单管理')
       expect(labels).toContain('知识库管理')
-      expect(labels).toContain('AI 客服管理')
+      expect(labels).toContain('客服规则管理')
       expect(labels).toContain('公告管理')
       expect(labels).toContain('应用更新')
       expect(labels).toContain('系统设置')
+      expect(labels).toContain('后台账号管理')
       expect(labels).not.toContain('退出登录')
+    })
+
+    it('应该按固定三角色隐藏无权限入口', async () => {
+      sessionStorage.setItem('toolbox_role', 'support')
+      const wrapper = mount(AdminSidebar, {
+        global: { plugins: [createPinia(), mockRouter] }
+      })
+      await flushPromises()
+
+      const labels = wrapper.findAll('.menu-label').map(el => el.text())
+      expect(labels).not.toContain('专业工作台')
+      expect(labels).not.toContain('分润管理')
+      expect(labels).not.toContain('应用更新')
+      expect(labels).not.toContain('系统设置')
+      expect(labels).not.toContain('后台账号管理')
+      expect(labels).toContain('客服规则管理')
     })
 
     it('当前路由对应的菜单项应该有 is-active 类', async () => {

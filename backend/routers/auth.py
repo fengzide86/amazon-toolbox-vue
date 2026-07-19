@@ -36,9 +36,9 @@ async def verify_auth_code(request: Request, req: VerifyRequest, db: AsyncSessio
 @router.post("/admin-login")
 @auth_limiter.limit("5/minute")  # 管理员登录更严格：每分钟5次
 async def admin_login(request: Request, req: AdminLoginRequest, db: AsyncSession = Depends(get_db)):
-    """管理员登录"""
+    """兼容旧客户端的后台登录 URL；身份数据只来自 staff_users。"""
     service = AuthService(db)
-    return await service.admin_login(req.password)
+    return await service.admin_login(req.password, req.username, request=request)
 
 
 @router.post("/check")
@@ -47,6 +47,12 @@ async def check_auth_status(
     db: AsyncSession = Depends(get_db)
 ):
     """检查授权码状态（用于踢人检测）"""
+    if current_user.get("staff_id"):
+        return {
+            "success": True,
+            "message": "后台账号正常",
+            "data": current_user,
+        }
     service = AuthService(db)
     return await service.check_auth_status(current_user.get("auth_code_id"))
 
@@ -57,6 +63,8 @@ async def get_current_user_info(
     db: AsyncSession = Depends(get_db)
 ):
     """获取当前用户信息"""
+    if current_user.get("staff_id"):
+        return {"success": True, "message": "ok", "data": current_user}
     service = AuthService(db)
     return await service.get_user_info(
         current_user.get("user_id"),
@@ -102,14 +110,16 @@ async def refresh_token(
     auth_code_id = payload.get("auth_code_id")
     device_id = payload.get("device_id")
     
-    # 管理员特殊处理
-    if role == "admin" and user_id == 0:
-        new_token = create_access_token(data={
-            "user_id": 0,
-            "role": "admin",
-            "auth_code_id": None,
-        })
-        return {"success": True, "data": {"token": new_token}}
+    if payload.get("token_type") == "staff":
+        # Staff sessions have a hard eight-hour lifetime.  Refreshing a still
+        # valid staff JWT would silently turn that into an indefinite session.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "FEATURE_DISABLED",
+                "message": "后台登录固定有效 8 小时，不提供刷新，请重新登录",
+            },
+        )
     
     # 4. 检查授权码是否仍然有效（防止授权码被冻结/删除后仍可刷新）
     if auth_code_id:

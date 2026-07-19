@@ -24,16 +24,40 @@ export class BackendProcessManager {
     return this.waitUntilReady()
   }
 
-  cleanup(): void {
+  async cleanup(timeoutMs = 3000): Promise<void> {
     const process = this.process
-    this.process = null
     if (!process) return
-    try { process.kill('SIGTERM') }
-    catch (error) { console.error('[BackendManager] Graceful shutdown failed:', error) }
-    const timer = setTimeout(() => {
-      if (process.exitCode === null && !process.killed) process.kill('SIGKILL')
-    }, 3000)
-    timer.unref()
+    await new Promise<void>((resolve, reject) => {
+      let settled = false
+      const finish = (error?: Error): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        process.removeListener('exit', onExit)
+        if (error) reject(error)
+        else {
+          if (this.process === process) this.process = null
+          resolve()
+        }
+      }
+      const onExit = (): void => finish()
+      const timer = setTimeout(() => {
+        try {
+          if (process.exitCode === null) process.kill('SIGKILL')
+        } catch (error) {
+          console.error('[BackendManager] Forced shutdown failed:', error)
+        }
+        finish(Object.assign(new Error('Backend process cleanup timed out'), { code: 'INSTALL_BUSY' }))
+      }, timeoutMs)
+      process.once('exit', onExit)
+      try {
+        if (process.exitCode === null) process.kill('SIGTERM')
+        else finish()
+      } catch (error) {
+        console.error('[BackendManager] Graceful shutdown failed:', error)
+        finish(error instanceof Error ? error : new Error('Backend process cleanup failed'))
+      }
+    })
   }
 
   private checkHealth(timeoutMs = 1200): Promise<boolean> {

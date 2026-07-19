@@ -4,6 +4,7 @@ import { setCache, getCache, removeCache, clearAllCache, generateCacheKey } from
 describe('缓存工具', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
   })
 
   describe('setCache / getCache', () => {
@@ -58,8 +59,10 @@ describe('缓存工具', () => {
 
   describe('generateCacheKey', () => {
     it('应该生成缓存键', () => {
+      sessionStorage.setItem('toolbox_role', 'support')
+      localStorage.setItem('toolbox_user', JSON.stringify({ staff_id: 7, auth_code_id: 12 }))
       const key = generateCacheKey('/api/test', { id: 1, name: 'test' })
-      expect(key).toBe('/api/test?id=1&name=test')
+      expect(key).toBe('support:7:12:/api/test?id=1&name=test')
     })
 
     it('应该按参数名排序', () => {
@@ -70,7 +73,21 @@ describe('缓存工具', () => {
 
     it('应该处理无参数的情况', () => {
       const key = generateCacheKey('/api/test')
-      expect(key).toBe('/api/test')
+      expect(key).toBe('user:unknown:none:/api/test')
+    })
+
+    it('应该隔离不同用户和角色的缓存键', () => {
+      sessionStorage.setItem('toolbox_role', 'operator')
+      localStorage.setItem('toolbox_user', JSON.stringify({ staff_id: 8 }))
+      const operatorKey = generateCacheKey('/api/test')
+
+      sessionStorage.setItem('toolbox_role', 'support')
+      localStorage.setItem('toolbox_user', JSON.stringify({ staff_id: 9 }))
+      const supportKey = generateCacheKey('/api/test')
+
+      expect(operatorKey).not.toBe(supportKey)
+      expect(operatorKey).toBe('operator:8:none:/api/test')
+      expect(supportKey).toBe('support:9:none:/api/test')
     })
   })
 })

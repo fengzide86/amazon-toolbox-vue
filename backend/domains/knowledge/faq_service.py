@@ -13,14 +13,6 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^\w\u4e00-\u9fff]+", "", (text or "").lower())
 
 
-def _tokens(text: str) -> set[str]:
-    normalized = _normalize(text)
-    latin = set(re.findall(r"[a-z0-9_-]{2,}", (text or "").lower()))
-    chinese = "".join(re.findall(r"[\u4e00-\u9fff]", normalized))
-    grams = {chinese[i:i + 2] for i in range(max(0, len(chinese) - 1))}
-    return latin | grams
-
-
 async def match_faq(
     db: AsyncSession,
     question: str,
@@ -39,8 +31,8 @@ async def match_faq(
         conditions.append(or_(KnowledgeBase.capability_key == capability_key, KnowledgeBase.capability_key.is_(None), KnowledgeBase.capability_key == ""))
 
     result = await db.execute(select(KnowledgeBase).where(and_(*conditions)))
-    question_tokens = _tokens(question)
     best = None
+    best_key: tuple[int, int, int] | None = None
     best_score = 0.0
     for item in result.scalars().all():
         title = _normalize(item.title)
@@ -49,20 +41,34 @@ async def match_faq(
         except (json.JSONDecodeError, TypeError):
             keywords = []
 
-        score = 0.0
-        if len(title) >= 3 and (title in question_normalized or question_normalized in title):
-            score += 8
-        for keyword in keywords:
-            keyword_normalized = _normalize(str(keyword))
-            if len(keyword_normalized) >= 2 and keyword_normalized in question_normalized:
-                score += 5
-        score += min(len(question_tokens & _tokens(item.title)), 3) * 2
-        score += min(len(question_tokens & _tokens(item.content)), 3) * 0.5
-        score *= {"high": 1.15, "low": 0.9}.get(item.priority, 1.0)
-        if score > best_score:
-            best, best_score = item, score
+        normalized_keywords = [
+            normalized
+            for keyword in keywords
+            if (normalized := _normalize(str(keyword)))
+        ]
 
-    if not best or best_score < 4:
+        # Match tiers are deliberately deterministic: exact question/title,
+        # exact keyword, contained keyword, then contained title.
+        match_level = 0
+        if title and title == question_normalized:
+            match_level = 5
+        elif question_normalized in normalized_keywords:
+            match_level = 4
+        elif any(len(keyword) >= 2 and keyword in question_normalized for keyword in normalized_keywords):
+            match_level = 3
+        elif len(title) >= 3 and (title in question_normalized or question_normalized in title):
+            match_level = 2
+
+        if match_level == 0:
+            continue
+
+        priority = {"high": 3, "medium": 2, "low": 1}.get(item.priority, 2)
+        candidate_key = (match_level, priority, item.id or 0)
+        if best_key is None or candidate_key > best_key:
+            best, best_key = item, candidate_key
+            best_score = match_level / 5
+
+    if not best:
         return None
     return {
         "id": best.id,
@@ -70,7 +76,7 @@ async def match_faq(
         "title": best.title,
         "category": best.category,
         "content": best.content,
-        "score": round(min(best_score / 10, 1.0), 4),
+        "score": round(best_score, 4),
         "platform_key": best.platform_key,
         "capability_key": best.capability_key,
     }

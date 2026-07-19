@@ -7,10 +7,11 @@ import json
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Body, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit import log_admin_action
 from core.config import settings
 from core.dependencies import get_current_admin, get_current_user
 from core.deprecation import log_deprecated_api_call
@@ -19,6 +20,7 @@ from core.response import ErrorCodes, error_response, success_response
 from database import get_db
 from domains.catalog import (
     DEFAULT_CATEGORIES,
+    force_demo_only_tool_configs,
     normalize_tool_config,
     normalize_tool_configs,
     resolve_tool_runtime,
@@ -61,6 +63,8 @@ async def get_tools(
         tools = json.loads(setting.value)
 
     tools = normalize_tool_configs(tools)
+    if settings.TOOL_EXECUTION_MODE == "demo":
+        tools = force_demo_only_tool_configs(tools)
     
     # ===== 1.5 平台筛选 =====
     if platform_key and platform_key != "all":
@@ -86,15 +90,19 @@ async def get_tools(
 
 @router.put("")
 async def update_tools(
+    request: Request,
     tools: list[dict] = Body(...),
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin)
+    actor: dict = Depends(get_current_admin)
 ):
     """更新工具配置"""
     result = await db.execute(select(Setting).where(Setting.key == "tool_configs"))
     setting = result.scalars().first()
     
+    before = json.loads(setting.value) if setting and setting.value else []
     normalized_tools = normalize_tool_configs(tools)
+    if settings.TOOL_EXECUTION_MODE == "demo":
+        normalized_tools = force_demo_only_tool_configs(normalized_tools)
     tools_json = json.dumps(normalized_tools, ensure_ascii=False)
     
     if setting:
@@ -103,17 +111,33 @@ async def update_tools(
         setting = Setting(key="tool_configs", value=tools_json)
         db.add(setting)
     
+    await log_admin_action(
+        db,
+        user_id=actor.get("staff_id"),
+        user_name=actor.get("username"),
+        action="demo_tool_config_update",
+        target_type="tool_configs",
+        target_id="all",
+        detail={"role": actor.get("role"), "before": before, "after": normalized_tools, "reason": None},
+        request=request,
+    )
     await db.commit()
     logger.info("工具配置已更新")
     return {"success": True, "data": normalized_tools}
 
 
 @router.put("/categories")
-async def update_tool_categories(categories: list, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
+async def update_tool_categories(
+    categories: list,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    actor: dict = Depends(get_current_admin),
+):
     """更新工具分类配置"""
     result = await db.execute(select(Setting).where(Setting.key == "tool_categories"))
     setting = result.scalars().first()
     
+    before = json.loads(setting.value) if setting and setting.value else DEFAULT_CATEGORIES
     categories_json = json.dumps(categories, ensure_ascii=False)
     
     if setting:
@@ -122,6 +146,16 @@ async def update_tool_categories(categories: list, db: AsyncSession = Depends(ge
         setting = Setting(key="tool_categories", value=categories_json)
         db.add(setting)
     
+    await log_admin_action(
+        db,
+        user_id=actor.get("staff_id"),
+        user_name=actor.get("username"),
+        action="demo_tool_categories_update",
+        target_type="tool_categories",
+        target_id="all",
+        detail={"role": actor.get("role"), "before": before, "after": categories, "reason": None},
+        request=request,
+    )
     await db.commit()
     logger.info("工具分类配置已更新")
     return {"success": True}
@@ -162,11 +196,17 @@ async def get_platforms(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/platforms")
-async def update_platforms(platforms: list, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
+async def update_platforms(
+    platforms: list,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    actor: dict = Depends(get_current_admin),
+):
     """更新平台配置（管理员）"""
     result = await db.execute(select(Setting).where(Setting.key == "platform_configs"))
     setting = result.scalars().first()
     
+    before = json.loads(setting.value) if setting and setting.value else DEFAULT_PLATFORMS
     platforms_json = json.dumps(platforms, ensure_ascii=False)
     
     if setting:
@@ -175,6 +215,16 @@ async def update_platforms(platforms: list, db: AsyncSession = Depends(get_db), 
         setting = Setting(key="platform_configs", value=platforms_json)
         db.add(setting)
     
+    await log_admin_action(
+        db,
+        user_id=actor.get("staff_id"),
+        user_name=actor.get("username"),
+        action="platform_config_update",
+        target_type="platform_configs",
+        target_id="all",
+        detail={"role": actor.get("role"), "before": before, "after": platforms, "reason": None},
+        request=request,
+    )
     await db.commit()
     logger.info("平台配置已更新")
     return {"success": True}
@@ -208,6 +258,15 @@ async def create_launch_token(
     7. 当前用户 seat 有效
     8. 当前设备未超限
     """
+    if settings.TOOL_EXECUTION_MODE != "live":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FEATURE_DISABLED",
+                "message": "当前为演示模式，真实工具尚未接入",
+                "reason": "demo_only",
+            },
+        )
     if request.url.path.endswith("/launch-token"):
         log_deprecated_api_call(request, "/api/tools/{tool_id}/launch-token")
     user_id = current_user.get("user_id")
@@ -281,6 +340,12 @@ async def create_launch_token(
     if not target_tool:
         return error_response("工具不存在", 404)
     target_tool = normalize_tool_config(target_tool)
+    if target_tool.get("availability") not in {"live", "live_beta"}:
+        return error_response(
+            "该工具当前仅支持演示流程",
+            ErrorCodes.TOOL_UNAVAILABLE,
+            {"reason": "demo_only", "availability": target_tool.get("availability")},
+        )
     
     # 4. 检查工具平台一致性
     if target_tool.get("platform_key") != platform_key:
@@ -493,6 +558,11 @@ async def verify_launch_token(
     
     返回工具启动所需信息
     """
+    if settings.TOOL_EXECUTION_MODE != "live":
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "FEATURE_DISABLED", "message": "当前为演示模式"},
+        )
     if request.url.path.endswith("/launch-token/verify"):
         log_deprecated_api_call(request, "/api/tools/launch-token/verify")
     result = await db.execute(
