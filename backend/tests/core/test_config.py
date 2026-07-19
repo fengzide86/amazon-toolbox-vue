@@ -6,6 +6,10 @@ def test_runtime_settings_have_valid_network_defaults() -> None:
     assert settings.HOST
     assert 1 <= settings.PORT <= 65535
     assert isinstance(settings.CORS_ORIGINS, list)
+    assert settings.APP_ENV in {"internal", "test"}
+    assert settings.TOOL_EXECUTION_MODE == "demo"
+    assert settings.AI_SUPPORT_MODE == "rules"
+    assert settings.BUNDLED_BACKEND_ENABLED is False
 
 
 def test_security_configuration_uses_supported_types() -> None:
@@ -28,4 +32,9 @@ def test_ai_configuration_has_bounded_retry_values() -> None:
 
 def test_environment_override_is_parsed(monkeypatch) -> None:
     monkeypatch.setenv("DEBUG", "true")
-    assert Settings().DEBUG is True
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("BUNDLED_BACKEND_ENABLED", "true")
+    configured = Settings()
+    assert configured.DEBUG is True
+    assert configured.APP_ENV == "test"
+    assert configured.BUNDLED_BACKEND_ENABLED is True

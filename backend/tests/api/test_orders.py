@@ -1,191 +1,206 @@
-"""
-订单管理 API 集成测试
-"""
+from decimal import Decimal
+
 import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from models import Order, Plan, Setting, ProfitRecord
-
-
-class TestGetOrders:
-    """获取订单列表测试"""
-    
-    @pytest.mark.asyncio
-    async def test_get_orders_empty(self, client: AsyncClient):
-        """测试获取空订单列表"""
-        response = await client.get("/api/orders")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
-    
-    @pytest.mark.asyncio
-    async def test_get_orders_with_data(self, client: AsyncClient, db_session: AsyncSession):
-        """测试获取订单列表（有数据）"""
-        order1 = Order(order_no="ORD-001", amount=99.00, status="pending")
-        order2 = Order(order_no="ORD-002", amount=199.00, status="paid")
-        db_session.add_all([order1, order2])
-        await db_session.commit()
-        
-        response = await client.get("/api/orders")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 2
-    
-    @pytest.mark.asyncio
-    async def test_get_orders_pagination(self, client: AsyncClient, db_session: AsyncSession):
-        """测试订单分页"""
-        # 创建多个订单
-        for i in range(10):
-            order = Order(order_no=f"ORD-{i:03d}", amount=99.00, status="pending")
-            db_session.add(order)
-        await db_session.commit()
-        
-        # 获取第一页
-        response = await client.get("/api/orders?page=1&page_size=5")
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data) == 5
+from models import Order, Plan, ProfitRecord, StaffRole
 
 
-class TestCreateOrder:
-    """创建订单测试"""
-    
-    @pytest.mark.asyncio
-    async def test_create_order_pending(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试创建待付款订单"""
-        order_data = {
-            "amount": 99.00,
-            "channel": "微信支付",
-            "responsible": "张三",
-            "status": "pending"
-        }
-        
-        response = await client.post("/api/orders", json=order_data, headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert float(data["amount"]) == 99.00
-        assert data["status"] == "pending"
-        assert data["order_no"].startswith("ORD-")
-    
-    @pytest.mark.asyncio
-    async def test_create_order_paid(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试创建已付款订单（自动生成分润记录）"""
-        # 设置分润比例
-        setting2 = Setting(key="profit_ratios", value='{"tech": 0.30, "market": 0.25, "product": 0.15, "service": 0.15, "coordination": 0.10, "record": 0.05}')
-        db_session.add(setting2)
-        await db_session.commit()
-        
-        order_data = {
-            "amount": 100.00,
-            "status": "paid"
-        }
-        
-        response = await client.post("/api/orders", json=order_data, headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "paid"
-        assert data["paid_at"] is not None
+async def create_active_plan(db_session, name="测试套餐", price=Decimal("100.00")):
+    plan = Plan(name=name, price=price, duration_days=30, status="active")
+    db_session.add(plan)
+    await db_session.commit()
+    await db_session.refresh(plan)
+    return plan
 
 
-class TestUpdateOrder:
-    """更新订单测试"""
-    
-    @pytest.mark.asyncio
-    async def test_update_order_status(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试更新订单状态"""
-        # 设置分润比例
-        setting2 = Setting(key="profit_ratios", value='{"tech": 0.30, "market": 0.25, "product": 0.15, "service": 0.15, "coordination": 0.10, "record": 0.05}')
-        db_session.add(setting2)
-        await db_session.commit()
-        
-        # 创建订单
-        order = Order(order_no="ORD-UPDATE-001", amount=99.00, status="pending")
-        db_session.add(order)
-        await db_session.commit()
-        
-        # 更新为已付款
-        update_data = {"status": "paid"}
-        response = await client.put(f"/api/orders/{order.id}", json=update_data, headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "paid"
-        assert data["paid_at"] is not None
-    
-    @pytest.mark.asyncio
-    async def test_update_order_not_found(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试更新不存在的订单"""
-        response = await client.put("/api/orders/99999", json={"status": "paid"}, headers=auth_headers)
-        
-        assert response.status_code == 404
+@pytest.mark.asyncio
+async def test_orders_are_not_public(client):
+    response = await client.get("/api/orders")
+    assert response.status_code == 401
 
 
-class TestRefundOrder:
-    """订单退款测试"""
-    
-    @pytest.mark.asyncio
-    async def test_refund_order_success(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试订单退款成功"""
-        # 创建已付款订单
-        order = Order(order_no="ORD-REFUND-001", amount=99.00, status="paid")
-        db_session.add(order)
-        await db_session.commit()
-        
-        response = await client.post(f"/api/orders/{order.id}/refund", headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert data["order_no"] == "ORD-REFUND-001"
-        
-        # 验证订单状态
-        await db_session.refresh(order)
-        assert order.status == "refunded"
-        assert float(order.refund_amount) == 99.00
-    
-    @pytest.mark.asyncio
-    async def test_refund_order_deletes_profit_record(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试退款时删除分润记录"""
-        # 创建已付款订单和分润记录
-        order = Order(order_no="ORD-REFUND-002", amount=100.00, status="paid")
-        db_session.add(order)
-        await db_session.flush()
-        
-        profit = ProfitRecord(
-            order_id=order.id,
-            tech_share=30.00,
-            market_share=25.00,
-            product_share=15.00,
-            service_share=15.00,
-            coordination_share=10.00,
-            record_share=5.00
+@pytest.mark.asyncio
+async def test_order_list_is_bounded_and_paginated(client, db_session, auth_headers):
+    for index in range(3):
+        db_session.add(Order(order_no=f"ORD-PAGE-{index}", amount=10, status="pending"))
+    await db_session.commit()
+    response = await client.get("/api/orders?page=1&page_size=2", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["data"]) == 2
+    assert body["total"] == 3
+    assert body["page_size"] == 2
+    assert (await client.get("/api/orders?page_size=101", headers=auth_headers)).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_order_is_always_pending_and_snapshots_plan(client, db_session, auth_headers):
+    plan = await create_active_plan(db_session)
+    response = await client.post(
+        "/api/orders",
+        headers=auth_headers,
+        json={"plan_id": plan.id, "channel": "internal"},
+    )
+    assert response.status_code == 201
+    order = response.json()["data"]
+    assert order["status"] == "pending"
+    assert order["amount"] == 100.0
+    assert order["plan_name_snapshot"] == plan.name
+
+    rejected = await client.post(
+        "/api/orders",
+        headers=auth_headers,
+        json={"plan_id": plan.id, "status": "paid"},
+    )
+    assert rejected.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_support_can_read_but_cannot_mutate_orders(
+    client, db_session, staff_headers_factory
+):
+    plan = await create_active_plan(db_session)
+    support_headers = await staff_headers_factory(StaffRole.SUPPORT, "order-support")
+    assert (await client.get("/api/orders", headers=support_headers)).status_code == 200
+    response = await client.post(
+        "/api/orders",
+        headers=support_headers,
+        json={"plan_id": plan.id},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_mark_paid_creates_exactly_one_profit_record(
+    client, db_session, auth_headers
+):
+    plan = await create_active_plan(db_session, price=Decimal("99.99"))
+    created = await client.post(
+        "/api/orders",
+        headers=auth_headers,
+        json={"plan_id": plan.id},
+    )
+    order_id = created.json()["data"]["id"]
+
+    paid = await client.post(f"/api/orders/{order_id}/mark-paid", headers=auth_headers)
+    assert paid.status_code == 200
+    assert paid.json()["data"]["status"] == "paid"
+    duplicate = await client.post(f"/api/orders/{order_id}/mark-paid", headers=auth_headers)
+    assert duplicate.status_code == 409
+
+    result = await db_session.execute(
+        select(ProfitRecord).where(ProfitRecord.order_id == order_id)
+    )
+    records = result.scalars().all()
+    assert len(records) == 1
+    record = records[0]
+    total = sum(
+        Decimal(str(getattr(record, field)))
+        for field in (
+            "tech_share",
+            "market_share",
+            "product_share",
+            "service_share",
+            "coordination_share",
+            "record_share",
         )
-        db_session.add(profit)
-        await db_session.commit()
-        
-        # 退款
-        response = await client.post(f"/api/orders/{order.id}/refund", headers=auth_headers)
-        
-        assert response.status_code == 200
-        
-        # 验证分润记录已删除
-        from sqlalchemy import select
-        result = await db_session.execute(
-            select(ProfitRecord).where(ProfitRecord.order_id == order.id)
+    )
+    assert total == Decimal("99.99")
+    assert record.policy_version == 1
+
+
+@pytest.mark.asyncio
+async def test_profit_failure_keeps_order_pending(
+    client, db_session, auth_headers, monkeypatch
+):
+    plan = await create_active_plan(db_session)
+    created = await client.post(
+        "/api/orders", headers=auth_headers, json={"plan_id": plan.id}
+    )
+    order_id = created.json()["data"]["id"]
+
+    async def fail_profit(*_args, **_kwargs):
+        raise RuntimeError("forced profit failure")
+
+    monkeypatch.setattr(
+        "services.profit_service.ProfitService.create_for_paid_order",
+        fail_profit,
+    )
+    with pytest.raises(RuntimeError, match="forced profit failure"):
+        await client.post(f"/api/orders/{order_id}/mark-paid", headers=auth_headers)
+    db_session.expire_all()
+    order = (await db_session.execute(select(Order).where(Order.id == order_id))).scalar_one()
+    assert order.status == "pending"
+
+
+@pytest.mark.asyncio
+async def test_refund_reverses_profit_instead_of_deleting(
+    client, db_session, auth_headers
+):
+    plan = await create_active_plan(db_session)
+    created = await client.post(
+        "/api/orders", headers=auth_headers, json={"plan_id": plan.id}
+    )
+    order_id = created.json()["data"]["id"]
+    await client.post(f"/api/orders/{order_id}/mark-paid", headers=auth_headers)
+
+    refunded = await client.post(
+        f"/api/orders/{order_id}/refund",
+        headers=auth_headers,
+        json={"reason": "内部退款验证"},
+    )
+    assert refunded.status_code == 200
+    assert refunded.json()["data"]["status"] == "refunded"
+
+    record = (
+        await db_session.execute(
+            select(ProfitRecord).where(ProfitRecord.order_id == order_id)
         )
-        deleted_profit = result.scalars().first()
-        assert deleted_profit is None
-    
-    @pytest.mark.asyncio
-    async def test_refund_order_not_found(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试退款不存在的订单"""
-        response = await client.post("/api/orders/99999/refund", headers=auth_headers)
-        
-        assert response.status_code == 404
+    ).scalar_one()
+    assert record.status == "reversed"
+    assert record.reversed_at is not None
+    summary = await client.get("/api/profit/summary", headers=auth_headers)
+    assert summary.json()["grand_total"] == 0
+    assert summary.json()["reversed_total"] == 100.0
+
+
+@pytest.mark.asyncio
+async def test_cancelled_and_refunded_are_terminal(client, db_session, auth_headers):
+    plan = await create_active_plan(db_session)
+    created = await client.post(
+        "/api/orders", headers=auth_headers, json={"plan_id": plan.id}
+    )
+    order_id = created.json()["data"]["id"]
+    cancelled = await client.post(
+        f"/api/orders/{order_id}/cancel",
+        headers=auth_headers,
+        json={"reason": "内部取消验证"},
+    )
+    assert cancelled.status_code == 200
+    assert cancelled.json()["data"]["status"] == "cancelled"
+    assert (
+        await client.post(f"/api/orders/{order_id}/mark-paid", headers=auth_headers)
+    ).status_code == 409
+    assert (
+        await client.patch(
+            f"/api/orders/{order_id}",
+            headers=auth_headers,
+            json={"amount": "80.00"},
+        )
+    ).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_plan_price_change_does_not_rewrite_order_snapshot(
+    client, db_session, auth_headers
+):
+    plan = await create_active_plan(db_session, price=Decimal("100.00"))
+    created = await client.post(
+        "/api/orders", headers=auth_headers, json={"plan_id": plan.id}
+    )
+    order_id = created.json()["data"]["id"]
+    plan.price = Decimal("200.00")
+    await db_session.commit()
+    detail = await client.get(f"/api/orders/{order_id}", headers=auth_headers)
+    assert detail.json()["data"]["plan_price_snapshot"] == 100.0

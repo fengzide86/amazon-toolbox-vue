@@ -21,17 +21,16 @@ import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import BusinessSidebar from '@/components/BusinessSidebar.vue'
 import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
-import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
+import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
 import { getCurrentUser } from '@/utils/api'
 import { authService } from '@/utils/auth'
 import { authenticatedUserSchema } from '@/features/auth/model'
 
 const route = useRoute()
 const router = useRouter()
-const store = useBusinessWorkspaceStore()
+const store = useBusinessDemoWorkspaceStore()
 const showSidebar = ref(false)
 let removeAfterEach: (() => void) | undefined
-let removeNotification: (() => void) | undefined
 let accessTimer: ReturnType<typeof setInterval> | undefined
 
 async function refreshAccess() {
@@ -58,16 +57,10 @@ onMounted(async () => {
   }
   accessTimer = setInterval(() => refreshAccess().catch(() => {}), 30000)
   removeAfterEach = router.afterEach(() => { showSidebar.value = false })
-  removeNotification = window.electronAPI?.notifications?.onFocus?.(payload => {
-    if (payload?.mode !== 'batch') return
-    router.push('/business/workspace')
-    if (payload.itemId) store.selectItem(payload.itemId)
-  })
 })
 onUnmounted(() => {
   if (accessTimer) clearInterval(accessTimer)
   removeAfterEach?.()
-  removeNotification?.()
   store.dispose()
 })
 </script>

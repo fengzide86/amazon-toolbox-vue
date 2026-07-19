@@ -2,14 +2,14 @@
 工单反馈路由模块（优化版）
 使用服务层 + 统一响应格式 + 分页
 """
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 
-from database import get_db
-from schemas import FeedbackCreate, FeedbackUpdate
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from core.dependencies import get_current_admin, get_current_user
 from core.pagination import PaginationParams
+from database import get_db
+from schemas import FeedbackCreate, FeedbackUpdate
 from services.feedback_service import FeedbackService
 
 router = APIRouter()
@@ -17,8 +17,8 @@ router = APIRouter()
 
 @router.get("")
 async def get_feedback_list(
-    status: Optional[str] = Query(None, description="状态过滤"),
-    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
+    status: str | None = Query(None, description="状态过滤"),
+    platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -84,20 +84,27 @@ async def create_feedback(
 async def update_feedback(
     feedback_id: int,
     req: FeedbackUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin)
+    actor: dict = Depends(get_current_admin)
 ):
     """更新工单（管理员回复等）"""
     service = FeedbackService(db)
-    return await service.update_feedback(feedback_id, req.model_dump(exclude_none=True))
+    return await service.update_feedback(
+        feedback_id,
+        req.model_dump(exclude_none=True),
+        actor=actor,
+        request=request,
+    )
 
 
 @router.delete("/{feedback_id}")
 async def delete_feedback(
     feedback_id: int,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin)
+    actor: dict = Depends(get_current_admin)
 ):
     """删除工单"""
     service = FeedbackService(db)
-    return await service.delete_feedback(feedback_id)
+    return await service.delete_feedback(feedback_id, actor=actor, request=request)

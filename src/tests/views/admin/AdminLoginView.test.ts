@@ -51,7 +51,7 @@ describe('AdminLoginView', () => {
 
     it('应该显示副标题提示', () => {
       const wrapper = mountWithPinia(AdminLoginView)
-      expect(wrapper.text()).toContain('请输入管理员密码进入后台')
+      expect(wrapper.text()).toContain('使用管理账号和密码进入后台')
     })
 
     it('应该渲染密码输入框', () => {
@@ -83,18 +83,19 @@ describe('AdminLoginView', () => {
   })
 
   describe('表单验证测试', () => {
-    it('空密码提交应该显示错误提示', async () => {
+    it('空账号提交应该显示错误提示', async () => {
       const wrapper = mountWithPinia(AdminLoginView)
       const form = wrapper.find('form')
       await form.trigger('submit')
       await flushPromises()
 
-      expect(mockShowToast).toHaveBeenCalledWith('请输入密码', 'error')
+      expect(mockShowToast).toHaveBeenCalledWith('请输入管理账号', 'error')
       expect(mockAdminLogin).not.toHaveBeenCalled()
     })
 
     it('只有空格的密码应该被视为空', async () => {
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       const input = wrapper.find('#adminPassword')
       await input.setValue('   ')
       
@@ -110,21 +111,23 @@ describe('AdminLoginView', () => {
     it('登录成功应该保存 token 并跳转', async () => {
       mockAdminLogin.mockResolvedValue({
         success: true,
-        data: { token: 'test-jwt-token' }
+        message: '登录成功',
+        data: { token: 'test-jwt-token', role: 'super_admin', username: 'owner', force_password_reset: false }
       })
 
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       const input = wrapper.find('#adminPassword')
-      await input.setValue('admin123')
+      await input.setValue('Test-only-pass-123')
 
       const form = wrapper.find('form')
       await form.trigger('submit')
       await flushPromises()
 
-      expect(mockAdminLogin).toHaveBeenCalledWith('admin123')
+      expect(mockAdminLogin).toHaveBeenCalledWith('owner', 'Test-only-pass-123')
       
       // 管理员令牌仅保存在当前会话
-      expect(sessionStorage.getItem('toolbox_role')).toBe('admin')
+      expect(sessionStorage.getItem('toolbox_role')).toBe('super_admin')
       expect(sessionStorage.getItem('toolbox_token')).toBe('test-jwt-token')
       
       // 成功后立即导航，由全局光轨承担一次克制确认
@@ -140,6 +143,7 @@ describe('AdminLoginView', () => {
       })
 
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       const input = wrapper.find('#adminPassword')
       await input.setValue('wrong-password')
 
@@ -156,15 +160,16 @@ describe('AdminLoginView', () => {
       mockAdminLogin.mockRejectedValue(new Error('Network error'))
 
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       const input = wrapper.find('#adminPassword')
-      await input.setValue('admin123')
+      await input.setValue('Test-only-pass-123')
 
       const form = wrapper.find('form')
       await form.trigger('submit')
       await flushPromises()
 
       expect(wrapper.find('.error-message').classes()).toContain('show')
-      expect(wrapper.find('.error-message span').text()).toContain('无法连接到后端服务')
+      expect(wrapper.find('.error-message span').text()).toContain('Network error')
     })
 
     it('登录过程中按钮应该显示加载状态', async () => {
@@ -172,8 +177,9 @@ describe('AdminLoginView', () => {
       mockAdminLogin.mockReturnValue(new Promise(resolve => { resolvePromise = resolve }))
 
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       const input = wrapper.find('#adminPassword')
-      await input.setValue('admin123')
+      await input.setValue('Test-only-pass-123')
 
       const form = wrapper.find('form')
       await form.trigger('submit')
@@ -185,7 +191,7 @@ describe('AdminLoginView', () => {
       expect(btn.text()).toContain('验证中...')
 
       // 完成登录
-      resolvePromise({ success: true, data: { token: 'test' } })
+      resolvePromise({ success: true, message: '登录成功', data: { token: 'test', role: 'super_admin', username: 'owner' } })
       await flushPromises()
     })
   })
@@ -258,8 +264,9 @@ describe('AdminLoginView', () => {
       mockAdminLogin.mockReturnValue(new Promise(() => {})) // 永不 resolve
 
       const wrapper = mountWithPinia(AdminLoginView)
+      await wrapper.find('#adminUsername').setValue('owner')
       const input = wrapper.find('#adminPassword')
-      await input.setValue('admin123')
+      await input.setValue('Test-only-pass-123')
 
       const form = wrapper.find('form')
       await form.trigger('submit')

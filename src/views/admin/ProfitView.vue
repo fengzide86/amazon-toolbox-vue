@@ -1,9 +1,10 @@
 <template>
   <div>
     <h2 class="page-title">分润管理</h2>
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载分润数据…" @retry="loadData" />
 
     <!-- 分润统计卡片 -->
-    <el-row :gutter="16" style="margin-bottom: 1.5rem; align-items: stretch;">
+    <el-row v-if="loadState !== 'loading' && loadState !== 'error'" :gutter="16" style="margin-bottom: 1.5rem; align-items: stretch;">
       <el-col :xs="12" :sm="8" :md="4" v-for="(item, index) in profitItems" :key="item.key" style="display: flex;">
         <el-card class="stat-card" style="width: 100%; min-height: 120px;">
           <div class="stat-icon" :style="{ background: item.bgColor }">
@@ -20,22 +21,22 @@
     </el-row>
 
     <!-- 分润总计 -->
-    <el-card class="total-card">
+    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="total-card">
       <div class="total-content">
         <div class="total-label">分润总计</div>
         <div class="total-value">¥{{ summary.grand_total?.toFixed(2) || '0.00' }}</div>
       </div>
       <div v-if="!summary.grand_total" class="total-empty">
-        暂无分润记录，请先创建订单并确认付款
+      暂无分润记录，请先创建订单并标记已收款
       </div>
     </el-card>
 
     <!-- 分润比例可视化 -->
-    <el-card class="table-card">
+    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="table-card">
       <template #header>
         <div class="card-header">
           <h3>分润比例配置</h3>
-          <router-link to="/admin/settings" class="settings-link">
+          <router-link v-if="canEditPolicy" to="/admin/settings" class="settings-link">
             <el-icon><Setting /></el-icon>
             去设置
           </router-link>
@@ -59,11 +60,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { getProfitSummary, getSettings } from '@/utils/api'
-import { showToast } from '@/utils'
+import { getProfitPolicy, getProfitSummary } from '@/utils/api'
 import { usePlatformStore } from '@/stores/platform'
+import { authService } from '@/utils/auth'
 import { Setting } from '@element-plus/icons-vue'
-import { adminSettingsSchema, profitSummarySchema } from '@/features/admin/model'
+import { profitPolicySchema, profitSummarySchema } from '@/features/admin/model'
+import { hasStaffPermission } from '@/features/auth/permissions'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import { failedDataState, type AsyncDataState } from '@/features/async/state'
 
 type ProfitKey = 'tech' | 'market' | 'product' | 'service' | 'coordination' | 'record'
 type ProfitAmountKey = 'total_tech' | 'total_market' | 'total_product' | 'total_service' | 'total_coordination' | 'total_record'
@@ -78,6 +82,9 @@ interface ProfitItem {
 }
 
 const summary = ref(profitSummarySchema.parse({}))
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
+const hasLoaded = ref(false)
 const profitRatios = ref<Record<ProfitKey, number>>({
   tech: 30,
   market: 25,
@@ -88,7 +95,7 @@ const profitRatios = ref<Record<ProfitKey, number>>({
 })
 
 const platformStore = usePlatformStore()
-
+const canEditPolicy = computed(() => hasStaffPermission(authService.getRole(), 'profit.policy.write'))
 const profitItems = computed<ProfitItem[]>(() => [
   { key: 'tech', label: '技术', icon: '🔧', amountKey: 'total_tech', color: '#6366F1', bgColor: 'rgba(99,102,241,0.1)', barColor: '#6366F1' },
   { key: 'market', label: '市场', icon: '📢', amountKey: 'total_market', color: '#10B981', bgColor: 'rgba(16,185,129,0.1)', barColor: '#10B981' },
@@ -99,31 +106,29 @@ const profitItems = computed<ProfitItem[]>(() => [
 ])
 
 async function loadData() {
+  loadState.value = hasLoaded.value ? 'data' : 'loading'
+  loadError.value = ''
   try {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
     const params = platformKey ? { platform_key: platformKey } : {}
-    const [summaryRes, settingsRes] = await Promise.all([
+    const [summaryRes, policyRes] = await Promise.all([
       getProfitSummary(params),
-      getSettings()
+      getProfitPolicy(),
     ])
     summary.value = profitSummarySchema.parse(summaryRes)
-    
-    const settings = adminSettingsSchema.parse(settingsRes)
-    const profitSetting = settings.find((setting) => setting.key === 'profit_ratios')
-    if (profitSetting && profitSetting.value) {
-      try {
-        const ratios = JSON.parse(profitSetting.value) as unknown
-        const ratioUpdate = Object.fromEntries(
-          Object.entries(typeof ratios === 'object' && ratios !== null ? ratios : {})
-            .filter(([key, value]) => key in profitRatios.value && typeof value === 'number' && Number.isFinite(value)),
-        ) as Partial<Record<ProfitKey, number>>
-        profitRatios.value = { ...profitRatios.value, ...ratioUpdate }
-      } catch (e) {
-        // 使用默认值
-      }
-    }
-  } catch (err) {
-    showToast('数据加载失败', 'error')
+
+    const policy = profitPolicySchema.parse(policyRes)
+    const ratioUpdate = Object.fromEntries(
+      Object.entries(policy.ratios)
+        .filter(([key, value]) => key in profitRatios.value && Number.isFinite(value))
+        .map(([key, value]) => [key, Number((value * 100).toFixed(2))]),
+    ) as Partial<Record<ProfitKey, number>>
+    profitRatios.value = { ...profitRatios.value, ...ratioUpdate }
+    hasLoaded.value = true
+    loadState.value = summary.value.grand_total > 0 ? 'data' : 'empty'
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '分润汇总与策略暂时无法加载'
+    loadState.value = failedDataState(hasLoaded.value)
   }
 }
 

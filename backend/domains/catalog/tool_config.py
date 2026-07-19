@@ -12,12 +12,12 @@ DEFAULT_CATEGORIES = [
     {"id": "automation", "name": "自动化工具", "sort_order": 3},
     {"id": "other", "name": "其他工具", "sort_order": 4},
 ]
-DEFAULT_TARGET_URLS = {
-    "amazon": "https://sellercentral.amazon.com/",
-    "aliexpress": "https://sellercenter.aliexpress.com/",
-}
+# Internal builds must never infer a real seller-center destination.  A live
+# tool will have to provide an explicit target when that phase is implemented.
+DEFAULT_TARGET_URLS: dict[str, str] = {}
 VALID_RELEASE_STATUSES = {"available", "beta", "maintenance", "disabled"}
 VALID_TOOL_STATUSES = {"online", "maintenance", "offline"}
+VALID_AVAILABILITIES = {"demo_only", "live_beta", "live"}
 SENSITIVE_BATCH_KEYS = {"password", "passwd", "pwd", "secret", "token", "cookie"}
 
 
@@ -56,9 +56,16 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
     status = str(normalized.get("status") or ("online" if release_status in {"available", "beta"} else "maintenance"))
     if status not in VALID_TOOL_STATUSES:
         status = "online" if release_status in {"available", "beta"} else "maintenance"
+    availability = str(normalized.get("availability") or "demo_only")
+    if availability not in VALID_AVAILABILITIES:
+        availability = "demo_only"
+    demo_scenario_id = slugify(str(normalized.get("demo_scenario_id") or f"{capability_key}_v1"))
     script_key, target_url = resolve_tool_runtime(
         {**normalized, "id": tool_id, "platform_key": platform_key, "capability_key": capability_key}, platform_key
     )
+    if availability == "demo_only":
+        script_key = f"demo.{demo_scenario_id}"
+        target_url = ""
     normalized.update({
         "id": tool_id,
         "name": str(normalized.get("name") or "未命名工具").strip(),
@@ -66,11 +73,17 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
         "category": normalized.get("category") or "automation",
         "platform_key": platform_key,
         "capability_key": capability_key,
+        "availability": availability,
+        "demo_scenario_id": demo_scenario_id,
+        "supports_demo_single": bool(normalized.get("supports_demo_single", True)),
+        "supports_demo_batch": bool(normalized.get("supports_demo_batch", normalized.get("supports_batch", False))),
+        "supports_live_single": bool(normalized.get("supports_live_single", False)) if availability != "demo_only" else False,
+        "supports_live_batch": bool(normalized.get("supports_live_batch", False)) if availability != "demo_only" else False,
         "release_status": release_status,
         "status": status,
         "description": normalized.get("description") or "",
-        "script_key": normalized.get("script_key") or script_key,
-        "target_url": normalized.get("target_url") or target_url,
+        "script_key": script_key if availability == "demo_only" else normalized.get("script_key") or script_key,
+        "target_url": target_url if availability == "demo_only" else normalized.get("target_url") or target_url,
         "tool_version": str(normalized.get("tool_version") or "1.0.0"),
         "runner_api_version": int(normalized.get("runner_api_version") or 1),
         "sort_order": int(normalized.get("sort_order") or index + 1),
@@ -98,7 +111,7 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
     if normalized["supports_batch"] and not any(item["key"] == "account_label" for item in batch_schema):
         batch_schema.insert(0, {"key": "account_label", "label": "客户简称", "type": "text", "required": True, "sensitive": False})
     normalized["batch_input_schema"] = batch_schema
-    normalized["requires_signature"] = bool(normalized.get("requires_signature", True))
+    normalized["requires_signature"] = False if availability == "demo_only" else bool(normalized.get("requires_signature", False))
     if isinstance(normalized["available_plans"], str):
         normalized["available_plans"] = [item.strip() for item in normalized["available_plans"].split(",") if item.strip()]
     return normalized
@@ -106,3 +119,30 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
 
 def normalize_tool_configs(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [normalize_tool_config(tool, index) for index, tool in enumerate(tools or [])]
+
+
+def force_demo_only_tool_configs(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Close catalog entries over the explicit Demo Adapter boundary.
+
+    Applying this at read and write boundaries means a stale database value or
+    admin payload cannot accidentally re-enable a Runner, seller-centre URL,
+    or live execution capability in the internal build.
+    """
+
+    for tool in tools:
+        scenario_id = slugify(str(
+            tool.get("demo_scenario_id")
+            or f"{tool.get('capability_key') or tool.get('id') or 'tool'}_walkthrough_v1"
+        ))
+        tool.update({
+            "availability": "demo_only",
+            "demo_scenario_id": scenario_id,
+            "supports_demo_single": bool(tool.get("supports_demo_single", True)),
+            "supports_demo_batch": bool(tool.get("supports_demo_batch", tool.get("supports_batch", False))),
+            "supports_live_single": False,
+            "supports_live_batch": False,
+            "script_key": f"demo.{scenario_id}",
+            "target_url": "",
+            "requires_signature": False,
+        })
+    return tools

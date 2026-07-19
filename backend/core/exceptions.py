@@ -2,9 +2,10 @@
 自定义异常和全局异常处理
 提供统一的错误处理机制
 """
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
 import logging
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +63,14 @@ async def business_exception_handler(request: Request, exc: BusinessException) -
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """HTTP 异常处理器"""
     logger.warning(f"HTTP异常: {exc.detail} (路径: {request.url.path}, 状态码: {exc.status_code})")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"success": False, "message": exc.detail}
-    )
+    if isinstance(exc.detail, dict):
+        message = exc.detail.get("message") or exc.detail.get("code") or "request failed"
+        content = {"success": False, "message": message, "detail": exc.detail}
+        if exc.detail.get("code"):
+            content["error_code"] = exc.detail["code"]
+    else:
+        content = {"success": False, "message": exc.detail}
+    return JSONResponse(status_code=exc.status_code, content=content)
 
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:

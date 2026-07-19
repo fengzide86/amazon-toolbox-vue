@@ -36,8 +36,11 @@ export const automationToolSchema = z.object({
   name: z.string().optional(),
   platformKey: z.string().optional(),
   targetUrl: z.string().optional(),
+  executionMode: z.enum(['demo', 'live']).default('demo'),
+  scenarioId: z.string().optional(),
+  demoRunId: z.string().optional(),
 }).passthrough()
-export type AutomationTool = z.infer<typeof automationToolSchema>
+export type AutomationTool = z.input<typeof automationToolSchema>
 
 export const automationStepSchema = z.object({
   id: z.string(),

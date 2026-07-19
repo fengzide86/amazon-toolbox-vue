@@ -4,7 +4,7 @@ AI 客服对话路由模块
 """
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,11 +43,10 @@ class RateSession(BaseModel):
 
 
 class UpdateConfig(BaseModel):
-    welcome_message: str | None = None
-    suggested_questions: list | None = None
-    ai_model: str | None = None
-    reply_style: str | None = None
-    max_retries: int | None = None
+    welcome_message: str | None = Field(default=None, max_length=1000)
+    suggested_questions: list[str] | None = None
+    max_unmatched: int | None = Field(default=None, ge=1, le=10)
+    transfer_keywords: list[str] | None = None
     transfer_rules: dict | None = None
 
 
@@ -110,6 +109,9 @@ async def send_message(
     return {
         "session_id": result["session_id"],
         "reply": result["reply"],
+        "answer_mode": result["answer_mode"],
+        "ai_used": False,
+        "should_transfer": result.get("should_transfer", False),
         "knowledge_refs": result.get("knowledge_refs", []),
     }
 
@@ -124,7 +126,13 @@ async def send_message_stream(
     """发送消息（SSE 流式返回）"""
     await _require_session_owner(db, session_id, current_user)
     async def event_generator():
-        async for chunk in ai_chat_service.send_message_stream(db, session_id, req.message):
+        async for chunk in ai_chat_service.send_message_stream(
+            db,
+            session_id,
+            req.message,
+            req.platform_key,
+            req.capability_key,
+        ):
             yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
 
@@ -198,14 +206,14 @@ async def get_history(
 
 @router.post("/admin/debug")
 async def debug_chat(
-    req: DebugChatRequest,
-    db: AsyncSession = Depends(get_db),
+    _req: DebugChatRequest,
+    _db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
-    """真实无状态问答调试，不生成会话或统计。"""
-    return await ai_chat_service.answer_question(
-        db, req.message, req.platform_key, req.capability_key,
-        top_k=req.top_k, min_score=req.min_score,
+    """Rules mode intentionally hides legacy retrieval/model diagnostics."""
+    raise HTTPException(
+        status_code=409,
+        detail={"code": "FEATURE_DISABLED", "message": "规则客服模式不提供检索调试"},
     )
 
 @router.get("/admin/config")
@@ -220,17 +228,20 @@ async def get_config(
 @router.put("/admin/config")
 async def update_config(
     req: UpdateConfig,
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
+    actor: dict = Depends(get_current_admin),
 ):
     """更新 AI 客服配置"""
     updates = req.model_dump(exclude_none=True)
     # 将 list/dict 类型序列化为 JSON 字符串
     if "suggested_questions" in updates:
         updates["suggested_questions"] = json.dumps(updates["suggested_questions"], ensure_ascii=False)
+    if "transfer_keywords" in updates:
+        updates["transfer_keywords"] = json.dumps(updates["transfer_keywords"], ensure_ascii=False)
     if "transfer_rules" in updates:
         updates["transfer_rules"] = json.dumps(updates["transfer_rules"], ensure_ascii=False)
-    return await ai_chat_service.update_config(db, updates)
+    return await ai_chat_service.update_config(db, updates, actor=actor, request=request)
 
 
 @router.get("/admin/sessions")

@@ -14,7 +14,7 @@ def test_resolve_tool_runtime_supports_legacy_tool_config():
     )
 
     assert script_key == "amazon.listing_script.v1"
-    assert target_url == "https://sellercentral.amazon.com/"
+    assert target_url == ""
 
 
 def test_normalize_tool_config_fills_operational_fields():
@@ -29,8 +29,9 @@ def test_normalize_tool_config_fills_operational_fields():
     )
 
     assert tool["id"] == "tool_register"
-    assert tool["script_key"] == "amazon.register.v1"
-    assert tool["target_url"] == "https://sellercentral.amazon.com/"
+    assert tool["script_key"] == "demo.register_v1"
+    assert tool["target_url"] == ""
+    assert tool["availability"] == "demo_only"
     assert tool["tool_version"] == "1.0.0"
     assert tool["runner_api_version"] == 1
     assert tool["status"] == "online"
@@ -66,8 +67,9 @@ class TestGetTools:
 
     async def test_get_tools_after_set(self, client: AsyncClient, db_session, auth_headers: dict):
         """设置工具后可获取 - 直接写入 Setting 表"""
-        from models import Setting
         import json
+
+        from models import Setting
         tools = [
             {"name": "工具A", "module": "模块A", "status": "online", "category": "data"},
             {"name": "工具B", "module": "模块B", "status": "offline", "category": "operation"},
@@ -84,8 +86,9 @@ class TestGetTools:
 
     async def test_get_tools_filter_by_category(self, client: AsyncClient, db_session, auth_headers: dict):
         """按分类筛选工具"""
-        from models import Setting
         import json
+
+        from models import Setting
         tools = [
             {"name": "工具A", "module": "模块A", "status": "online", "category": "data"},
             {"name": "工具B", "module": "模块B", "status": "online", "category": "operation"},
@@ -102,8 +105,9 @@ class TestGetTools:
 
     async def test_get_tools_filter_by_search(self, client: AsyncClient, db_session, auth_headers: dict):
         """按关键词搜索工具"""
-        from models import Setting
         import json
+
+        from models import Setting
         tools = [
             {"name": "数据分析工具", "module": "数据分析", "status": "online", "description": "用于数据分析"},
             {"name": "发货助手", "module": "物流", "status": "online", "description": "批量发货"},
@@ -119,8 +123,9 @@ class TestGetTools:
 
     async def test_get_tools_search_case_insensitive(self, client: AsyncClient, db_session, auth_headers: dict):
         """搜索不区分大小写"""
-        from models import Setting
         import json
+
+        from models import Setting
         tools = [{"name": "DataTool", "module": "Module", "status": "online"}]
         db_session.add(Setting(key="tool_configs", value=json.dumps(tools, ensure_ascii=False)))
         await db_session.commit()
@@ -131,8 +136,9 @@ class TestGetTools:
 
     async def test_get_tools_platform_filter_normalizes_legacy_tools_first(self, client: AsyncClient, db_session):
         """旧工具没有 platform_key 时，平台筛选前应先补齐默认运行字段"""
-        from models import Setting
         import json
+
+        from models import Setting
         tools = [{"id": "tool_reg_newbie", "name": "旧注册工具", "module": "注册工具", "status": "online"}]
         db_session.add(Setting(key="tool_configs", value=json.dumps(tools, ensure_ascii=False)))
         await db_session.commit()
@@ -143,12 +149,14 @@ class TestGetTools:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["platform_key"] == "amazon"
-        assert data[0]["script_key"] == "amazon.tool_reg_newbie.v1"
+        assert data[0]["script_key"] == "demo.tool_reg_newbie_v1"
+        assert data[0]["target_url"] == ""
 
     async def test_get_tools_category_all(self, client: AsyncClient, db_session, auth_headers: dict):
         """category=all 返回全部"""
-        from models import Setting
         import json
+
+        from models import Setting
         tools = [
             {"name": "A", "module": "M", "status": "online", "category": "data"},
             {"name": "B", "module": "M", "status": "online", "category": "operation"},
@@ -175,8 +183,9 @@ class TestToolCategories:
 
     async def test_update_categories(self, client: AsyncClient, db_session, auth_headers: dict):
         """更新分类配置 - 直接写入 Setting 表"""
-        from models import Setting
         import json
+
+        from models import Setting
         cats = [{"id": "custom", "name": "自定义", "sort_order": 0}]
         db_session.add(Setting(key="tool_categories", value=json.dumps(cats, ensure_ascii=False)))
         await db_session.commit()
@@ -204,8 +213,9 @@ class TestUpdateTools:
 
     async def test_update_tools_success(self, client: AsyncClient, db_session, auth_headers: dict):
         """管理员可更新工具 - 验证 Setting 表写入"""
-        from models import Setting
         import json
+
+        from models import Setting
         # 先写入初始数据
         tools = [{"name": "新工具", "module": "模块", "status": "online"}]
         db_session.add(Setting(key="tool_configs", value=json.dumps(tools, ensure_ascii=False)))
@@ -216,3 +226,31 @@ class TestUpdateTools:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["name"] == "新工具"
+
+    async def test_internal_update_cannot_enable_live_runtime(
+        self,
+        client: AsyncClient,
+        auth_headers: dict,
+    ):
+        response = await client.put(
+            "/api/tools",
+            headers=auth_headers,
+            json=[{
+                "id": "unsafe-live-tool",
+                "name": "待演示工具",
+                "module": "内部验证",
+                "availability": "live",
+                "supports_live_single": True,
+                "supports_live_batch": True,
+                "target_url": "https://sellercentral.amazon.com/",
+                "script_key": "amazon.unsafe.v1",
+            }],
+        )
+
+        assert response.status_code == 200
+        tool = response.json()["data"][0]
+        assert tool["availability"] == "demo_only"
+        assert tool["supports_live_single"] is False
+        assert tool["supports_live_batch"] is False
+        assert tool["target_url"] == ""
+        assert tool["script_key"].startswith("demo.")

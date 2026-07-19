@@ -21,8 +21,9 @@ def test_upgrade_default_register_tool_keeps_original_product_name():
 
     assert changed is True
     assert tools[0]["name"] == "新手快速注册工具"
-    assert tools[0]["script_key"] == "amazon.register.v1"
-    assert tools[0]["target_url"] == "https://sellercentral.amazon.com/"
+    assert tools[0]["script_key"] == "demo.register_walkthrough_v1"
+    assert tools[0]["target_url"] == ""
+    assert tools[0]["availability"] == "demo_only"
     assert tools[0]["description"] == DEFAULT_REGISTER_TOOL["description"]
 
 
@@ -39,11 +40,12 @@ def test_upgrade_legacy_default_tool_names_fill_ids_and_runtime_fields():
     runtime_changed = ensure_tool_runtime_fields(tools)
 
     assert changed is True
-    assert runtime_changed is True
+    assert runtime_changed is False
     assert tools[0]["id"] == "tool_logistics_standard"
     assert tools[0]["platform_key"] == "amazon"
     assert tools[0]["capability_key"] == "logistics_standard"
-    assert tools[0]["script_key"] == "amazon.logistics_standard.v1"
+    assert tools[0]["script_key"] == "demo.logistics_standard_walkthrough_v1"
+    assert tools[0]["target_url"] == ""
 
 
 def test_upgrade_default_register_tool_keeps_custom_admin_tool():
@@ -71,7 +73,7 @@ def test_ensure_tool_runtime_fields_keeps_register_script_key():
     changed = ensure_tool_runtime_fields(tools)
 
     assert changed is False
-    assert tools[0]["script_key"] == "amazon.register.v1"
+    assert tools[0]["script_key"] == "demo.register_walkthrough_v1"
 
 
 def test_default_tool_configs_include_register_tool():
@@ -80,5 +82,7 @@ def test_default_tool_configs_include_register_tool():
 
     assert len(tools) >= 10
     assert register_tool["name"] == "新手快速注册工具"
-    assert register_tool["script_key"] == "amazon.register.v1"
-    assert register_tool["target_url"] == "https://sellercentral.amazon.com/"
+    assert register_tool["script_key"] == "demo.register_walkthrough_v1"
+    assert register_tool["target_url"] == ""
+    assert register_tool["availability"] == "demo_only"
+    assert register_tool["supports_live_single"] is False

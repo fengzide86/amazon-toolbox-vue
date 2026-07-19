@@ -29,9 +29,10 @@ export default defineConfig({
       'amazon-toolbox/**',
       'backend/**'
     ],
-    // Windows 默认线程池在完整套件中会残留 worker；单 fork 更稳定且当前套件更快。
+    // Forks avoid the lingering thread workers seen on Windows; eight workers
+    // keep the full 44-file suite bounded on the 16-core development machine.
     pool: 'forks',
-    maxWorkers: 1,
+    maxWorkers: 8,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

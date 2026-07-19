@@ -165,7 +165,10 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     adapter = null
   }
 
-  async function start(nextTool: AutomationTool, options: AutomationAdapterOptions = {}): Promise<unknown> {
+  async function start(
+    nextTool: AutomationTool,
+    options: Omit<AutomationAdapterOptions, 'mode'> & { mode?: AutomationAdapterOptions['mode'] } = {},
+  ): Promise<unknown> {
     disposeAdapter()
     stopClock()
     runId.value = null
@@ -179,7 +182,8 @@ export const useTaskRunStore = defineStore('taskRun', () => {
     error.value = null
     artifacts.value = []
     userAction.value = null
-    adapter = markRaw(options.adapter || createAutomationAdapter(options))
+    const mode = options.mode || (nextTool.executionMode === 'live' ? 'live' : 'demo')
+    adapter = markRaw(options.adapter || createAutomationAdapter({ ...options, mode }))
     unsubscribe = adapter.subscribe(applyEvent)
     try {
       return await adapter.start(nextTool)

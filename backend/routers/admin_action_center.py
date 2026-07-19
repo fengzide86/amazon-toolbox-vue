@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.dependencies import get_current_admin
 from core.response import success_response
 from database import get_db
-from models import AuthCode, AuthSeat, AutomationBatch, AutomationBatchItem, Device, Feedback
+from models import AuthCode, AuthSeat, Device, Feedback
 
 router = APIRouter()
 
@@ -50,31 +50,13 @@ async def get_action_center(
     )
     tickets = feedback_result.scalars().all()
 
-    waiting_result = await db.execute(
-        select(AutomationBatchItem, AutomationBatch)
-        .join(AutomationBatch, AutomationBatch.id == AutomationBatchItem.batch_id)
-        .where(AutomationBatchItem.status == "waiting_user")
-        .order_by(AutomationBatchItem.updated_at)
-        .limit(30)
-    )
-    waiting = waiting_result.all()
-
-    stale_before = now - timedelta(seconds=90)
-    stale_result = await db.execute(
-        select(AutomationBatch).where(
-            AutomationBatch.status == "running",
-            AutomationBatch.last_heartbeat_at < stale_before,
-        ).order_by(AutomationBatch.last_heartbeat_at).limit(20)
-    )
-    stale = stale_result.scalars().all()
-
     return success_response({
         "summary": {
             "expiring_authorizations": len(expiring),
             "device_anomalies": len(anomalies),
             "pending_tickets": len(tickets),
-            "waiting_interventions": len(waiting),
-            "stale_batches": len(stale),
+            "waiting_interventions": 0,
+            "stale_batches": 0,
         },
         "expiring_authorizations": [{
             "id": item.id,
@@ -95,41 +77,20 @@ async def get_action_center(
             "priority": item.priority,
             "created_at": item.created_at.isoformat() if item.created_at else None,
         } for item in tickets],
-        "waiting_interventions": [{
-            "batch_id": batch.id,
-            "tool_name": batch.tool_name,
-            "account_label_masked": item.account_label_masked,
-            "intervention_type": item.intervention_type,
-            "updated_at": item.updated_at.isoformat() if item.updated_at else None,
-        } for item, batch in waiting],
-        "stale_batches": [{
-            "batch_id": item.id,
-            "tool_name": item.tool_name,
-            "last_heartbeat_at": item.last_heartbeat_at.isoformat() if item.last_heartbeat_at else None,
-        } for item in stale],
+        # Legacy Runner batches are intentionally excluded. Demo metrics live
+        # under /api/demo and never masquerade as operational execution alerts.
+        "waiting_interventions": [],
+        "stale_batches": [],
     })
 
 
 @router.get("/business-batches/{batch_id}")
 async def get_business_batch(batch_id: int, _admin: dict = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(AutomationBatch).where(AutomationBatch.id == batch_id))
-    batch = result.scalar_one_or_none()
-    if not batch:
-        raise HTTPException(status_code=404, detail="批次不存在")
-    items_result = await db.execute(
-        select(AutomationBatchItem).where(AutomationBatchItem.batch_id == batch.id).order_by(AutomationBatchItem.id)
+    del batch_id, _admin, db
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "code": "FEATURE_DISABLED",
+            "message": "内部演示版不开放旧 Runner 批次详情",
+        },
     )
-    return success_response({
-        "id": batch.id,
-        "tool_name": batch.tool_name,
-        "status": batch.status,
-        "total_count": batch.total_count,
-        "last_heartbeat_at": batch.last_heartbeat_at.isoformat() if batch.last_heartbeat_at else None,
-        "items": [{
-            "account_label_masked": item.account_label_masked,
-            "status": item.status,
-            "intervention_type": item.intervention_type,
-            "customer_message": item.customer_message,
-            "updated_at": item.updated_at.isoformat() if item.updated_at else None,
-        } for item in items_result.scalars().all()],
-    })

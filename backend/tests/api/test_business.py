@@ -33,7 +33,7 @@ async def test_large_consumer_plan_cannot_use_business_api(client: AsyncClient, 
 
 
 @pytest.mark.asyncio
-async def test_business_batch_is_idempotent_and_only_stores_masked_control_data(client: AsyncClient, db_session):
+async def test_legacy_business_batch_write_is_disabled_in_demo_mode(client: AsyncClient, db_session):
     plan = Plan(
         name="专业批量版",
         price=999,
@@ -66,27 +66,9 @@ async def test_business_batch_is_idempotent_and_only_stores_masked_control_data(
     payload = {"client_batch_id": "client-batch-001", "tool_id": "tool_register", "tool_name": "不可信名称", "total_count": 2}
     first = await client.post("/api/business/batches", json=payload, headers=headers)
     second = await client.post("/api/business/batches", json=payload, headers=headers)
-    assert first.status_code == 200
-    assert second.status_code == 200
-    first_data = first.json()["data"]
-    assert first_data["id"] == second.json()["data"]["id"]
-    assert first_data["tool_name"] == "注册自动处理"
 
-    item = await client.put(
-        f"/api/business/batches/{first_data['id']}/items/item-1",
-        json={
-            "account_label_masked": "customer@example.com",
-            "status": "waiting_user",
-            "intervention_type": "captcha",
-            "customer_message": "password=should-never-be-stored",
-        },
-        headers=headers,
-    )
-    assert item.status_code == 200
-    assert item.json()["data"]["account_label_masked"] == "cu***@example.com"
-    assert item.json()["data"]["customer_message"] == "需要完成页面验证码"
-
-    batch_count = len((await db_session.execute(select(AutomationBatch))).scalars().all())
-    stored_item = (await db_session.execute(select(AutomationBatchItem))).scalar_one()
-    assert batch_count == 1
-    assert "password" not in (stored_item.customer_message or "").lower()
+    assert first.status_code == 409
+    assert second.status_code == 409
+    assert "FEATURE_DISABLED" in str(first.json())
+    assert (await db_session.execute(select(AutomationBatch))).scalars().all() == []
+    assert (await db_session.execute(select(AutomationBatchItem))).scalars().all() == []

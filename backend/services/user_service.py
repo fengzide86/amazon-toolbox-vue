@@ -3,14 +3,17 @@
 包含用户 CRUD、统计、分页查询等业务逻辑
 """
 from datetime import datetime
-from typing import Optional, Dict, Any
-from sqlalchemy import select, func, desc
+from typing import Any
+
+from fastapi import Request
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import User, AuthCode, Device, Plan
+from core.audit import log_admin_action
 from core.logging import get_logger
-from core.response import success_response, error_response, ErrorCodes
 from core.pagination import PaginationParams, paginate
+from core.response import ErrorCodes, error_response, success_response
+from models import AuthCode, Device, User
 
 logger = get_logger(__name__)
 
@@ -23,9 +26,9 @@ class UserService:
     
     async def get_users_list(
         self,
-        keyword: Optional[str] = None,
-        pagination: Optional[PaginationParams] = None
-    ) -> Dict[str, Any]:
+        keyword: str | None = None,
+        pagination: PaginationParams | None = None
+    ) -> dict[str, Any]:
         """获取用户列表（支持搜索和分页）"""
         query = select(User).order_by(desc(User.created_at))
         
@@ -54,7 +57,7 @@ class UserService:
                 data=[self._serialize_user(u) for u in users]
             )
     
-    async def get_user_by_id(self, user_id: int) -> Dict[str, Any]:
+    async def get_user_by_id(self, user_id: int) -> dict[str, Any]:
         """根据 ID 获取用户详情"""
         result = await self.db.execute(select(User).where(User.id == user_id))
         user = result.scalars().first()
@@ -64,14 +67,21 @@ class UserService:
         
         return success_response(data=self._serialize_user(user, detailed=True))
     
-    async def update_user(self, user_id: int, data: dict) -> Dict[str, Any]:
+    async def update_user(
+        self,
+        user_id: int,
+        data: dict,
+        actor: dict | None = None,
+        request: Request | None = None,
+    ) -> dict[str, Any]:
         """更新用户信息"""
         result = await self.db.execute(select(User).where(User.id == user_id))
         user = result.scalars().first()
         
         if not user:
             return error_response("用户不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
+
+        before = self._serialize_user(user, detailed=True)
         # 更新字段
         updatable_fields = ["name", "phone", "total_seats", "extra_devices", "is_active"]
         for field in updatable_fields:
@@ -79,6 +89,22 @@ class UserService:
                 setattr(user, field, data[field])
         
         try:
+            if actor:
+                await log_admin_action(
+                    self.db,
+                    user_id=actor.get("staff_id"),
+                    user_name=actor.get("username"),
+                    action="user_update",
+                    target_type="user",
+                    target_id=user.id,
+                    detail={
+                        "role": actor.get("role"),
+                        "before": before,
+                        "after": self._serialize_user(user, detailed=True),
+                        "reason": None,
+                    },
+                    request=request,
+                )
             await self.db.commit()
             await self.db.refresh(user)
         except Exception as e:
@@ -89,7 +115,7 @@ class UserService:
         logger.info(f"更新用户: {user.name or user.id} (ID: {user.id})")
         return success_response(data=self._serialize_user(user), message="更新成功")
     
-    async def get_user_devices(self, user_id: int) -> Dict[str, Any]:
+    async def get_user_devices(self, user_id: int) -> dict[str, Any]:
         """获取用户的设备列表"""
         # 先获取用户的授权码
         user_result = await self.db.execute(select(User).where(User.id == user_id))
@@ -117,7 +143,7 @@ class UserService:
             for d in devices
         ])
     
-    async def get_user_stats(self) -> Dict[str, Any]:
+    async def get_user_stats(self) -> dict[str, Any]:
         """获取用户统计"""
         # 总用户数
         total_result = await self.db.execute(select(func.count(User.id)))

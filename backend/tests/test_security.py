@@ -384,7 +384,6 @@ class TestCheckSecurity:
         s.DB_TYPE = "sqlite"
         s.DEBUG = False
         s.CORS_ORIGINS = ["*"]
-        s.DEFAULT_ADMIN_PASSWORD = "admin123"
 
         result = s.check_security()
 
@@ -398,15 +397,16 @@ class TestCheckSecurity:
         s.DB_TYPE = "mysql"
         s.DEBUG = False
         s.CORS_ORIGINS = ["*"]
-        s.DEFAULT_ADMIN_PASSWORD = "admin123"
         s.MYSQL_PASSWORD = ""
 
         result = s.check_security()
 
-        # 生产环境应触发 CORS 和默认密码错误
+        # 生产环境应触发 CORS 和数据库密码错误；后台账号由 staff bootstrap 管理。
         error_texts = " ".join(result["errors"])
         assert "CORS" in error_texts
-        assert "admin123" in error_texts
+        assert "MySQL" in error_texts
+        assert ("admin" + "123") not in error_texts
+        assert "Ed25519" not in error_texts
 
     def test_debug_mode_no_errors(self):
         """测试 DEBUG=True 时不触发生产环境错误"""
@@ -414,7 +414,6 @@ class TestCheckSecurity:
         s.DB_TYPE = "mysql"
         s.DEBUG = True
         s.CORS_ORIGINS = ["*"]
-        s.DEFAULT_ADMIN_PASSWORD = "admin123"
 
         result = s.check_security()
 

@@ -95,9 +95,21 @@ export function generateCacheKey(
   url: string,
   params: Record<string, string | number | boolean> = {},
 ): string {
+  let scope: string
+  try {
+    const role = sessionStorage.getItem('toolbox_role') || localStorage.getItem('toolbox_role') || 'user'
+    const rawUser = localStorage.getItem('toolbox_user')
+    const user = rawUser ? JSON.parse(rawUser) as Record<string, unknown> : {}
+    const userId = user.staff_id ?? user.user_id ?? user.id ?? 'unknown'
+    const authCodeId = user.auth_code_id ?? user.authCodeId ?? 'none'
+    scope = `${String(role)}:${String(userId)}:${String(authCodeId)}`
+  } catch {
+    scope = 'invalid-session'
+  }
   const sortedParams = Object.keys(params)
     .sort()
     .map(key => `${key}=${String(params[key])}`)
     .join('&')
-  return sortedParams ? `${url}?${sortedParams}` : url
+  const requestKey = sortedParams ? `${url}?${sortedParams}` : url
+  return `${scope}:${requestKey}`
 }

@@ -1,41 +1,17 @@
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useTaskRunStore } from '@/stores/taskRun'
-import { createLog } from '@/utils/api'
-import { createToolLaunchGrant } from '@/utils/api/tools'
+import { cancelDemoRun, createDemoRun, finishDemoRun, updateDemoRun } from '@/utils/api'
 import { showToast } from '@/utils'
 import { confirmAction } from '@/shared/ui/confirm'
-import { z } from 'zod'
 import type { RunStatus } from '@/automation'
+import { demoRunSchema, unwrapApiData } from '@/features/demo/model'
+import { demoActivityToken, setDemoActivity } from '@/utils/demoActivity'
 
 
 export function useSingleAutomationRun() {
-interface EmbeddedWebviewElement extends HTMLElement {
-  getWebContentsId(): number
-}
-
-const launchGrantSchema = z.object({
-  token: z.string(),
-  target_url: z.string().optional(),
-  expires_at: z.string().optional(),
-  script_key: z.string().optional(),
-  runner_api_version: z.coerce.number().optional(),
-  tool_version: z.string().optional(),
-  tool_manifest: z.unknown().optional(),
-  tool_signature: z.string().optional(),
-  signing_key_id: z.string().optional(),
-  signature_required: z.boolean().optional(),
-}).passthrough()
-
-const launchGrantResponseSchema = z.object({
-  launch_data: launchGrantSchema.optional(),
-  grant: launchGrantSchema.optional(),
-  expires_at: z.string().optional(),
-  expires_in: z.coerce.number().optional(),
-}).passthrough()
-
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
@@ -43,51 +19,35 @@ function errorMessage(error: unknown, fallback: string): string {
 const router = useRouter()
 const appStore = useAppStore()
 const taskRunStore = useTaskRunStore()
-const {
-  status: runStatus,
-  currentStep,
-  browserUrl,
-  userAction,
-} = storeToRefs(taskRunStore)
+ const {
+   status: runStatus,
+   currentStep,
+   userAction,
+ } = storeToRefs(taskRunStore)
 
-const webviewRef = ref<EmbeddedWebviewElement | null>(null)
-const browserLoading = ref(true)
+ const browserLoading = ref(true)
 const restarting = ref(false)
 const taskStarted = ref(false)
 const taskStarting = ref(false)
-const loggedRunIds = new Set<string>()
-let browserReadyFallback: ReturnType<typeof setTimeout> | null = null
-const webviewCleanup: Array<() => void> = []
+ const loggedRunIds = new Set<string>()
+ let activeDemoToken: string | null = null
 
 const stageItems = [
-  { key: 'prepare', label: '准备', description: '正在打开并检查目标页面' },
-  { key: 'process', label: '执行', description: '系统正在自动完成操作' },
-  { key: 'verify', label: '核验', description: '正在确认页面反馈和结果' },
-  { key: 'complete', label: '完成', description: '结束本次自动操作' },
+  { key: 'prepare', label: '演示准备', description: '正在准备模拟页面和演示场景' },
+  { key: 'process', label: '演示步骤', description: '展示工具计划执行的操作流程' },
+  { key: 'verify', label: '结果说明', description: '展示模拟结果及需要关注的信息' },
+  { key: 'complete', label: '演示完成', description: '结束本次模拟流程' },
 ]
 
-const toolName = computed(() => appStore.currentTool?.name || '自动化工具')
-const toolUrl = computed(() => appStore.toolUrl || 'https://sellercentral.amazon.com')
-const isElectron = computed(() => Boolean(window.electronAPI))
+ const toolName = computed(() => appStore.currentTool?.name || '自动化工具')
+ const isDemo = computed(() => true)
 const platformName = computed(() => appStore.currentTool?.platformKey === 'aliexpress' ? '速卖通' : '亚马逊')
 const platformShortName = computed(() => platformName.value === '速卖通' ? 'AliExpress' : 'amazon seller')
 const isActiveRun = computed(() => ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
 const isTerminal = computed(() => ['completed', 'failed', 'cancelled'].includes(runStatus.value))
-const isBrowserRetryableError = computed(() => {
-  if (runStatus.value !== 'failed') return false
-  return ['BROWSER_NAVIGATION_FAILED', 'BROWSER_NAVIGATION_TIMEOUT', 'BROWSER_NOT_REGISTERED']
-    .includes(taskRunStore.error?.code || '')
-})
-const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
-const displayUrl = computed(() => {
-  const value = browserUrl.value || toolUrl.value
-  try {
-    const parsed = new URL(value)
-    return parsed.host + parsed.pathname
-  } catch {
-    return value
-  }
-})
+ const isBrowserRetryableError = computed(() => false)
+ const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
+ const displayUrl = computed(() => '演示流程 · 不访问真实平台')
 
 const currentStageIndex = computed(() => {
   if (runStatus.value === 'completed') return 3
@@ -97,36 +57,35 @@ const currentStageIndex = computed(() => {
   return 0
 })
 
-const runningMessage = computed(() => {
-  if (runStatus.value === 'preparing' || runStatus.value === 'idle') return '正在准备自动操作'
-  if (runStatus.value === 'paused') return '自动操作已暂停'
-  if (currentStageIndex.value === 2) return '正在检查处理结果'
-  return '正在自动处理'
-})
-const customerStatusText = computed(() => ({
-  idle: '正在准备',
-  preparing: '正在准备',
-  running: '正在自动处理',
-  waiting_user: '需要你的操作',
-  paused: '已暂停',
-  completed: '处理完成',
-  failed: '本次未完成',
-  cancelled: '已停止',
-}[runStatus.value] || '正在处理'))
+ const runningMessage = computed(() => {
+   if (runStatus.value === 'preparing' || runStatus.value === 'idle') return '正在准备演示流程'
+   if (runStatus.value === 'paused') return '演示已暂停'
+   if (currentStageIndex.value === 2) return '正在展示结果说明'
+   return '演示进行中'
+ })
+ const customerStatusText = computed(() => ({
+   idle: '演示准备中',
+   preparing: '演示准备中',
+   running: '演示进行中',
+   waiting_user: '模拟人工步骤',
+   paused: '演示已暂停',
+   completed: '演示完成',
+   failed: '演示异常',
+   cancelled: '已退出演示',
+ }[runStatus.value] || '演示进行中'))
 const problemCode = computed(() => {
   const source = taskRunStore.runId || taskRunStore.error?.code || 'UNKNOWN'
   return String(source).replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase() || 'UNKNOWN'
 })
-const failureTitle = computed(() => isBrowserRetryableError.value ? '页面暂时没有打开' : '本次操作未完成')
-const failureDescription = computed(() => {
-  if (isBrowserRetryableError.value) return '系统没有继续修改页面。你可以重新打开，并从安全位置继续处理。'
-  const stepId = currentStep.value?.id
-  if (stepId === 'prepare') return '工具在准备阶段停止，没有开始修改页面。'
-  if (stepId === 'open') return '目标页面没有正常打开，系统已经停止后续操作。'
-  if (stepId === 'inspect') return '系统在检查页面时停止，没有继续执行后续操作。'
-  if (stepId === 'verify' || stepId === 'summary') return '系统在核验页面结果时停止，请以左侧页面显示为准。'
-  return '系统已经停止后续操作，不会继续修改页面。'
-})
+ const failureTitle = computed(() => '演示加载异常')
+ const failureDescription = computed(() => {
+   const stepId = currentStep.value?.id
+   if (stepId === 'prepare') return '模拟场景在准备阶段停止，可重新加载演示。'
+   if (stepId === 'open') return '模拟页面没有正常载入，演示已安全停止。'
+   if (stepId === 'inspect') return '模拟页面检查未完成，演示已安全停止。'
+   if (stepId === 'verify' || stepId === 'summary') return '结果说明未能完整展示，可重新加载演示。'
+   return '模拟流程已经停止，不影响任何真实平台数据。'
+ })
 const technicalError = computed(() => {
   const code = taskRunStore.error?.code || 'AUTOMATION_FAILED'
   const message = taskRunStore.error?.message || '未提供更多信息'
@@ -161,15 +120,15 @@ async function stopRun() {
 
 async function closeWorkspace() {
   if (isActiveRun.value && !await confirmAction({
-    title: '退出执行工作区？',
-    message: '当前自动处理尚未完成，退出后本次运行会停止。',
-    confirmText: '退出并停止',
+    title: '退出演示工作区？',
+    message: '当前演示尚未完成，退出后本次播放会停止。',
+    confirmText: '退出演示',
     cancelText: '留在这里',
     danger: true,
   })) return
   if (isActiveRun.value) await taskRunStore.cancel()
+  await deactivateDemoActivity()
   taskRunStore.reset()
-  await window.electronAPI?.automation?.unregisterBrowser?.()
   appStore.closeTool()
 }
 
@@ -177,38 +136,29 @@ async function restartRun() {
   if (restarting.value) return
   restarting.value = true
   try {
-    if (!window.electronAPI?.automation) {
-      await taskRunStore.restart()
-      return
-    }
     const currentTool = appStore.currentTool
     if (!currentTool?.id) throw new Error('当前工具信息不完整')
-    const response = launchGrantResponseSchema.parse(await createToolLaunchGrant(currentTool.id, {
-      platformKey: currentTool.platformKey,
-      deviceId: localStorage.getItem('toolbox_device_id') || '',
-    }))
-    const grant = response?.launch_data || response?.grant
-    if (!grant?.token) throw new Error('工具启动数据不完整')
-    const nextTool = {
-      ...currentTool,
-      targetUrl: grant.target_url || currentTool.targetUrl || toolUrl.value,
-      launchGrant: {
-        token: grant.token,
-        expiresAt: grant.expires_at || response.expires_at,
-        expiresIn: response.expires_in,
-        scriptKey: grant.script_key,
-        runnerApiVersion: grant.runner_api_version || 1,
-        toolVersion: grant.tool_version || '1.0.0',
-        toolManifest: grant.tool_manifest,
-        toolSignature: grant.tool_signature,
-        signingKeyId: grant.signing_key_id,
-        signatureRequired: Boolean(grant.signature_required),
-      },
-    }
+    const clientDemoRunId = `demo_run_${Date.now()}_${cryptoRandom()}`
+    const created = demoRunSchema.parse(unwrapApiData(await createDemoRun({
+      client_demo_run_id: clientDemoRunId,
+      tool_id: String(currentTool.id),
+      tool_name: currentTool.name || '工具演示',
+      platform_key: currentTool.platformKey || 'amazon',
+      scenario_id: currentTool.scenarioId || 'default',
+      total_step_count: 6,
+    })))
+    await updateDemoRun(String(created.id), {
+      event_seq: 1,
+      status: 'running',
+      current_step_id: 'prepare',
+      completed_step_count: 0,
+    })
+    const nextTool = { ...currentTool, demoRunId: String(created.id), executionMode: 'demo' as const }
     appStore.currentTool = nextTool
-    appStore.toolUrl = nextTool.targetUrl
-    await taskRunStore.start(nextTool)
+    await activateDemoActivity(created.id)
+    await taskRunStore.start(nextTool, { mode: 'demo' })
   } catch (error) {
+    await deactivateDemoActivity()
     showToast(errorMessage(error, '暂时无法重新执行'), 'error')
   } finally {
     restarting.value = false
@@ -228,96 +178,67 @@ async function openSupport() {
   if (!appStore.toolVisible) router.push('/user/ai-chat')
 }
 
-async function startTaskWithBrowser() {
-  if (taskStarted.value || taskStarting.value) return
-  taskStarting.value = true
-  const webview = webviewRef.value
-  if (isElectron.value && webview?.getWebContentsId && window.electronAPI?.automation?.registerBrowser) {
-    try {
-      await window.electronAPI.automation.registerBrowser(webview.getWebContentsId())
-    } catch (error) {
-      console.warn('[ToolWorkspace] 嵌入浏览器注册失败，将使用独立浏览器:', errorMessage(error, '未知错误'))
+ async function startDemoTask() {
+   if (taskStarted.value || taskStarting.value) return
+   taskStarting.value = true
+   taskStarted.value = true
+   try {
+     await activateDemoActivity(appStore.currentTool?.demoRunId || taskRunStore.runId || 'workspace')
+     await taskRunStore.start({ ...(appStore.currentTool || {}), executionMode: 'demo' }, { mode: 'demo' })
+   } catch {
+     await deactivateDemoActivity()
+     showToast('演示启动失败，你可以重新加载或联系客服', 'error')
+   } finally {
+     taskStarting.value = false
+     browserLoading.value = false
+   }
+ }
+
+ async function recordTerminalRun(status: RunStatus) {
+   if (!['completed', 'failed', 'cancelled'].includes(status)) return
+   const runId = taskRunStore.runId
+   if (!runId || loggedRunIds.has(runId)) {
+     await deactivateDemoActivity()
+     return
+   }
+   loggedRunIds.add(runId)
+   try {
+    if (status === 'completed') {
+      await finishDemoRun(runId, { event_seq: 2, completed_step_count: taskRunStore.completedCount })
+    } else if (status === 'cancelled') {
+      await cancelDemoRun(runId, 2)
+    } else {
+      await updateDemoRun(runId, {
+        event_seq: 2,
+        status: 'error',
+        current_step_id: taskRunStore.currentStep?.id || null,
+        completed_step_count: taskRunStore.completedCount,
+        error_code: taskRunStore.error?.code || 'DEMO_RUNTIME_ERROR',
+      })
     }
-  }
-  taskStarted.value = true
-  if (browserReadyFallback) clearTimeout(browserReadyFallback)
-  try {
-    await taskRunStore.start({ ...(appStore.currentTool || {}), targetUrl: toolUrl.value })
-  } catch {
-    showToast('自动处理启动失败，你可以重新执行或联系客服', 'error')
-  } finally {
-    taskStarting.value = false
-  }
-}
+   } catch (error) {
+     console.warn('[DemoRun] 演示记录上报失败:', errorMessage(error, '未知错误'))
+   } finally {
+     await deactivateDemoActivity()
+   }
+ }
 
-function bindWebviewEvents() {
-  const webview = webviewRef.value
-  if (!webview?.addEventListener) {
-    browserLoading.value = false
-    startTaskWithBrowser()
-    return
-  }
-  const onStart = () => { browserLoading.value = true }
-  const onStop = () => { browserLoading.value = false }
-  const onFail = () => { browserLoading.value = false }
-  const onReady = () => {
-    browserLoading.value = false
-    void startTaskWithBrowser()
-  }
-  webview.addEventListener('did-start-loading', onStart)
-  webview.addEventListener('did-stop-loading', onStop)
-  webview.addEventListener('did-fail-load', onFail)
-  webview.addEventListener('dom-ready', onReady, { once: true })
-  webviewCleanup.push(
-    () => webview.removeEventListener('did-start-loading', onStart),
-    () => webview.removeEventListener('did-stop-loading', onStop),
-    () => webview.removeEventListener('did-fail-load', onFail),
-    () => webview.removeEventListener('dom-ready', onReady),
-  )
-  try {
-    if (webview.getWebContentsId?.()) startTaskWithBrowser()
-  } catch {
-    // webContents id is unavailable until the first DOM-ready event on some Electron versions.
-  }
-}
+ async function activateDemoActivity(id: string | number): Promise<void> {
+   const nextToken = demoActivityToken('single', id)
+   if (activeDemoToken === nextToken) return
+   await deactivateDemoActivity()
+   activeDemoToken = nextToken
+   await setDemoActivity(nextToken, true)
+ }
 
-async function recordTerminalRun(status: RunStatus) {
-  const runId = taskRunStore.runId
-  if (!runId || loggedRunIds.has(runId) || !['completed', 'failed', 'cancelled'].includes(status)) return
-  loggedRunIds.add(runId)
-  const tool = taskRunStore.tool || appStore.currentTool || {}
-  const toolRecord = tool as Record<string, unknown>
-  const launchGrant = typeof toolRecord.launchGrant === 'object' && toolRecord.launchGrant !== null
-    ? toolRecord.launchGrant as Record<string, unknown>
-    : null
-  try {
-    await createLog({
-      device_id: localStorage.getItem('toolbox_device_id') || null,
-      tool_name: tool.name,
-      module: typeof toolRecord.module === 'string' ? toolRecord.module : undefined,
-      status: status === 'completed' ? 'success' : status,
-      error_code: status === 'failed' ? (taskRunStore.error?.code || 'AUTOMATION_FAILED') : null,
-      detail: JSON.stringify({
-        run_id: runId,
-        tool_id: tool.id,
-        platform_key: tool.platformKey,
-        script_key: typeof launchGrant?.scriptKey === 'string' ? launchGrant.scriptKey : undefined,
-        elapsed_seconds: taskRunStore.elapsedSeconds,
-      }),
-    })
-  } catch (error) {
-    console.warn('[TaskRun] 运行日志上报失败:', errorMessage(error, '未知错误'))
-  }
-}
+ async function deactivateDemoActivity(): Promise<void> {
+   const token = activeDemoToken
+   activeDemoToken = null
+   if (token) await setDemoActivity(token, false)
+ }
 
 onMounted(() => {
-  if (!isElectron.value) {
-    browserLoading.value = false
-    startTaskWithBrowser()
-    return
-  }
-  nextTick(bindWebviewEvents)
-  browserReadyFallback = setTimeout(startTaskWithBrowser, 6000)
+  void startDemoTask()
 })
 
 watch(runStatus, recordTerminalRun)
@@ -328,16 +249,21 @@ watch(runStatus, status => {
 })
 
 onUnmounted(() => {
-  if (browserReadyFallback) clearTimeout(browserReadyFallback)
-  webviewCleanup.splice(0).forEach(cleanup => cleanup())
-  window.electronAPI?.automation?.unregisterBrowser?.()
+  void deactivateDemoActivity()
   taskRunStore.reset()
 })
   return {
-    webviewRef, browserLoading, restarting, stageItems, toolName, toolUrl, isElectron,
+    browserLoading, restarting, stageItems, toolName, isDemo,
     platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
     currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
     isBrowserRetryableError, failureTitle, failureDescription, technicalError,
     stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport,
   }
+}
+
+function cryptoRandom(): string {
+  if (globalThis.crypto?.getRandomValues) {
+    return Array.from(globalThis.crypto.getRandomValues(new Uint32Array(2)), value => value.toString(16)).join('')
+  }
+  return Math.random().toString(16).slice(2)
 }

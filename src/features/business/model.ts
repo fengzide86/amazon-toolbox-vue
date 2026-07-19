@@ -8,6 +8,10 @@ export const businessToolSchema = z.object({
   target_url: z.string().optional(),
   targetUrl: z.string().optional(),
   batch_input_schema: z.array(z.record(z.string(), z.unknown())).optional(),
+  availability: z.enum(['demo_only', 'live_beta', 'live']).default('demo_only'),
+  demo_scenario_id: z.string().default('default'),
+  supports_demo_batch: z.boolean().default(true),
+  supports_live_batch: z.boolean().default(false),
 }).passthrough()
 export type BusinessTool = z.infer<typeof businessToolSchema>
 
@@ -25,7 +29,9 @@ export type BusinessBootstrap = z.infer<typeof businessBootstrapSchema>
 
 export const importPreviewSchema = z.object({
   importId: z.string(),
+  fileName: z.string().optional(),
   validCount: z.number().nonnegative(),
+  errorCount: z.number().nonnegative().optional(),
   rows: z.array(z.object({
     itemId: z.string(),
     preview: z.record(z.string(), z.unknown()),
@@ -64,6 +70,7 @@ export const businessBatchSnapshotSchema = z.object({
   activeItemId: z.string().nullable().optional(),
   provisioningItemId: z.string().nullable().optional(),
   maxOpenSessions: z.number().optional(),
+  recordKind: z.enum(['demo', 'live']).default('live'),
   counts: batchCountsSchema.default({}),
   items: z.array(batchItemSchema).default([]),
 }).passthrough()
@@ -116,5 +123,5 @@ export const launchGrantEnvelopeSchema = z.object({
 }).passthrough()
 
 export function emptyBatchSnapshot(): BusinessBatchSnapshot {
-  return { status: 'idle', items: [], counts: {} }
+  return { status: 'idle', recordKind: 'demo', items: [], counts: {} }
 }

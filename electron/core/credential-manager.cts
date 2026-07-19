@@ -21,15 +21,15 @@ export class CredentialManager {
 
   register(): void {
     this.ipcMain.handle('credential-save-user-code', (event, code: unknown) => {
-      assertTrustedSender(event, this.getWindow)
+      assertTrustedSender(event, this.getWindow, !app.isPackaged)
       return this.save(code)
     })
     this.ipcMain.handle('credential-load-user-code', event => {
-      assertTrustedSender(event, this.getWindow)
+      assertTrustedSender(event, this.getWindow, !app.isPackaged)
       return this.load()
     })
     this.ipcMain.handle('credential-clear-user-code', event => {
-      assertTrustedSender(event, this.getWindow)
+      assertTrustedSender(event, this.getWindow, !app.isPackaged)
       return this.clear()
     })
   }

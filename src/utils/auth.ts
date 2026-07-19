@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
+import { clearAllCache } from '@/utils/cache'
 import {
   authRoleSchema,
   authSessionSchema,
@@ -9,6 +10,8 @@ import {
   type AuthenticatedUser,
   type AuthRole,
   type AuthSession,
+  isBackofficeRole,
+  isSuperAdminRole,
 } from '@/features/auth/model'
 
 const AUTH_KEY = 'toolbox_auth'
@@ -88,7 +91,15 @@ class AuthService {
   }
 
   isAdmin(): boolean {
-    return this.getRole() === 'admin'
+    return this.isSuperAdmin()
+  }
+
+  isSuperAdmin(): boolean {
+    return isSuperAdminRole(this.getRole())
+  }
+
+  isBackoffice(): boolean {
+    return isBackofficeRole(this.getRole())
   }
 
   login(auth: AuthSession, role: AuthRole, user: AuthenticatedUser): void {
@@ -104,6 +115,7 @@ class AuthService {
   }
 
   clear(): void {
+    clearAllCache()
     sessionStorage.removeItem(AUTH_KEY)
     sessionStorage.removeItem(ROLE_KEY)
     sessionStorage.removeItem(TOKEN_KEY)
@@ -191,6 +203,8 @@ export const getUser = (): AuthenticatedUser | null => authService.getUser()
 export const setUser = (user: AuthenticatedUser): void => authService.setUser(user)
 export const isAuthenticated = (): boolean => authService.isAuthenticated()
 export const isAdmin = (): boolean => authService.isAdmin()
+export const isSuperAdmin = (): boolean => authService.isSuperAdmin()
+export const isBackoffice = (): boolean => authService.isBackoffice()
 export const login = (auth: AuthSession, role: AuthRole, user: AuthenticatedUser): void => authService.login(auth, role, user)
 export const logout = (): void => authService.logout()
 export const clear = (): void => authService.clear()

@@ -2,12 +2,13 @@
 数据看板路由模块（优化版）
 使用服务层 + 统一响应格式 + 缓存
 """
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
 
-from database import get_db
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.audit import log_admin_action
 from core.dependencies import get_current_admin
+from database import get_db
 from services.dashboard_service import DashboardService
 
 router = APIRouter()
@@ -15,7 +16,7 @@ router = APIRouter()
 
 @router.get("")
 async def get_dashboard(
-    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
+    platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
@@ -26,7 +27,7 @@ async def get_dashboard(
 
 @router.get("/charts")
 async def get_dashboard_charts(
-    platform_key: Optional[str] = Query(None, description="平台标识 (amazon/aliexpress)"),
+    platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
@@ -37,10 +38,27 @@ async def get_dashboard_charts(
 
 @router.post("/refresh-cache")
 async def refresh_dashboard_cache(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin)
+    actor: dict = Depends(get_current_admin)
 ):
     """手动刷新看板缓存"""
     service = DashboardService(db)
     await service.invalidate_cache()
+    await log_admin_action(
+        db,
+        user_id=actor.get("staff_id"),
+        user_name=actor.get("username"),
+        action="dashboard_cache_refresh",
+        target_type="dashboard_cache",
+        target_id="all",
+        detail={
+            "role": actor.get("role"),
+            "before": {"state": "cached_or_empty"},
+            "after": {"state": "invalidated"},
+            "reason": None,
+        },
+        request=request,
+    )
+    await db.commit()
     return {"success": True, "message": "看板缓存已刷新"}

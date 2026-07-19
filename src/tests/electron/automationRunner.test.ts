@@ -1,109 +1,37 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import path from 'node:path'
-import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
 
-const require = createRequire(import.meta.url)
-const { RunnerClient } = require('../../../dist-electron/electron/automation/runner-client.cjs')
-const { createSteps, safeProfileName } = require('../../../dist-electron/electron/automation/runtime.cjs')
+describe('internal demo-only automation profile', () => {
+  it('does not package the Runner or its real automation scripts', () => {
+    const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+      toolbox?: { distribution?: string }
+      build?: { extraResources?: unknown[]; files?: string[] }
+    }
 
-interface RunnerEvent extends Record<string, unknown> {
-  type: string
-  result: { runner?: string }
-  tool: { launchGrant: { token?: string } }
-}
-
-describe('Node Automation Runner', () => {
-  let client
-
-  afterEach(async () => {
-    await client?.stop()
-    client = null
+    expect(metadata.toolbox?.distribution).toBe('internal')
+    expect(metadata.build?.extraResources).toEqual([])
+    expect(metadata.build?.files).toContain('!dist-electron/electron/automation-runner.cjs')
+    expect(metadata.build?.files).toContain('!dist-electron/electron/automation/scripts/**')
   })
 
-  it('使用独立进程按统一协议完成一轮任务', async () => {
-    const events: RunnerEvent[] = []
-    let resolveCompleted: (event: RunnerEvent) => void = () => undefined
-    const completed = new Promise<RunnerEvent>(resolve => { resolveCompleted = resolve })
-    client = new RunnerClient({
-      scriptPath: path.resolve(process.cwd(), 'dist-electron/electron/automation-runner.cjs'),
-      env: { TOOLBOX_RUNNER_MOCK: 'true' },
-      onEvent: event => {
-        events.push(event)
-        if (event.type === 'run.completed') resolveCompleted(event)
-      },
-      timeoutMs: 5000,
-    })
+  it('keeps Runner, batch and webview capabilities behind the development profile gate', () => {
+    const main = readFileSync(resolve('electron/main.cts'), 'utf8')
 
-    const response = await client.start({
-      id: 'tool_listing',
-      name: '自动上品脚本',
-      platformKey: 'amazon',
-      targetUrl: 'https://sellercentral.amazon.com/',
-      launchGrant: { scriptKey: 'amazon.listing.v1', runnerApiVersion: 1 },
-    })
-    const terminalEvent = await completed
-
-    expect(response.runId).toMatch(/^local_run_/)
-    expect(events[0].type).toBe('run.started')
-    expect(events.filter(event => event.type === 'step.completed')).toHaveLength(6)
-    expect(terminalEvent.result.runner).toBe('node-playwright')
-    expect(events[0].tool.launchGrant.token).toBeUndefined()
-  }, 10000)
-
-  it('生成固定步骤并隔离平台 Profile 名称', () => {
-    expect(createSteps({ platformKey: 'amazon' })).toHaveLength(6)
-    expect(safeProfileName({ platformKey: '../amazon seller' })).toBe('___amazon_seller')
+    expect(main).toContain("packageMetadata.toolbox?.distribution === 'internal'")
+    expect(main).toContain('const AUTOMATION_RUNTIME_ENABLED = !INTERNAL_PRODUCTION')
+    expect(main).toContain('if (AUTOMATION_RUNTIME_ENABLED) registerTrustedHandle(channel, handler)')
+    expect(main).toContain('webviewTag: AUTOMATION_RUNTIME_ENABLED')
   })
 
-  it('注册脚本使用业务流程步骤文案', () => {
-    const steps = createSteps({
-      platformKey: 'amazon',
-      targetUrl: 'https://sellercentral.amazon.com/',
-      launchGrant: { scriptKey: 'amazon.register.v1' },
-    })
+  it('does not expose the automation bridge in an internal packaged renderer', () => {
+    const preload = readFileSync(resolve('electron/preload.cts'), 'utf8')
+    const conditionalBridge = preload.indexOf('...(automationEnabled ?')
+    const automationBridge = preload.indexOf('automation: {')
+    const conditionalBridgeEnd = preload.indexOf('} : {}),', automationBridge)
 
-    expect(steps.find(step => step.id === 'execute')).toMatchObject({
-      title: '执行注册流程',
-      action: '正在处理注册信息',
-    })
-    expect(steps.find(step => step.id === 'verify').title).toBe('检查执行结果')
+    expect(conditionalBridge).toBeGreaterThan(-1)
+    expect(automationBridge).toBeGreaterThan(conditionalBridge)
+    expect(conditionalBridgeEnd).toBeGreaterThan(automationBridge)
   })
-
-  it('把嵌入浏览器动作双向转发给 Electron Browser Host', async () => {
-    const actions: string[] = []
-    let resolveCompleted: (event: RunnerEvent) => void = () => undefined
-    const completed = new Promise<RunnerEvent>(resolve => { resolveCompleted = resolve })
-    client = new RunnerClient({
-      scriptPath: path.resolve(process.cwd(), 'dist-electron/electron/automation-runner.cjs'),
-      env: { TOOLBOX_RUNNER_MOCK: 'true' },
-      onHostRequest: async (action, payload) => {
-        actions.push(action)
-        if (action === 'browser.navigate') return { url: payload.url }
-        if (action === 'browser.inspect') return { title: 'Embedded Page', url: 'https://example.com/', forms: 1 }
-        if (action === 'browser.highlight') return { matched: true, tagName: 'MAIN' }
-        if (action === 'browser.wait') return { waited: payload.ms }
-        return {}
-      },
-      onEvent: event => {
-        if (event.type === 'run.completed') resolveCompleted(event)
-      },
-      timeoutMs: 5000,
-    })
-
-    await client.start({
-      id: 'tool_register',
-      platformKey: 'amazon',
-      browserMode: 'embedded-cdp',
-      targetUrl: 'https://example.com/',
-      launchGrant: { scriptKey: 'amazon.register.v1', runnerApiVersion: 1 },
-    })
-    const event = await completed
-
-    expect(actions).toEqual(['browser.navigate', 'browser.inspect', 'browser.highlight', 'browser.wait'])
-    expect(event.result).toMatchObject({
-      runner: 'node-embedded-cdp',
-      scriptName: '新手快速注册工具',
-      pageTitle: 'Embedded Page',
-    })
-  }, 10000)
 })

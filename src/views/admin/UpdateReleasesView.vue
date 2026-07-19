@@ -11,6 +11,7 @@
       <article><span>02</span><div><strong>人工确认</strong><p>暂存不会触达客户，可先核对文件和版本信息。</p></div></article>
       <article><span>03</span><div><strong>原子发布</strong><p>清单最后切换，客户端不会读到半发布状态。</p></div></article>
     </section>
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载更新版本…" @retry="load" />
 
     <AppSurface class="release-list">
       <DataToolbar label="桌面版本">
@@ -18,7 +19,7 @@
         <template #actions><el-button :loading="loading" @click="load">刷新</el-button></template>
       </DataToolbar>
 
-      <el-table v-loading="loading" :data="releases" row-key="version">
+      <el-table v-if="loadState !== 'loading' && loadState !== 'error'" v-loading="loading" :data="releases" row-key="version">
         <el-table-column label="版本" min-width="150">
           <template #default="{ row }"><div class="version-cell"><strong>v{{ row.version }}</strong><small>{{ row.files.length }} 个发布文件</small></div></template>
         </el-table-column>
@@ -31,9 +32,9 @@
         <el-table-column label="操作" width="190" fixed="right">
           <template #default="{ row }">
             <div class="row-actions">
-              <el-button v-if="row.status === 'staged'" size="small" type="primary" @click="publish(row)">确认发布</el-button>
+              <el-button v-if="row.status === 'staged'" size="small" type="primary" :loading="publishingVersion === row.version" :disabled="Boolean(publishingVersion || deletingVersion)" @click="publish(row)">确认发布</el-button>
               <el-dropdown v-if="row.status === 'staged'" trigger="click" @command="remove(row)">
-                <el-button size="small">更多</el-button>
+                <el-button size="small" :loading="deletingVersion === row.version" :disabled="Boolean(publishingVersion || deletingVersion)">更多</el-button>
                 <template #dropdown><el-dropdown-menu><el-dropdown-item command="remove">删除暂存</el-dropdown-item></el-dropdown-menu></template>
               </el-dropdown>
               <span v-else class="published-note">客户端可检查到</span>
@@ -70,20 +71,34 @@ import DataToolbar from '@/components/DataToolbar.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { useCompactLayout } from '@/composables/useCompactLayout'
 import { listUpdateReleases, publishUpdateRelease, removeStagedUpdateRelease, stageUpdateRelease, type UpdateRelease } from '@/features/updates/release-api'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 
 const compact = useCompactLayout()
 const loading = ref(false)
 const uploading = ref(false)
+const publishingVersion = ref('')
+const deletingVersion = ref('')
 const drawerOpen = ref(false)
 const releases = ref<UpdateRelease[]>([])
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
 const fileList = ref<UploadUserFile[]>([])
 
 async function load(): Promise<void> {
   loading.value = true
-  try { releases.value = await listUpdateReleases() }
-  catch (error) { ElMessage.error(error instanceof Error ? error.message : '更新版本加载失败') }
+  loadState.value = releases.value.length ? 'data' : 'loading'
+  loadError.value = ''
+  try {
+    releases.value = await listUpdateReleases()
+    loadState.value = settledDataState(releases.value.length)
+  }
+  catch (error) {
+    loadError.value = error instanceof Error ? error.message : '更新版本加载失败'
+    loadState.value = failedDataState(releases.value.length > 0)
+  }
   finally { loading.value = false }
 }
 
@@ -112,18 +127,32 @@ async function stage(): Promise<void> {
 
 async function publish(raw: unknown): Promise<void> {
   const row = raw as UpdateRelease
-  await ElMessageBox.confirm(`发布 v${row.version} 后，桌面客户端即可检查到该版本。`, '确认发布更新', { confirmButtonText: '确认发布', cancelButtonText: '继续核对', type: 'warning' })
-  await publishUpdateRelease(row.version)
-  ElMessage.success(`v${row.version} 已发布`)
-  await load()
+  try {
+    await ElMessageBox.confirm(`发布 v${row.version} 后，桌面客户端即可检查到该版本。`, '确认发布更新', { confirmButtonText: '确认发布', cancelButtonText: '继续核对', type: 'warning' })
+    publishingVersion.value = row.version
+    await publishUpdateRelease(row.version)
+    ElMessage.success(`v${row.version} 已发布`)
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error instanceof Error ? error.message : '发布失败，请刷新后核对版本状态')
+  } finally {
+    publishingVersion.value = ''
+    await load()
+  }
 }
 
 async function remove(raw: unknown): Promise<void> {
   const row = raw as UpdateRelease
-  await ElMessageBox.confirm(`只删除 v${row.version} 的暂存文件，不影响已发布版本。`, '删除暂存版本', { confirmButtonText: '删除暂存', cancelButtonText: '取消', type: 'warning' })
-  await removeStagedUpdateRelease(row.version)
-  ElMessage.success('暂存版本已删除')
-  await load()
+  try {
+    await ElMessageBox.confirm(`只删除 v${row.version} 的暂存文件，不影响已发布版本。`, '删除暂存版本', { confirmButtonText: '删除暂存', cancelButtonText: '取消', type: 'warning' })
+    deletingVersion.value = row.version
+    await removeStagedUpdateRelease(row.version)
+    ElMessage.success('暂存版本已删除')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error instanceof Error ? error.message : '删除失败，请刷新后重试')
+  } finally {
+    deletingVersion.value = ''
+    await load()
+  }
 }
 
 function formatBytes(bytes: number): string {

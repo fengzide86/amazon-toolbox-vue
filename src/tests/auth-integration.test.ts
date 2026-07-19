@@ -57,7 +57,7 @@ describe('认证系统集成测试', () => {
       const userStore = useUserStore()
       userStore.setLogin({
         token: 'admin-token',
-        role: 'admin',
+        role: 'super_admin',
         auth_code: 'admin'
       })
       
@@ -66,7 +66,7 @@ describe('认证系统集成测试', () => {
       expect(auth).not.toBeNull()
       expect(auth.auth_code).toBe('admin')
       expect(auth.token).toBe('admin-token')
-      expect(auth.role).toBe('admin')
+      expect(auth.role).toBe('super_admin')
     })
   })
 
@@ -92,7 +92,7 @@ describe('认证系统集成测试', () => {
       const userStore = useUserStore()
       userStore.setLogin({
         token: 'admin-token',
-        role: 'admin',
+        role: 'super_admin',
         auth_code: 'admin'
       })
       

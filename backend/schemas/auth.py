@@ -18,6 +18,7 @@ class VerifyResponse(BaseModel):
 
 
 class AdminLoginRequest(BaseModel):
+    username: str = "admin"
     password: str
 
 

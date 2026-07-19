@@ -8,7 +8,7 @@
         <div class="tool-mark"><Zap :size="18" /></div>
         <div class="tool-identity">
           <h1>{{ toolName }}</h1>
-          <p>{{ platformName }} · 自动处理</p>
+          <p>{{ platformName }} · 演示模式</p>
         </div>
       </div>
 
@@ -17,12 +17,12 @@
           <span class="status-dot"></span>{{ customerStatusText }}
         </span>
         <button v-if="isActiveRun" class="control-button danger" type="button" @click="stopRun">
-          <Square :size="14" />停止操作
+          <Square :size="14" />停止演示
         </button>
         <button v-else-if="isTerminal" class="control-button" type="button" :disabled="restarting" @click="restartRun">
           <LoaderCircle v-if="restarting" :size="14" class="spin" />
           <RotateCcw v-else :size="14" />
-          {{ restarting ? '正在打开…' : '重新执行' }}
+          {{ restarting ? '正在打开…' : '重新演示' }}
         </button>
         <button v-if="isTerminal" class="control-button" type="button" @click="closeWorkspace">返回工具箱</button>
       </div>
@@ -34,26 +34,18 @@
           <div class="browser-toolbar">
             <LockKeyhole :size="14" />
             <span>{{ displayUrl }}</span>
-            <span class="browser-note">自动操作窗口</span>
+            <span class="browser-note">模拟页面</span>
           </div>
 
           <div class="browser-viewport">
             <div v-if="browserLoading" class="browser-loading">
               <span class="loading-orbit"><LoaderCircle :size="25" class="spin" /></span>
-              <strong>正在打开亚马逊页面</strong>
-              <p>页面准备好后会自动开始处理</p>
+              <strong>正在准备模拟页面</strong>
+              <p>准备好后会自动开始演示</p>
               <span class="loading-line"></span>
             </div>
 
-            <webview
-              v-if="isElectron"
-              ref="webviewRef"
-              :src="toolUrl"
-              class="workspace-webview"
-              partition="persist:tool-workspace"
-            ></webview>
-
-            <div v-else class="browser-mock" aria-label="自动处理预览页面">
+            <div class="browser-mock" aria-label="工具模拟演示页面">
               <div class="mock-site-header">
                 <strong>{{ platformShortName }}</strong><span></span><i></i>
               </div>
@@ -62,7 +54,7 @@
                 <div class="mock-content">
                   <small>控制台 / {{ toolName }}</small>
                   <h2>{{ stageItems[currentStageIndex]?.label }}</h2>
-                  <p>系统正在目标页面中自动处理。</p>
+                  <p>这是模拟界面，仅用于展示工具流程。</p>
                   <div class="mock-cards"><i v-for="item in 3" :key="item"></i></div>
                   <div class="mock-table"><span v-for="item in 6" :key="item"></span></div>
                 </div>
@@ -70,19 +62,16 @@
             </div>
 
             <div v-if="interactionLocked && !browserLoading" class="interaction-shield">
-              <div><LoaderCircle :size="16" class="spin" />正在自动处理，请不要操作页面</div>
-            </div>
-
-            <div v-if="isBrowserRetryableError" class="browser-error-state">
-              <span><CircleAlert :size="24" /></span>
-              <strong>页面暂时没有打开</strong>
-              <p>没有继续执行页面操作，可以在右侧安全地重新打开。</p>
+              <div><LoaderCircle :size="16" class="spin" />演示正在播放</div>
             </div>
           </div>
         </div>
       </main>
 
       <aside class="progress-panel">
+        <div class="demo-disclosure" role="note">
+          演示模式：不会登录、读取或修改真实店铺数据。
+        </div>
         <template v-if="!isTerminal">
           <header class="panel-heading">
             <span>当前进度</span>
@@ -109,25 +98,25 @@
 
           <div v-else class="running-note">
             <LoaderCircle :size="17" class="spin" />
-            <div><strong>{{ runningMessage }}</strong><span>完成前请不要关闭窗口</span></div>
+            <div><strong>{{ runningMessage }}</strong><span>演示结果不代表真实任务结果</span></div>
           </div>
         </template>
 
         <div v-else-if="runStatus === 'completed'" class="result-card success">
           <div class="result-icon"><Check :size="28" /></div>
-          <h2>处理完成</h2>
-          <p>自动操作已经完成，请以左侧目标页面显示的结果为准。</p>
-          <button class="primary-action" type="button" @click="closeWorkspace">再用一个工具</button>
-          <button class="secondary-action" type="button" @click="restartRun">再次执行</button>
+          <h2>演示流程已走完</h2>
+          <p>仅表示模拟步骤播放完成，不代表平台任务执行成功。</p>
+          <button class="primary-action" type="button" @click="closeWorkspace">体验其他演示</button>
+          <button class="secondary-action" type="button" @click="restartRun">重新体验演示</button>
         </div>
 
         <div v-else-if="runStatus === 'failed'" class="result-card failed">
           <div class="result-icon"><CircleAlert :size="27" /></div>
-          <h2>{{ failureTitle }}</h2>
+          <h2>演示加载异常</h2>
           <p>{{ failureDescription }}</p>
           <div class="problem-code">问题编号：{{ problemCode }}</div>
           <button class="primary-action" type="button" @click="restartRun">
-            {{ isBrowserRetryableError ? '重新打开并继续' : '重新执行' }}
+            重新加载演示
           </button>
           <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
           <details class="technical-details">
@@ -139,9 +128,9 @@
 
         <div v-else class="result-card cancelled">
           <div class="result-icon"><Square :size="23" /></div>
-          <h2>操作已停止</h2>
-          <p>本次自动操作已经停止。</p>
-          <button class="primary-action" type="button" @click="restartRun">重新执行</button>
+          <h2>已退出演示</h2>
+          <p>本次模拟流程已经停止，不影响任何真实平台数据。</p>
+          <button class="primary-action" type="button" @click="restartRun">重新演示</button>
           <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
         </div>
       </aside>
@@ -154,10 +143,10 @@ import { ArrowLeft, Check, CircleAlert, LoaderCircle, LockKeyhole, RotateCcw, Sq
 import { useSingleAutomationRun } from '@/features/automation/useSingleAutomationRun'
 
 const {
-  webviewRef, browserLoading, restarting, stageItems, toolName, toolUrl, isElectron,
+  browserLoading, restarting, stageItems, toolName,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
-  isBrowserRetryableError, failureTitle, failureDescription, technicalError,
+  failureDescription, technicalError,
   stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport,
 } = useSingleAutomationRun()
 </script>
@@ -286,6 +275,7 @@ const {
 .mock-table span { display: block; height: 9px; margin: 13px 0; border-radius: 5px; background: #e2e8f0; }
 
 .progress-panel { display: flex; flex-direction: column; padding: 22px; animation: workspacePanelIn 420ms var(--ease-emphasized) 130ms both; }
+.demo-disclosure { margin: -4px 0 14px; padding: 10px 11px; border: 1px solid rgba(45,95,202,.16); border-radius: 9px; color: var(--color-primary); background: var(--color-primary-soft); font-size: var(--type-meta); line-height: 1.55; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
 .panel-heading span { font-size: 17px; font-weight: 800; }
 .panel-heading strong { color: var(--color-primary); font-size:var(--type-meta); }

@@ -19,5 +19,7 @@ export async function exportOrders(params: ApiQueryParams = {}): Promise<Blob> {
 }
 
 export const createOrder = (data: unknown): Promise<unknown> => api.post('/api/orders', data)
-export const updateOrder = (id: EntityId, data: unknown): Promise<unknown> => api.put(`/api/orders/${id}`, data)
-export const refundOrder = (id: EntityId): Promise<unknown> => api.post(`/api/orders/${id}/refund`)
+export const updateOrder = (id: EntityId, data: unknown): Promise<unknown> => api.patch(`/api/orders/${encodeURIComponent(String(id))}`, data)
+export const markOrderPaid = (id: EntityId): Promise<unknown> => api.post(`/api/orders/${encodeURIComponent(String(id))}/mark-paid`)
+export const cancelOrder = (id: EntityId, reason: string): Promise<unknown> => api.post(`/api/orders/${encodeURIComponent(String(id))}/cancel`, { reason })
+export const refundOrder = (id: EntityId, reason: string): Promise<unknown> => api.post(`/api/orders/${encodeURIComponent(String(id))}/refund`, { reason })

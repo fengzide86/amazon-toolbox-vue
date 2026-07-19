@@ -3,6 +3,7 @@ fastapi==0.115.0
 uvicorn==0.30.6
 python-multipart==0.0.9
 python-dotenv==1.0.1
+PyYAML==6.0.2
 
 # ===== 数据库 =====
 sqlalchemy==2.0.35
@@ -32,8 +33,7 @@ alembic==1.13.0
 
 # ===== 部署工具 =====
 
-# ===== AI 客服 =====
-chromadb>=1.0.0
+# ===== 规则式客服（AI/向量依赖在 internal 模式下不安装）=====
 greenlet>=3.0.0
 
 # ===== 测试依赖 =====

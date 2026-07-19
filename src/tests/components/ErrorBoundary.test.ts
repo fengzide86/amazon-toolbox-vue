@@ -4,7 +4,13 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: '/', component: { template: '<div />' } }],
+})
 
 describe('ErrorBoundary', () => {
   it('应该正常渲染子组件', () => {
@@ -15,6 +21,7 @@ describe('ErrorBoundary', () => {
     })
 
     const wrapper = mount(ErrorBoundary, {
+      global: { plugins: [router] },
       slots: {
         default: ChildComponent
       }
@@ -30,6 +37,7 @@ describe('ErrorBoundary', () => {
 
   it('应该有 error 插槽', () => {
     const wrapper = mount(ErrorBoundary, {
+      global: { plugins: [router] },
       slots: {
         default: '<div>正常内容</div>',
         error: '<div>错误内容</div>'

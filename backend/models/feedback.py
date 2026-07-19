@@ -2,7 +2,8 @@
 反馈相关数据模型
 包含: Feedback, RunLog
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, func
+
 from models.base import Base
 
 
@@ -18,6 +19,18 @@ class LogStatus:
     """日志状态"""
     SUCCESS = "success"    # 成功
     FAILED = "failed"      # 失败
+
+
+class ExecutionVerification:
+    """真实执行核验状态。
+
+    当前内测版不提供 Runner 写入通道，历史日志统一标记为
+    ``legacy_unverified``，不能被计入真实执行指标。
+    """
+
+    LEGACY_UNVERIFIED = "legacy_unverified"
+    VERIFIED = "verified"
+    INCONCLUSIVE = "inconclusive"
 
 
 # ===== 数据模型 =====
@@ -41,6 +54,13 @@ class RunLog(Base):
     capability_key = Column(String(100), nullable=True, index=True)  # register / listing / ads 等
     script_key = Column(String(100), nullable=True, index=True)  # amz_register / ae_register 等
     tool_id = Column(String(100), nullable=True, index=True)  # 工具配置ID
+    verification_state = Column(
+        String(30),
+        nullable=False,
+        default=ExecutionVerification.LEGACY_UNVERIFIED,
+        server_default=ExecutionVerification.LEGACY_UNVERIFIED,
+        index=True,
+    )
 
     __table_args__ = (
         Index('ix_run_logs_user_created', 'user_id', 'created_at'),

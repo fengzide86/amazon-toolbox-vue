@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, webContents } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, webContents } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -16,6 +16,13 @@ const { parseBatchFile, writeBatchErrors } = require('./automation/batch-importe
 const toolSigningConfig = require('./tool-signing-config.cjs');
 const packageMetadata = require('../../package.json');
 const { resolveRuntimeConfig } = require('./core/runtime-config.cjs');
+const { assertTrustedSender } = require('./ipc/sender-guard.js');
+const {
+  isAllowedExternalUrl,
+  isAllowedMainFrameUrl,
+  isAllowedWebviewPartition,
+  isAllowedWebviewUrl,
+} = require('./security/navigation-policy.js');
 
 type UnknownRecord = Record<string, unknown>;
 type BrowserWindowType = import('electron').BrowserWindow;
@@ -47,6 +54,9 @@ interface CoordinatorLike {
 interface UpdateManagerLike {
   activityChanged(): void;
   check(): Promise<unknown>;
+  install(): Promise<unknown>;
+  isInstalling(): boolean;
+  shouldInstallOnQuit(): boolean;
 }
 
 function asRecord(value: unknown): UnknownRecord {
@@ -55,6 +65,10 @@ function asRecord(value: unknown): UnknownRecord {
 
 function errorMessage(error: unknown, fallback = '未知错误'): string {
   return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function installBusyError(message: string): Error & { code: 'INSTALL_BUSY' } {
+  return Object.assign(new Error(message), { code: 'INSTALL_BUSY' as const });
 }
 
 process.env.TOOLBOX_CLIENT_VERSION = app.getVersion();
@@ -67,10 +81,26 @@ let selectedBatchItemId: string | null = null;
 let allowWindowClose = false;
 let updateManager: UpdateManagerLike | null = null;
 let singleRunActive = false;
+let shutdownReady = false;
+let shutdownPromise: Promise<void> | null = null;
+const demoActivityTokens = new Set<string>();
 const embeddedBrowserHost = new EmbeddedBrowserHost();
 const batchBrowserHosts = new EmbeddedBrowserHostManager();
 
 registerAppScheme();
+
+app.on('web-contents-created', (_event: unknown, contents: import('electron').WebContents) => {
+  if (contents.getType() !== 'webview') return;
+  const keepWebviewOnHttps = (event: import('electron').Event, url: string): void => {
+    if (!isAllowedWebviewUrl(url)) event.preventDefault();
+  };
+  contents.on('will-navigate', keepWebviewOnHttps);
+  contents.on('will-redirect', keepWebviewOnHttps);
+  contents.setWindowOpenHandler(({ url }: { url: string }) => {
+    if (mayOpenExternalUrl(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+});
 
 function stableDeviceIdentity(): { deviceId: string; deviceName: string } {
   const source = [os.hostname(), os.homedir(), os.platform(), os.arch()].join('|');
@@ -122,23 +152,64 @@ if (!gotTheLock) {
 }
 
 // 云端控制面地址。配置为远程 HTTPS 后，桌面端不会再启动打包的 Python 后端。
-const { controlApiBase: CONTROL_API_BASE, useBundledBackend: USE_BUNDLED_BACKEND } = resolveRuntimeConfig(
+const INTERNAL_PRODUCTION = app.isPackaged && packageMetadata.toolbox?.distribution === 'internal';
+const AUTOMATION_RUNTIME_ENABLED = !INTERNAL_PRODUCTION;
+const runtimeConfig = resolveRuntimeConfig(
   process.env,
   packageMetadata,
 ) as { controlApiBase: string; useBundledBackend: boolean };
+const CONTROL_API_BASE = runtimeConfig.controlApiBase;
+const USE_BUNDLED_BACKEND = runtimeConfig.useBundledBackend;
+if (INTERNAL_PRODUCTION && USE_BUNDLED_BACKEND) {
+  throw new Error('Internal production builds cannot start a bundled backend');
+}
+
+function mayOpenExternalUrl(url: string): boolean {
+  return isAllowedExternalUrl(url, INTERNAL_PRODUCTION);
+}
+
+function registerTrustedHandle<TArgs extends unknown[], TResult>(
+  channel: string,
+  handler: (event: IpcInvokeEvent, ...args: TArgs) => TResult,
+): void {
+  ipcMain.handle(channel, (event: IpcInvokeEvent, ...args: unknown[]) => {
+    assertTrustedSender(event, () => mainWindow, !app.isPackaged);
+    return handler(event, ...(args as TArgs));
+  });
+}
+
+function registerAutomationHandle<TArgs extends unknown[], TResult>(
+  channel: string,
+  handler: (event: IpcInvokeEvent, ...args: TArgs) => TResult,
+): void {
+  if (AUTOMATION_RUNTIME_ENABLED) registerTrustedHandle(channel, handler);
+}
+
+function registerTrustedOn<TArgs extends unknown[]>(
+  channel: string,
+  handler: (event: IpcEvent, ...args: TArgs) => void | Promise<void>,
+): void {
+  ipcMain.on(channel, (event: IpcEvent, ...args: unknown[]) => {
+    try {
+      assertTrustedSender(event, () => mainWindow, !app.isPackaged);
+      void handler(event, ...(args as TArgs));
+    } catch (error) {
+      console.warn(`[IPC] Rejected ${channel}:`, errorMessage(error));
+    }
+  });
+}
 
 // ===== 分屏模式：在系统浏览器中打开外部链接 =====
-ipcMain.handle('open-external', async (_event: IpcInvokeEvent, url: unknown) => {
-  const { shell } = require('electron');
-  if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
-    shell.openExternal(url);
+registerTrustedHandle('open-external', async (_event: IpcInvokeEvent, url: unknown) => {
+  if (typeof url === 'string' && mayOpenExternalUrl(url)) {
+    await shell.openExternal(url);
     return { success: true };
   }
   return { success: false, message: '无效的 URL' };
 });
 
 // ===== 工具启动控制（内部 IPC 直通处理） =====
-ipcMain.on('launch-tool', async (event: IpcEvent, rawData: unknown) => {
+if (AUTOMATION_RUNTIME_ENABLED) registerTrustedOn('launch-tool', async (event: IpcEvent, rawData: unknown) => {
   const { shell, net } = require('electron');
   const data = asRecord(rawData);
   const launchData = asRecord(data.launchData);
@@ -149,8 +220,8 @@ ipcMain.on('launch-tool', async (event: IpcEvent, rawData: unknown) => {
   // 兼容旧的 launchUrl 模式
   if (!launchData.token && typeof data.launchUrl === 'string') {
     const launchUrl = data.launchUrl;
-    if (launchUrl.startsWith('http://') || launchUrl.startsWith('https://')) {
-      shell.openExternal(launchUrl);
+    if (mayOpenExternalUrl(launchUrl)) {
+      await shell.openExternal(launchUrl);
       event.sender.send('launch-tool-success', { toolName });
       return;
     }
@@ -243,7 +314,7 @@ function getAutomationRunner(): RunnerLike {
   return automationRunner;
 }
 
-ipcMain.handle('automation:start', async (_event: IpcInvokeEvent, rawTool: unknown) => {
+registerAutomationHandle('automation:start', async (_event: IpcInvokeEvent, rawTool: unknown) => {
   const tool = asRecord(rawTool);
   if (!tool.id) throw new Error('工具启动数据不完整');
   return getAutomationRunner().start({
@@ -251,11 +322,24 @@ ipcMain.handle('automation:start', async (_event: IpcInvokeEvent, rawTool: unkno
     browserMode: embeddedBrowserHost.isReady() ? 'embedded-cdp' : 'playwright',
   });
 });
-ipcMain.handle('automation:pause', () => getAutomationRunner().pause());
-ipcMain.handle('automation:resume', () => getAutomationRunner().resume());
-ipcMain.handle('automation:complete-user-action', () => getAutomationRunner().completeUserAction());
-ipcMain.handle('automation:cancel', () => getAutomationRunner().cancel());
-ipcMain.handle('automation:register-browser', (event: IpcInvokeEvent, webContentsId: unknown) => {
+
+registerTrustedHandle(
+  'demo-activity:set-active',
+  (_event: IpcInvokeEvent, token: unknown, active: unknown): void => {
+    if (typeof token !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(token)) {
+      throw new TypeError('Invalid demo activity token');
+    }
+    if (typeof active !== 'boolean') throw new TypeError('Invalid demo activity state');
+    if (active) demoActivityTokens.add(token);
+    else demoActivityTokens.delete(token);
+    updateManager?.activityChanged();
+  },
+);
+registerAutomationHandle('automation:pause', () => getAutomationRunner().pause());
+registerAutomationHandle('automation:resume', () => getAutomationRunner().resume());
+registerAutomationHandle('automation:complete-user-action', () => getAutomationRunner().completeUserAction());
+registerAutomationHandle('automation:cancel', () => getAutomationRunner().cancel());
+registerAutomationHandle('automation:register-browser', (event: IpcInvokeEvent, webContentsId: unknown) => {
   const guest = webContents.fromId(Number(webContentsId));
   if (!guest || guest.getType?.() !== 'webview') throw new Error('无法注册工作区浏览器');
   if (guest.hostWebContents && guest.hostWebContents.id !== event.sender.id) {
@@ -263,7 +347,7 @@ ipcMain.handle('automation:register-browser', (event: IpcInvokeEvent, webContent
   }
   return embeddedBrowserHost.register(guest);
 });
-ipcMain.handle('automation:unregister-browser', () => embeddedBrowserHost.release());
+registerAutomationHandle('automation:unregister-browser', () => embeddedBrowserHost.release());
 
 function runnerEnvironment(): NodeJS.ProcessEnv {
   return {
@@ -294,7 +378,7 @@ function getBatchCoordinator(): CoordinatorLike {
   return batchCoordinator;
 }
 
-ipcMain.handle('batch:select-import-file', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
+registerAutomationHandle('batch:select-import-file', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
   const options = asRecord(rawOptions);
   const dialogOptions: import('electron').OpenDialogOptions = {
     title: '选择批量数据文件',
@@ -309,13 +393,13 @@ ipcMain.handle('batch:select-import-file', async (_event: IpcInvokeEvent, rawOpt
   const parsed = await parseBatchFile(selectedBatchImportPath, Array.isArray(options.schema) ? options.schema : [], Number(options.maxRows) || 50);
   return getBatchCoordinator().storeImport(parsed);
 });
-ipcMain.handle('batch:parse-import-file', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
+registerAutomationHandle('batch:parse-import-file', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
   const options = asRecord(rawOptions);
   if (!selectedBatchImportPath) throw new Error('请先选择批量数据文件');
   const parsed = await parseBatchFile(selectedBatchImportPath, Array.isArray(options.schema) ? options.schema : [], Number(options.maxRows) || 50);
   return getBatchCoordinator().storeImport(parsed);
 });
-ipcMain.handle('batch:export-import-errors', async (_event: IpcInvokeEvent, rawErrors: unknown) => {
+registerAutomationHandle('batch:export-import-errors', async (_event: IpcInvokeEvent, rawErrors: unknown) => {
   const errors = Array.isArray(rawErrors) ? rawErrors : [];
   const dialogOptions: import('electron').SaveDialogOptions = {
     title: '导出导入问题',
@@ -328,49 +412,80 @@ ipcMain.handle('batch:export-import-errors', async (_event: IpcInvokeEvent, rawE
   if (result.canceled || !result.filePath) return null;
   return writeBatchErrors(result.filePath, errors);
 });
-ipcMain.handle('batch:create', (_event: IpcInvokeEvent, payload: unknown) => getBatchCoordinator().create(asRecord(payload)));
-ipcMain.handle('batch:start', (_event: IpcInvokeEvent, payload: unknown) => {
+registerAutomationHandle('batch:create', (_event: IpcInvokeEvent, payload: unknown) => getBatchCoordinator().create(asRecord(payload)));
+registerAutomationHandle('batch:start', (_event: IpcInvokeEvent, payload: unknown) => {
   const data = asRecord(payload);
   return getBatchCoordinator().startItem(String(data.itemId || ''), asRecord(data.tool));
 });
-ipcMain.handle('batch:fail-item', (_event: IpcInvokeEvent, payload: unknown) => {
+registerAutomationHandle('batch:fail-item', (_event: IpcInvokeEvent, payload: unknown) => {
   const data = asRecord(payload);
   return getBatchCoordinator().failProvision(String(data.itemId || ''), typeof data.message === 'string' ? data.message : undefined);
 });
-ipcMain.handle('batch:complete-user-action', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().completeUserAction(String(itemId || '')));
-ipcMain.handle('batch:restart-item', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().restartItem(String(itemId || '')));
-ipcMain.handle('batch:cancel', async (_event: IpcInvokeEvent, status: unknown) => {
+registerAutomationHandle('batch:complete-user-action', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().completeUserAction(String(itemId || '')));
+registerAutomationHandle('batch:restart-item', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().restartItem(String(itemId || '')));
+registerAutomationHandle('batch:cancel', async (_event: IpcInvokeEvent, status: unknown) => {
   selectedBatchItemId = null;
   return getBatchCoordinator().cancel(typeof status === 'string' ? status : 'cancelled');
 });
-ipcMain.handle('batch:get-snapshot', () => getBatchCoordinator().snapshot());
-ipcMain.handle('batch:select-item', (_event: IpcInvokeEvent, rawItemId: unknown) => {
+registerAutomationHandle('batch:get-snapshot', () => getBatchCoordinator().snapshot());
+registerAutomationHandle('batch:select-item', (_event: IpcInvokeEvent, rawItemId: unknown) => {
   const itemId = String(rawItemId || '');
   selectedBatchItemId = itemId;
   return { itemId, snapshot: getBatchCoordinator().snapshot() };
 });
-ipcMain.handle('batch:register-browser', (event: IpcInvokeEvent, rawItemId: unknown, webContentsId: unknown) => {
+registerAutomationHandle('batch:register-browser', (event: IpcInvokeEvent, rawItemId: unknown, webContentsId: unknown) => {
   const itemId = String(rawItemId || '');
   const guest = webContents.fromId(Number(webContentsId));
   if (!guest || guest.getType?.() !== 'webview') throw new Error('无法注册批量工作区浏览器');
   if (guest.hostWebContents && guest.hostWebContents.id !== event.sender.id) throw new Error('批量浏览器归属校验失败');
   return getBatchCoordinator().registerBrowser(itemId, guest);
 });
-ipcMain.handle('batch:unregister-browser', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().unregisterBrowser(String(itemId || '')));
+registerAutomationHandle('batch:unregister-browser', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().unregisterBrowser(String(itemId || '')));
 
-function cleanupAutomationRunner(): void {
+async function cleanupAutomationRunner(): Promise<void> {
   embeddedBrowserHost.release();
+  const cleanupTasks: Promise<unknown>[] = [];
   if (batchCoordinator) {
     selectedBatchItemId = null;
     const coordinator = batchCoordinator;
-    batchCoordinator = null;
-    coordinator.cancel('interrupted').catch((error: unknown) => console.error('[BatchCoordinator] 清理失败:', errorMessage(error)));
+    cleanupTasks.push(coordinator.cancel('interrupted'));
   }
   batchBrowserHosts.releaseAll();
-  if (!automationRunner) return;
-  const runner = automationRunner;
+  if (automationRunner) {
+    const runner = automationRunner;
+    cleanupTasks.push(runner.stop());
+  }
+  if (!cleanupTasks.length) return;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>(resolve => { timeoutId = setTimeout(resolve, 5000); });
+  const results = await Promise.race([Promise.allSettled(cleanupTasks), timeout]);
+  if (timeoutId) clearTimeout(timeoutId);
+  if (Array.isArray(results)) {
+    const failures: unknown[] = [];
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        failures.push(result.reason);
+        console.error('[Automation] 清理失败:', errorMessage(result.reason));
+      }
+    }
+    if (failures.length) {
+      const message = errorMessage(failures[0]);
+      if (/timed?\s*out|timeout/i.test(message)) throw installBusyError(`Automation cleanup timed out: ${message}`);
+      throw new Error(`Automation cleanup failed: ${message}`);
+    }
+  } else {
+    throw installBusyError('Automation cleanup timed out');
+  }
+  batchCoordinator = null;
   automationRunner = null;
-  runner.stop().catch((error: unknown) => console.error('[AutomationRunner] 关闭失败:', errorMessage(error)));
+  singleRunActive = false;
+}
+
+async function quiesceApplication(): Promise<void> {
+  await Promise.all([
+    backendManager.cleanup(),
+    cleanupAutomationRunner(),
+  ]);
 }
 
 // ===== 后端进程管理 =====
@@ -389,12 +504,13 @@ function createWindow(): void {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      webviewTag: true,
+      webviewTag: AUTOMATION_RUNTIME_ENABLED,
       preload: path.join(__dirname, 'preload.cjs'),
       additionalArguments: [
         `--toolbox-control-api-base=${CONTROL_API_BASE}`,
         `--toolbox-device-id=${DEVICE_IDENTITY.deviceId}`,
         `--toolbox-device-name=${encodeURIComponent(DEVICE_IDENTITY.deviceName)}`,
+        `--toolbox-automation-enabled=${AUTOMATION_RUNTIME_ENABLED ? 'true' : 'false'}`,
       ],
     },
     frame: true,
@@ -413,6 +529,35 @@ function createWindow(): void {
     void window.loadURL('app://toolbox/index.html');
   }
 
+  const allowDevelopmentOrigin = !app.isPackaged;
+  const keepMainWindowOnApp = (event: import('electron').Event, url: string): void => {
+    if (!isAllowedMainFrameUrl(url, allowDevelopmentOrigin)) event.preventDefault();
+  };
+  window.webContents.on('will-navigate', keepMainWindowOnApp);
+  window.webContents.on('will-redirect', keepMainWindowOnApp);
+  window.webContents.setWindowOpenHandler(({ url }: { url: string }) => {
+    if (mayOpenExternalUrl(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  window.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    if (
+      !AUTOMATION_RUNTIME_ENABLED
+      || !isAllowedWebviewUrl(params.src || 'about:blank')
+      || !isAllowedWebviewPartition(params.partition)
+      || Boolean(params.preload)
+    ) {
+      event.preventDefault();
+      return;
+    }
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+  });
+
   // 页面加载完成后显示窗口（消除白屏闪烁）
   window.once('ready-to-show', () => {
     window.show();
@@ -429,17 +574,23 @@ function createWindow(): void {
   mainWindow = window;
 
   window.on('closed', () => {
+    demoActivityTokens.clear();
+    updateManager?.activityChanged();
     if (mainWindow === window) mainWindow = null;
   });
 
   window.on('close', (event: import('electron').Event) => {
     const snapshot = batchCoordinator?.snapshot();
-    if (allowWindowClose || !snapshot || snapshot.status !== 'running') return;
+    const batchActive = snapshot?.status === 'running';
+    const demoActive = demoActivityTokens.size > 0;
+    if (allowWindowClose || (!batchActive && !singleRunActive && !demoActive)) return;
     event.preventDefault();
     dialog.showMessageBox(window, {
       type: 'warning',
-      title: '结束当前批次？',
-      message: '仍有账号正在处理或等待操作。关闭后浏览器现场会被清理，不能从通用检查点继续。',
+      title: batchActive ? '结束当前批次？' : '结束当前操作？',
+      message: batchActive
+        ? '仍有账号正在处理或等待操作。关闭后浏览器现场会被清理，不能从通用检查点继续。'
+        : '当前自动操作仍在进行。关闭后会安全停止本次操作。',
       buttons: ['继续使用', '结束并关闭'],
       defaultId: 0,
       cancelId: 0,
@@ -447,6 +598,8 @@ function createWindow(): void {
       if (result.response !== 1) return;
       allowWindowClose = true;
       await batchCoordinator?.cancel('interrupted').catch(() => {});
+      await automationRunner?.cancel().catch(() => {});
+      singleRunActive = false;
       window.close();
     });
   });
@@ -482,10 +635,12 @@ app.whenReady().then(async () => {
   updateManager = new UpdateManager({
     ipcMain,
     getWindow: () => mainWindow,
-    hasActiveWork: () => singleRunActive || batchCoordinator?.snapshot()?.status === 'running',
-    beforeInstall: () => {
-      backendManager.cleanup();
-      cleanupAutomationRunner();
+    hasActiveWork: () => singleRunActive
+      || batchCoordinator?.snapshot()?.status === 'running'
+      || demoActivityTokens.size > 0,
+    beforeInstall: async () => {
+      await quiesceApplication();
+      shutdownReady = true;
     },
   });
   // 创建窗口
@@ -494,15 +649,27 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
-  backendManager.cleanup();
-  cleanupAutomationRunner();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-app.on('before-quit', () => {
-  credentialManager.dispose();
-  backendManager.cleanup();
-  cleanupAutomationRunner();
+app.on('before-quit', (event: import('electron').Event) => {
+  if (shutdownReady) {
+    credentialManager.dispose();
+    return;
+  }
+  event.preventDefault();
+  if (updateManager?.shouldInstallOnQuit() && !updateManager.isInstalling()) {
+    void updateManager.install();
+    return;
+  }
+  if (!shutdownPromise) {
+    shutdownPromise = quiesceApplication()
+      .catch(error => console.error('[Shutdown] Cleanup failed:', errorMessage(error)))
+      .finally(() => {
+        shutdownReady = true;
+        app.quit();
+      });
+  }
 });

@@ -6,7 +6,8 @@ import { useAppStore } from '@/stores/app'
 
 const mocks = vi.hoisted(() => ({
   getTools: vi.fn(),
-  createToolLaunchGrant: vi.fn(),
+  createDemoRun: vi.fn(),
+  updateDemoRun: vi.fn(),
   push: vi.fn(),
   showToast: vi.fn(),
   route: { query: {} },
@@ -14,7 +15,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/utils/api', () => ({
   getTools: mocks.getTools,
-  createToolLaunchGrant: mocks.createToolLaunchGrant,
+  createDemoRun: mocks.createDemoRun,
+  updateDemoRun: mocks.updateDemoRun,
 }))
 
 vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
@@ -43,15 +45,8 @@ describe('ToolsView 一键工具箱', () => {
     vi.clearAllMocks()
     mocks.route.query = {}
     mocks.getTools.mockResolvedValue([])
-    mocks.createToolLaunchGrant.mockResolvedValue({
-      launch_data: {
-        token: 'grant-token',
-        tool_id: 'register',
-        tool_name: '注册工具',
-        target_url: 'https://sellercentral.amazon.com',
-        platform_key: 'amazon',
-      },
-    })
+    mocks.createDemoRun.mockResolvedValue({ id: 'demo-1', tool_id: 'register', status: 'created' })
+    mocks.updateDemoRun.mockResolvedValue({ success: true })
     localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y15 体验包', plan_code: 'Y15' }))
   })
 
@@ -59,7 +54,7 @@ describe('ToolsView 一键工具箱', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.find('.toolbox-header h2').text()).toBe('选择一个工具开始')
+    expect(wrapper.find('.toolbox-header h2').text()).toBe('选择一个工具体验演示')
     expect(wrapper.find('.search-box').exists()).toBe(false)
     expect(wrapper.find('.category-tabs').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('成功率')
@@ -97,10 +92,10 @@ describe('ToolsView 一键工具箱', () => {
 
     await wrapper.find('[data-testid="tool-card-上品工具"]').trigger('click')
     expect(mocks.push).toHaveBeenCalledWith({ path: '/user/plans', query: { tool: 'listing' } })
-    expect(mocks.createToolLaunchGrant).not.toHaveBeenCalled()
+    expect(mocks.createDemoRun).not.toHaveBeenCalled()
   })
 
-  it('点击可用工具只申请一次授权并进入工作区', async () => {
+  it('点击可用工具只创建一次演示记录并进入工作区', async () => {
     mocks.getTools.mockResolvedValue([
       { id: 'register', name: '注册工具', module: 'register', status: 'online', available_plans: ['Y15'] },
     ])
@@ -111,9 +106,11 @@ describe('ToolsView 一键工具箱', () => {
     await Promise.all([card.trigger('click'), card.trigger('click')])
     await flushPromises()
 
-    expect(mocks.createToolLaunchGrant).toHaveBeenCalledTimes(1)
+    expect(mocks.createDemoRun).toHaveBeenCalledTimes(1)
+    expect(mocks.updateDemoRun).toHaveBeenCalledTimes(1)
     expect(useAppStore().toolVisible).toBe(true)
     expect(useAppStore().currentTool.name).toBe('注册工具')
+    expect(useAppStore().currentTool.executionMode).toBe('demo')
   })
 
   it('按当前平台向后端请求工具', async () => {

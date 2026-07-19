@@ -39,7 +39,7 @@ describe('User Store', () => {
       const store = useUserStore()
       store.setLogin({
         token: 'test-token',
-        role: 'admin',
+        role: 'super_admin',
         auth_code: 'admin',
         user: {}
       })
@@ -47,7 +47,7 @@ describe('User Store', () => {
       // 检查 store 状态是否正确设置
       expect(store.isLoggedIn).toBe(true)
       expect(store.token).toBe('test-token')
-      expect(store.role).toBe('admin')
+      expect(store.role).toBe('super_admin')
     })
   })
 
@@ -83,7 +83,7 @@ describe('User Store', () => {
   describe('isAdmin', () => {
     it('管理员应该返回 true', () => {
       const store = useUserStore()
-      store.setLogin({ token: 'test', role: 'admin', auth_code: 'admin', user: {} })
+      store.setLogin({ token: 'test', role: 'super_admin', auth_code: 'admin', user: {} })
       
       expect(store.isAdmin).toBe(true)
     })

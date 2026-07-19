@@ -19,7 +19,7 @@ export default async function globalSetup(): Promise<void> {
   await page.waitForLoadState('networkidle')
 
   const passwordInput = page.locator('#adminPassword')
-  await passwordInput.fill('admin123')
+  await passwordInput.fill(process.env.E2E_STAFF_PASSWORD || 'Test-only-pass-123')
 
   const [loginResponse] = await Promise.all([
     page.waitForResponse(

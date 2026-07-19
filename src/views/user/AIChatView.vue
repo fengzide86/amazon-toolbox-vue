@@ -5,7 +5,7 @@
       <button v-if="sessionId" class="btn btn-secondary" @click="showHistory = true">历史记录</button>
     </div>
 
-    <div class="chat-messages" ref="messagesContainer">
+    <div ref="messagesContainer" class="chat-messages" role="log" aria-live="polite" :aria-busy="isLoading">
       <div v-if="!sessionId" class="welcome-message">
         <div class="typing-indicator"><span></span><span></span><span></span></div>
         <p>正在连接客服…</p>
@@ -13,7 +13,7 @@
 
       <div v-else>
         <div v-for="msg in messages" :key="msg.id" :class="['message', msg.role]">
-          <div class="message-avatar">
+          <div class="message-avatar" aria-hidden="true">
             {{ msg.role === 'user' ? '' : msg.role === 'ai' ? '' : '⚙️' }}
           </div>
           <div class="message-content">
@@ -33,7 +33,7 @@
         </div>
 
         <div v-if="isLoading" class="message ai">
-          <div class="message-avatar">🤖</div>
+          <div class="message-avatar" aria-hidden="true">规</div>
           <div class="message-content">
             <div class="typing-indicator">
               <span></span><span></span><span></span>
@@ -55,7 +55,7 @@
         <div v-if="showRating" class="rating-panel">
           <p>请为本次服务评分：</p>
           <div class="rating-stars">
-            <span v-for="star in 5" :key="star" class="star" :class="{ active: star <= rating }" @click="submitRating(star)">★</span>
+            <button v-for="star in 5" :key="star" type="button" class="star" :class="{ active: star <= rating }" :aria-label="`${star} 星`" :aria-pressed="star === rating" @click="submitRating(star)">★</button>
           </div>
         </div>
 
@@ -69,31 +69,32 @@
       </div>
     </div>
 
-    <div v-if="sessionId && !sessionResolved && !sessionTransferred" class="chat-input">
+    <form v-if="sessionId && !sessionResolved && !sessionTransferred" class="chat-input" @submit.prevent="sendMessage">
+      <label class="sr-only" for="support-question">描述你的问题</label>
       <input
+        id="support-question"
         v-model="inputMessage"
         type="text"
         placeholder="输入您的问题..."
-        @keyup.enter="sendMessage"
         :disabled="isLoading"
       />
-      <button class="btn btn-primary" @click="sendMessage" :disabled="isLoading || !inputMessage.trim()">
+      <button type="submit" class="btn btn-primary" :disabled="isLoading || !inputMessage.trim()">
         发送
       </button>
-    </div>
+    </form>
 
     <!-- History Modal -->
     <div v-if="showHistory" class="modal-overlay" @click.self="showHistory = false">
-      <div class="modal">
-        <h3>对话历史</h3>
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
+        <h3 id="history-title">对话历史</h3>
         <div class="history-list">
-          <div v-for="session in historySessions" :key="session.session_id" class="history-item" @click="loadSession(session.session_id)">
+          <button v-for="session in historySessions" :key="session.session_id" type="button" class="history-item" @click="loadSession(session.session_id)">
             <div class="history-info">
               <span class="history-status" :class="session.status">{{ getStatusText(session.status) }}</span>
               <span class="history-time">{{ formatTime(session.created_at) }}</span>
             </div>
             <div class="history-meta">{{ session.message_count }} 条消息</div>
-          </div>
+          </button>
           <div v-if="!historySessions.length" class="empty-history">暂无历史记录</div>
         </div>
         <button class="btn btn-secondary" @click="showHistory = false">关闭</button>
@@ -312,6 +313,9 @@ const {
 }
 
 .star {
+  padding: 2px;
+  border: 0;
+  background: transparent;
   font-size: 2rem;
   cursor: pointer;
   color: var(--color-border);
@@ -394,6 +398,11 @@ const {
 }
 
 .history-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  color: inherit;
+  background: var(--color-surface);
   padding: 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -405,6 +414,8 @@ const {
 .history-item:hover {
   background: var(--color-surface-soft);
 }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .history-info {
   display: flex;

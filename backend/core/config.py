@@ -34,7 +34,11 @@ class Settings:
     # 应用配置
     APP_NAME: str = "跨境电商赛训效率工具箱"
     APP_VERSION: str = _get_version()
+    APP_ENV: str = "internal"
     DEBUG: bool = False
+    TOOL_EXECUTION_MODE: str = "demo"
+    AI_SUPPORT_MODE: str = "rules"
+    BUNDLED_BACKEND_ENABLED: bool = False
     
     # 服务器配置
     HOST: str = "0.0.0.0"
@@ -73,11 +77,8 @@ class Settings:
     # ===== API 频率限制 =====
     RATE_LIMIT_PER_MINUTE: int = 60  # 每分钟最多60次请求
     
-    # 默认管理员密码（通过环境变量覆盖）
-    DEFAULT_ADMIN_PASSWORD: str = ""
-    
     # 默认分润比例
-    DEFAULT_PROFIT_RATIOS: dict[str, float]
+    DEFAULT_PROFIT_RATIOS: dict[str, str]
     
     # ===== AI 客服配置 =====
     AI_PROVIDER: str = "qwen"                    # qwen/openai
@@ -93,11 +94,12 @@ class Settings:
     AI_CHAT_MAX_HISTORY: int = 5                 # 对话历史轮数
     
     def __init__(self):
+        self.APP_ENV = os.getenv("APP_ENV", "internal").strip().lower() or "internal"
         # 初始化 DEBUG 模式（优先环境变量）
         self.DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-        
-        # 初始化默认管理员密码（优先环境变量）
-        self.DEFAULT_ADMIN_PASSWORD = os.getenv("DEFAULT_ADMIN_PASSWORD", "admin123")
+        self.TOOL_EXECUTION_MODE = os.getenv("TOOL_EXECUTION_MODE", "demo").strip().lower() or "demo"
+        self.AI_SUPPORT_MODE = os.getenv("AI_SUPPORT_MODE", "rules").strip().lower() or "rules"
+        self.BUNDLED_BACKEND_ENABLED = os.getenv("BUNDLED_BACKEND_ENABLED", "false").lower() == "true"
         
         # 初始化 CORS 配置（生产环境禁止使用 *）
         cors_env = os.getenv("CORS_ORIGINS", "")
@@ -172,8 +174,8 @@ class Settings:
         
         # 初始化默认分润比例
         self.DEFAULT_PROFIT_RATIOS = {
-            "tech": 0.30, "market": 0.25, "product": 0.15,
-            "service": 0.15, "coordination": 0.10, "record": 0.05
+            "tech": "0.30", "market": "0.25", "product": "0.15",
+            "service": "0.15", "coordination": "0.10", "record": "0.05"
         }
         
         # ===== 初始化 AI 客服配置 =====
@@ -189,6 +191,9 @@ class Settings:
     
     def _get_db_path(self) -> str:
         """Get the local SQLite database path, preferring the configured runtime root."""
+        configured_path = os.environ.get("DB_PATH", "").strip()
+        if configured_path:
+            return os.path.abspath(os.path.expanduser(configured_path))
         runtime_root = os.environ.get('TOOLBOX_RUNTIME_DIR', '').strip()
         if runtime_root:
             db_dir = os.path.join(runtime_root, "AmazonToolbox")
@@ -230,26 +235,18 @@ class Settings:
         if self.DEBUG:
             result["warnings"].append("DEBUG 模式已启用，生产环境应设置 DEBUG=False")
         
-        # 4. 默认管理员密码检查（仅生产环境）
-        if is_production and self.DEFAULT_ADMIN_PASSWORD == "admin123":
-            result["errors"].append("使用默认管理员密码 'admin123'，生产环境必须修改 DEFAULT_ADMIN_PASSWORD")
-        
-        # 5. MySQL 密码检查（仅生产环境）
+        # 4. MySQL 密码检查（仅生产环境）
         if is_production and self.DB_TYPE == "mysql" and not self.MYSQL_PASSWORD:
             result["errors"].append("生产环境 MySQL 密码未设置")
         
-        # 6. AI Key 检查（仅生产环境）
-        if is_production and not self.QWEN_API_KEY:
+        # 5. 仅在线 AI 模式需要供应商密钥；规则客服不依赖外部模型。
+        if is_production and self.AI_SUPPORT_MODE != "rules" and not self.QWEN_API_KEY:
             result["warnings"].append("生产环境未配置 QWEN_API_KEY，工具帮助将使用 FAQ 与人工工单降级")
         
-        # 7. 更新地址检查（仅生产环境）
+        # 6. 更新地址检查（仅生产环境）
         update_url = os.getenv("UPDATE_URL", "")
         if is_production and (not update_url or "localhost" in update_url or "127.0.0.1" in update_url):
             result["warnings"].append("生产环境 UPDATE_URL 未设置或仍为本地地址")
-
-        # 8. 工具发布签名密钥（云端控制面必需）
-        if is_production and (not self.TOOL_SIGNING_PRIVATE_KEY_B64 or not self.TOOL_SIGNING_PUBLIC_KEY_B64):
-            result["errors"].append("生产环境未配置 Ed25519 工具签名密钥")
         
         return result
 

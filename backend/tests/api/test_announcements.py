@@ -2,30 +2,8 @@
 公告 API 测试
 """
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from main import app
-from database import get_db
 from models import Announcement, AuthCode, Plan, User
 from core.security import create_access_token
-
-
-@pytest.fixture
-def client(db_session: AsyncSession):
-    """创建测试客户端"""
-    async def override_get_db():
-        yield db_session
-    
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-
-@pytest.fixture
-def admin_token():
-    """管理员 token"""
-    return create_access_token({"sub": "admin", "role": "admin"})
 
 
 @pytest.fixture
@@ -48,7 +26,7 @@ class TestAnnouncementsAPI:
         db_session.add(announcement)
         await db_session.commit()
 
-        response = client.get(
+        response = await client.get(
             "/api/announcements",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -70,14 +48,15 @@ class TestAnnouncementsAPI:
         db_session.add(announcement)
         await db_session.commit()
 
-        response = client.get("/api/announcements/active")
+        response = await client.get("/api/announcements/active")
         assert response.status_code == 200
         body = response.json()
         assert body["success"] is True
 
-    def test_admin_list_requires_authentication(self, client):
-        response = client.get("/api/announcements")
-        assert response.status_code == 403
+    @pytest.mark.asyncio
+    async def test_admin_list_requires_authentication(self, client):
+        response = await client.get("/api/announcements")
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_feed_targets_consumer_and_records_receipt(self, client, db_session):
@@ -107,15 +86,15 @@ class TestAnnouncementsAPI:
         })
         headers = {"Authorization": f"Bearer {token}"}
 
-        response = client.get("/api/announcements/feed", headers=headers)
+        response = await client.get("/api/announcements/feed", headers=headers)
         assert response.status_code == 200
         titles = [item["title"] for item in response.json()["data"]]
         assert "C端公告" in titles
         assert "B端公告" not in titles
 
-        response = client.post(f"/api/announcements/{consumer.id}/read", headers=headers)
+        response = await client.post(f"/api/announcements/{consumer.id}/read", headers=headers)
         assert response.status_code == 200
-        response = client.get("/api/announcements/feed", headers=headers)
+        response = await client.get("/api/announcements/feed", headers=headers)
         item = next(item for item in response.json()["data"] if item["id"] == consumer.id)
         assert item["is_read"] is True
 
@@ -129,7 +108,7 @@ class TestAnnouncementsAPI:
         await db_session.commit()
         await db_session.refresh(announcement)
 
-        response = client.put(
+        response = await client.put(
             f"/api/announcements/{announcement.id}",
             json={"content": "修订后的内容"},
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -140,7 +119,7 @@ class TestAnnouncementsAPI:
     @pytest.mark.asyncio
     async def test_create_announcement_admin(self, client, admin_token):
         """测试管理员创建公告"""
-        response = client.post(
+        response = await client.post(
             "/api/announcements",
             json={"title": "新公告", "content": "内容", "status": "published"},
             headers={"Authorization": f"Bearer {admin_token}"}
@@ -162,7 +141,7 @@ class TestAnnouncementsAPI:
         await db_session.commit()
         await db_session.refresh(announcement)
 
-        response = client.put(
+        response = await client.put(
             f"/api/announcements/{announcement.id}",
             json={"title": "新标题", "content": "新内容"},
             headers={"Authorization": f"Bearer {admin_token}"}
@@ -183,7 +162,7 @@ class TestAnnouncementsAPI:
         await db_session.commit()
         await db_session.refresh(announcement)
 
-        response = client.delete(
+        response = await client.delete(
             f"/api/announcements/{announcement.id}",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
@@ -194,7 +173,7 @@ class TestAnnouncementsAPI:
     @pytest.mark.asyncio
     async def test_delete_nonexistent_announcement(self, client, admin_token):
         """测试删除不存在的公告"""
-        response = client.delete(
+        response = await client.delete(
             "/api/announcements/99999",
             headers={"Authorization": f"Bearer {admin_token}"}
         )

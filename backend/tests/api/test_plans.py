@@ -1,185 +1,152 @@
-"""
-套餐管理 API 集成测试
-"""
+from decimal import Decimal
+
 import pytest
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Plan, Setting
-from core.security import hash_password
+from models import AuthCode, Plan, StaffRole
 
 
-def get_data(response):
-    """从统一响应格式中提取 data 字段"""
-    body = response.json()
-    return body.get("data", body)
+def data(response):
+    return response.json().get("data", response.json())
 
 
-class TestGetPlans:
-    """获取套餐列表测试"""
-    
-    @pytest.mark.asyncio
-    async def test_get_plans_empty(self, client: AsyncClient):
-        """测试获取空套餐列表"""
-        response = await client.get("/api/plans")
-        
-        assert response.status_code == 200
-        data = get_data(response)
-        assert isinstance(data, list)
-        assert len(data) == 0
-    
-    @pytest.mark.asyncio
-    async def test_get_plans_with_data(self, client: AsyncClient, db_session: AsyncSession):
-        """测试获取套餐列表（有数据）"""
-        # 创建测试套餐
-        plan1 = Plan(name="月度套餐", price=99.00, duration_days=30, status="active")
-        plan2 = Plan(name="年度套餐", price=999.00, duration_days=365, status="active")
-        db_session.add_all([plan1, plan2])
-        await db_session.commit()
-        
-        response = await client.get("/api/plans")
-        
-        assert response.status_code == 200
-        data = get_data(response)
-        assert len(data) == 2
-        assert data[0]["name"] in ["月度套餐", "年度套餐"]
-    
-    @pytest.mark.asyncio
-    async def test_get_plans_excludes_deleted(self, client: AsyncClient, db_session: AsyncSession):
-        """测试获取套餐列表排除已删除"""
-        active_plan = Plan(name="有效套餐", price=99.00, duration_days=30, status="active")
-        deleted_plan = Plan(name="已删除套餐", price=49.00, duration_days=15, status="deleted")
-        db_session.add_all([active_plan, deleted_plan])
-        await db_session.commit()
-        
-        response = await client.get("/api/plans")
-        
-        assert response.status_code == 200
-        data = get_data(response)
-        assert len(data) == 1
-        assert data[0]["name"] == "有效套餐"
+@pytest.mark.asyncio
+async def test_public_catalog_only_exposes_active_consumer_plans(client, db_session):
+    db_session.add_all(
+        [
+            Plan(name="启用套餐", price=99, duration_days=30, status="active"),
+            Plan(name="禁用套餐", price=49, duration_days=7, status="disabled"),
+            Plan(name="归档套餐", price=19, duration_days=1, status="archived"),
+            Plan(
+                name="企业套餐",
+                price=999,
+                duration_days=90,
+                status="active",
+                product_type="business",
+            ),
+        ]
+    )
+    await db_session.commit()
+    response = await client.get("/api/plans")
+    assert response.status_code == 200
+    assert [item["name"] for item in data(response)] == ["启用套餐"]
 
-    @pytest.mark.asyncio
-    async def test_get_plans_returns_customer_entitlements(self, client: AsyncClient, db_session: AsyncSession):
-        """套餐列表返回前端展示所需的用户权益，不依赖授权码前缀。"""
-        plan = Plan(
-            name="Y199冲刺包",
-            price=199.00,
-            duration_days=5,
-            status="active",
-            features='{"benefits":["完整自动化工具","赛期支持"],"allowed_tools":["listing"]}',
+
+@pytest.mark.asyncio
+async def test_plan_admin_list_requires_staff(client):
+    assert (await client.get("/api/plans/admin")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_create_plan_defaults_disabled_and_validates_money(client, auth_headers):
+    response = await client.post(
+        "/api/plans",
+        headers=auth_headers,
+        json={"name": "新套餐", "price": "199.00", "duration_days": 60},
+    )
+    assert response.status_code == 201
+    assert data(response)["status"] == "disabled"
+    assert (
+        await client.post(
+            "/api/plans",
+            headers=auth_headers,
+            json={"name": "无效套餐", "price": 0, "duration_days": 30},
         )
-        db_session.add(plan)
-        await db_session.commit()
-
-        response = await client.get("/api/plans")
-        data = get_data(response)
-
-        assert response.status_code == 200
-        assert data[0]["plan_code"] == "Y199"
-        assert data[0]["benefits"] == ["完整自动化工具", "赛期支持"]
-        assert data[0]["allowed_tools"] == ["listing"]
-        assert data[0]["is_recommended"] is True
-        assert data[0]["display_badge"] == "赛期主推"
+    ).status_code == 422
 
 
-class TestCreatePlan:
-    """创建套餐测试"""
-    
-    @pytest.mark.asyncio
-    async def test_create_plan_success(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试成功创建套餐"""
-        plan_data = {
-            "name": "新套餐",
-            "price": 199.00,
-            "duration_days": 60,
-            "features": '["功能1", "功能2"]',
-            "status": "active"
-        }
-        
-        response = await client.post("/api/plans", json=plan_data, headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = get_data(response)
-        assert data["name"] == "新套餐"
-        assert float(data["price"]) == 199.00
-        assert data["duration_days"] == 60
-    
-    @pytest.mark.asyncio
-    async def test_create_plan_without_auth(self, client: AsyncClient):
-        """测试未认证创建套餐"""
-        plan_data = {
-            "name": "未授权套餐",
-            "price": 99.00,
-            "duration_days": 30
-        }
-        
-        response = await client.post("/api/plans", json=plan_data)
-        
-        assert response.status_code == 403
+@pytest.mark.asyncio
+async def test_only_super_admin_mutates_plans(client, staff_headers_factory):
+    operator_headers = await staff_headers_factory(StaffRole.OPERATOR, "plan-operator")
+    response = await client.post(
+        "/api/plans",
+        headers=operator_headers,
+        json={"name": "越权套餐", "price": 10, "duration_days": 1},
+    )
+    assert response.status_code == 403
 
 
-class TestUpdatePlan:
-    """更新套餐测试"""
-    
-    @pytest.mark.asyncio
-    async def test_update_plan_success(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试成功更新套餐"""
-        # 创建套餐
-        plan = Plan(name="原套餐", price=99.00, duration_days=30, status="active")
-        db_session.add(plan)
-        await db_session.commit()
-        
-        update_data = {
-            "name": "更新后套餐",
-            "price": 149.00
-        }
-        
-        response = await client.put(f"/api/plans/{plan.id}", json=update_data, headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = get_data(response)
-        assert data["name"] == "更新后套餐"
-        assert float(data["price"]) == 149.00
-    
-    @pytest.mark.asyncio
-    async def test_update_plan_not_found(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试更新不存在的套餐"""
-        response = await client.put("/api/plans/99999", json={"name": "不存在"}, headers=auth_headers)
-        
-        assert response.status_code == 200
-        body = response.json()
-        assert body["success"] is False
-        assert "不存在" in body["message"]
+@pytest.mark.asyncio
+async def test_plan_state_machine_and_active_edit_guard(client, auth_headers):
+    created = await client.post(
+        "/api/plans",
+        headers=auth_headers,
+        json={"name": "状态套餐", "price": "100.00", "duration_days": 30},
+    )
+    plan_id = data(created)["id"]
+    enabled = await client.post(f"/api/plans/{plan_id}/enable", headers=auth_headers)
+    assert enabled.status_code == 200
+    assert data(enabled)["status"] == "active"
+
+    display_update = await client.patch(
+        f"/api/plans/{plan_id}",
+        headers=auth_headers,
+        json={"features": "新的展示说明"},
+    )
+    assert display_update.status_code == 200
+    commercial_update = await client.patch(
+        f"/api/plans/{plan_id}",
+        headers=auth_headers,
+        json={"price": "120.00"},
+    )
+    assert commercial_update.status_code == 409
+
+    disabled = await client.post(f"/api/plans/{plan_id}/disable", headers=auth_headers)
+    assert data(disabled)["status"] == "disabled"
+    updated = await client.patch(
+        f"/api/plans/{plan_id}",
+        headers=auth_headers,
+        json={"price": "120.00"},
+    )
+    assert updated.status_code == 200
+    assert Decimal(str(data(updated)["price"])) == Decimal("120.0")
+
+    archived = await client.post(f"/api/plans/{plan_id}/archive", headers=auth_headers)
+    assert data(archived)["status"] == "archived"
+    assert (
+        await client.post(f"/api/plans/{plan_id}/enable", headers=auth_headers)
+    ).status_code == 409
+    assert (
+        await client.patch(
+            f"/api/plans/{plan_id}",
+            headers=auth_headers,
+            json={"features": "不可修改"},
+        )
+    ).status_code == 409
 
 
-class TestDeletePlan:
-    """删除套餐测试"""
-    
-    @pytest.mark.asyncio
-    async def test_delete_plan_success(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试成功删除套餐（软删除）"""
-        # 创建套餐
-        plan = Plan(name="待删除套餐", price=99.00, duration_days=30, status="active")
-        db_session.add(plan)
-        await db_session.commit()
-        
-        response = await client.delete(f"/api/plans/{plan.id}", headers=auth_headers)
-        
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        
-        # 验证是软删除
-        await db_session.refresh(plan)
-        assert plan.status == "deleted"
-    
-    @pytest.mark.asyncio
-    async def test_delete_plan_not_found(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试删除不存在的套餐"""
-        response = await client.delete("/api/plans/99999", headers=auth_headers)
-        
-        assert response.status_code == 200
-        body = response.json()
-        assert body["success"] is False
-        assert "不存在" in body["message"]
+@pytest.mark.asyncio
+async def test_plan_with_usable_codes_cannot_be_archived(client, db_session, auth_headers):
+    plan = Plan(name="有关联码套餐", price=100, duration_days=30, status="disabled")
+    db_session.add(plan)
+    await db_session.flush()
+    db_session.add(AuthCode(code="PLAN-CODE-001", plan_id=plan.id, status="unused"))
+    await db_session.commit()
+    response = await client.post(f"/api/plans/{plan.id}/archive", headers=auth_headers)
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_plan_missing_resources_use_404(client, auth_headers):
+    response = await client.patch(
+        "/api/plans/99999",
+        headers=auth_headers,
+        json={"name": "不存在"},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_plan_customer_entitlements_remain_available(client, db_session):
+    plan = Plan(
+        name="Y199冲刺包",
+        price=199,
+        duration_days=5,
+        status="active",
+        features='{"benefits":["完整自动化工具"],"allowed_tools":["listing"]}',
+    )
+    db_session.add(plan)
+    await db_session.commit()
+    item = data(await client.get("/api/plans"))[0]
+    assert item["plan_code"] == "Y199"
+    assert item["benefits"] == ["完整自动化工具"]
+    assert item["allowed_tools"] == ["listing"]

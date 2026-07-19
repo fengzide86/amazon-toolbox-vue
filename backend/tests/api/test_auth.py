@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.security import hash_password
-from models import AuthCode, AuthSeat, Device, Plan, Setting, User
+from models import AuthCode, AuthSeat, Device, Plan, StaffRole, StaffStatus, StaffUser, User
 
 
 class TestHealthCheck:
@@ -63,30 +63,42 @@ class TestAdminLogin:
     @pytest.mark.asyncio
     async def test_admin_login_success(self, client: AsyncClient, db_session: AsyncSession):
         """测试管理员正确密码登录"""
-        # 设置管理员密码
-        setting = Setting(
-            key="admin_password",
-            value=hash_password("admin123")
+        staff = StaffUser(
+            username="admin",
+            display_name="超级管理员",
+            password_hash=hash_password("Admin-test-123"),
+            role=StaffRole.SUPER_ADMIN,
+            status=StaffStatus.ACTIVE,
+            token_version=1,
+            force_password_reset=False,
         )
-        db_session.add(setting)
+        db_session.add(staff)
         await db_session.commit()
         
-        response = await client.post("/api/auth/admin-login", json={"password": "admin123"})
+        response = await client.post(
+            "/api/auth/admin-login",
+            json={"username": "admin", "password": "Admin-test-123"},
+        )
         
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert "token" in data["data"]
-        assert data["data"]["role"] == "admin"
+        assert data["data"]["role"] == StaffRole.SUPER_ADMIN
     
     @pytest.mark.asyncio
     async def test_admin_login_wrong_password(self, client: AsyncClient, db_session: AsyncSession):
         """测试管理员错误密码"""
-        setting = Setting(
-            key="admin_password",
-            value=hash_password("correct_password")
+        staff = StaffUser(
+            username="admin",
+            display_name="超级管理员",
+            password_hash=hash_password("Correct-password-123"),
+            role=StaffRole.SUPER_ADMIN,
+            status=StaffStatus.ACTIVE,
+            token_version=1,
+            force_password_reset=False,
         )
-        db_session.add(setting)
+        db_session.add(staff)
         await db_session.commit()
         
         response = await client.post("/api/auth/admin-login", json={"password": "wrong_password"})
@@ -360,14 +372,14 @@ class TestGetCurrentUser:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["data"]["role"] == "admin"
+        assert data["data"]["role"] == StaffRole.SUPER_ADMIN
     
     @pytest.mark.asyncio
     async def test_get_current_user_without_token(self, client: AsyncClient):
         """测试不带 Token 获取用户信息"""
         response = await client.get("/api/auth/me")
         
-        assert response.status_code == 403
+        assert response.status_code == 401
     
     @pytest.mark.asyncio
     async def test_get_current_user_with_invalid_token(self, client: AsyncClient):
@@ -384,25 +396,16 @@ class TestRefreshToken:
     """Token 刷新测试"""
     
     @pytest.mark.asyncio
-    async def test_refresh_token_success(self, client: AsyncClient, admin_token: str):
-        """测试成功刷新 Token"""
+    async def test_staff_token_refresh_is_disabled(self, client: AsyncClient, admin_token: str):
+        """后台 JWT 固定八小时，不提供刷新。"""
         response = await client.post(
             "/api/auth/refresh",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
         
-        assert response.status_code == 200
+        assert response.status_code == 403
         data = response.json()
-        assert data["success"] is True
-        assert "token" in data["data"]
-        
-        # 新 Token 应该可以使用
-        new_token = data["data"]["token"]
-        response2 = await client.get(
-            "/api/auth/me",
-            headers={"Authorization": f"Bearer {new_token}"}
-        )
-        assert response2.status_code == 200
+        assert data["detail"]["code"] == "FEATURE_DISABLED"
     
     @pytest.mark.asyncio
     async def test_refresh_token_without_token(self, client: AsyncClient):
@@ -427,7 +430,7 @@ class TestCheckAuthStatus:
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert data["data"]["role"] == "admin"
+        assert data["data"]["role"] == StaffRole.SUPER_ADMIN
     
     @pytest.mark.asyncio
     async def test_check_auth_status_without_token(self, client: AsyncClient):
@@ -437,4 +440,4 @@ class TestCheckAuthStatus:
             json={"code": "test", "device_id": "test", "device_name": ""}
         )
         
-        assert response.status_code == 403
+        assert response.status_code == 401

@@ -151,8 +151,9 @@ export default defineConfig(({ command, mode }) => {
           drop_debugger: true,
         }
       },
-      // 分包大小警告阈值（KB）
-      chunkSizeWarningLimit: 500,
+      // ExcelJS is an intentionally lazy-loaded spreadsheet chunk (~911 KB).
+      // Entry and shared vendor chunks remain below 120 KB.
+      chunkSizeWarningLimit: 1000,
       // CSS 代码分离
       cssCodeSplit: true,
       // 生成 sourcemap（仅开发环境）

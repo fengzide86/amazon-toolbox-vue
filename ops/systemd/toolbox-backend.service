@@ -1,0 +1,43 @@
+[Unit]
+Description=Amazon Toolbox control-plane backend
+Wants=network-online.target
+After=network-online.target mariadb.service
+
+[Service]
+Type=simple
+User=toolbox
+Group=toolbox
+WorkingDirectory=/opt/amazon-toolbox/backend
+EnvironmentFile=/opt/amazon-toolbox/backend/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=UPDATE_RELEASE_DIR=/var/lib/amazon-toolbox/updates
+ExecStart=/opt/amazon-toolbox/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=3s
+TimeoutStartSec=45s
+TimeoutStopSec=15s
+KillSignal=SIGTERM
+UMask=0077
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+ReadWritePaths=-/opt/amazon-toolbox/backend/updates
+ReadWritePaths=-/opt/amazon-toolbox/backend/.updates-staging
+ReadWritePaths=-/var/lib/amazon-toolbox/updates
+ReadWritePaths=-/var/lib/amazon-toolbox/.updates-staging
+ReadWritePaths=-/opt/amazon-toolbox/backend/uploads
+ReadWritePaths=-/opt/amazon-toolbox/backend/runtime
+ReadWritePaths=-/opt/amazon-toolbox/backend/logs
+
+[Install]
+WantedBy=multi-user.target

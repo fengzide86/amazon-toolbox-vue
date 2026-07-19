@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.dependencies import get_current_admin
 from core.response import success_response
 from database import get_db
@@ -15,11 +16,23 @@ from services.tool_release_service import (
 router = APIRouter()
 
 
+def _require_live_tool_stage() -> None:
+    if settings.TOOL_EXECUTION_MODE != "live":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "FEATURE_DISABLED",
+                "message": "完整内测版仅提供演示流程，真实工具版本发布尚未开放",
+            },
+        )
+
+
 @router.get("")
 async def list_tool_releases(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
+    _require_live_tool_stage()
     return success_response(await load_releases(db))
 
 
@@ -29,6 +42,7 @@ async def add_tool_release(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
+    _require_live_tool_stage()
     required = ["tool_id", "version", "script_key"]
     missing = [field for field in required if not payload.get(field)]
     if missing:
@@ -53,6 +67,7 @@ async def publish_tool_release(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
+    _require_live_tool_stage()
     releases = await load_releases(db)
     release = next((r for r in releases if r.get("tool_id") == tool_id and r.get("version") == version), None)
     if not release:
@@ -79,6 +94,7 @@ async def rollback_tool_release(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
+    _require_live_tool_stage()
     target_version = payload.get("target_version")
     if not target_version:
         raise HTTPException(status_code=400, detail="缺少 target_version")

@@ -6,7 +6,6 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Setting
-from core.security import verify_password
 
 
 class TestGetSettings:
@@ -16,7 +15,7 @@ class TestGetSettings:
     async def test_get_settings_requires_admin(self, client: AsyncClient):
         """测试获取设置需要管理员权限"""
         response = await client.get("/api/settings")
-        assert response.status_code == 403
+        assert response.status_code == 401
     
     @pytest.mark.asyncio
     async def test_get_settings_with_admin(self, client: AsyncClient, auth_headers: dict):
@@ -36,8 +35,7 @@ class TestGetSettings:
         data = response.json()
         # 如果有 admin_password，值应该是隐藏的
         password_settings = [s for s in data if s["key"] == "admin_password"]
-        if password_settings:
-            assert password_settings[0]["value"] == "********"
+        assert password_settings == []
 
 
 class TestGetPublicSettings:
@@ -127,14 +125,14 @@ class TestUpdateSetting:
         assert data["success"] is True
     
     @pytest.mark.asyncio
-    async def test_update_admin_password_hashes(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
-        """测试更新管理员密码时使用 bcrypt 哈希"""
+    async def test_admin_password_setting_is_rejected(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
+        """后台密码只能通过 staff account API 修改。"""
         response = await client.put("/api/settings", json={
             "key": "admin_password",
             "value": "new_password_123"
         }, headers=auth_headers)
         
-        assert response.status_code == 200
+        assert response.status_code == 422
         
         # 验证密码已哈希存储
         from sqlalchemy import select
@@ -142,8 +140,7 @@ class TestUpdateSetting:
             select(Setting).where(Setting.key == "admin_password")
         )
         setting = result.scalars().first()
-        assert setting.value.startswith("$2b$")
-        assert verify_password("new_password_123", setting.value) is True
+        assert setting is None
     
     @pytest.mark.asyncio
     async def test_update_setting_without_auth(self, client: AsyncClient):
@@ -153,4 +150,4 @@ class TestUpdateSetting:
             "value": "未授权修改"
         })
         
-        assert response.status_code == 403
+        assert response.status_code == 401

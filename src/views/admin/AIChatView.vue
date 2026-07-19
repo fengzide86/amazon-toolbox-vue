@@ -1,11 +1,15 @@
 <template>
   <div class="ai-chat-admin">
     <div class="page-header">
-      <h2 class="page-title">AI 客服管理</h2>
+      <div>
+        <h2 class="page-title">客服规则管理</h2>
+        <p class="page-description">配置欢迎语、推荐问题与转人工规则，并预览固定知识规则的应答效果。</p>
+      </div>
     </div>
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载客服规则…" @retry="loadAll" />
 
     <!-- Master-Detail 双栏布局 -->
-    <div class="master-detail-container">
+    <div v-if="loadState !== 'loading' && loadState !== 'error'" class="master-detail-container">
       <!-- 左侧面板：配置 + 数据看板 + 对话记录 -->
       <div class="panel-left">
         <!-- 策略配置 -->
@@ -41,11 +45,7 @@
             </el-button>
           </div>
 
-          <div class="config-row">
-            <div class="config-section">
-              <label>模型</label>
-              <el-input v-model="config.ai_model" placeholder="如 qwen-turbo" />
-            </div>
+          <div class="config-row single-column">
             <div class="config-section">
               <label>回复风格</label>
               <el-select v-model="config.reply_style" style="width: 100%;">
@@ -120,16 +120,16 @@
         </div>
       </div>
 
-      <!-- 右侧面板：实时聊天沙盒 -->
+      <!-- 右侧面板：规则应答预览 -->
       <div class="panel-right">
         <div class="panel-section chat-sandbox">
-          <h3 class="section-title">💬 实时聊天沙盒</h3>
+          <h3 class="section-title">💬 规则应答预览</h3>
           
           <!-- 聊天消息区 -->
           <div class="chat-messages-sandbox">
             <div v-for="(msg, idx) in sandboxMessages" :key="idx" :class="['message-sandbox', msg.role]">
               <div class="message-avatar-sandbox">
-                {{ msg.role === 'user' ? '👤' : '🤖' }}
+                {{ msg.role === 'user' ? '👤' : '规' }}
               </div>
                 <div class="message-content-sandbox">
                   <div class="message-text-sandbox">{{ msg.content }}</div>
@@ -142,15 +142,14 @@
               </div>
             </div>
             <div v-if="!sandboxMessages.length" class="empty-sandbox">
-              发送消息测试 AI 客服效果
+              发送问题测试规则匹配与固定知识应答效果
             </div>
           </div>
 
           <div v-if="lastDebug" class="debug-panel">
-            <div><strong>路径：</strong>{{ lastDebug.answer_mode }} · <strong>调用 AI：</strong>{{ lastDebug.ai_used ? '是' : '否' }}</div>
-            <div><strong>模型：</strong>{{ lastDebug.diagnostics?.provider || '-' }} / {{ lastDebug.diagnostics?.model || '-' }}</div>
-            <div><strong>耗时：</strong>召回 {{ lastDebug.diagnostics?.retrieval_ms || 0 }} ms · 生成 {{ lastDebug.diagnostics?.generation_ms || 0 }} ms · 总计 {{ lastDebug.diagnostics?.total_ms || 0 }} ms</div>
-            <div v-if="lastDebug.fallback_reason"><strong>降级原因：</strong>{{ lastDebug.fallback_reason }}</div>
+            <div><strong>匹配路径：</strong>{{ lastDebug.answer_mode || '固定规则' }}</div>
+            <div><strong>处理耗时：</strong>{{ lastDebug.diagnostics?.total_ms || 0 }} ms</div>
+            <div v-if="lastDebug.fallback_reason"><strong>未命中原因：</strong>{{ lastDebug.fallback_reason }}</div>
           </div>
 
           <!-- 输入区 -->
@@ -161,7 +160,7 @@
             </el-select>
             <el-input
               v-model="testMessage"
-              placeholder="输入测试消息..."
+              placeholder="输入测试问题..."
               @keyup.enter="sendTest"
               :disabled="sendingTest"
             />
@@ -177,10 +176,12 @@
 
 <script setup lang="ts">
 import { useOperatorSupportConsole } from '@/features/ai/useOperatorSupportConsole'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 
 const {
   config, suggestedQuestions, transferRules, saving, sessions, currentSession, stats,
   testMessage, sandboxMessages, sendingTest, lastDebug, debugPlatform,
+  loadState, loadError, loadAll,
   getStatusTagType, getStatusText, formatTime, saveConfig, viewSession, sendTest,
 } = useOperatorSupportConsole()
 </script>
@@ -192,6 +193,7 @@ const {
 }
 
 .config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.config-row.single-column { grid-template-columns: 1fr; }
 .debug-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 12px; line-height: 1.8; background: var(--color-surface-soft); }
 .debug-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 
@@ -206,6 +208,7 @@ const {
   color: var(--color-text);
   margin: 0;
 }
+.page-description { margin: 6px 0 0; color: var(--color-text-secondary); font-size: var(--type-control); }
 
 /* ===== Master-Detail 双栏布局 ===== */
 .master-detail-container {

@@ -4,3 +4,6 @@ export const getDashboard = (params: ApiQueryParams = {}): Promise<unknown> => a
 export const getDashboardCharts = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/dashboard/charts', params)
 export const getProfit = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/profit', params)
 export const getProfitSummary = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/profit/summary', params)
+export const getProfitPolicy = (): Promise<unknown> => api.get('/api/profit/policy', {}, { cache: false })
+export const updateProfitPolicy = (ratios: Record<string, number>): Promise<unknown> =>
+  api.put('/api/profit/policy', { ratios })

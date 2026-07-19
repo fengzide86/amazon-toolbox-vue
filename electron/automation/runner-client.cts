@@ -137,9 +137,37 @@ export class RunnerClient {
   async stop(): Promise<void> {
     if (!this.child) return
     const child = this.child
-    try { await this.command('shutdown') } catch { /* Runner may already be gone. */ }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        this.command('shutdown'),
+        new Promise<void>(resolve => { timer = setTimeout(resolve, 2000) }),
+      ])
+    } catch { /* Runner may already be gone. */ }
+    finally { if (timer) clearTimeout(timer) }
     if (child.connected) child.disconnect()
-    child.kill()
-    this.child = null
+    if (child.exitCode === null && child.signalCode === null) child.kill()
+    await new Promise<void>((resolve, reject) => {
+      if (child.exitCode !== null || child.signalCode !== null) {
+        resolve()
+        return
+      }
+      let settled = false
+      const finish = (): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(exitTimer)
+        child.removeListener('exit', finish)
+        resolve()
+      }
+      const exitTimer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        child.removeListener('exit', finish)
+        reject(Object.assign(new Error('Runner process cleanup timed out'), { code: 'INSTALL_BUSY' }))
+      }, 2000)
+      child.once('exit', finish)
+    })
+    if (this.child === child) this.child = null
   }
 }

@@ -1,283 +1,291 @@
-"""
-套餐服务模块
-包含套餐 CRUD、缓存管理、排序等业务逻辑
-"""
-from typing import Optional, Dict, Any, List
+"""Validated plan catalogue and explicit plan lifecycle transitions."""
+
 import json
 import re
-from sqlalchemy import select, func, desc
+from typing import Any
+
+from fastapi import Request
+from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Plan, AuthCode, Order
-from core.logging import get_logger
-from core.response import success_response, error_response, ErrorCodes
-from core.cache import cache, CacheKeys
-from core.pagination import PaginationParams, paginate
+from core.audit import log_admin_action
+from core.cache import CacheKeys, cache
+from core.exceptions import ConflictException, NotFoundException, ValidationException
+from models import AuthCode, Order, Plan, PlanStatus
 from services.entitlement_service import normalize_entitlements, serialize_entitlements
-
-logger = get_logger(__name__)
 
 
 class PlanService:
-    """套餐服务"""
-    
+    DISPLAY_FIELDS = frozenset({"name", "features", "sort_order"})
+    COMMERCIAL_FIELDS = frozenset(
+        {"price", "duration_days", "code_prefix", "product_type", "entitlements"}
+    )
+
     def __init__(self, db: AsyncSession):
         self.db = db
-    
-    async def get_plans_list(
-        self,
-        status: Optional[str] = None,
-        pagination: Optional[PaginationParams] = None,
-        product_type: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """获取套餐列表（带缓存）
-        
-        Args:
-            status: 状态过滤（active/disabled/deleted）
-            pagination: 分页参数，None 则返回全部
-        """
-        # 尝试从缓存获取（仅无过滤条件时）
-        cache_key = CacheKeys.PLANS_LIST
-        if not status and not pagination:
-            cached = await cache.get(cache_key)
-            if cached:
-                return cached
-        
-        # 构建查询
-        query = select(Plan).order_by(Plan.sort_order, Plan.id)
-        if product_type:
-            query = query.where(Plan.product_type == product_type)
-        if status:
-            query = query.where(Plan.status == status)
-        else:
-            # 默认排除已删除
-            query = query.where(Plan.status != "deleted")
-        
-        if pagination:
-            items, total = await paginate(query, self.db, pagination)
-            result = success_response(
-                data=[self._serialize_plan(p) for p in items],
-                total=total,
-                page=pagination.page,
-                page_size=pagination.page_size,
-            )
-        else:
-            result_query = await self.db.execute(query)
-            plans = result_query.scalars().all()
-            result = success_response(
-                data=[self._serialize_plan(p) for p in plans]
-            )
-        
-        # 缓存结果
-        if not status and not pagination:
-            await cache.set(cache_key, result, ttl=300)
-        
-        return result
-    
-    async def get_plan_by_id(self, plan_id: int) -> Dict[str, Any]:
-        """根据 ID 获取套餐详情"""
-        # 尝试缓存
-        cache_key = CacheKeys.plan_detail(plan_id)
-        cached = await cache.get(cache_key)
-        if cached:
-            return cached
-        
-        result = await self.db.execute(select(Plan).where(Plan.id == plan_id))
-        plan = result.scalars().first()
-        
-        if not plan:
-            return error_response("套餐不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
-        data = self._serialize_plan(plan, detailed=True)
-        result = success_response(data=data)
-        
-        # 缓存5分钟
-        await cache.set(cache_key, result, ttl=300)
-        
-        return result
-    
-    async def create_plan(self, data: dict) -> Dict[str, Any]:
-        """创建套餐"""
-        # 检查名称是否重复
-        existing = await self.db.execute(
-            select(Plan).where(Plan.name == data["name"])
-        )
-        if existing.scalars().first():
-            return error_response("套餐名称已存在", ErrorCodes.RESOURCE_ALREADY_EXISTS)
-        
-        product_type = str(data.get("product_type") or "consumer").lower()
-        if product_type not in {"consumer", "business"}:
-            return error_response("产品类型无效", ErrorCodes.INVALID_PARAMS)
-        entitlements = normalize_entitlements(data.get("entitlements"), product_type)
-        if product_type == "business" and not (
-            entitlements["batch_execution"] and entitlements["multi_account_workspace"]
-        ):
-            return error_response("专业批量版必须同时开启批量执行和多账号工作台", ErrorCodes.INVALID_PARAMS)
 
+    async def list_public(self, product_type: str = "consumer") -> dict:
+        result = await self.db.execute(
+            select(Plan)
+            .where(Plan.status == PlanStatus.ACTIVE, Plan.product_type == product_type)
+            .order_by(Plan.sort_order, Plan.id)
+        )
+        return {
+            "success": True,
+            "message": "ok",
+            "data": [self.serialize(plan) for plan in result.scalars().all()],
+        }
+
+    async def list_admin(
+        self,
+        status_filter: str | None,
+        page: int,
+        page_size: int,
+    ) -> dict:
+        filters = []
+        if status_filter:
+            if status_filter not in PlanStatus.ALL:
+                raise ValidationException("套餐状态无效")
+            filters.append(Plan.status == status_filter)
+        base = select(Plan).where(*filters)
+        count_result = await self.db.execute(
+            select(func.count()).select_from(base.order_by(None).subquery())
+        )
+        result = await self.db.execute(
+            base.order_by(Plan.sort_order, Plan.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        return {
+            "success": True,
+            "message": "ok",
+            "data": [self.serialize(plan) for plan in result.scalars().all()],
+            "page": page,
+            "page_size": page_size,
+            "total": int(count_result.scalar() or 0),
+        }
+
+    async def get_public(self, plan_id: int) -> dict:
+        result = await self.db.execute(
+            select(Plan).where(Plan.id == plan_id, Plan.status == PlanStatus.ACTIVE)
+        )
+        plan = result.scalar_one_or_none()
+        if not plan:
+            raise NotFoundException("套餐不存在或未启用")
+        return {"success": True, "message": "ok", "data": self.serialize(plan, detailed=True)}
+
+    async def create(
+        self,
+        data: dict,
+        actor: dict,
+        request: Request,
+    ) -> dict:
+        product_type, entitlements = self._validate_product(data)
         plan = Plan(
             name=data["name"],
             price=data["price"],
             duration_days=data["duration_days"],
-            features=data.get("features", ""),
-            status=data.get("status", "active"),
-            code_prefix=data.get("code_prefix", ""),
+            features=data.get("features"),
+            status=PlanStatus.DISABLED,
+            code_prefix=data.get("code_prefix"),
             sort_order=data.get("sort_order", 0),
             product_type=product_type,
             entitlements=serialize_entitlements(entitlements, product_type),
         )
         self.db.add(plan)
-        
         try:
+            await self.db.flush()
+            await self._audit(actor, request, "plan_create", plan, None, self.serialize(plan))
             await self.db.commit()
             await self.db.refresh(plan)
-        except Exception as e:
+        except IntegrityError as error:
             await self.db.rollback()
-            logger.error(f"创建套餐失败: {e}")
-            return error_response("创建套餐失败", ErrorCodes.DATABASE_ERROR)
-        
-        # 清除缓存
-        await self._invalidate_cache()
-        
-        logger.info(f"创建套餐: {plan.name} (ID: {plan.id})")
-        return success_response(data=self._serialize_plan(plan), message="创建成功")
-    
-    async def update_plan(self, plan_id: int, data: dict) -> Dict[str, Any]:
-        """更新套餐"""
-        result = await self.db.execute(select(Plan).where(Plan.id == plan_id))
-        plan = result.scalars().first()
-        
-        if not plan:
-            return error_response("套餐不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
-        # 检查名称重复（排除自身）
-        if "name" in data and data["name"] != plan.name:
-            existing = await self.db.execute(
-                select(Plan).where(Plan.name == data["name"], Plan.id != plan_id)
-            )
-            if existing.scalars().first():
-                return error_response("套餐名称已存在", ErrorCodes.RESOURCE_ALREADY_EXISTS)
-        
-        next_product_type = str(data.get("product_type", plan.product_type or "consumer")).lower()
-        if next_product_type not in {"consumer", "business"}:
-            return error_response("产品类型无效", ErrorCodes.INVALID_PARAMS)
-        next_entitlements = normalize_entitlements(data.get("entitlements", plan.entitlements), next_product_type)
-        if next_product_type == "business" and not (
-            next_entitlements["batch_execution"] and next_entitlements["multi_account_workspace"]
-        ):
-            return error_response("专业批量版必须同时开启批量执行和多账号工作台", ErrorCodes.INVALID_PARAMS)
+            raise ConflictException("套餐名称已存在") from error
+        await self._invalidate_cache(plan.id)
+        return {"success": True, "message": "套餐已创建，默认处于禁用状态", "data": self.serialize(plan)}
 
-        # 更新字段
-        for field in ["name", "price", "duration_days", "features", "status", "code_prefix", "sort_order"]:
+    async def update(
+        self,
+        plan_id: int,
+        data: dict,
+        actor: dict,
+        request: Request,
+    ) -> dict:
+        plan = await self._locked_plan(plan_id)
+        if plan.status == PlanStatus.ARCHIVED:
+            raise ConflictException("已归档套餐不可修改")
+        if not data:
+            raise ValidationException("没有可更新字段")
+        if plan.status == PlanStatus.ACTIVE:
+            forbidden = set(data) - self.DISPLAY_FIELDS
+            if forbidden:
+                raise ConflictException("启用中的套餐只能修改名称、展示说明和排序；请先禁用")
+
+        before = self.serialize(plan)
+        if self.COMMERCIAL_FIELDS.intersection(data):
+            product_type, entitlements = self._validate_product(data, current=plan)
+            plan.product_type = product_type
+            plan.entitlements = serialize_entitlements(entitlements, product_type)
+        for field in ("name", "price", "duration_days", "features", "code_prefix", "sort_order"):
             if field in data:
                 setattr(plan, field, data[field])
-        plan.product_type = next_product_type
-        plan.entitlements = serialize_entitlements(next_entitlements, next_product_type)
-        
         try:
+            await self._audit(
+                actor,
+                request,
+                "plan_update",
+                plan,
+                before,
+                self.serialize(plan),
+            )
             await self.db.commit()
             await self.db.refresh(plan)
-        except Exception as e:
+        except IntegrityError as error:
             await self.db.rollback()
-            logger.error(f"更新套餐失败: {e}")
-            return error_response("更新套餐失败", ErrorCodes.DATABASE_ERROR)
-        
-        # 清除缓存
-        await self._invalidate_cache()
-        await cache.delete(CacheKeys.plan_detail(plan_id))
-        
-        logger.info(f"更新套餐: {plan.name} (ID: {plan.id})")
-        return success_response(data=self._serialize_plan(plan), message="更新成功")
-    
-    async def delete_plan(self, plan_id: int) -> Dict[str, Any]:
-        """删除套餐（软删除）"""
-        result = await self.db.execute(select(Plan).where(Plan.id == plan_id))
-        plan = result.scalars().first()
-        
-        if not plan:
-            return error_response("套餐不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
-        # 检查是否有关联的活跃授权码
-        active_count_result = await self.db.execute(
-            select(func.count(AuthCode.id)).where(
-                AuthCode.plan_id == plan_id,
-                AuthCode.status.in_(["active", "unused"])
+            raise ConflictException("套餐名称已存在") from error
+        await self._invalidate_cache(plan.id)
+        return {"success": True, "message": "套餐已更新", "data": self.serialize(plan)}
+
+    async def transition(
+        self,
+        plan_id: int,
+        action: str,
+        actor: dict,
+        request: Request,
+    ) -> dict:
+        targets = {
+            "enable": PlanStatus.ACTIVE,
+            "disable": PlanStatus.DISABLED,
+            "archive": PlanStatus.ARCHIVED,
+        }
+        if action not in targets:
+            raise ValidationException("套餐操作无效")
+        plan = await self._locked_plan(plan_id)
+        if plan.status == PlanStatus.ARCHIVED:
+            raise ConflictException("已归档套餐为终态")
+        target = targets[action]
+        if action == "enable" and plan.status != PlanStatus.DISABLED:
+            raise ConflictException("只有禁用套餐可以启用")
+        if action == "disable" and plan.status != PlanStatus.ACTIVE:
+            raise ConflictException("只有启用套餐可以禁用")
+        if action == "archive":
+            active_codes_result = await self.db.execute(
+                select(func.count(AuthCode.id)).where(
+                    AuthCode.plan_id == plan.id,
+                    AuthCode.status.in_(["active", "unused"]),
+                )
             )
+            active_codes = int(active_codes_result.scalar() or 0)
+            if active_codes:
+                raise ConflictException(f"套餐仍有 {active_codes} 个可用授权码，不能归档")
+        before = self.serialize(plan)
+        plan.status = target
+        await self._audit(
+            actor,
+            request,
+            f"plan_{action}",
+            plan,
+            before,
+            self.serialize(plan),
         )
-        active_count = active_count_result.scalar() or 0
-        
-        if active_count > 0:
-            return error_response(
-                f"该套餐下有 {active_count} 个活跃授权码，无法删除",
-                ErrorCodes.RESOURCE_ALREADY_EXISTS
-            )
-        
-        # 软删除
-        plan.status = "deleted"
-        
-        try:
-            await self.db.commit()
-        except Exception as e:
-            await self.db.rollback()
-            logger.error(f"删除套餐失败: {e}")
-            return error_response("删除套餐失败", ErrorCodes.DATABASE_ERROR)
-        
-        # 清除缓存
-        await self._invalidate_cache()
-        await cache.delete(CacheKeys.plan_detail(plan_id))
-        
-        logger.info(f"删除套餐: {plan.name} (ID: {plan.id})")
-        return success_response(message="删除成功")
-    
-    async def get_plan_stats(self, plan_id: int) -> Dict[str, Any]:
-        """获取套餐统计信息"""
+        await self.db.commit()
+        await self.db.refresh(plan)
+        await self._invalidate_cache(plan.id)
+        return {"success": True, "message": f"套餐已{ {'enable': '启用', 'disable': '禁用', 'archive': '归档'}[action] }", "data": self.serialize(plan)}
+
+    async def stats(self, plan_id: int) -> dict:
         result = await self.db.execute(select(Plan).where(Plan.id == plan_id))
-        plan = result.scalars().first()
-        
+        plan = result.scalar_one_or_none()
         if not plan:
-            return error_response("套餐不存在", ErrorCodes.RESOURCE_NOT_FOUND)
-        
-        # 授权码统计
-        codes_result = await self.db.execute(
+            raise NotFoundException("套餐不存在")
+        code_result = await self.db.execute(
             select(
                 func.count(AuthCode.id),
-                func.sum(func.case((AuthCode.status == "active", 1), else_=0)),
-                func.sum(func.case((AuthCode.status == "unused", 1), else_=0)),
-                func.sum(func.case((AuthCode.status == "expired", 1), else_=0)),
+                func.sum(case((AuthCode.status == "active", 1), else_=0)),
+                func.sum(case((AuthCode.status == "unused", 1), else_=0)),
+                func.sum(case((AuthCode.status == "expired", 1), else_=0)),
             ).where(AuthCode.plan_id == plan_id)
         )
-        total_codes, active_codes, unused_codes, expired_codes = codes_result.one()
-        
-        # 订单统计
-        orders_result = await self.db.execute(
-            select(
-                func.count(Order.id),
-                func.coalesce(func.sum(Order.amount), 0),
-            ).where(Order.plan_id == plan_id, Order.status == "paid")
+        total_codes, active_codes, unused_codes, expired_codes = code_result.one()
+        order_result = await self.db.execute(
+            select(func.count(Order.id), func.coalesce(func.sum(Order.amount), 0)).where(
+                Order.plan_id == plan_id,
+                Order.status == "paid",
+            )
         )
-        total_orders, total_revenue = orders_result.one()
-        
-        return success_response(data={
-            "plan": self._serialize_plan(plan),
-            "codes": {
-                "total": total_codes or 0,
-                "active": active_codes or 0,
-                "unused": unused_codes or 0,
-                "expired": expired_codes or 0,
+        total_orders, revenue = order_result.one()
+        return {
+            "success": True,
+            "message": "ok",
+            "data": {
+                "plan": self.serialize(plan),
+                "codes": {
+                    "total": total_codes or 0,
+                    "active": active_codes or 0,
+                    "unused": unused_codes or 0,
+                    "expired": expired_codes or 0,
+                },
+                "orders": {"total": total_orders or 0, "revenue": float(revenue or 0)},
             },
-            "orders": {
-                "total": total_orders or 0,
-                "revenue": float(total_revenue or 0),
-            }
-        })
-    
-    def _serialize_plan(self, plan: Plan, detailed: bool = False) -> dict:
-        """序列化套餐对象"""
+        }
+
+    async def _locked_plan(self, plan_id: int) -> Plan:
+        result = await self.db.execute(
+            select(Plan).where(Plan.id == plan_id).with_for_update()
+        )
+        plan = result.scalar_one_or_none()
+        if not plan:
+            raise NotFoundException("套餐不存在")
+        return plan
+
+    @staticmethod
+    def _validate_product(data: dict, current: Plan | None = None) -> tuple[str, dict]:
+        product_type = str(
+            data.get("product_type", current.product_type if current else "consumer")
+            or "consumer"
+        ).lower()
+        if product_type not in {"consumer", "business"}:
+            raise ValidationException("产品类型无效")
+        raw_entitlements: Any = data.get(
+            "entitlements",
+            current.entitlements if current else None,
+        )
+        entitlements = normalize_entitlements(raw_entitlements, product_type)
+        if product_type == "business" and not (
+            entitlements["batch_execution"] and entitlements["multi_account_workspace"]
+        ):
+            raise ValidationException("专业批量版必须同时开启批量执行和多账号工作台")
+        return product_type, entitlements
+
+    async def _audit(
+        self,
+        actor: dict,
+        request: Request,
+        action: str,
+        plan: Plan,
+        before: dict | None,
+        after: dict,
+    ) -> None:
+        await log_admin_action(
+            self.db,
+            user_id=actor["staff_id"],
+            user_name=actor["username"],
+            action=action,
+            target_type="plan",
+            target_id=plan.id,
+            detail={"role": actor["role"], "before": before, "after": after},
+            request=request,
+        )
+
+    @staticmethod
+    def serialize(plan: Plan, detailed: bool = False) -> dict:
         name = plan.name or ""
         plan_match = re.search(r"Y\d+", name, re.IGNORECASE)
         plan_code = plan_match.group(0).upper() if plan_match else None
         feature_text = plan.features or ""
-        benefits = []
-        allowed_tools = []
+        benefits: list = []
+        allowed_tools: list = []
         if feature_text:
             try:
                 parsed = json.loads(feature_text)
@@ -287,7 +295,11 @@ class PlanService:
                 elif isinstance(parsed, list):
                     benefits = parsed
             except (ValueError, TypeError):
-                benefits = [item.strip() for item in feature_text.replace("+", "\n").splitlines() if item.strip()]
+                benefits = [
+                    item.strip()
+                    for item in feature_text.replace("+", "\n").splitlines()
+                    if item.strip()
+                ]
         data = {
             "id": plan.id,
             "name": plan.name,
@@ -307,13 +319,12 @@ class PlanService:
             "entitlements": normalize_entitlements(plan.entitlements, plan.product_type or "consumer"),
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
         }
-        
         if detailed:
             data["updated_at"] = plan.updated_at.isoformat() if plan.updated_at else None
-        
         return data
-    
-    async def _invalidate_cache(self):
-        """清除套餐相关缓存"""
+
+    @staticmethod
+    async def _invalidate_cache(plan_id: int) -> None:
         await cache.delete(CacheKeys.PLANS_LIST)
-        await cache.delete_pattern("plans:detail:*")
+        await cache.delete(CacheKeys.plan_detail(plan_id))
+        await cache.delete_pattern("plans:*")

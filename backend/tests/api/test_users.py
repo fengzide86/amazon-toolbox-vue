@@ -5,8 +5,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import User, Setting
-from core.security import hash_password
+from models import User
 from tests.conftest import get_data
 
 
@@ -116,7 +115,7 @@ class TestUpdateUser:
         update_data = {"name": "新名字"}
         response = await client.put(f"/api/users/{user.id}", json=update_data)
         
-        assert response.status_code == 403
+        assert response.status_code == 401
     
     @pytest.mark.asyncio
     async def test_update_user_not_found(self, client: AsyncClient, auth_headers: dict):

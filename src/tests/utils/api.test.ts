@@ -2,7 +2,7 @@
  * API 工具函数单元测试
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getAuthCodes, updateAuthCode, deleteAuthCode, getOrders, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit } from '@/utils/api'
+import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getPlansAdmin, updatePlan, enablePlan, disablePlan, archivePlan, getAuthCodes, updateAuthCode, deleteAuthCode, unbindDevice, getOrders, markOrderPaid, cancelOrder, refundOrder, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit, getProfitPolicy, updateProfitPolicy } from '@/utils/api'
 
 // Mock fetch
 global.fetch = vi.fn()
@@ -215,13 +215,13 @@ describe('API Utils', () => {
     })
 
     it('adminLogin 应该调用正确的接口', async () => {
-      await adminLogin('admin123')
+      await adminLogin('owner', 'Test-only-pass-123')
 
       expect(global.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/auth/admin-login'),
+        expect.stringContaining('/api/staff/auth/login'),
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ password: 'admin123' })
+          body: JSON.stringify({ username: 'owner', password: 'Test-only-pass-123' })
         })
       )
     })
@@ -244,6 +244,40 @@ describe('API Utils', () => {
       )
     })
 
+    it('套餐编辑与生命周期动作使用 PATCH 和独立 POST 接口', async () => {
+      await updatePlan(9, { name: '演示专业版' })
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/plans/9'),
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ name: '演示专业版' }) }),
+      )
+
+      await enablePlan(9)
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/plans/9/enable'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+
+      await disablePlan(9)
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/plans/9/disable'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+
+      await archivePlan(9)
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/plans/9/archive'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+
+    it('后台三角色通过管理端套餐接口读取完整生命周期列表', async () => {
+      await getPlansAdmin({ page_size: 100 })
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/plans/admin?page_size=100'),
+        expect.objectContaining({ method: 'GET' }),
+      )
+    })
+
     it('授权码更新和删除应把真实 ID 放进请求路径', async () => {
       await updateAuthCode(42, { note: 'updated' })
       expect(mockedFetch.mock.calls[0][0]).toContain('/api/auth-codes/42')
@@ -252,6 +286,16 @@ describe('API Utils', () => {
       mockedFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ success: true }) })
       await deleteAuthCode('CODE-9')
       expect(mockedFetch.mock.calls[0][0]).toContain('/api/auth-codes/CODE-9')
+    })
+
+    it('管理员解绑设备必须把设备 ID 与原因一并传给后端', async () => {
+      await unbindDevice(17, '客户换机')
+      const calledUrl = String(mockedFetch.mock.calls[0][0])
+      expect(calledUrl).toContain('/api/devices/unbind?')
+      const url = new URL(calledUrl)
+      expect(url.searchParams.get('device_id')).toBe('17')
+      expect(url.searchParams.get('reason')).toBe('客户换机')
+      expect(mockedFetch.mock.calls[0][1]).toEqual(expect.objectContaining({ method: 'POST' }))
     })
 
     it('getOrders 应该调用正确的接口', async () => {
@@ -330,6 +374,41 @@ describe('API Utils', () => {
       expect(global.fetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/profit'),
         expect.objectContaining({ method: 'GET' })
+      )
+    })
+
+    it('订单人工收款、取消与退款使用独立状态动作并提交原因', async () => {
+      await markOrderPaid(7)
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/orders/7/mark-paid'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+
+      await cancelOrder(7, '重复订单')
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/orders/7/cancel'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ reason: '重复订单' }) }),
+      )
+
+      await refundOrder(7, '客户退款')
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/orders/7/refund'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ reason: '客户退款' }) }),
+      )
+    })
+
+    it('分润策略使用版本化专用接口，不直接覆盖设置字符串', async () => {
+      await getProfitPolicy()
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/profit/policy'),
+        expect.objectContaining({ method: 'GET' }),
+      )
+
+      const ratios = { tech: 0.3, market: 0.25, product: 0.15, service: 0.15, coordination: 0.1, record: 0.05 }
+      await updateProfitPolicy(ratios)
+      expect(global.fetch).toHaveBeenLastCalledWith(
+        expect.stringContaining('/api/profit/policy'),
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ ratios }) }),
       )
     })
   })

@@ -5,14 +5,13 @@
 import json
 from typing import Any
 
+from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit import log_admin_action
 from core.logging import get_logger
 from models import KnowledgeBase
-
-from . import provider as ai_provider
-from . import vector_store
 
 logger = get_logger(__name__)
 
@@ -80,8 +79,11 @@ async def get_list(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    serialized = [_knowledge_to_dict(item) for item in items]
     return {
-        "items": [_knowledge_to_dict(item) for item in items],
+        "data": serialized,
+        # Compatibility alias for clients shipped before the standard list contract.
+        "items": serialized,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -95,12 +97,7 @@ async def get_by_id(db: AsyncSession, knowledge_id: int) -> dict[str, Any] | Non
     )
     item = result.scalar_one_or_none()
     if item:
-        await db.refresh(item)
-        # 增加查看次数
-        item.view_count = (item.view_count or 0) + 1
-        data = _knowledge_to_dict(item)
-        await db.commit()
-        return data
+        return _knowledge_to_dict(item)
     return None
 
 
@@ -113,6 +110,8 @@ async def create(
     priority: str = "medium",
     platform_key: str | None = None,
     capability_key: str | None = None,
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
 ) -> dict[str, Any]:
     """创建知识条目"""
     item = KnowledgeBase(
@@ -126,29 +125,25 @@ async def create(
         capability_key=capability_key,
     )
     db.add(item)
+    await db.flush()
+    if actor:
+        await log_admin_action(
+            db,
+            user_id=actor.get("staff_id"),
+            user_name=actor.get("username"),
+            action="create_knowledge",
+            target_type="knowledge",
+            target_id=item.id,
+            detail={
+                "role": actor.get("role"),
+                "before": None,
+                "after": _knowledge_to_dict(item),
+                "reason": None,
+            },
+            request=request,
+        )
     await db.commit()
     await db.refresh(item)
-
-    # 同步到向量库
-    try:
-        embedding = await ai_provider.get_embedding(f"{title}\n{content}") if ai_provider.has_api_key() else None
-        if embedding:
-            vector_id = await vector_store.add_knowledge(
-                knowledge_id=item.id,
-                title=title,
-                content=content,
-                category=category,
-                keywords=keywords,
-                priority=priority,
-                embedding=embedding,
-                platform_key=platform_key,
-                capability_key=capability_key,
-            )
-            item.vector_id = vector_id
-            await db.commit()
-            await db.refresh(item)
-    except Exception as e:
-        logger.warning(f"同步向量库失败（不影响创建）: {e}")
 
     return _knowledge_to_dict(item)
 
@@ -164,6 +159,8 @@ async def update(
     status: str | None = None,
     platform_key: str | None = None,
     capability_key: str | None = None,
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
 ) -> dict[str, Any] | None:
     """更新知识条目"""
     result = await db.execute(
@@ -172,6 +169,8 @@ async def update(
     item = result.scalar_one_or_none()
     if not item:
         return None
+
+    before = _knowledge_to_dict(item)
 
     if category is not None:
         item.category = category
@@ -190,49 +189,39 @@ async def update(
     if capability_key is not None:
         item.capability_key = capability_key
 
-    await db.commit()
+    # Internal builds use deterministic FAQ/rule matching only.  Clear legacy
+    # vector identifiers so operators never mistake this record for a synced
+    # external-AI entry.
+    if item.vector_id is not None:
+        item.vector_id = None
 
-    # 同步到向量库
-    try:
-        if item.status != "active":
-            await vector_store.delete_knowledge(item.id)
-            item.vector_id = None
-            await db.commit()
-        else:
-            embedding = await ai_provider.get_embedding(f"{item.title}\n{item.content}") if ai_provider.has_api_key() else None
-        if item.status == "active" and item.vector_id:
-            await vector_store.update_knowledge(
-                knowledge_id=item.id,
-                title=item.title,
-                content=item.content,
-                category=item.category,
-                keywords=json.loads(item.keywords) if item.keywords else None,
-                priority=item.priority,
-                embedding=embedding,
-                platform_key=item.platform_key,
-                capability_key=item.capability_key,
-            )
-        elif item.status == "active" and embedding:
-            vector_id = await vector_store.add_knowledge(
-                knowledge_id=item.id,
-                title=item.title,
-                content=item.content,
-                category=item.category,
-                keywords=json.loads(item.keywords) if item.keywords else None,
-                priority=item.priority,
-                embedding=embedding,
-                platform_key=item.platform_key,
-                capability_key=item.capability_key,
-            )
-            item.vector_id = vector_id
-            await db.commit()
-    except Exception as e:
-        logger.warning(f"同步向量库失败（不影响更新）: {e}")
+    if actor:
+        await log_admin_action(
+            db,
+            user_id=actor.get("staff_id"),
+            user_name=actor.get("username"),
+            action="update_knowledge",
+            target_type="knowledge",
+            target_id=item.id,
+            detail={
+                "role": actor.get("role"),
+                "before": before,
+                "after": _knowledge_to_dict(item),
+                "reason": None,
+            },
+            request=request,
+        )
+    await db.commit()
 
     return _knowledge_to_dict(item)
 
 
-async def delete(db: AsyncSession, knowledge_id: int) -> bool:
+async def delete(
+    db: AsyncSession,
+    knowledge_id: int,
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
+) -> bool:
     """删除知识条目"""
     result = await db.execute(
         select(KnowledgeBase).where(KnowledgeBase.id == knowledge_id)
@@ -241,18 +230,34 @@ async def delete(db: AsyncSession, knowledge_id: int) -> bool:
     if not item:
         return False
 
-    # 从向量库删除
-    try:
-        await vector_store.delete_knowledge(knowledge_id)
-    except Exception as e:
-        logger.warning(f"从向量库删除失败: {e}")
-
+    before = _knowledge_to_dict(item)
     await db.delete(item)
+    if actor:
+        await log_admin_action(
+            db,
+            user_id=actor.get("staff_id"),
+            user_name=actor.get("username"),
+            action="delete_knowledge",
+            target_type="knowledge",
+            target_id=item.id,
+            detail={
+                "role": actor.get("role"),
+                "before": before,
+                "after": {"deleted": True},
+                "reason": None,
+            },
+            request=request,
+        )
     await db.commit()
     return True
 
 
-async def batch_import(db: AsyncSession, items: list[dict[str, Any]]) -> dict[str, Any]:
+async def batch_import(
+    db: AsyncSession,
+    items: list[dict[str, Any]],
+    actor: dict[str, Any] | None = None,
+    request: Request | None = None,
+) -> dict[str, Any]:
     """批量导入知识条目"""
     success = 0
     failed = 0
@@ -267,6 +272,10 @@ async def batch_import(db: AsyncSession, items: list[dict[str, Any]]) -> dict[st
                 content=data.get("content", ""),
                 keywords=data.get("keywords", []),
                 priority=data.get("priority", "medium"),
+                platform_key=data.get("platform_key"),
+                capability_key=data.get("capability_key"),
+                actor=actor,
+                request=request,
             )
             success += 1
         except Exception as e:
@@ -305,46 +314,18 @@ async def get_stats(db: AsyncSession) -> dict[str, Any]:
     )
     categories = category_result.scalar() or 0
 
-    vector_stats = await vector_store.get_stats()
-
     return {
         "total": total,
         "active": active,
         "categories": categories,
-        "vector_store": vector_stats,
+        "vector_store": {"enabled": False, "reason": "rules_mode"},
     }
 
 
 async def sync_all_to_vector(db: AsyncSession) -> dict[str, Any]:
-    """全量同步知识库到向量库"""
-    if not ai_provider.has_api_key():
-        raise RuntimeError("当前 AI 提供商未配置 API Key，无法重建向量库")
-    result = await db.execute(
-        select(KnowledgeBase).where(KnowledgeBase.status == "active")
-    )
-    items = result.scalars().all()
-
-    knowledge_items = []
-    for item in items:
-        knowledge_items.append({
-            "id": item.id,
-            "title": item.title,
-            "content": item.content,
-            "category": item.category,
-            "keywords": json.loads(item.keywords) if item.keywords else [],
-            "priority": item.priority,
-            "platform_key": item.platform_key,
-            "capability_key": item.capability_key,
-        })
-
-    await vector_store.sync_all(knowledge_items, embed_fn=ai_provider.get_embedding)
-
-    # 更新所有条目的 vector_id
-    for item in items:
-        item.vector_id = f"knowledge_{item.id}"
-    await db.commit()
-
-    return {"synced": len(items)}
+    """Vector synchronization is intentionally unavailable in rules mode."""
+    del db
+    raise RuntimeError("FEATURE_DISABLED: rules mode does not use a vector store")
 
 
 def _knowledge_to_dict(item: KnowledgeBase) -> dict[str, Any]:

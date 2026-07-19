@@ -12,6 +12,8 @@ import {
   type AuthenticatedUser,
   type AuthRole,
   type LoginPayload,
+  authRoleSchema,
+  isBackofficeRole,
 } from '@/features/auth/model'
 
 export const useUserStore = defineStore('user', () => {
@@ -20,7 +22,8 @@ export const useUserStore = defineStore('user', () => {
   // 认证信息
   const token = ref<string | null>(sessionStorage.getItem('toolbox_token'))
   const storedRole = sessionStorage.getItem('toolbox_role')
-  const role = ref<AuthRole | null>(storedRole === 'admin' || storedRole === 'user' ? storedRole : null)
+  const parsedStoredRole = authRoleSchema.safeParse(storedRole)
+  const role = ref<AuthRole | null>(parsedStoredRole.success ? parsedStoredRole.data : null)
   const auth = ref<string | null>(sessionStorage.getItem('toolbox_auth'))
   const userInfo = ref<AuthenticatedUser | null>(parseStoredUser(localStorage.getItem('toolbox_user')))
   
@@ -40,7 +43,9 @@ export const useUserStore = defineStore('user', () => {
   const isLoggedIn = computed(() => !!token.value && !!auth.value)
   
   // 是否是管理员
-  const isAdmin = computed(() => role.value === 'admin')
+  const isSuperAdmin = computed(() => role.value === 'super_admin')
+  const isAdmin = isSuperAdmin
+  const isBackoffice = computed(() => isBackofficeRole(role.value))
   
   // 是否是普通用户
   const isUser = computed(() => role.value === 'user')
@@ -144,7 +149,8 @@ export const useUserStore = defineStore('user', () => {
   function restoreFromStorage() {
     token.value = sessionStorage.getItem('toolbox_token')
     const restoredRole = sessionStorage.getItem('toolbox_role')
-    role.value = restoredRole === 'admin' || restoredRole === 'user' ? restoredRole : null
+    const parsedRole = authRoleSchema.safeParse(restoredRole)
+    role.value = parsedRole.success ? parsedRole.data : null
     auth.value = sessionStorage.getItem('toolbox_auth')
     userInfo.value = parseStoredUser(localStorage.getItem('toolbox_user'))
     
@@ -180,6 +186,8 @@ export const useUserStore = defineStore('user', () => {
     // Getters
     isLoggedIn,
     isAdmin,
+    isSuperAdmin,
+    isBackoffice,
     isUser,
     getAuth,
     getUserId,

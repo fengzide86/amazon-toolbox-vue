@@ -6,7 +6,7 @@
       <p>查看当前电脑是否已获得使用权限，必要时可管理其他已绑定设备。</p>
     </header>
 
-    <div class="device-info-banner">
+    <div v-if="!loading && !loadError" class="device-info-banner">
       <CircleCheck v-if="currentDeviceBound" :size="21" />
       <AlertTriangle v-else :size="21" />
       <div>
@@ -16,7 +16,19 @@
       <small>已绑定 {{ devices.length }} / {{ maxDevices }} 台</small>
     </div>
 
-    <div v-if="devices.length" class="device-list">
+    <div v-if="loading" class="empty-state" aria-live="polite">
+      <LoaderCircle :size="36" class="spin" />
+      <p>正在加载设备授权…</p>
+    </div>
+
+    <div v-else-if="loadError" class="empty-state error-state" role="alert">
+      <AlertTriangle :size="42" />
+      <strong>设备列表暂时无法加载</strong>
+      <p>{{ loadError }}</p>
+      <button type="button" @click="loadDevices">重新加载</button>
+    </div>
+
+    <div v-else-if="devices.length" class="device-list">
       <div v-for="device in devices" :key="device.id" class="device-card">
         <div class="device-icon">
           <Monitor :size="28" :stroke-width="1.5" />
@@ -50,13 +62,15 @@
 import { computed, ref, onMounted } from 'vue'
 import { getMyDevices, userUnbindDevice } from '@/utils/api'
 import { getDeviceId, showToast } from '@/utils'
-import { AlertTriangle, CircleCheck, Monitor } from '@lucide/vue'
+import { AlertTriangle, CircleCheck, LoaderCircle, Monitor } from '@lucide/vue'
 import { confirmAction } from '@/shared/ui/confirm'
 import { deviceListSchema, readStoredLicense, type DeviceSummary } from '@/features/user/model'
 
 const devices = ref<DeviceSummary[]>([])
 const maxDevices = ref(1)
 const unbinding = ref(false)
+const loading = ref(true)
+const loadError = ref('')
 const currentDeviceId = getDeviceId()
 const currentDeviceBound = computed(() => devices.value.some(isCurrentDevice))
 
@@ -71,17 +85,21 @@ function formatTime(timeStr: string | null | undefined): string {
 }
 
 async function loadDevices() {
+  loading.value = true
+  loadError.value = ''
   try {
     const userInfo = readStoredLicense()
     const userId = userInfo.user_id || userInfo.id
     if (!userId) {
-      showToast('用户信息不存在', 'error')
-      return
+      throw new Error('用户信息已失效，请重新登录')
     }
     devices.value = deviceListSchema.parse(await getMyDevices(userId))
     maxDevices.value = userInfo.max_devices || 1
-  } catch (err) {
-    showToast('设备列表加载失败', 'error')
+  } catch (err: unknown) {
+    devices.value = []
+    loadError.value = err instanceof Error && err.message ? err.message : '请检查网络连接后重试。'
+  } finally {
+    loading.value = false
   }
 }
 
@@ -195,4 +213,9 @@ onMounted(loadDevices)
   padding: 4rem 2rem; color: var(--color-text-secondary);
 }
 .empty-state p { margin-top: 1rem; }
+.empty-state strong { margin-top: 12px; color: var(--color-text); }
+.empty-state button { min-height: 38px; padding: 0 15px; border: 0; border-radius: 9px; color: #fff; background: var(--color-primary); font-weight: 700; cursor: pointer; }
+.error-state svg { color: var(--color-danger); }
+.spin { animation: spin .85s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

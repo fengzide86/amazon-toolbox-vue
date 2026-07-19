@@ -1,16 +1,150 @@
 import base64
 import hashlib
 import io
+import json
 
 import pytest
 import yaml
-from fastapi import HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi.staticfiles import StaticFiles
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
+import routers.updates as updates_module
+from core.dependencies import require_super_admin
 from domains.updates.service import UpdateReleaseService
+from models import AuditLog, StaffRole
+from routers.updates import router as updates_router
 
 
 def upload(name: str, content: bytes) -> UploadFile:
     return UploadFile(filename=name, file=io.BytesIO(content))
+
+
+def release_uploads(installer_name: str, installer: bytes, manifest: bytes) -> list[UploadFile]:
+    return [
+        upload(installer_name, installer),
+        upload(f"{installer_name}.blockmap", b"blockmap-placeholder"),
+        upload("latest.yml", manifest),
+    ]
+
+
+def test_legacy_direct_upload_route_is_not_registered():
+    route_paths = {getattr(route, "path", None) for route in updates_router.routes}
+    assert "/upload" not in route_paths
+
+
+def test_release_mutations_explicitly_require_super_admin():
+    mutation_paths = {
+        "/releases/stage",
+        "/releases/{version}/publish",
+        "/releases/{version}/staged",
+    }
+    routes = {route.path: route for route in updates_router.routes if route.path in mutation_paths}
+    assert routes.keys() == mutation_paths
+    for route in routes.values():
+        dependency_calls = {dependency.call for dependency in route.dependant.dependencies}
+        assert require_super_admin in dependency_calls
+
+
+@pytest.mark.asyncio
+async def test_release_mutations_write_staff_and_request_id_audit(
+    tmp_path,
+    monkeypatch,
+    client,
+    auth_headers,
+    staff_headers_factory,
+    db_session,
+):
+    service = UpdateReleaseService(tmp_path / "updates")
+    monkeypatch.setattr(updates_module, "release_service", service)
+
+    async def stage(version: str, headers: dict[str, str]):
+        installer = f"installer-{version}".encode()
+        digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+        manifest = yaml.safe_dump({
+            "version": version,
+            "files": [{"url": f"setup-{version}.exe", "sha512": digest, "size": len(installer)}],
+        }).encode()
+        return await client.post(
+            "/api/updates/releases/stage",
+            data={"version": version},
+            files=[
+                ("files", (f"setup-{version}.exe", installer, "application/octet-stream")),
+                (
+                    "files",
+                    (f"setup-{version}.exe.blockmap", b"blockmap", "application/octet-stream"),
+                ),
+                ("files", ("latest.yml", manifest, "application/yaml")),
+            ],
+            headers=headers,
+        )
+
+    operator_headers = await staff_headers_factory(StaffRole.OPERATOR, "updates-operator")
+    assert (await stage("8.9.9", operator_headers)).status_code == 403
+
+    assert (await stage("9.0.0", auth_headers)).status_code == 200
+    assert (
+        await client.post("/api/updates/releases/9.0.0/publish", headers=auth_headers)
+    ).status_code == 200
+    assert (await stage("9.0.1", auth_headers)).status_code == 200
+    assert (
+        await client.delete("/api/updates/releases/9.0.1/staged", headers=auth_headers)
+    ).status_code == 200
+
+    result = await db_session.execute(
+        select(AuditLog).where(AuditLog.action.in_({
+            "stage_update_release",
+            "publish_update_release",
+            "delete_staged_update_release",
+        }))
+    )
+    logs = result.scalars().all()
+    assert {log.action for log in logs} == {
+        "stage_update_release",
+        "publish_update_release",
+        "delete_staged_update_release",
+    }
+    assert all(log.user_id and log.user_name for log in logs)
+    audit_details = [json.loads(log.detail) for log in logs]
+    assert all(detail["request_id"] for detail in audit_details)
+    assert all({"role", "before", "after", "reason"}.issubset(detail) for detail in audit_details)
+    assert all(detail["role"] == StaffRole.SUPER_ADMIN for detail in audit_details)
+    assert all(detail["reason"] is None for detail in audit_details)
+
+
+@pytest.mark.asyncio
+async def test_staged_artifacts_are_outside_public_static_root(tmp_path):
+    releases_dir = tmp_path / "updates"
+    service = UpdateReleaseService(releases_dir)
+    installer = b"private-staged-installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "7.0.0",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+    await service.stage("7.0.0", release_uploads("setup.exe", installer, manifest))
+
+    assert service.staging_dir == tmp_path / ".updates-staging"
+    assert not (releases_dir / ".staging").exists()
+    assert (service.staging_dir / "7.0.0" / "setup.exe").is_file()
+
+    static_app = FastAPI()
+    static_app.mount("/updates", StaticFiles(directory=releases_dir), name="updates")
+    async with AsyncClient(transport=ASGITransport(app=static_app), base_url="http://test") as static_client:
+        response = await static_client.get("/updates/.staging/7.0.0/setup.exe")
+    assert response.status_code == 404
+
+
+def test_legacy_public_staging_is_moved_before_static_mount(tmp_path):
+    legacy = tmp_path / "updates" / ".staging" / "7.0.1"
+    legacy.mkdir(parents=True)
+    (legacy / "stage.json").write_text("{}", encoding="utf-8")
+
+    service = UpdateReleaseService(tmp_path / "updates")
+
+    assert not (tmp_path / "updates" / ".staging").exists()
+    assert (service.staging_dir / "7.0.1" / "stage.json").is_file()
 
 
 @pytest.mark.asyncio
@@ -25,10 +159,10 @@ async def test_stage_then_publish_places_manifest_last(tmp_path):
         "sha512": digest,
     }).encode()
 
-    staged = await service.stage("1.8.0", [
-        upload("AmazonToolbox Setup 1.8.0.exe", installer),
-        upload("latest.yml", manifest),
-    ])
+    staged = await service.stage(
+        "1.8.0",
+        release_uploads("AmazonToolbox Setup 1.8.0.exe", installer, manifest),
+    )
     assert staged["version"] == "1.8.0"
     assert staged["status"] == "staged"
     assert not (tmp_path / "updates" / "latest.yml").exists()
@@ -40,6 +174,41 @@ async def test_stage_then_publish_places_manifest_last(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_republishing_identical_current_version_is_idempotent(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+    installer = b"same-installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.5",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+    await service.stage("1.8.5", release_uploads("setup.exe", installer, manifest))
+
+    first = service.publish("1.8.5")
+    second = service.publish("1.8.5")
+
+    assert second == first
+
+
+@pytest.mark.asyncio
+async def test_republishing_current_version_rejects_changed_online_file(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+    installer = b"same-installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.6",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+    await service.stage("1.8.6", release_uploads("setup.exe", installer, manifest))
+    service.publish("1.8.6")
+    (tmp_path / "updates" / "setup.exe").write_bytes(b"different")
+
+    with pytest.raises(HTTPException) as error:
+        service.publish("1.8.6")
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_stage_rejects_manifest_hash_mismatch(tmp_path):
     service = UpdateReleaseService(tmp_path / "updates")
     manifest = yaml.safe_dump({
@@ -47,7 +216,22 @@ async def test_stage_rejects_manifest_hash_mismatch(tmp_path):
         "files": [{"url": "setup.exe", "sha512": "wrong", "size": 3}],
     }).encode()
     with pytest.raises(HTTPException) as error:
-        await service.stage("1.8.0", [upload("setup.exe", b"abc"), upload("latest.yml", manifest)])
+        await service.stage("1.8.0", release_uploads("setup.exe", b"abc", manifest))
+    assert error.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_stage_requires_blockmap(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+    installer = b"installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.7",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+
+    with pytest.raises(HTTPException) as error:
+        await service.stage("1.8.7", [upload("setup.exe", installer), upload("latest.yml", manifest)])
     assert error.value.status_code == 400
 
 
@@ -68,7 +252,7 @@ async def test_stage_infers_version_from_manifest(tmp_path):
         "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
     }).encode()
 
-    staged = await service.stage(None, [upload("setup.exe", installer), upload("latest.yml", manifest)])
+    staged = await service.stage(None, release_uploads("setup.exe", installer, manifest))
     assert staged["version"] == "1.8.1"
     assert staged["staged_at"]
 
@@ -84,11 +268,66 @@ async def test_publish_rejects_non_increasing_version(tmp_path):
             "version": version,
             "files": [{"url": f"setup-{version}.exe", "sha512": digest, "size": len(installer)}],
         }).encode()
-        await service.stage(version, [upload(f"setup-{version}.exe", installer), upload("latest.yml", manifest)])
+        await service.stage(
+            version,
+            release_uploads(f"setup-{version}.exe", installer, manifest),
+        )
 
     await stage("1.8.0")
     service.publish("1.8.0")
     await stage("1.7.9")
     with pytest.raises(HTTPException) as error:
         service.publish("1.7.9")
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_publish_rehashes_staged_files_before_switching_manifest(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+    installer = b"original-installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.2",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+    await service.stage("1.8.2", release_uploads("setup.exe", installer, manifest))
+
+    (service.staging_dir / "1.8.2" / "setup.exe").write_bytes(b"tampered")
+
+    with pytest.raises(HTTPException) as error:
+        service.publish("1.8.2")
+    assert error.value.status_code == 409
+    assert not (tmp_path / "updates" / "latest.yml").exists()
+
+
+@pytest.mark.asyncio
+async def test_stage_rejects_overwriting_an_existing_version(tmp_path):
+    service = UpdateReleaseService(tmp_path / "updates")
+    installer = b"installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.3",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+    await service.stage("1.8.3", release_uploads("setup.exe", installer, manifest))
+
+    with pytest.raises(HTTPException) as error:
+        await service.stage("1.8.3", release_uploads("setup.exe", installer, manifest))
+    assert error.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_publish_uses_a_cross_process_file_lock(tmp_path):
+    first = UpdateReleaseService(tmp_path / "updates")
+    second = UpdateReleaseService(tmp_path / "updates")
+    installer = b"installer"
+    digest = base64.b64encode(hashlib.sha512(installer).digest()).decode("ascii")
+    manifest = yaml.safe_dump({
+        "version": "1.8.4",
+        "files": [{"url": "setup.exe", "sha512": digest, "size": len(installer)}],
+    }).encode()
+    await first.stage("1.8.4", release_uploads("setup.exe", installer, manifest))
+
+    with first._file_lock(), pytest.raises(HTTPException) as error:
+        second.publish("1.8.4")
     assert error.value.status_code == 409

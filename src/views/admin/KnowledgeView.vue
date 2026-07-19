@@ -1,17 +1,14 @@
 <template>
   <div>
-    <PageHeader title="知识库管理" description="维护工具帮助内容与检索数据">
+    <PageHeader title="知识库管理" description="维护固定的工具帮助内容、关键词与适用范围">
       <template #actions>
-        <el-button @click="openRetrievalTest">🔍 召回测试</el-button>
-        <el-button @click="syncVector" :loading="syncing">
-          {{ syncing ? '同步中...' : '🔄 同步向量库' }}
-        </el-button>
         <el-button type="primary" @click="openCreate">+ 新建条目</el-button>
       </template>
     </PageHeader>
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载知识库…" @retry="loadInitial" />
 
     <!-- 统计 -->
-    <section class="knowledge-stats" aria-label="知识库统计">
+    <section v-if="loadState !== 'loading' && loadState !== 'error'" class="knowledge-stats" aria-label="知识库统计">
       <article class="stat-card">
           <div class="stat-value">{{ stats.total || 0 }}</div>
           <div class="stat-label">总条目</div>
@@ -24,14 +21,10 @@
           <div class="stat-value">{{ stats.categories || 0 }}</div>
           <div class="stat-label">分类数</div>
       </article>
-      <article class="stat-card">
-          <div class="stat-value">{{ stats.vector_store?.total_vectors || 0 }}</div>
-          <div class="stat-label">向量数</div>
-      </article>
     </section>
 
     <!-- 筛选 -->
-    <DataToolbar label="知识库筛选">
+    <DataToolbar v-if="loadState !== 'loading' && loadState !== 'error'" label="知识库筛选">
       <el-select v-model="filterCategory" placeholder="全部分类" clearable @change="loadData" style="width: 200px;">
         <el-option 
           v-for="cat in categories" 
@@ -55,7 +48,7 @@
     </DataToolbar>
 
     <!-- 列表 -->
-    <el-card class="table-card" shadow="never">
+    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="table-card" shadow="never">
       <el-table :data="list" stripe style="width: 100%">
         <el-table-column prop="title" label="标题" min-width="250" show-overflow-tooltip />
         <el-table-column v-if="!isCompact" prop="id" label="ID" width="80" />
@@ -177,57 +170,6 @@
       </template>
     </el-dialog>
 
-    <el-drawer v-model="showRetrievalTest" title="单条召回测试" size="560px">
-      <el-form label-position="top">
-        <el-form-item label="测试问题">
-          <el-input v-model="retrievalForm.query" type="textarea" :rows="3" placeholder="输入用户可能提出的问题" />
-        </el-form-item>
-        <el-form-item label="适用平台">
-          <el-select v-model="form.platform_key" clearable placeholder="全平台" style="width: 100%;">
-            <el-option label="亚马逊" value="amazon" />
-            <el-option label="速卖通" value="aliexpress" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="功能标识">
-          <el-input v-model="form.capability_key" clearable placeholder="留空表示平台通用" />
-        </el-form-item>
-        <div class="retrieval-options">
-          <el-form-item label="平台">
-            <el-select v-model="retrievalForm.platform_key" clearable placeholder="全平台">
-              <el-option label="亚马逊" value="amazon" />
-              <el-option label="速卖通" value="aliexpress" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="功能标识">
-            <el-input v-model="retrievalForm.capability_key" clearable placeholder="可选" />
-          </el-form-item>
-          <el-form-item label="Top-K">
-            <el-input-number v-model="retrievalForm.top_k" :min="1" :max="20" />
-          </el-form-item>
-          <el-form-item label="最低相关度">
-            <el-input-number v-model="retrievalForm.min_score" :min="-1" :max="1" :step="0.05" :precision="2" />
-          </el-form-item>
-        </div>
-        <el-button type="primary" :loading="retrievalLoading" @click="runRetrievalTest">开始测试</el-button>
-      </el-form>
-
-      <div v-if="retrievalResult" class="retrieval-result">
-        <div class="retrieval-summary">
-          召回 {{ retrievalResult.results?.length || 0 }} 条 · {{ retrievalResult.elapsed_ms }} ms
-        </div>
-        <el-card v-for="item in retrievalResult.results" :key="item.id" class="retrieval-item" shadow="never">
-          <div class="retrieval-item-header">
-            <strong>{{ item.title }}</strong>
-            <el-tag :type="item.score >= 0.7 ? 'success' : item.score >= 0.4 ? 'warning' : 'info'">
-              {{ Math.round(item.score * 100) }}%
-            </el-tag>
-          </div>
-          <div class="retrieval-meta">{{ item.category }} · {{ item.platform_key || '全平台' }} · {{ item.capability_key || '通用' }}</div>
-          <div class="retrieval-content">{{ item.content }}</div>
-        </el-card>
-        <el-empty v-if="!retrievalResult.results?.length" description="当前条件没有召回结果" />
-      </div>
-    </el-drawer>
   </div>
 </template>
 
@@ -240,8 +182,10 @@ import { useCompactLayout } from '@/composables/useCompactLayout'
 import PageHeader from '@/components/PageHeader.vue'
 import DataToolbar from '@/components/DataToolbar.vue'
 import AdminDetailDrawer from '@/components/AdminDetailDrawer.vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { Search } from '@element-plus/icons-vue'
 import { confirmAction } from '@/shared/ui/confirm'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 import {
   knowledgeCategoriesSchema,
   knowledgeItemSchema,
@@ -275,6 +219,8 @@ const retrievalResult = ref<RetrievalTestResult | null>(null)
 const retrievalForm = ref({ query: '', platform_key: '', capability_key: '', top_k: 5, min_score: 0.3 })
 const showDetailDrawer = ref(false)
 const detailItem = ref<KnowledgeItem | null>(null)
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
 
 const allCategories = ['安装教程', '授权说明', '使用教程', '报错处理', '套餐说明', '退款规则', '比赛须知', '其他']
 
@@ -289,6 +235,8 @@ const form = ref({
 })
 
 async function loadData() {
+  loadState.value = list.value.length ? 'data' : 'loading'
+  loadError.value = ''
   try {
     const params: Record<string, string | number> = { page: page.value, page_size: pageSize }
     if (filterCategory.value) params.category = filterCategory.value
@@ -298,8 +246,10 @@ async function loadData() {
     const result = knowledgeListSchema.parse(await getKnowledgeList(params))
     list.value = result.items
     total.value = result.total
-  } catch (err) {
-    showToast('加载失败', 'error')
+    loadState.value = settledDataState(result.items.length)
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '知识库列表暂时无法加载'
+    loadState.value = failedDataState(list.value.length > 0)
   }
 }
 
@@ -308,7 +258,15 @@ async function loadMeta() {
     const [cats, st] = await Promise.all([getKnowledgeCategories(), getKnowledgeStats()])
     categories.value = knowledgeCategoriesSchema.parse(cats)
     stats.value = knowledgeStatsSchema.parse(st)
-  } catch (err) { /* ignore */ }
+  } catch (error) {
+    loadError.value = error instanceof Error && error.message ? error.message : '知识库统计暂时无法更新'
+    loadState.value = failedDataState(loadState.value === 'data' || loadState.value === 'empty' || list.value.length > 0)
+  }
+}
+
+async function loadInitial() {
+  await loadData()
+  await loadMeta()
 }
 
 function openCreate() {
@@ -431,10 +389,7 @@ async function runRetrievalTest() {
   }
 }
 
-onMounted(() => {
-  loadData()
-  loadMeta()
-})
+onMounted(loadInitial)
 </script>
 
 <style scoped>
@@ -451,7 +406,7 @@ onMounted(() => {
 .retrieval-meta { margin: 6px 0; color: var(--color-text-secondary); font-size: 12px; }
 .retrieval-content { max-height: 120px; overflow: auto; white-space: pre-wrap; line-height: 1.5; }
 
-.knowledge-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 1rem; }
+.knowledge-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 1rem; }
 
 .stat-card {
   padding: 18px;

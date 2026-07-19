@@ -1,15 +1,16 @@
 """B 端批量工作台控制面。仅接收脱敏状态，不接收 Excel 原文。"""
-from datetime import datetime
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.response import success_response
 from database import get_db
+from domains.catalog.tool_config import force_demo_only_tool_configs, normalize_tool_configs
 from models import AutomationBatch, AutomationBatchItem, Setting
-from routers.tools import normalize_tool_configs
 from schemas.business import BatchCreate, BatchFinish, BatchItemUpdate, BatchUpdate
 from services.entitlement_service import require_business_access
 
@@ -89,7 +90,22 @@ async def _business_tools(db: AsyncSession) -> list[dict]:
         tools = json.loads(result.scalar() or "[]")
     except (TypeError, ValueError):
         tools = []
-    return [tool for tool in normalize_tool_configs(tools) if tool.get("supports_batch")]
+    normalized = normalize_tool_configs(tools)
+    if settings.TOOL_EXECUTION_MODE == "demo":
+        normalized = force_demo_only_tool_configs(normalized)
+        return [
+            tool for tool in normalized
+            if tool.get("availability") == "demo_only" and tool.get("supports_demo_batch")
+        ]
+    return [tool for tool in normalized if tool.get("supports_live_batch")]
+
+
+def _require_live_batch_write() -> None:
+    if settings.TOOL_EXECUTION_MODE != "live":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="FEATURE_DISABLED: 内测版只允许写入演示批次",
+        )
 
 
 @router.get("/bootstrap")
@@ -109,6 +125,7 @@ async def get_tools(_context: dict = Depends(require_business_access), db: Async
 
 @router.post("/batches")
 async def create_batch(req: BatchCreate, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
+    _require_live_batch_write()
     if req.total_count > context["entitlements"]["max_batch_rows"]:
         raise HTTPException(status_code=422, detail="导入数量超过当前授权限制")
     tools = await _business_tools(db)
@@ -165,6 +182,7 @@ async def get_batch(batch_id: int, context: dict = Depends(require_business_acce
 
 @router.patch("/batches/{batch_id}")
 async def update_batch(req: BatchUpdate, batch_id: int, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
+    _require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context)
     counts = [req.pending_count, req.running_count, req.waiting_count, req.completed_count, req.failed_count]
     if sum(counts) > batch.total_count:
@@ -188,6 +206,7 @@ async def upsert_batch_item(
     context: dict = Depends(require_business_access),
     db: AsyncSession = Depends(get_db),
 ):
+    _require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context)
     result = await db.execute(select(AutomationBatchItem).where(
         AutomationBatchItem.batch_id == batch.id,
@@ -217,6 +236,7 @@ async def upsert_batch_item(
 
 @router.post("/batches/{batch_id}/finish")
 async def finish_batch(req: BatchFinish, batch_id: int, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
+    _require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context)
     batch.status = req.status
     batch.finished_at = datetime.now()

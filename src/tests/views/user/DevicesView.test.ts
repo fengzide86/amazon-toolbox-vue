@@ -220,18 +220,19 @@ describe('DevicesView', () => {
   })
 
   describe('错误处理', () => {
-    it('API 失败时应该显示错误提示', async () => {
+    it('API 失败时应该显示可重试的错误状态', async () => {
       const { getMyDevices } = await import('@/utils/api')
       vi.mocked(getMyDevices).mockRejectedValue(new Error('Network error'))
 
-      const { showToast } = await import('@/utils')
-
-      mount(DevicesView, {
+      const wrapper = mount(DevicesView, {
         global: { plugins: [createPinia()] }
       })
       await flushPromises()
 
-      expect(showToast).toHaveBeenCalledWith('设备列表加载失败', 'error')
+      expect(wrapper.find('[role="alert"]').exists()).toBe(true)
+      expect(wrapper.find('[role="alert"]').text()).toContain('设备列表暂时无法加载')
+      expect(wrapper.find('[role="alert"]').text()).toContain('Network error')
+      expect(wrapper.find('[role="alert"] button').text()).toBe('重新加载')
     })
   })
 })

@@ -11,34 +11,36 @@
 - system.py: 系统相关模型 (Setting, Announcement, AuditLog)
 """
 
-# Base 定义
-from models.base import Base
-
-# 状态常量
-from models.auth import AuthCodeStatus, LaunchTokenStatus
-from models.order import OrderStatus, PlanStatus
-from models.feedback import FeedbackStatus, LogStatus
-from models.ai_chat import ChatSessionStatus, KnowledgeCategory
-from models.system import AnnouncementStatus
+# AI客服相关模型
+from models.ai_chat import (
+    ChatConfig,
+    ChatMessage,
+    ChatSession,
+    ChatSessionStatus,
+    KnowledgeBase,
+    KnowledgeCategory,
+)
 
 # 授权相关模型
-from models.auth import AuthCode, Device, AuthSeat, LaunchToken
+from models.auth import AuthCode, AuthCodeStatus, AuthSeat, Device, LaunchToken, LaunchTokenStatus
+from models.automation import AutomationBatch, AutomationBatchItem
+from models.base import Base
+from models.demo import DemoBatch, DemoBatchItem, DemoRun
+
+# 反馈相关模型
+from models.feedback import ExecutionVerification, Feedback, FeedbackStatus, LogStatus, RunLog
+
+# 订单相关模型
+from models.order import Order, OrderStatus, Plan, PlanStatus, ProfitRecord, ProfitStatus
+
+# 后台员工账号（与客户 User 完全分离）
+from models.staff import StaffRole, StaffStatus, StaffUser
+
+# 系统相关模型
+from models.system import Announcement, AnnouncementReceipt, AnnouncementStatus, AuditLog, Setting
 
 # 用户模型
 from models.user import User
-
-# 订单相关模型
-from models.order import Order, Plan, ProfitRecord
-
-# 反馈相关模型
-from models.feedback import Feedback, RunLog
-
-# AI客服相关模型
-from models.ai_chat import KnowledgeBase, ChatSession, ChatMessage, ChatConfig
-
-# 系统相关模型
-from models.system import Setting, Announcement, AnnouncementReceipt, AuditLog
-from models.automation import AutomationBatch, AutomationBatchItem
 
 __all__ = [
     # Base
@@ -47,12 +49,16 @@ __all__ = [
     "AuthCodeStatus",
     "OrderStatus",
     "PlanStatus",
+    "ProfitStatus",
     "FeedbackStatus",
     "LogStatus",
+    "ExecutionVerification",
     "ChatSessionStatus",
     "KnowledgeCategory",
     "AnnouncementStatus",
     "LaunchTokenStatus",
+    "StaffRole",
+    "StaffStatus",
     # 授权相关
     "AuthCode",
     "Device",
@@ -60,6 +66,10 @@ __all__ = [
     "LaunchToken",
     # 用户
     "User",
+    "StaffUser",
+    "DemoRun",
+    "DemoBatch",
+    "DemoBatchItem",
     # 订单相关
     "Order",
     "Plan",

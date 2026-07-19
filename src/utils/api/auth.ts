@@ -4,8 +4,8 @@ export function verifyAuthCode(code: string, deviceId: string, deviceName: strin
   return api.post('/api/auth/verify', { code, device_id: deviceId, device_name: deviceName })
 }
 
-export function adminLogin(password: string): Promise<unknown> {
-  return api.post('/api/auth/admin-login', { password })
+export function adminLogin(username: string, password: string): Promise<unknown> {
+  return api.post('/api/staff/auth/login', { username, password })
 }
 
 export function checkAuthStatus(code: string, deviceId: string): Promise<unknown> {

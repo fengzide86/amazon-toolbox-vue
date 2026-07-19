@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
-from models import Order, AuthCode, User, RunLog, Feedback, Plan
+from models import AuthCode, ExecutionVerification, Feedback, Order, Plan, RunLog, User
 from tests.conftest import get_data
 
 
@@ -35,15 +35,16 @@ class TestGetDashboard:
         order1 = Order(order_no="ORD-001", amount=99.00, status="paid")
         order2 = Order(order_no="ORD-002", amount=199.00, status="paid")
         order3 = Order(order_no="ORD-003", amount=50.00, status="pending")
-        db_session.add_all([order1, order2, order3])
+        order4 = Order(order_no="ORD-004", amount=999.00, status="refunded")
+        db_session.add_all([order1, order2, order3, order4])
         await db_session.commit()
         
         response = await client.get("/api/dashboard", headers=auth_headers)
         
         assert response.status_code == 200
         data = get_data(response)
-        assert data["total_orders"] == 3
-        assert data["total_revenue"] == 298.00  # 只计算 paid 和 refunded
+        assert data["total_orders"] == 4
+        assert data["total_revenue"] == 298.00  # 退款订单不再计入收入
     
     @pytest.mark.asyncio
     async def test_get_dashboard_with_users(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
@@ -93,7 +94,7 @@ class TestGetDashboard:
         """测试未认证访问看板"""
         response = await client.get("/api/dashboard")
         
-        assert response.status_code == 403
+        assert response.status_code == 401
 
 
 class TestGetDashboardCharts:
@@ -152,10 +153,10 @@ class TestGetDashboardCharts:
     async def test_get_charts_tool_success_rate(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """测试工具成功率数据"""
         # 创建运行日志
-        log1 = RunLog(tool_name="工具A", status="success")
-        log2 = RunLog(tool_name="工具A", status="success")
-        log3 = RunLog(tool_name="工具A", status="failed")
-        log4 = RunLog(tool_name="工具B", status="success")
+        log1 = RunLog(tool_name="工具A", status="success", verification_state=ExecutionVerification.VERIFIED)
+        log2 = RunLog(tool_name="工具A", status="success", verification_state=ExecutionVerification.VERIFIED)
+        log3 = RunLog(tool_name="工具A", status="failed", verification_state=ExecutionVerification.VERIFIED)
+        log4 = RunLog(tool_name="工具B", status="success", verification_state=ExecutionVerification.VERIFIED)
         db_session.add_all([log1, log2, log3, log4])
         await db_session.commit()
         
@@ -174,4 +175,4 @@ class TestGetDashboardCharts:
         """测试未认证访问图表"""
         response = await client.get("/api/dashboard/charts")
         
-        assert response.status_code == 403
+        assert response.status_code == 401

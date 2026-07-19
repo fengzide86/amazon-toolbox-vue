@@ -79,7 +79,10 @@ class TestUnbindDevice:
         db_session.add(seat)
         await db_session.commit()
 
-        resp = await client.post(f"/api/devices/unbind?device_id={devices[0].id}", headers=auth_headers)
+        resp = await client.post(
+            f"/api/devices/unbind?device_id={devices[0].id}&reason=内部解绑测试",
+            headers=auth_headers,
+        )
         assert resp.status_code == 200
         assert get_data(resp)["success"] is True
 
@@ -90,9 +93,14 @@ class TestUnbindDevice:
 
     async def test_unbind_device_requires_admin(self, client: AsyncClient, db_session: AsyncSession):
         _, _, devices = await seed_devices(db_session)
-        resp = await client.post(f"/api/devices/unbind?device_id={devices[0].id}")
+        resp = await client.post(
+            f"/api/devices/unbind?device_id={devices[0].id}&reason=内部解绑测试"
+        )
         assert resp.status_code in (401, 403)
 
     async def test_unbind_nonexistent_device(self, client: AsyncClient, auth_headers: dict):
-        resp = await client.post("/api/devices/unbind?device_id=9999", headers=auth_headers)
+        resp = await client.post(
+            "/api/devices/unbind?device_id=9999&reason=内部解绑测试",
+            headers=auth_headers,
+        )
         assert resp.status_code == 404

@@ -9,7 +9,9 @@
       <LockKeyhole :size="17" />当前套餐暂未包含你选择的工具，可查看下面的可用套餐。
     </div>
 
-    <div v-if="plans.length" :class="['plans-grid', `plans-grid--count-${plans.length}`]">
+    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载套餐..." @retry="loadPlans" />
+
+    <div v-if="(loadState === 'data' || loadState === 'stale') && plans.length" :class="['plans-grid', `plans-grid--count-${plans.length}`]">
       <article
         v-for="plan in plans"
         :key="plan.id"
@@ -30,7 +32,7 @@
       </article>
     </div>
 
-    <div v-else class="empty-state">暂无套餐信息</div>
+    <div v-else-if="loadState === 'empty'" class="empty-state">暂无套餐信息</div>
   </div>
 </template>
 
@@ -38,12 +40,16 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Check, LockKeyhole, ShieldCheck } from '@lucide/vue'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 import { getPlans } from '@/utils/api'
 import { showToast } from '@/utils'
 import { customerPlanListSchema, readStoredLicense, type CustomerPlan } from '@/features/user/model'
 
 const route = useRoute() || { query: {} }
 const plans = ref<CustomerPlan[]>([])
+const loadState = ref<AsyncDataState>('loading')
+const loadError = ref('')
 const userInfo = computed(readStoredLicense)
 const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
 const currentPlanCode = computed(() => userInfo.value.plan_code || userInfo.value.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase() || '')
@@ -72,10 +78,15 @@ function contactService(plan: CustomerPlan) {
 }
 
 async function loadPlans() {
+  loadState.value = plans.value.length ? 'data' : 'loading'
+  loadError.value = ''
   try {
     plans.value = customerPlanListSchema.parse(await getPlans()).filter(plan => plan.status === 'active')
+    loadState.value = settledDataState(plans.value.length)
   } catch (error) {
-    showToast('套餐加载失败', 'error')
+    loadError.value = error instanceof Error && error.message ? error.message : '套餐加载失败'
+    loadState.value = failedDataState(plans.value.length > 0)
+    showToast(loadError.value, 'error')
   }
 }
 

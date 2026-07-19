@@ -2,7 +2,7 @@
 AI 对话服务测试
 """
 import pytest
-from unittest.mock import patch, AsyncMock
+
 from domains.knowledge import chat_service as ai_chat_service
 
 
@@ -90,17 +90,18 @@ class TestAIChatService:
         
         assert "welcome_message" in config
         assert "suggested_questions" in config
-        assert "ai_model" in config
+        assert config["support_mode"] == "rules"
+        assert "transfer_keywords" in config
 
     @pytest.mark.asyncio
     async def test_update_config(self, db_session):
         """测试更新配置"""
         updates = {
             "welcome_message": "新的欢迎语",
-            "ai_model": "qwen-turbo"
+            "max_unmatched": "3",
         }
         
         config = await ai_chat_service.update_config(db_session, updates)
         
         assert config["welcome_message"] == "新的欢迎语"
-        assert config["ai_model"] == "qwen-turbo"
+        assert config["max_unmatched"] == "3"

@@ -1,22 +1,40 @@
 """套餐服务当前异步契约测试。"""
 import pytest
+from starlette.requests import Request
 
-from models import Plan
+from core.exceptions import ConflictException, NotFoundException
+from models import Plan, PlanStatus
 from services.plan_service import PlanService
+
+ACTOR = {"staff_id": 1, "username": "owner", "role": "super_admin"}
+
+
+def request(method: str = "POST") -> Request:
+    return Request({
+        "type": "http",
+        "method": method,
+        "path": "/api/plans",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("test", 80),
+        "scheme": "http",
+        "query_string": b"",
+    })
 
 
 @pytest.mark.asyncio
 class TestPlanService:
     async def test_create_plan(self, db_session):
         service = PlanService(db_session)
-        result = await service.create_plan({
+        result = await service.create({
             "name": "Y199 冲刺包",
             "price": 199.00,
             "duration_days": 5,
             "features": '{"benefits":["完整工具"],"allowed_tools":["listing"]}',
-        })
+        }, ACTOR, request())
 
         assert result["success"] is True
+        assert result["data"]["status"] == PlanStatus.DISABLED
         assert result["data"]["name"] == "Y199 冲刺包"
         assert result["data"]["plan_code"] == "Y199"
         assert result["data"]["benefits"] == ["完整工具"]
@@ -25,19 +43,17 @@ class TestPlanService:
     async def test_create_duplicate_plan(self, db_session):
         service = PlanService(db_session)
         payload = {"name": "重复套餐", "price": 99, "duration_days": 7}
-        await service.create_plan(payload)
-        duplicate = await service.create_plan(payload)
+        await service.create(payload, ACTOR, request())
+        with pytest.raises(ConflictException, match="已存在"):
+            await service.create(payload, ACTOR, request())
 
-        assert duplicate["success"] is False
-        assert "已存在" in duplicate["message"]
-
-    async def test_get_plans_list_excludes_deleted(self, db_session):
+    async def test_public_list_excludes_archived(self, db_session):
         db_session.add_all([
             Plan(name="Y15 体验卡", price=15, duration_days=1, status="active"),
-            Plan(name="已删除", price=0, duration_days=1, status="deleted"),
+            Plan(name="已归档", price=1, duration_days=1, status="archived"),
         ])
         await db_session.commit()
-        result = await PlanService(db_session).get_plans_list()
+        result = await PlanService(db_session).list_public()
 
         assert result["success"] is True
         assert [plan["name"] for plan in result["data"]] == ["Y15 体验卡"]
@@ -51,7 +67,7 @@ class TestPlanService:
             features="物流模板+新手工具",
         ))
         await db_session.commit()
-        result = await PlanService(db_session).get_plans_list(status="active")
+        result = await PlanService(db_session).list_public()
 
         plan = result["data"][0]
         assert plan["plan_code"] == "Y49"
@@ -59,10 +75,15 @@ class TestPlanService:
         assert plan["allowed_tools"] == []
 
     async def test_update_plan(self, db_session):
-        plan = Plan(name="原套餐", price=99, duration_days=30, status="active")
+        plan = Plan(name="原套餐", price=99, duration_days=30, status="disabled")
         db_session.add(plan)
         await db_session.commit()
-        result = await PlanService(db_session).update_plan(plan.id, {"name": "更新套餐", "price": 149})
+        result = await PlanService(db_session).update(
+            plan.id,
+            {"name": "更新套餐", "price": 149},
+            ACTOR,
+            request("PATCH"),
+        )
 
         assert result["success"] is True
         assert result["data"]["name"] == "更新套餐"
@@ -72,23 +93,27 @@ class TestPlanService:
         plan = Plan(name="Y999 全程陪跑包", price=999, duration_days=90, status="active")
         db_session.add(plan)
         await db_session.commit()
-        result = await PlanService(db_session).get_plan_by_id(plan.id)
+        result = await PlanService(db_session).get_public(plan.id)
 
         assert result["success"] is True
         assert result["data"]["display_badge"] == "全程服务"
         assert "updated_at" in result["data"]
 
-    async def test_delete_plan_soft_deletes(self, db_session):
-        plan = Plan(name="待删除套餐", price=99, duration_days=30, status="active")
+    async def test_archive_plan_is_terminal_state(self, db_session):
+        plan = Plan(name="待归档套餐", price=99, duration_days=30, status="disabled")
         db_session.add(plan)
         await db_session.commit()
-        result = await PlanService(db_session).delete_plan(plan.id)
+        result = await PlanService(db_session).transition(
+            plan.id,
+            "archive",
+            ACTOR,
+            request(),
+        )
         await db_session.refresh(plan)
 
         assert result["success"] is True
-        assert plan.status == "deleted"
+        assert plan.status == PlanStatus.ARCHIVED
 
     async def test_missing_plan_returns_error(self, db_session):
-        result = await PlanService(db_session).get_plan_by_id(99999)
-        assert result["success"] is False
-        assert "不存在" in result["message"]
+        with pytest.raises(NotFoundException, match="不存在"):
+            await PlanService(db_session).get_public(99999)

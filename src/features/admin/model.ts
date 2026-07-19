@@ -50,6 +50,18 @@ export const profitSummarySchema = z.object({
   grand_total: z.coerce.number().default(0),
 })
 
+export const profitPolicySchema = z.object({
+  version: z.coerce.number().int().positive(),
+  ratios: z.object({
+    tech: z.coerce.number().min(0).max(1),
+    market: z.coerce.number().min(0).max(1),
+    product: z.coerce.number().min(0).max(1),
+    service: z.coerce.number().min(0).max(1),
+    coordination: z.coerce.number().min(0).max(1),
+    record: z.coerce.number().min(0).max(1),
+  }),
+})
+
 export const adminSettingsSchema = z.array(z.object({
   key: z.string(),
   value: z.string().nullable().optional(),

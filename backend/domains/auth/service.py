@@ -6,18 +6,16 @@ import re
 from datetime import datetime, timedelta
 from typing import Any
 
+from fastapi import Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.logging import get_logger
 from core.response import ErrorCodes, error_response, success_response
-from core.security import (
-    create_access_token,
-    hash_password_async,
-    verify_password_fallback_async,
-)
-from models import AuthCode, AuthSeat, Device, Plan, Setting, User
+from core.security import create_access_token
+from models import AuthCode, AuthSeat, Device, Plan, User
 from services.entitlement_service import normalize_entitlements, resolve_product_access
+from services.staff_service import authenticate_staff, create_staff_access_token, staff_to_dict
 
 logger = get_logger(__name__)
 
@@ -311,38 +309,21 @@ class AuthService:
             message="验证成功"
         )
     
-    async def admin_login(self, password: str) -> dict[str, Any]:
-        """管理员登录
-        
-        支持旧版明文密码的自动升级
-        """
-        result = await self.db.execute(
-            select(Setting).where(Setting.key == "admin_password")
-        )
-        setting = result.scalars().first()
-        
-        if setting and setting.value:
-            is_valid, needs_upgrade = await verify_password_fallback_async(password, setting.value)
-            
-            if is_valid:
-                if needs_upgrade:
-                    setting.value = await hash_password_async(password)
-                    await self.db.commit()
-                    logger.info("管理员密码已自动升级为 bcrypt 格式")
-                
-                token = create_access_token(data={
-                    "user_id": 0,
-                    "role": "admin",
-                    "auth_code_id": None,
-                })
-                
-                logger.info("管理员登录成功")
-                return success_response(
-                    data={"token": token, "role": "admin"},
-                    message="登录成功"
-                )
-        
-        logger.warning("管理员登录失败: 密码错误")
+    async def admin_login(
+        self,
+        password: str,
+        username: str = "admin",
+        request: Request | None = None,
+    ) -> dict[str, Any]:
+        """Compatibility login URL backed exclusively by ``staff_users``."""
+        staff = await authenticate_staff(self.db, username, password, request=request)
+        if staff:
+            logger.info("后台账号兼容入口登录成功: %s", staff.username)
+            return success_response(
+                data={"token": create_staff_access_token(staff), **staff_to_dict(staff)},
+                message="登录成功",
+            )
+        logger.warning("后台账号兼容入口登录失败: %s", username)
         return error_response("密码错误", ErrorCodes.UNAUTHORIZED)
     
     async def check_auth_status(self, auth_code_id: int | None) -> dict[str, Any]:
