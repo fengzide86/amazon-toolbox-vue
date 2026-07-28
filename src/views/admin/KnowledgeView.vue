@@ -10,18 +10,26 @@
     <!-- 统计 -->
     <section v-if="loadState !== 'loading' && loadState !== 'error'" class="knowledge-stats" aria-label="知识库统计">
       <article class="stat-card">
-          <div class="stat-value">{{ stats.total || 0 }}</div>
+          <div class="stat-value">{{ metaHasLoaded ? stats.total : '—' }}</div>
           <div class="stat-label">总条目</div>
       </article>
       <article class="stat-card">
-          <div class="stat-value">{{ stats.active || 0 }}</div>
+          <div class="stat-value">{{ metaHasLoaded ? stats.active : '—' }}</div>
           <div class="stat-label">已启用</div>
       </article>
       <article class="stat-card">
-          <div class="stat-value">{{ stats.categories || 0 }}</div>
+          <div class="stat-value">{{ metaHasLoaded ? stats.categories : '—' }}</div>
           <div class="stat-label">分类数</div>
       </article>
     </section>
+    <AsyncStateNotice
+      v-if="loadState !== 'loading' && loadState !== 'error'"
+      :state="metaState"
+      :message="metaError"
+      loading-text="正在加载知识库统计…"
+      error-title="知识库统计暂时无法加载"
+      @retry="loadMeta"
+    />
 
     <!-- 筛选 -->
     <DataToolbar v-if="loadState !== 'loading' && loadState !== 'error'" label="知识库筛选">
@@ -221,6 +229,9 @@ const showDetailDrawer = ref(false)
 const detailItem = ref<KnowledgeItem | null>(null)
 const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
+const metaState = ref<AsyncDataState>('loading')
+const metaError = ref('')
+const metaHasLoaded = ref(false)
 
 const allCategories = ['安装教程', '授权说明', '使用教程', '报错处理', '套餐说明', '退款规则', '比赛须知', '其他']
 
@@ -254,19 +265,22 @@ async function loadData() {
 }
 
 async function loadMeta() {
+  metaState.value = metaHasLoaded.value ? 'data' : 'loading'
+  metaError.value = ''
   try {
     const [cats, st] = await Promise.all([getKnowledgeCategories(), getKnowledgeStats()])
     categories.value = knowledgeCategoriesSchema.parse(cats)
     stats.value = knowledgeStatsSchema.parse(st)
+    metaHasLoaded.value = true
+    metaState.value = 'data'
   } catch (error) {
-    loadError.value = error instanceof Error && error.message ? error.message : '知识库统计暂时无法更新'
-    loadState.value = failedDataState(loadState.value === 'data' || loadState.value === 'empty' || list.value.length > 0)
+    metaError.value = error instanceof Error && error.message ? error.message : '知识库统计暂时无法更新'
+    metaState.value = failedDataState(metaHasLoaded.value)
   }
 }
 
 async function loadInitial() {
-  await loadData()
-  await loadMeta()
+  await Promise.allSettled([loadData(), loadMeta()])
 }
 
 function openCreate() {
@@ -407,6 +421,8 @@ onMounted(loadInitial)
 .retrieval-content { max-height: 120px; overflow: auto; white-space: pre-wrap; line-height: 1.5; }
 
 .knowledge-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 1rem; }
+
+.knowledge-stats + :deep(.async-notice) { margin: -0.25rem 0 1rem; }
 
 .stat-card {
   padding: 18px;

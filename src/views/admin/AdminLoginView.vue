@@ -188,7 +188,7 @@ function handleLogin() {
         // 保持 Auth 工具类的兼容性
         Auth.set('backoffice')
         
-        window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
+        window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 780 } }))
         const destination = res.data.force_password_reset ? '/admin/change-password' : '/admin/dashboard'
         Promise.resolve(router.push(destination)).catch(() => {
           isLoading.value = false

@@ -2,29 +2,33 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-describe('internal demo-only automation profile', () => {
-  it('does not package the Runner or its real automation scripts', () => {
+describe('packaged local automation runtime', () => {
+  it('packages the Runner while the server catalog controls demo/live availability', () => {
     const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
-      toolbox?: { distribution?: string }
+      toolbox?: { distribution?: string; automationRuntime?: boolean }
       build?: { extraResources?: unknown[]; files?: string[] }
     }
 
     expect(metadata.toolbox?.distribution).toBe('internal')
-    expect(metadata.build?.extraResources).toEqual([])
-    expect(metadata.build?.files).toContain('!dist-electron/electron/automation-runner.cjs')
-    expect(metadata.build?.files).toContain('!dist-electron/electron/automation/scripts/**')
+    expect(metadata.toolbox?.automationRuntime).toBe(true)
+    expect(metadata.build?.extraResources).toEqual([
+      { from: 'resources/templates', to: 'templates', filter: ['**/*.xlsx'] },
+      { from: 'resources/rates', to: 'rates', filter: ['**/*.xlsx'] },
+    ])
+    expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation-runner.cjs')
+    expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation/scripts/**')
   })
 
-  it('keeps Runner, batch and webview capabilities behind the development profile gate', () => {
+  it('keeps Runner, batch and webview capabilities behind an explicit package/runtime gate', () => {
     const main = readFileSync(resolve('electron/main.cts'), 'utf8')
 
-    expect(main).toContain("packageMetadata.toolbox?.distribution === 'internal'")
-    expect(main).toContain('const AUTOMATION_RUNTIME_ENABLED = !INTERNAL_PRODUCTION')
+    expect(main).toContain('packageMetadata.toolbox?.automationRuntime === true')
+    expect(main).toContain("process.env.TOOLBOX_AUTOMATION_ENABLED === 'true'")
     expect(main).toContain('if (AUTOMATION_RUNTIME_ENABLED) registerTrustedHandle(channel, handler)')
     expect(main).toContain('webviewTag: AUTOMATION_RUNTIME_ENABLED')
   })
 
-  it('does not expose the automation bridge in an internal packaged renderer', () => {
+  it('only exposes the automation bridge when main explicitly enables it', () => {
     const preload = readFileSync(resolve('electron/preload.cts'), 'utf8')
     const conditionalBridge = preload.indexOf('...(automationEnabled ?')
     const automationBridge = preload.indexOf('automation: {')

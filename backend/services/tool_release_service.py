@@ -21,6 +21,25 @@ def canonical_manifest(manifest: dict[str, Any]) -> bytes:
     return json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def canonical_artifact(adapter: dict[str, Any]) -> bytes:
+    """Return the exact bytes served to runners and covered by artifactSha256."""
+    return json.dumps(adapter, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def validate_declarative_artifact(adapter: Any, script_key: str, version: str) -> dict[str, Any]:
+    if not isinstance(adapter, dict):
+        raise ValueError("adapter 必须是声明式 JSON 对象")
+    if adapter.get("key") != script_key or adapter.get("version") != version:
+        raise ValueError("adapter 的 key/version 必须与发布版本一致")
+    if adapter.get("mode") != "workflow" or adapter.get("sandbox") is True:
+        raise ValueError("远程 adapter 只能是非沙盒 workflow")
+    if not isinstance(adapter.get("steps"), list) or not adapter["steps"]:
+        raise ValueError("adapter 必须包含可执行步骤")
+    if not isinstance(adapter.get("successChecks"), list) or not adapter["successChecks"]:
+        raise ValueError("adapter 必须包含结果核验规则")
+    return adapter
+
+
 def sign_manifest(manifest: dict[str, Any], private_key_b64: str | None = None) -> str:
     encoded_key = private_key_b64 or settings.TOOL_SIGNING_PRIVATE_KEY_B64
     if not encoded_key:
@@ -58,7 +77,7 @@ def version_key(version: str) -> tuple[int, ...]:
 
 
 def rollout_bucket(tool_id: str, version: str, subject: str) -> int:
-    digest = hashlib.sha256(f"{tool_id}:{version}:{subject}".encode("utf-8")).digest()
+    digest = hashlib.sha256(f"{tool_id}:{version}:{subject}".encode()).digest()
     return int.from_bytes(digest[:4], "big") % 100
 
 
@@ -82,18 +101,25 @@ def resolve_release(releases: list[dict[str, Any]], tool_id: str, subject: str) 
 
 
 def create_release(payload: dict[str, Any], private_key_b64: str | None = None) -> dict[str, Any]:
+    adapter = payload.get("adapter")
+    artifact_sha256 = payload.get("artifact_sha256", "embedded")
+    if adapter is not None:
+        adapter = validate_declarative_artifact(adapter, payload["script_key"], payload["version"])
+        artifact_sha256 = hashlib.sha256(canonical_artifact(adapter)).hexdigest()
     release = {
         "tool_id": payload["tool_id"],
         "version": payload["version"],
         "script_key": payload["script_key"],
         "runner_api_version": int(payload.get("runner_api_version", 1)),
-        "artifact_sha256": payload.get("artifact_sha256", "embedded"),
+        "artifact_sha256": artifact_sha256,
         "artifact_url": payload.get("artifact_url"),
         "channel": payload.get("channel", "canary"),
         "rollout_percentage": int(payload.get("rollout_percentage", 0)),
         "status": payload.get("status", "draft"),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if adapter is not None:
+        release["adapter"] = adapter
     release["manifest"] = build_manifest(release)
     release["signature"] = sign_manifest(release["manifest"], private_key_b64)
     release["signing_key_id"] = settings.TOOL_SIGNING_KEY_ID

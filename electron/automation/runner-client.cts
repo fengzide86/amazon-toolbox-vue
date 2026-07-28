@@ -47,7 +47,7 @@ export class RunnerClient {
   private readonly pending = new Map<string, PendingCommand>()
   private sequence = 0
 
-  constructor({ scriptPath, env = {}, onEvent = () => undefined, onHostRequest = null, forkFn = fork, timeoutMs = 15000 }: RunnerClientOptions) {
+  constructor({ scriptPath, env = {}, onEvent = () => undefined, onHostRequest = null, forkFn = fork, timeoutMs = 45000 }: RunnerClientOptions) {
     this.scriptPath = scriptPath
     this.env = env
     this.onEvent = onEvent

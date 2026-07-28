@@ -68,6 +68,7 @@ test-results/
 playwright-report/
 .automation-profiles/
 .automation-artifacts/
+.automation-smoke/
 
 # ===== AI 工具配置 =====
 .clinerules/

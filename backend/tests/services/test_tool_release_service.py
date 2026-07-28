@@ -1,9 +1,11 @@
 import base64
+import hashlib
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from services.tool_release_service import (
+    canonical_artifact,
     create_release,
     resolve_release,
     rollback_releases,
@@ -38,6 +40,29 @@ def test_release_manifest_is_signed_and_tamper_evident():
     assert verify_manifest_signature(release["manifest"], release["signature"], public_key)
     release["manifest"]["scriptKey"] = "amazon.evil.v1"
     assert not verify_manifest_signature(release["manifest"], release["signature"], public_key)
+
+
+def test_declarative_adapter_is_hashed_and_embedded_in_release_storage():
+    private_key, public_key = key_pair()
+    adapter = {
+        "key": "amazon.register.v1",
+        "version": "1.3.0",
+        "mode": "workflow",
+        "sandbox": False,
+        "steps": [{"id": "fill", "actions": [{"id": "name", "kind": "fill"}]}],
+        "successChecks": [{"id": "success", "kind": "assertText"}],
+    }
+    release = create_release({
+        "tool_id": "tool_register",
+        "version": "1.3.0",
+        "script_key": "amazon.register.v1",
+        "artifact_url": "/api/tool-releases/tool_register/1.3.0/artifact",
+        "adapter": adapter,
+    }, private_key)
+
+    assert release["adapter"] == adapter
+    assert release["manifest"]["artifactSha256"] == hashlib.sha256(canonical_artifact(adapter)).hexdigest()
+    assert verify_manifest_signature(release["manifest"], release["signature"], public_key)
 
 
 def test_gray_release_selection_is_stable_per_subject():

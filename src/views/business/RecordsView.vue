@@ -1,6 +1,8 @@
 <template>
   <div class="records-page">
-    <header><div><span>BUSINESS RECORDS</span><h1>批量流程记录</h1><p>模拟批次与真实批次完全分开，不保存客户原始数据。</p></div><button @click="load"><RefreshCw :size="15" />刷新</button></header>
+    <PageHeader eyebrow="BUSINESS RECORDS" title="批量流程记录" description="模拟批次与真实批次完全分开，不保存客户原始数据。">
+      <template #actions><button @click="load"><RefreshCw :size="15" />刷新</button></template>
+    </PageHeader>
     <div class="record-tabs" role="tablist" aria-label="批次记录类型">
       <button type="button" role="tab" :aria-selected="activeTab === 'demo'" :class="{ active: activeTab === 'demo' }" @click="activeTab='demo'">演示记录</button>
       <button type="button" role="tab" :aria-selected="activeTab === 'live'" :class="{ active: activeTab === 'live' }" @click="activeTab='live'">真实批次</button>
@@ -33,6 +35,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Archive, CircleAlert, RefreshCw } from '@lucide/vue'
 import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 const store = useBusinessDemoWorkspaceStore()
 type RecordTab = 'demo' | 'live'

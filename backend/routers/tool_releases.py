@@ -1,5 +1,7 @@
 """自动化工具版本发布、灰度与回滚管理。"""
-from fastapi import APIRouter, Body, Depends, HTTPException
+import re
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -7,6 +9,7 @@ from core.dependencies import get_current_admin
 from core.response import success_response
 from database import get_db
 from services.tool_release_service import (
+    canonical_artifact,
     create_release,
     load_releases,
     rollback_releases,
@@ -14,6 +17,8 @@ from services.tool_release_service import (
 )
 
 router = APIRouter()
+
+RELEASE_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 
 
 def _require_live_tool_stage() -> None:
@@ -47,16 +52,50 @@ async def add_tool_release(
     missing = [field for field in required if not payload.get(field)]
     if missing:
         raise HTTPException(status_code=400, detail=f"缺少字段: {', '.join(missing)}")
+    if not RELEASE_ID_PATTERN.fullmatch(str(payload["tool_id"])) or not RELEASE_ID_PATTERN.fullmatch(str(payload["version"])):
+        raise HTTPException(status_code=400, detail="tool_id/version 只能包含字母、数字、点、下划线和连字符")
+    release_payload = dict(payload)
+    if release_payload.get("adapter") is not None:
+        release_payload["artifact_url"] = f"/api/tool-releases/{payload['tool_id']}/{payload['version']}/artifact"
     releases = await load_releases(db)
     if any(r.get("tool_id") == payload["tool_id"] and r.get("version") == payload["version"] for r in releases):
         raise HTTPException(status_code=409, detail="该工具版本已存在")
     try:
-        release = create_release(payload)
+        release = create_release(release_payload)
     except ValueError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     releases.append(release)
     await save_releases(db, releases)
     return success_response(release, "工具版本已创建并签名")
+
+
+@router.get("/{tool_id}/{version}/artifact")
+async def get_tool_release_artifact(
+    tool_id: str,
+    version: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve only published declarative JSON; integrity is checked by the signed manifest."""
+    _require_live_tool_stage()
+    releases = await load_releases(db)
+    release = next((
+        item for item in releases
+        if item.get("tool_id") == tool_id
+        and item.get("version") == version
+        and item.get("status") == "published"
+    ), None)
+    if not release or not isinstance(release.get("adapter"), dict):
+        raise HTTPException(status_code=404, detail="工具适配器不存在或尚未发布")
+    content = canonical_artifact(release["adapter"])
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "Cache-Control": "public, max-age=300, immutable",
+            "ETag": f'"{release.get("artifact_sha256", "")}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/{tool_id}/{version}/publish")

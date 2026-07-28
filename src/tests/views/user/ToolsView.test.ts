@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getTools: vi.fn(),
   createDemoRun: vi.fn(),
   updateDemoRun: vi.fn(),
+  createToolLaunchGrant: vi.fn(),
   push: vi.fn(),
   showToast: vi.fn(),
   route: { query: {} },
@@ -17,6 +18,7 @@ vi.mock('@/utils/api', () => ({
   getTools: mocks.getTools,
   createDemoRun: mocks.createDemoRun,
   updateDemoRun: mocks.updateDemoRun,
+  createToolLaunchGrant: mocks.createToolLaunchGrant,
 }))
 
 vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
@@ -35,6 +37,14 @@ function mountView() {
       stubs: {
         RouterLink: { props: ['to'], template: '<a><slot /></a>' },
         ElDrawer: { template: '<aside><slot name="header" /><slot /><slot name="footer" /></aside>' },
+        ElDialog: { template: '<section><slot name="header" /><slot /><slot name="footer" /></section>' },
+        ElForm: { template: '<form><slot /></form>' },
+        ElFormItem: { template: '<label><slot /></label>' },
+        ElInput: true,
+        ElInputNumber: true,
+        ElSelect: { template: '<select><slot /></select>' },
+        ElOption: true,
+        ElButton: { template: '<button><slot /></button>' },
       },
     },
   })
@@ -54,7 +64,7 @@ describe('ToolsView 一键工具箱', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.find('.toolbox-header h2').text()).toBe('选择一个工具体验演示')
+    expect(wrapper.get('.page-header-v6 h2').text()).toBe('选择一个工具开始处理')
     expect(wrapper.find('.search-box').exists()).toBe(false)
     expect(wrapper.find('.category-tabs').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('成功率')
@@ -95,7 +105,7 @@ describe('ToolsView 一键工具箱', () => {
     expect(mocks.createDemoRun).not.toHaveBeenCalled()
   })
 
-  it('点击可用工具只创建一次演示记录并进入工作区', async () => {
+  it('点击可用工具立即进入本地演示，不被远端记录接口阻塞', async () => {
     mocks.getTools.mockResolvedValue([
       { id: 'register', name: '注册工具', module: 'register', status: 'online', available_plans: ['Y15'] },
     ])
@@ -106,11 +116,12 @@ describe('ToolsView 一键工具箱', () => {
     await Promise.all([card.trigger('click'), card.trigger('click')])
     await flushPromises()
 
-    expect(mocks.createDemoRun).toHaveBeenCalledTimes(1)
-    expect(mocks.updateDemoRun).toHaveBeenCalledTimes(1)
+    expect(mocks.createDemoRun).not.toHaveBeenCalled()
+    expect(mocks.updateDemoRun).not.toHaveBeenCalled()
     expect(useAppStore().toolVisible).toBe(true)
     expect(useAppStore().currentTool.name).toBe('注册工具')
     expect(useAppStore().currentTool.executionMode).toBe('demo')
+    expect(useAppStore().currentTool.demoRunId).toMatch(/^demo_run_local_/)
   })
 
   it('按当前平台向后端请求工具', async () => {

@@ -20,34 +20,16 @@ import { failedDataState, settledDataState, type AsyncDataState } from '@/featur
 
 
 export function useOperatorSupportConsole() {
-interface TransferRules {
-  refund_direct_transfer: boolean
-  complaint_direct_transfer: boolean
-  auto_transfer_after_retries: boolean
-  account_direct_transfer: boolean
-}
-
 const platformStore = usePlatformStore()
 
 // 配置
-const config = ref({
-  welcome_message: '',
-  suggested_questions: '[]',
-  transfer_rules: '{}',
-  ai_model: 'qwen-turbo',
-  reply_style: 'concise'
-})
+const config = ref(aiConfigSchema.parse({}))
 const suggestedQuestions = ref([''])
-const transferRules = ref({
-  refund_direct_transfer: true,
-  complaint_direct_transfer: true,
-  auto_transfer_after_retries: true,
-  account_direct_transfer: false
-})
+const transferKeywords = ref<string[]>([])
 const saving = ref(false)
-const loadState = ref<AsyncDataState>('loading')
-const loadError = ref('')
-const hasLoaded = ref(false)
+const configState = ref<AsyncDataState>('loading')
+const configError = ref('')
+const configHasLoaded = ref(false)
 
 // 对话记录
 const sessions = ref<ChatSessionSummary[]>([])
@@ -57,9 +39,15 @@ const pageSize = 20
 const totalSessions = ref(0)
 const showDetail = ref(false)
 const currentSession = ref<ChatSessionDetail | null>(null)
+const sessionsState = ref<AsyncDataState>('loading')
+const sessionsError = ref('')
+const sessionsHaveLoaded = ref(false)
 
 // 统计
 const stats = ref(aiStatsSchema.parse({}))
+const statsState = ref<AsyncDataState>('loading')
+const statsError = ref('')
+const statsHaveLoaded = ref(false)
 
 // 沙盒测试
 const testMessage = ref('')
@@ -74,25 +62,29 @@ function getStatusTagType(status?: string | null): 'primary' | 'success' | 'warn
 }
 
 async function loadConfig() {
-  const res = aiConfigSchema.parse(await getAIChatConfig())
-  config.value = res
+  configState.value = configHasLoaded.value ? 'data' : 'loading'
+  configError.value = ''
   try {
-    const parsed: unknown = JSON.parse(res.suggested_questions || '[]')
-    suggestedQuestions.value = Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : ['']
-  } catch {
-    suggestedQuestions.value = ['']
+    const res = aiConfigSchema.parse(await getAIChatConfig())
+    config.value = res
+    suggestedQuestions.value = parseStringList(res.suggested_questions, [''])
+    transferKeywords.value = parseStringList(res.transfer_keywords, [])
+    configHasLoaded.value = true
+    configState.value = 'data'
+  } catch (error) {
+    configError.value = errorMessage(error, '客服规则配置暂时无法加载')
+    configState.value = failedDataState(configHasLoaded.value)
   }
+}
+
+function parseStringList(raw: string, fallback: string[]): string[] {
   try {
-    const parsed: unknown = JSON.parse(res.transfer_rules || '{}')
-    if (typeof parsed !== 'object' || parsed === null) throw new Error('invalid transfer rules')
-    transferRules.value = { ...transferRules.value, ...parsed as Partial<TransferRules> }
+    const parsed: unknown = JSON.parse(raw || '[]')
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+      : fallback
   } catch {
-    transferRules.value = {
-      refund_direct_transfer: true,
-      complaint_direct_transfer: true,
-      auto_transfer_after_retries: true,
-      account_direct_transfer: false
-    }
+    return fallback
   }
 }
 
@@ -102,9 +94,8 @@ async function saveConfig() {
     await updateAIChatConfig({
       welcome_message: config.value.welcome_message,
       suggested_questions: suggestedQuestions.value.filter(q => q.trim()),
-      transfer_rules: transferRules.value,
-      ai_model: config.value.ai_model,
-      reply_style: config.value.reply_style
+      transfer_keywords: transferKeywords.value.map(keyword => keyword.trim()).filter(Boolean),
+      max_unmatched: config.value.max_unmatched,
     })
     showToast('配置已保存', 'success')
   } catch {
@@ -115,13 +106,22 @@ async function saveConfig() {
 }
 
 async function loadSessions() {
-  const res = chatHistorySchema.parse(await getAdminChatSessions({
-    status: sessionFilter.value || undefined,
-    page: currentPage.value,
-    page_size: pageSize
-  }))
-  sessions.value = res.items
-  totalSessions.value = res.total
+  sessionsState.value = sessionsHaveLoaded.value ? settledDataState(sessions.value.length) : 'loading'
+  sessionsError.value = ''
+  try {
+    const res = chatHistorySchema.parse(await getAdminChatSessions({
+      status: sessionFilter.value || undefined,
+      page: currentPage.value,
+      page_size: pageSize
+    }))
+    sessions.value = res.items
+    totalSessions.value = res.total
+    sessionsHaveLoaded.value = true
+    sessionsState.value = settledDataState(res.items.length)
+  } catch (error) {
+    sessionsError.value = errorMessage(error, '最近对话暂时无法加载')
+    sessionsState.value = failedDataState(sessionsHaveLoaded.value)
+  }
 }
 
 async function viewSession(rawSession: unknown) {
@@ -136,20 +136,20 @@ async function viewSession(rawSession: unknown) {
 }
 
 async function loadStats() {
-  stats.value = aiStatsSchema.parse(await getAIChatStats())
+  statsState.value = statsHaveLoaded.value ? 'data' : 'loading'
+  statsError.value = ''
+  try {
+    stats.value = aiStatsSchema.parse(await getAIChatStats())
+    statsHaveLoaded.value = true
+    statsState.value = 'data'
+  } catch (error) {
+    statsError.value = errorMessage(error, '客服统计暂时无法加载')
+    statsState.value = failedDataState(statsHaveLoaded.value)
+  }
 }
 
 async function loadAll() {
-  loadState.value = hasLoaded.value ? (sessions.value.length ? 'data' : 'empty') : 'loading'
-  loadError.value = ''
-  try {
-    await Promise.all([loadConfig(), loadSessions(), loadStats()])
-    hasLoaded.value = true
-    loadState.value = settledDataState(sessions.value.length)
-  } catch (error) {
-    loadError.value = errorMessage(error, '客服规则、对话与统计暂时无法加载')
-    loadState.value = failedDataState(hasLoaded.value)
-  }
+  await Promise.allSettled([loadConfig(), loadSessions(), loadStats()])
 }
 
 // 沙盒测试发送
@@ -169,8 +169,6 @@ async function sendTest() {
     const result = aiDebugResultSchema.parse(await debugAIChat({
       message: userMsg.content,
       platform_key: debugPlatform.value,
-      top_k: 5,
-      min_score: 0.3,
     }))
     lastDebug.value = result
     sandboxMessages.value.push({
@@ -188,9 +186,10 @@ async function sendTest() {
 
 onMounted(loadAll)
   return {
-    config, suggestedQuestions, transferRules, saving, sessions, currentSession, stats,
+    config, suggestedQuestions, transferKeywords, saving, sessions, currentSession, stats,
     testMessage, sandboxMessages, sendingTest, lastDebug, debugPlatform,
-    loadState, loadError, loadAll,
+    configState, configError, sessionsState, sessionsError, statsState, statsError,
+    loadAll, loadConfig, loadSessions, loadStats,
     getStatusTagType, getStatusText, formatTime, saveConfig, viewSession, sendTest,
   }
 }

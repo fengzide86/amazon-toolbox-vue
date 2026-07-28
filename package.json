@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.7.8",
+  "version": "1.8.0",
   "description": "面向跨境电商业务的桌面自动化效率工具箱",
   "author": "Amazon Toolbox Team",
   "private": true,
@@ -8,7 +8,8 @@
   "main": "dist-electron/electron/desktop-main.cjs",
   "toolbox": {
     "controlApiUrl": "https://8.130.113.104",
-    "distribution": "internal"
+    "distribution": "internal",
+    "automationRuntime": true
   },
   "scripts": {
     "dev": "vite --mode development",
@@ -35,6 +36,7 @@
     "test:embedded-browser": "npm run electron:compile && electron dist-electron/electron/smoke/embedded-browser-smoke.cjs",
     "test:amazon-navigation": "npm run electron:compile && electron dist-electron/electron/smoke/amazon-navigation-smoke.cjs",
     "test:app-protocol": "npm run electron:compile && electron dist-electron/electron/smoke/app-protocol-smoke.cjs",
+    "test:automation-smoke": "npm run electron:compile && node scripts/automation-smoke.mjs",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\"",
     "security:audit": "python scripts/audit_secrets.py",
@@ -49,6 +51,7 @@
   "dependencies": {
     "electron-updater": "^6.8.3",
     "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
     "playwright-core": "^1.61.1",
     "zod": "^4.4.3"
   },
@@ -67,6 +70,7 @@
     "electron": "^42.4.1",
     "electron-builder": "^26.8.1",
     "element-plus": "^2.14.2",
+    "esbuild": "^0.28.1",
     "eslint": "^10.7.0",
     "eslint-plugin-vue": "^10.9.2",
     "globals": "^17.7.0",
@@ -100,7 +104,22 @@
       "output": "release"
     },
     "extraFiles": [],
-    "extraResources": [],
+    "extraResources": [
+      {
+        "from": "resources/templates",
+        "to": "templates",
+        "filter": [
+          "**/*.xlsx"
+        ]
+      },
+      {
+        "from": "resources/rates",
+        "to": "rates",
+        "filter": [
+          "**/*.xlsx"
+        ]
+      }
+    ],
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
@@ -108,8 +127,6 @@
       "!**/*.ts",
       "!**/*.cts",
       "!dist-electron/electron/smoke/**",
-      "!dist-electron/electron/automation-runner.cjs",
-      "!dist-electron/electron/automation/scripts/**",
       "!**/test/**",
       "!**/tests/**",
       "!**/*.md"

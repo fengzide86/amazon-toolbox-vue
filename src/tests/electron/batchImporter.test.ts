@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
@@ -21,6 +21,23 @@ afterEach(async () => {
 })
 
 describe('batch importer', () => {
+  it('按 capabilityKey 从内置多工作表模板读取对应的 8 条数据', async () => {
+    const result = await parseBatchFile(resolve('resources/templates/B端批量自动化测试数据.xlsx'), {
+      capabilityKey: 'listing_script',
+      maxRows: 50,
+      schema: [
+        { key: 'account_label', label: '客户简称', required: true },
+        { key: 'sku', label: 'SKU', required: true },
+        { key: 'title', label: '商品标题', required: true },
+      ],
+    })
+
+    expect(result.worksheetName).toBe('商品上架')
+    expect(result.templateVersion).toBe('1.0.0')
+    expect(result.rows).toHaveLength(8)
+    expect(result.rows[0].input).toMatchObject({ account_label: '上品演示-01', sku: 'DEMO-SKU-001' })
+  })
+
   it('只读取白名单字段并忽略密码列', async () => {
     const filePath = await tempFile('accounts.csv', 'account_label,password,store\n客户甲,secret,店铺A\n')
     const result = await parseBatchFile(filePath, [

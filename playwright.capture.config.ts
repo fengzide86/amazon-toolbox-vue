@@ -1,5 +1,9 @@
 import { defineConfig } from '@playwright/test'
 
+const webServerCommand = process.env.PLAYWRIGHT_PREBUILT === '1'
+  ? 'npm run preview -- --host 127.0.0.1 --port 3000'
+  : 'npm run build:desktop && npm run preview -- --host 127.0.0.1 --port 3000'
+
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: 'premium-visual-capture.spec.ts',
@@ -13,7 +17,7 @@ export default defineConfig({
   reporter: [['list']],
   outputDir: 'test-results/premium-capture',
   webServer: {
-    command: 'npm run build:desktop && npm run preview -- --host 127.0.0.1 --port 3000',
+    command: webServerCommand,
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: false,
     timeout: 300_000,

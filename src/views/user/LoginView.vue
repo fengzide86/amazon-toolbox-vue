@@ -40,7 +40,7 @@
           <div class="stat-item" v-for="(stat, index) in stats" :key="index">
             <div class="stat-number-wrapper">
               <span class="stat-number" :style="{ animationDelay: `${index * 0.2}s` }">{{ stat.value }}</span>
-              <span class="stat-unit">{{ stat.unit }}</span>
+              <span class="stat-unit" data-testid="login-stat-unit">{{ stat.unit }}</span>
             </div>
             <div class="stat-line"></div>
             <div class="stat-desc">{{ stat.desc }}</div>
@@ -117,11 +117,12 @@
           </div>
 
           <button type="submit" class="btn-login" :disabled="isLoading" :aria-busy="isLoading">
-            <span class="btn-content" :class="{ hidden: isLoading }">
-              <LogIn :size="20" />
-              验证并登录
+            <span class="btn-content" :class="{ hidden: isLoading && !loginSucceeded }">
+              <Check v-if="loginSucceeded" :size="20" />
+              <LogIn v-else :size="20" />
+              {{ loginSucceeded ? '验证通过，正在进入' : '验证并登录' }}
             </span>
-            <span class="btn-loading" :class="{ visible: isLoading }">
+            <span class="btn-loading" :class="{ visible: isLoading && !loginSucceeded }">
               <Loader :size="20" class="spinner" />
               验证中...
             </span>
@@ -232,7 +233,7 @@ import { Zap, Check, CircleAlert, KeyRound, Monitor, LogIn, Loader, HelpCircle, 
 import { useLicenseLogin } from '@/features/auth/useLicenseLogin'
 
 const {
-  authCode, authCodeInput, isLoading, showError, showHelpModal, showContactModal, copySuccess,
+  authCode, authCodeInput, isLoading, loginSucceeded, showError, showHelpModal, showContactModal, copySuccess,
   errorMessage, inputFocused, deviceName, wechatId, stats, featureTags, helpSteps,
   connectionStatusClass, connectionStatusText, handleLogin, showHelp, showContact, copyWechatId, closeModals,
 } = useLicenseLogin()
@@ -1317,20 +1318,46 @@ const {
 .brand-divider .divider-line { background: var(--color-border-strong); }
 .brand-divider .divider-dot { background: var(--color-premium); box-shadow: none; }
 .brand-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
   padding: 22px 0;
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
 }
+.stat-item {
+  min-width: 0;
+  padding: 0 22px;
+  border-right: 1px solid var(--color-border);
+}
+.stat-item:first-child { padding-left: 0; }
+.stat-item:last-child { padding-right: 0; border-right: 0; }
+.stat-number-wrapper { min-height: 48px; }
 .stat-number {
   color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: clamp(38px, 3.2vw, 48px);
+  font-weight: 720;
+  letter-spacing: -.045em;
   background: none;
   text-shadow: none;
   -webkit-background-clip: initial;
   -webkit-text-fill-color: var(--color-text);
 }
-.stat-unit { color: var(--color-premium); }
-.stat-line { background: var(--color-border); }
-.stat-desc { color: var(--color-text-secondary); }
+.stat-unit {
+  display: inline-flex;
+  min-width: 1.15em;
+  align-items: baseline;
+  color: var(--color-premium);
+  opacity: 1;
+  -webkit-text-fill-color: var(--color-premium);
+  font-size: clamp(15px, 1.25vw, 19px);
+  font-weight: 700;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+.stat-line { width: 28px; margin-top: 2px; background: var(--color-premium); opacity: .45; }
+.stat-desc { max-width: 150px; color: var(--color-text-secondary); line-height: 1.55; }
 .feature-tag {
   border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
@@ -1392,7 +1419,8 @@ const {
   .brand-content { max-width: 460px; }
   .brand-title { font-size: clamp(30px, 3.5vw, 38px); }
   .brand-desc { margin-bottom: 24px; }
-  .brand-stats { gap: 16px; padding: 18px 0; margin-bottom: 18px; }
+  .brand-stats { gap: 0; padding: 18px 0; margin-bottom: 18px; }
+  .stat-item { padding: 0 12px; }
   .stat-number { font-size: 30px; }
   .stat-desc { font-size:var(--type-meta); }
   .feature-tags { gap: 5px; }

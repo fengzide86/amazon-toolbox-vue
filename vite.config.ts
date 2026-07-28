@@ -19,7 +19,13 @@ export default defineConfig(({ command, mode }) => {
   const declarationOutput = command === 'serve'
   return {
     plugins: [
-      vue(),
+      vue({
+        template: {
+          compilerOptions: {
+            isCustomElement: tag => tag === 'webview',
+          },
+        },
+      }),
       // 自动导入 Vue、Vue Router、Pinia 等 API
       AutoImport({
         imports: ['vue', 'vue-router', 'pinia'],
@@ -156,6 +162,9 @@ export default defineConfig(({ command, mode }) => {
       chunkSizeWarningLimit: 1000,
       // CSS 代码分离
       cssCodeSplit: true,
+      // PurgeCSS keeps the global design-token set; esbuild then safely
+      // minifies the declarations without cross-chunk variable pruning.
+      cssMinify: 'esbuild',
       // 生成 sourcemap（仅开发环境）
       sourcemap: mode !== 'production',
     },

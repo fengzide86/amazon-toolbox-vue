@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from core.security import create_access_token
 from domains.knowledge import chat_service as ai_chat_service
 from domains.knowledge import faq_service
-from models import ChatSession, Feedback, KnowledgeBase, User
+from models import ChatMessage, ChatSession, Feedback, KnowledgeBase, User
 
 
 @pytest.mark.asyncio
@@ -55,15 +55,29 @@ async def test_faq_platform_isolation(db_session):
 
 @pytest.mark.asyncio
 async def test_admin_debug_does_not_create_session(client, db_session, admin_token):
-    before = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
+    db_session.add(KnowledgeBase(
+        category="使用教程", title="规则预览测试", content="这是固定规则答案。",
+        keywords='["规则预览"]', status="active", platform_key="amazon",
+    ))
+    await db_session.commit()
+    before_sessions = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
+    before_messages = (await db_session.execute(select(func.count(ChatMessage.id)))).scalar() or 0
     response = await client.post(
-        "/api/ai-chat/admin/debug", json={"message": "测试"},
+        "/api/ai-chat/admin/debug",
+        json={"message": "规则预览", "platform_key": "amazon"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    after = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
-    assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "FEATURE_DISABLED"
-    assert before == after
+    after_sessions = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
+    after_messages = (await db_session.execute(select(func.count(ChatMessage.id)))).scalar() or 0
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reply"] == "这是固定规则答案。"
+    assert payload["answer_mode"] == "faq"
+    assert payload["ai_used"] is False
+    assert payload["knowledge_refs"][0]["title"] == "规则预览测试"
+    assert set(payload["diagnostics"]) == {"total_ms"}
+    assert before_sessions == after_sessions
+    assert before_messages == after_messages
 
 
 @pytest.mark.asyncio

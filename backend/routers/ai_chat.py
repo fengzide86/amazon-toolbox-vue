@@ -30,8 +30,7 @@ class CreateSession(BaseModel):
 
 
 class DebugChatRequest(SendMessage):
-    top_k: int = Field(default=5, ge=1, le=20)
-    min_score: float = Field(default=0.3, ge=-1, le=1)
+    """Rules-only preview input; legacy vector fields are ignored as extras."""
 
 
 class ResolveSession(BaseModel):
@@ -206,15 +205,29 @@ async def get_history(
 
 @router.post("/admin/debug")
 async def debug_chat(
-    _req: DebugChatRequest,
-    _db: AsyncSession = Depends(get_db),
+    req: DebugChatRequest,
+    db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
 ):
-    """Rules mode intentionally hides legacy retrieval/model diagnostics."""
-    raise HTTPException(
-        status_code=409,
-        detail={"code": "FEATURE_DISABLED", "message": "规则客服模式不提供检索调试"},
+    """Preview one stateless local FAQ/rule answer for an operator."""
+    result = await ai_chat_service.answer_question(
+        db,
+        req.message,
+        platform_key=req.platform_key,
+        capability_key=req.capability_key,
+        session_id=None,
     )
+    return {
+        "reply": result["reply"],
+        "answer_mode": result["answer_mode"],
+        "ai_used": False,
+        "knowledge_refs": result.get("knowledge_refs", []),
+        "fallback_reason": result.get("fallback_reason"),
+        "should_transfer": result.get("should_transfer", False),
+        "diagnostics": {
+            "total_ms": result.get("diagnostics", {}).get("total_ms", 0),
+        },
+    }
 
 @router.get("/admin/config")
 async def get_config(

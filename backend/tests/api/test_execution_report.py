@@ -1,0 +1,116 @@
+import json
+from datetime import datetime, timedelta
+
+import pytest
+from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.config import settings
+from models import AuthCode, LaunchToken, Setting, User
+from models.feedback import ExecutionVerification, RunLog
+from tests.conftest import get_data
+
+
+@pytest.mark.asyncio
+async def test_consumed_single_launch_grant_creates_one_verified_execution(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    auth_code = AuthCode(code="REPORT-LIVE-001", status="active")
+    db_session.add(auth_code)
+    await db_session.flush()
+    user = User(name="Runner Report User", auth_code_id=auth_code.id, device_id="device-report")
+    db_session.add(user)
+    await db_session.flush()
+    tool_config_value = json.dumps([{
+            "id": "tool_listing_script",
+            "name": "自动上品脚本",
+            "module": "上品脚本",
+            "platform_key": "amazon",
+            "capability_key": "listing_script",
+            "availability": "live",
+            "supports_live_single": True,
+            "script_key": "amazon.listing_script.v1",
+            "target_url": "https://training.idtrade.cn/listing/create",
+        }], ensure_ascii=False)
+    tool_setting = (await db_session.execute(select(Setting).where(Setting.key == "tool_configs"))).scalar_one_or_none()
+    if tool_setting:
+        tool_setting.value = tool_config_value
+    else:
+        db_session.add(Setting(key="tool_configs", value=tool_config_value))
+    launch = LaunchToken(
+        token="runner-report-token-1234567890",
+        user_id=user.id,
+        auth_code_id=auth_code.id,
+        platform_key="amazon",
+        tool_id="tool_listing_script",
+        script_key="amazon.listing_script.v1",
+        device_id="device-report",
+        expires_at=datetime.now() - timedelta(minutes=1),
+        used_at=datetime.now(),
+        status="used",
+        execution_mode="single",
+    )
+    db_session.add(launch)
+    await db_session.commit()
+
+    payload = {
+        "token": launch.token,
+        "run_id": "local-run-report-1",
+        "status": "succeeded",
+        "adapter_version": "1.0.0",
+        "page_fingerprint": "a" * 64,
+        "page_changed": False,
+        "completed_steps": 8,
+    }
+    response = await client.post("/api/executions/report", json=payload)
+
+    assert response.status_code == 200
+    assert get_data(response)["accepted"] is True
+    log = (await db_session.execute(select(RunLog).where(RunLog.user_id == user.id))).scalar_one()
+    assert log.status == "success"
+    assert log.verification_state == ExecutionVerification.VERIFIED
+    assert log.tool_id == "tool_listing_script"
+    assert "runner-report-token" not in (log.detail or "")
+
+    duplicate = await client.post("/api/executions/report", json=payload)
+    assert duplicate.status_code == 200
+    assert get_data(duplicate)["duplicate"] is True
+    logs = (await db_session.execute(select(RunLog).where(RunLog.user_id == user.id))).scalars().all()
+    assert len(logs) == 1
+
+
+@pytest.mark.asyncio
+async def test_execution_report_rejects_unconsumed_grant(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    launch = LaunchToken(
+        token="runner-report-pending-1234567890",
+        user_id=999,
+        auth_code_id=999,
+        platform_key="amazon",
+        tool_id="tool_listing_script",
+        script_key="amazon.listing_script.v1",
+        device_id="device-report",
+        expires_at=datetime.now() + timedelta(minutes=5),
+        status="pending",
+        execution_mode="single",
+    )
+    db_session.add(launch)
+    await db_session.commit()
+
+    response = await client.post("/api/executions/report", json={
+        "token": launch.token,
+        "run_id": "local-run-report-2",
+        "status": "failed",
+        "error_code": "PAGE_CHANGED",
+        "completed_steps": 2,
+    })
+
+    assert response.status_code == 409

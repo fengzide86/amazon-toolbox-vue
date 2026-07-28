@@ -51,6 +51,9 @@ class EmbeddedBrowserHost {
     if (action === 'browser.prepare') return this.prepare(guest);
     if (action === 'browser.navigate') return this.navigate(guest, payload.url);
     if (action === 'browser.inspect') return this.inspect(guest);
+    if (action === 'browser.scan') return this.scan(guest);
+    if (action === 'browser.action') return this.action(guest, payload);
+    if (action === 'browser.detect-interruption') return this.detectInterruption(guest);
     if (action === 'browser.highlight') return this.highlight(guest);
     if (action === 'browser.screenshot') return this.screenshot(guest);
     if (action === 'browser.wait') return this.wait(payload.ms);
@@ -229,6 +232,109 @@ class EmbeddedBrowserHost {
       links: document.links.length,
       headings: Array.from(document.querySelectorAll('h1, h2')).slice(0, 5).map(node => node.innerText.trim()).filter(Boolean)
     }))()`;
+    return guest.executeJavaScript(expression, true);
+  }
+
+  async scan(guest: WebContents): Promise<unknown> {
+    await this.prepare(guest);
+    const expression = `(() => {
+      const normalize = value => String(value || '').replace(/\\s+/g, ' ').trim().slice(0, 180);
+      const labelFor = element => {
+        if (element.labels?.length) return normalize(Array.from(element.labels).map(item => item.textContent).join(' '));
+        const id = element.getAttribute('id');
+        if (id) return normalize(document.querySelector('label[for="' + CSS.escape(id) + '"]')?.textContent);
+        return normalize(element.closest('label')?.textContent);
+      };
+      const nodes = Array.from(document.querySelectorAll('input, textarea, select, button, [role="button"], a[href]')).slice(0, 500);
+      return {
+        schemaVersion: 1,
+        title: normalize(document.title),
+        path: location.pathname,
+        headings: Array.from(document.querySelectorAll('h1, h2, h3')).slice(0, 30).map(node => normalize(node.textContent)).filter(Boolean),
+        forms: Array.from(document.forms).map((form, index) => ({ index, id: normalize(form.id), name: normalize(form.getAttribute('name')), method: form.method, actionPath: (() => { try { return new URL(form.action).pathname; } catch { return ''; } })() })),
+        controls: nodes.map((element, index) => ({
+          index, tag: element.tagName.toLowerCase(), type: element.getAttribute('type') || '', id: normalize(element.id),
+          name: normalize(element.getAttribute('name')), testId: normalize(element.getAttribute('data-testid') || element.getAttribute('data-test')),
+          role: normalize(element.getAttribute('role')), label: labelFor(element), placeholder: normalize(element.getAttribute('placeholder')),
+          text: normalize(element.textContent), hrefPath: element.tagName === 'A' ? (() => { try { return new URL(element.href).pathname; } catch { return ''; } })() : ''
+        }))
+      };
+    })()`;
+    return guest.executeJavaScript(expression, true);
+  }
+
+  async action(guest: WebContents, payload: Record<string, unknown>): Promise<unknown> {
+    await this.prepare(guest);
+    const serialized = JSON.stringify({ action: payload.action || {}, input: payload.input || {} })
+      .replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+    const expression = `(async payload => {
+      const action = payload.action || {};
+      const input = payload.input || {};
+      const value = action.inputKey ? input[action.inputKey] : action.value;
+      if (action.inputKey && action.required !== false && !action.optional && (value === undefined || value === null || value === '')) {
+        const error = new Error('缺少必填参数：' + (action.title || action.inputKey)); error.code = 'INPUT_REQUIRED'; throw error;
+      }
+      const visible = element => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+      const normalize = value => String(value || '').replace(/\\s+/g, ' ').trim();
+      const byCandidate = candidate => {
+        const strategy = candidate.strategy; const target = String(candidate.value || ''); let matches = [];
+        try {
+          if (strategy === 'css') matches = Array.from(document.querySelectorAll(target));
+          else if (strategy === 'id') matches = [document.getElementById(target)].filter(Boolean);
+          else if (strategy === 'name') matches = Array.from(document.getElementsByName(target));
+          else if (strategy === 'testId') matches = Array.from(document.querySelectorAll('[data-testid="' + CSS.escape(target) + '"],[data-test="' + CSS.escape(target) + '"]'));
+          else if (strategy === 'placeholder') matches = Array.from(document.querySelectorAll('[placeholder]')).filter(el => normalize(el.getAttribute('placeholder')).includes(target));
+          else if (strategy === 'label') {
+            const labels = Array.from(document.querySelectorAll('label')).filter(el => normalize(el.textContent).includes(target));
+            matches = labels.flatMap(el => { const id = el.getAttribute('for'); return [id ? document.getElementById(id) : el.querySelector('input,textarea,select,button')].filter(Boolean); });
+          } else if (strategy === 'role') {
+            const role = target; const roleSelector = role === 'button' ? 'button,input[type="button"],input[type="submit"],[role="button"]' : '[role="' + CSS.escape(role) + '"]';
+            matches = Array.from(document.querySelectorAll(roleSelector)).filter(el => !candidate.name || normalize(el.textContent || el.value).includes(candidate.name));
+          } else if (strategy === 'text') matches = Array.from(document.querySelectorAll('button,a,[role="button"],span,div')).filter(el => normalize(el.textContent) === target || normalize(el.textContent).includes(target));
+        } catch {}
+        return matches.find(visible) || null;
+      };
+      const deadline = Date.now() + Math.min(Math.max(Number(action.timeoutMs) || 8000, 500), 30000);
+      let element = null;
+      while (!element && Date.now() < deadline) {
+        for (const candidate of action.selectors || []) { element = byCandidate(candidate); if (element) break; }
+        if (!element) await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      if (!element) {
+        if (action.optional) return { skipped: true, optional: true };
+        const error = new Error('页面中没有找到“' + (action.title || action.id || '目标控件') + '”'); error.code = 'SELECTOR_NOT_FOUND'; throw error;
+      }
+      element.scrollIntoView({ block: 'center', inline: 'nearest' });
+      if (action.kind === 'fill') {
+        const proto = element.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(proto, 'value')?.set; if (setter) setter.call(element, String(value ?? '')); else element.value = String(value ?? '');
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: String(value ?? '') })); element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (action.kind === 'select') {
+        const option = Array.from(element.options || []).find(item => item.value === String(value) || normalize(item.textContent).includes(String(value)));
+        if (!option) { const error = new Error('下拉选项不存在：' + value); error.code = 'OPTION_NOT_FOUND'; throw error; }
+        element.value = option.value; element.dispatchEvent(new Event('input', { bubbles: true })); element.dispatchEvent(new Event('change', { bubbles: true }));
+      } else if (action.kind === 'click') element.click();
+      else if (action.kind === 'check') { element.checked = Boolean(value ?? true); element.dispatchEvent(new Event('change', { bubbles: true })); }
+      else if (action.kind === 'waitFor') return { visible: true };
+      else if (action.kind === 'assertText') { const actual = normalize(element.textContent || element.value); const expected = normalize(value); if (expected && !actual.includes(expected)) { const error = new Error('结果核验失败：页面未出现“' + expected + '”'); error.code = 'RESULT_NOT_CONFIRMED'; throw error; } return { text: actual.slice(0, 500) }; }
+      else if (action.kind === 'upload') { const error = new Error('嵌入浏览器不支持自动上传，请切换独立浏览器执行'); error.code = 'UPLOAD_REQUIRES_PLAYWRIGHT'; throw error; }
+      else { const error = new Error('不支持的动作类型：' + action.kind); error.code = 'ACTION_UNSUPPORTED'; throw error; }
+      return { completed: true, actionId: action.id };
+    })(${serialized})`;
+    return guest.executeJavaScript(expression, true);
+  }
+
+  async detectInterruption(guest: WebContents): Promise<unknown> {
+    await this.prepare(guest);
+    const expression = `(() => {
+      const url = location.href.toLowerCase();
+      const visible = element => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+      if (/\\/(login|signin|sign-in|auth)(\\/|\\?|$)/.test(url) || Array.from(document.querySelectorAll('input[type="password"]')).some(visible)) return { type:'login', title:'需要登录平台', instruction:'请完成账号登录，工具不会读取或上传密码。' };
+      if (Array.from(document.querySelectorAll('iframe[src*="captcha" i],[class*="captcha" i],[id*="captcha" i],textarea[name="g-recaptcha-response"]')).some(visible)) return { type:'captcha', title:'需要完成验证码', instruction:'请手动完成页面验证码，然后返回工具箱继续。' };
+      if (Array.from(document.querySelectorAll('input[autocomplete="one-time-code"],input[name*="otp" i],input[id*="otp" i]')).some(visible)) return { type:'two_factor', title:'需要二次验证', instruction:'请在页面完成短信或动态码验证。' };
+      const text = (document.body?.innerText || '').slice(0,20000); if (/请求过于频繁|访问频率过高|稍后再试|too many requests|rate limit/i.test(text)) { const error = new Error('平台提示访问频率受限，任务已停止'); error.code='PLATFORM_RATE_LIMITED'; throw error; }
+      return null;
+    })()`;
     return guest.executeJavaScript(expression, true);
   }
 

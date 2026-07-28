@@ -52,6 +52,10 @@
         <PackageCheck :size="14" class="menu-icon" />
         <span class="menu-label">应用更新</span>
       </router-link>
+      <router-link v-if="can('settings.manage')" to="/admin/freight-rates" class="menu-nav-item" active-class="is-active">
+        <Truck :size="14" class="menu-icon" />
+        <span class="menu-label">物流费率中心</span>
+      </router-link>
       <router-link v-if="can('settings.manage')" to="/admin/settings" class="menu-nav-item" active-class="is-active">
         <Settings :size="14" class="menu-icon" />
         <span class="menu-label">系统设置</span>
@@ -71,7 +75,7 @@ import { authService } from '@/utils/auth'
 import { hasStaffPermission, staffRoleLabel, type StaffPermission } from '@/features/auth/permissions'
 import {
   LayoutDashboard, Key, BriefcaseBusiness, Receipt, Percent, Users, Wrench,
-  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser
+  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser, Truck
 } from '@lucide/vue'
 
 const role = computed(() => authService.getRole())
@@ -98,7 +102,7 @@ const can = (permission: StaffPermission): boolean => hasStaffPermission(role.va
 }
 
 .sidebar-brand-zone {
-  height: var(--header-height);
+  height: var(--shell-header-height, 88px);
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -108,19 +112,19 @@ const can = (permission: StaffPermission): boolean => hasStaffPermission(role.va
 }
 
 .brand-badge {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   background: var(--color-primary);
   color: white;
   font-size:var(--type-meta);
   font-weight: 700;
-  border-radius: 9px;
+  border-radius: 10px;
   box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
 }
 
-.brand-text { display:grid; gap:1px; color: var(--color-text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+.brand-text { display:grid; gap:2px; color: var(--color-text); font-size: 13px; font-weight: 750; letter-spacing: -.01em; }
 .brand-text small { color: var(--color-text-tertiary); font-size: var(--type-micro); font-weight: 700; letter-spacing: .08em; }
 
 .sidebar-menu-nav {
@@ -159,6 +163,7 @@ const can = (permission: StaffPermission): boolean => hasStaffPermission(role.va
 .menu-nav-item:hover .menu-label { color: var(--color-text); }
 
 .menu-nav-item.is-active { background: var(--color-primary-soft); }
+.menu-nav-item.is-active { box-shadow: inset 0 0 0 1px rgba(45, 95, 202, .045); }
 
 .menu-nav-item.is-active .menu-icon,
 .menu-nav-item.is-active .menu-label { color: var(--color-primary); font-weight: 700; }

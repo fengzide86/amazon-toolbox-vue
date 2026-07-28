@@ -13,6 +13,8 @@ const { EmbeddedBrowserHost } = require('./automation/embedded-browser-host.cjs'
 const { EmbeddedBrowserHostManager } = require('./automation/embedded-browser-host-manager.cjs');
 const { BatchCoordinator } = require('./automation/batch-coordinator.cjs');
 const { parseBatchFile, writeBatchErrors } = require('./automation/batch-importer.cjs');
+const { parseFreightWorkbook } = require('./freight/rate-pack.cjs');
+const { quoteFreight } = require('../src/shared/freight/rate-engine.js');
 const toolSigningConfig = require('./tool-signing-config.cjs');
 const packageMetadata = require('../../package.json');
 const { resolveRuntimeConfig } = require('./core/runtime-config.cjs');
@@ -40,6 +42,7 @@ interface RunnerLike {
 
 interface CoordinatorLike {
   storeImport(parsed: unknown): unknown;
+  remapImportItems(importId: string, itemIds: string[]): unknown;
   create(payload: UnknownRecord): unknown;
   startItem(itemId: string, tool: UnknownRecord): Promise<unknown>;
   failProvision(itemId: string, message?: string): unknown;
@@ -77,6 +80,8 @@ let mainWindow: BrowserWindowType | null = null;
 let automationRunner: RunnerLike | null = null;
 let batchCoordinator: CoordinatorLike | null = null;
 let selectedBatchImportPath: string | null = null;
+let selectedFreightWorkbookPath: string | null = null;
+let defaultFreightPackCache: { mtimeMs: number; parsed: UnknownRecord } | null = null;
 let selectedBatchItemId: string | null = null;
 let allowWindowClose = false;
 let updateManager: UpdateManagerLike | null = null;
@@ -153,7 +158,11 @@ if (!gotTheLock) {
 
 // 云端控制面地址。配置为远程 HTTPS 后，桌面端不会再启动打包的 Python 后端。
 const INTERNAL_PRODUCTION = app.isPackaged && packageMetadata.toolbox?.distribution === 'internal';
-const AUTOMATION_RUNTIME_ENABLED = !INTERNAL_PRODUCTION;
+// The packaged client may carry the local Runner while the server still keeps
+// every catalog entry in demo_only mode. Live execution remains guarded by the
+// catalog capability, one-time launch grant, signed manifest and host allowlist.
+const AUTOMATION_RUNTIME_ENABLED = packageMetadata.toolbox?.automationRuntime === true
+  || process.env.TOOLBOX_AUTOMATION_ENABLED === 'true';
 const runtimeConfig = resolveRuntimeConfig(
   process.env,
   packageMetadata,
@@ -290,6 +299,7 @@ function getAutomationRunner(): RunnerLike {
       TOOLBOX_PROFILE_ROOT: path.join(app.getPath('userData'), 'automation-profiles'),
       TOOLBOX_ARTIFACT_ROOT: path.join(app.getPath('userData'), 'automation-artifacts'),
       PLAYWRIGHT_BROWSERS_PATH: path.join(RUNTIME_ROOT, 'playwright-browsers'),
+      TOOLBOX_FREIGHT_RATE_WORKBOOK: defaultFreightWorkbookPath(),
       TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64: process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || toolSigningConfig.publicKeyB64,
     },
     onEvent: (rawEvent: unknown) => {
@@ -355,6 +365,7 @@ function runnerEnvironment(): NodeJS.ProcessEnv {
     TOOLBOX_PROFILE_ROOT: path.join(app.getPath('userData'), 'automation-profiles'),
     TOOLBOX_ARTIFACT_ROOT: path.join(app.getPath('userData'), 'automation-artifacts'),
     PLAYWRIGHT_BROWSERS_PATH: path.join(RUNTIME_ROOT, 'playwright-browsers'),
+    TOOLBOX_FREIGHT_RATE_WORKBOOK: defaultFreightWorkbookPath(),
     TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64: process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || toolSigningConfig.publicKeyB64,
   };
 }
@@ -378,6 +389,35 @@ function getBatchCoordinator(): CoordinatorLike {
   return batchCoordinator;
 }
 
+registerAutomationHandle('batch:store-demo-import', (_event: IpcInvokeEvent, rawPayload: unknown) => {
+  const payload = asRecord(rawPayload);
+  const rawRows = Array.isArray(payload.rows) ? payload.rows.slice(0, 100) : [];
+  if (!rawRows.length) throw new Error('本地演示项为空');
+  const importId = typeof payload.importId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(payload.importId)
+    ? payload.importId
+    : `demo_import_${Date.now()}`;
+  return getBatchCoordinator().storeImport({
+    importId,
+    fileName: '本地交互演示数据',
+    rows: rawRows.map((value, index) => {
+      const row = asRecord(value);
+      const itemId = typeof row.itemId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(row.itemId)
+        ? row.itemId
+        : `demo_item_${index + 1}`;
+      const accountLabel = typeof row.accountLabel === 'string'
+        ? row.accountLabel.slice(0, 80)
+        : `演示项 ${index + 1}`;
+      return {
+        itemId,
+        input: asRecord(row.input),
+        preview: { account_label: accountLabel },
+        accountLabelMasked: accountLabel,
+      };
+    }),
+    errors: [],
+  });
+});
+
 registerAutomationHandle('batch:select-import-file', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
   const options = asRecord(rawOptions);
   const dialogOptions: import('electron').OpenDialogOptions = {
@@ -390,14 +430,45 @@ registerAutomationHandle('batch:select-import-file', async (_event: IpcInvokeEve
     : await dialog.showOpenDialog(dialogOptions);
   if (result.canceled || !result.filePaths[0]) return null;
   selectedBatchImportPath = result.filePaths[0];
-  const parsed = await parseBatchFile(selectedBatchImportPath, Array.isArray(options.schema) ? options.schema : [], Number(options.maxRows) || 50);
+  const parsed = await parseBatchFile(selectedBatchImportPath, options);
   return getBatchCoordinator().storeImport(parsed);
 });
 registerAutomationHandle('batch:parse-import-file', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
   const options = asRecord(rawOptions);
   if (!selectedBatchImportPath) throw new Error('请先选择批量数据文件');
-  const parsed = await parseBatchFile(selectedBatchImportPath, Array.isArray(options.schema) ? options.schema : [], Number(options.maxRows) || 50);
+  const parsed = await parseBatchFile(selectedBatchImportPath, options);
   return getBatchCoordinator().storeImport(parsed);
+});
+registerAutomationHandle('batch:load-sample-import', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
+  const options = asRecord(rawOptions);
+  const templatePath = app.isPackaged
+    ? path.join(process.resourcesPath, 'templates', 'B端批量自动化测试数据.xlsx')
+    : path.join(app.getAppPath(), 'resources', 'templates', 'B端批量自动化测试数据.xlsx');
+  if (!fs.existsSync(templatePath)) throw new Error('内置测试 Excel 不存在，请更新桌面客户端');
+  const parsed = await parseBatchFile(templatePath, options);
+  return getBatchCoordinator().storeImport(parsed);
+});
+registerAutomationHandle('batch:save-sample-template', async () => {
+  const templatePath = app.isPackaged
+    ? path.join(process.resourcesPath, 'templates', 'B端批量自动化测试数据.xlsx')
+    : path.join(app.getAppPath(), 'resources', 'templates', 'B端批量自动化测试数据.xlsx');
+  if (!fs.existsSync(templatePath)) throw new Error('内置测试 Excel 不存在，请更新桌面客户端');
+  const dialogOptions: import('electron').SaveDialogOptions = {
+    title: '保存 B 端测试 Excel',
+    defaultPath: 'B端批量自动化测试数据.xlsx',
+    filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }],
+  };
+  const result = mainWindow
+    ? await dialog.showSaveDialog(mainWindow, dialogOptions)
+    : await dialog.showSaveDialog(dialogOptions);
+  if (result.canceled || !result.filePath) return null;
+  fs.copyFileSync(templatePath, result.filePath);
+  return { filePath: result.filePath };
+});
+registerAutomationHandle('batch:remap-import-items', (_event: IpcInvokeEvent, rawPayload: unknown) => {
+  const payload = asRecord(rawPayload);
+  const itemIds = Array.isArray(payload.itemIds) ? payload.itemIds.map(value => String(value || '')).filter(Boolean) : [];
+  return getBatchCoordinator().remapImportItems(String(payload.importId || ''), itemIds);
 });
 registerAutomationHandle('batch:export-import-errors', async (_event: IpcInvokeEvent, rawErrors: unknown) => {
   const errors = Array.isArray(rawErrors) ? rawErrors : [];
@@ -441,6 +512,48 @@ registerAutomationHandle('batch:register-browser', (event: IpcInvokeEvent, rawIt
   return getBatchCoordinator().registerBrowser(itemId, guest);
 });
 registerAutomationHandle('batch:unregister-browser', (_event: IpcInvokeEvent, itemId: unknown) => getBatchCoordinator().unregisterBrowser(String(itemId || '')));
+
+function defaultFreightWorkbookPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'rates', 'FreightTemplate_v2.xlsx')
+    : path.join(app.getAppPath(), 'resources', 'rates', 'FreightTemplate_v2.xlsx');
+}
+
+async function loadDefaultFreightPack(): Promise<UnknownRecord> {
+  const filePath = defaultFreightWorkbookPath();
+  if (!fs.existsSync(filePath)) throw new Error('内置费率表不存在，请更新桌面客户端');
+  const mtimeMs = fs.statSync(filePath).mtimeMs;
+  const cached = defaultFreightPackCache;
+  if (cached && cached.mtimeMs === mtimeMs) return cached.parsed;
+  const parsed = await parseFreightWorkbook(filePath, { id: 'competition-freight', version: '1.0.0', exchangeRateCnyPerUsd: 7 });
+  defaultFreightPackCache = { mtimeMs, parsed };
+  return parsed;
+}
+
+registerAutomationHandle('freight:get-default-pack', () => loadDefaultFreightPack());
+registerAutomationHandle('freight:parse-workbook', async (_event: IpcInvokeEvent, rawOptions: unknown) => {
+  const options = asRecord(rawOptions);
+  const dialogOptions: import('electron').OpenDialogOptions = {
+    title: '选择物流费率工作簿',
+    properties: ['openFile'],
+    filters: [{ name: 'Excel 工作簿', extensions: ['xlsx'] }],
+  };
+  const result = mainWindow
+    ? await dialog.showOpenDialog(mainWindow, dialogOptions)
+    : await dialog.showOpenDialog(dialogOptions);
+  if (result.canceled || !result.filePaths[0]) return null;
+  selectedFreightWorkbookPath = result.filePaths[0];
+  return parseFreightWorkbook(selectedFreightWorkbookPath, options);
+});
+registerAutomationHandle('freight:reparse-workbook', (_event: IpcInvokeEvent, rawOptions: unknown) => {
+  if (!selectedFreightWorkbookPath) throw new Error('请先选择物流费率工作簿');
+  return parseFreightWorkbook(selectedFreightWorkbookPath, asRecord(rawOptions));
+});
+registerAutomationHandle('freight:quote', async (_event: IpcInvokeEvent, rawPayload: unknown) => {
+  const payload = asRecord(rawPayload);
+  const parsed = payload.pack ? { pack: payload.pack } : await loadDefaultFreightPack();
+  return quoteFreight(asRecord(parsed).pack, asRecord(payload.request));
+});
 
 async function cleanupAutomationRunner(): Promise<void> {
   embeddedBrowserHost.release();
@@ -520,10 +633,14 @@ function createWindow(): void {
 
   if (isDev) {
     // 开发模式：连接 Vite 开发服务器，支持热更新
-    console.log('[Dev] 连接 Vite 开发服务器 http://localhost:3000');
-    void window.loadURL('http://localhost:3000');
-    // 开发模式打开 DevTools
-    window.webContents.openDevTools();
+    const startRoute = process.env.TOOLBOX_START_ROUTE === '/admin/login' ? '#/admin/login' : '';
+    const developmentUrl = `http://localhost:3000/${startRoute}`;
+    console.log(`[Dev] 连接 Vite 开发服务器 ${developmentUrl}`);
+    void window.loadURL(developmentUrl);
+    // 日常预览保持完整应用宽度；仅在显式调试时打开独立 DevTools。
+    if (process.env.TOOLBOX_OPEN_DEVTOOLS === '1') {
+      window.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     // 生产模式：通过安全自定义协议加载，避免主界面使用 file://。
     void window.loadURL('app://toolbox/index.html');

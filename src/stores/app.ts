@@ -15,10 +15,30 @@ export interface ActiveTool extends UnknownRecord {
   module?: string
   category?: string
   platformKey?: string
+  capabilityKey?: string
   targetUrl?: string
   executionMode?: 'demo' | 'live'
   scenarioId?: string
   demoRunId?: string
+  launchGrant?: {
+    token?: string
+    scriptKey?: string
+    runnerApiVersion?: number
+    expiresAt?: string
+    expiresIn?: number
+    toolVersion?: string
+    toolManifest?: unknown
+    toolSignature?: string
+    signingKeyId?: string
+    signatureRequired?: boolean
+  }
+  executionContext?: {
+    mode?: 'single' | 'batch'
+    sessionId?: string
+    batchId?: string
+    itemId?: string
+    input?: UnknownRecord
+  }
 }
 
 export const useAppStore = defineStore('app', () => {

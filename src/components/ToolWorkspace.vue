@@ -8,7 +8,7 @@
         <div class="tool-mark"><Zap :size="18" /></div>
         <div class="tool-identity">
           <h1>{{ toolName }}</h1>
-          <p>{{ platformName }} · 演示模式</p>
+          <p>{{ platformName }} · {{ isDemo ? '本地交互演示' : '比赛模拟平台自动执行' }}</p>
         </div>
       </div>
 
@@ -17,14 +17,13 @@
           <span class="status-dot"></span>{{ customerStatusText }}
         </span>
         <button v-if="isActiveRun" class="control-button danger" type="button" @click="stopRun">
-          <Square :size="14" />停止演示
+          <Square :size="14" />{{ isDemo ? '停止演示' : '停止执行' }}
         </button>
         <button v-else-if="isTerminal" class="control-button" type="button" :disabled="restarting" @click="restartRun">
           <LoaderCircle v-if="restarting" :size="14" class="spin" />
           <RotateCcw v-else :size="14" />
-          {{ restarting ? '正在打开…' : '重新演示' }}
+          {{ restarting ? '正在打开…' : (isDemo ? '重新演示' : '重新执行') }}
         </button>
-        <button v-if="isTerminal" class="control-button" type="button" @click="closeWorkspace">返回工具箱</button>
       </div>
     </header>
 
@@ -34,18 +33,27 @@
           <div class="browser-toolbar">
             <LockKeyhole :size="14" />
             <span>{{ displayUrl }}</span>
-            <span class="browser-note">模拟页面</span>
+            <span class="browser-note">{{ isDemo ? '本地沙盒' : '独立本地浏览器' }}</span>
           </div>
 
           <div class="browser-viewport">
             <div v-if="browserLoading" class="browser-loading">
               <span class="loading-orbit"><LoaderCircle :size="25" class="spin" /></span>
-              <strong>正在准备模拟页面</strong>
-              <p>准备好后会自动开始演示</p>
+              <strong>{{ isDemo ? '正在准备本地交互沙盒' : '正在启动本地自动化浏览器' }}</strong>
+              <p>准备完成后会自动执行，遇到登录或验证时才会暂停</p>
               <span class="loading-line"></span>
             </div>
 
-            <div class="browser-mock" aria-label="工具模拟演示页面">
+            <webview
+              v-if="isDesktop"
+              class="workspace-webview"
+              src="about:blank"
+              partition="persist:tool-workspace"
+              aria-label="应用内自动化浏览器"
+              @dom-ready="registerWorkspaceBrowser"
+            />
+
+            <div v-else class="browser-mock" aria-label="工具模拟演示页面">
               <div class="mock-site-header">
                 <strong>{{ platformShortName }}</strong><span></span><i></i>
               </div>
@@ -54,7 +62,7 @@
                 <div class="mock-content">
                   <small>控制台 / {{ toolName }}</small>
                   <h2>{{ stageItems[currentStageIndex]?.label }}</h2>
-                  <p>这是模拟界面，仅用于展示工具流程。</p>
+                  <p>{{ isDemo ? '可见浏览器中正在真实填写、点击并核验本地沙盒。' : '工具正在独立浏览器中操作比赛模拟平台。' }}</p>
                   <div class="mock-cards"><i v-for="item in 3" :key="item"></i></div>
                   <div class="mock-table"><span v-for="item in 6" :key="item"></span></div>
                 </div>
@@ -70,7 +78,7 @@
 
       <aside class="progress-panel">
         <div class="demo-disclosure" role="note">
-          演示模式：不会登录、读取或修改真实店铺数据。
+          {{ isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
         </div>
         <template v-if="!isTerminal">
           <header class="panel-heading">
@@ -98,25 +106,36 @@
 
           <div v-else class="running-note">
             <LoaderCircle :size="17" class="spin" />
-            <div><strong>{{ runningMessage }}</strong><span>演示结果不代表真实任务结果</span></div>
+            <div><strong>{{ runningMessage }}</strong><span>{{ isDemo ? '结果只代表本地沙盒操作成功' : '只有通过平台结果核验才会标记成功' }}</span></div>
           </div>
         </template>
 
         <div v-else-if="runStatus === 'completed'" class="result-card success">
           <div class="result-icon"><Check :size="28" /></div>
-          <h2>演示流程已走完</h2>
-          <p>仅表示模拟步骤播放完成，不代表平台任务执行成功。</p>
-          <button class="primary-action" type="button" @click="closeWorkspace">体验其他演示</button>
-          <button class="secondary-action" type="button" @click="restartRun">重新体验演示</button>
+          <h2>{{ isDemo ? '交互演示已完成' : '平台任务执行成功' }}</h2>
+          <p>{{ isDemo ? '本地浏览器已完成真实填写、点击和结果核验。' : '已完成页面操作并通过比赛模拟平台结果核验。' }}</p>
+          <div class="result-proof-grid">
+            <div><span>适配器版本</span><strong>v{{ adapterVersion }}</strong></div>
+            <div><span>结果核验</span><strong>PASS</strong></div>
+            <div><span>证据截图</span><strong>{{ evidenceSummary.screenshot ? '已生成' : '本地记录' }}</strong></div>
+          </div>
+          <section v-if="freightQuote?.selected" class="freight-result">
+            <header><div><span>推荐物流方案</span><strong>{{ freightQuote.selected.carrierName }}</strong></div><b>¥{{ freightQuote.selected.totalCny?.toFixed(2) }}<small> / ${{ freightQuote.selected.totalUsd?.toFixed(2) }}</small></b></header>
+            <div class="freight-breakdown"><span>计费重 <b>{{ freightQuote.selected.billableWeightKg?.toFixed(2) }}kg</b></span><span>基础运费 <b>¥{{ freightQuote.selected.baseFreightCny?.toFixed(2) }}</b></span><span>固定费 <b>¥{{ freightQuote.selected.fixedFeeCny?.toFixed(2) }}</b></span><span>附加费 <b>¥{{ freightQuote.selected.surchargeCny?.toFixed(2) }}</b></span></div>
+            <small>费率包 {{ freightQuote.ratePackVersion }} · 汇率 {{ freightQuote.exchangeRateCnyPerUsd }} · 已比较 {{ freightQuote.candidates.length }} 个渠道</small>
+          </section>
+          <details class="execution-evidence"><summary>查看执行证据</summary><p>页面指纹：{{ evidenceSummary.fingerprint || '本地沙盒' }} · 签名：{{ evidenceSummary.signatureVerified ? '已验证' : (isDemo ? '内置演示适配器' : '等待验证记录') }}</p></details>
+          <button class="primary-action" type="button" @click="closeWorkspace">返回工具箱</button>
+          <button class="secondary-action" type="button" @click="restartRun">{{ isDemo ? '重新交互演示' : '使用新授权重新执行' }}</button>
         </div>
 
         <div v-else-if="runStatus === 'failed'" class="result-card failed">
           <div class="result-icon"><CircleAlert :size="27" /></div>
-          <h2>演示加载异常</h2>
+          <h2>{{ failureTitle }}</h2>
           <p>{{ failureDescription }}</p>
           <div class="problem-code">问题编号：{{ problemCode }}</div>
           <button class="primary-action" type="button" @click="restartRun">
-            重新加载演示
+            {{ isDemo ? '重新加载演示' : '重新获取授权并执行' }}
           </button>
           <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
           <details class="technical-details">
@@ -128,9 +147,9 @@
 
         <div v-else class="result-card cancelled">
           <div class="result-icon"><Square :size="23" /></div>
-          <h2>已退出演示</h2>
-          <p>本次模拟流程已经停止，不影响任何真实平台数据。</p>
-          <button class="primary-action" type="button" @click="restartRun">重新演示</button>
+          <h2>{{ isDemo ? '已退出演示' : '自动处理已停止' }}</h2>
+          <p>{{ isDemo ? '本地交互沙盒已经停止，不影响外部数据。' : '本次浏览器操作已安全停止。' }}</p>
+          <button class="primary-action" type="button" @click="restartRun">{{ isDemo ? '重新演示' : '重新执行' }}</button>
           <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
         </div>
       </aside>
@@ -143,11 +162,12 @@ import { ArrowLeft, Check, CircleAlert, LoaderCircle, LockKeyhole, RotateCcw, Sq
 import { useSingleAutomationRun } from '@/features/automation/useSingleAutomationRun'
 
 const {
-  browserLoading, restarting, stageItems, toolName,
+  browserLoading, restarting, stageItems, toolName, isDemo, isDesktop,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
+  freightQuote, adapterVersion, evidenceSummary,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
-  failureDescription, technicalError,
-  stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport,
+  failureTitle, failureDescription, technicalError,
+  stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport, registerWorkspaceBrowser,
 } = useSingleAutomationRun()
 </script>
 
@@ -182,13 +202,13 @@ const {
 }
 
 .workspace-topbar {
-  height: 64px;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 0 20px;
+  gap: 12px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   animation: workspaceHeaderIn 360ms var(--ease-emphasized) 40ms both;
@@ -198,12 +218,12 @@ const {
 .workspace-actions {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 7px;
 }
 
 .icon-button {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border: 0;
@@ -214,8 +234,9 @@ const {
 }
 
 .icon-button:hover { background: var(--color-primary-soft); color: var(--color-primary); }
-.tool-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; color: white; background: var(--color-primary); box-shadow: 0 7px 16px rgba(45,95,202,.18); }
-.tool-identity h1 { margin: 0; font-size: 14px; }
+.tool-mark { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; color: white; background: var(--color-primary); box-shadow: 0 6px 14px rgba(45,95,202,.16); }
+.tool-identity { min-width: 0; }
+.tool-identity h1 { max-width: min(36vw, 420px); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
 .tool-identity p { margin: 2px 0 0; color: var(--color-text-secondary); font-size:var(--type-meta); }
 
 .status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; color: var(--color-primary); background: var(--color-primary-soft); font-size:var(--type-control); font-weight: 700; }
@@ -230,19 +251,19 @@ const {
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .is-running .status-dot, .is-preparing .status-dot { animation: ambientPulse var(--motion-ambient) ease-in-out infinite; }
 
-.control-button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 11px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); background: white; font-size:var(--type-control); font-weight: 700; cursor: pointer; }
+.control-button { min-height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); background: white; font-size:var(--type-control); font-weight: 700; cursor:pointer; }
 .control-button:hover { border-color: var(--color-primary-muted); background: var(--color-surface-soft); }
 .control-button.danger { color: var(--color-danger); }
 
-.workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 336px; gap: 12px; padding: 12px; animation: workspaceBodyIn 400ms var(--ease-emphasized) 80ms both; }
+.workspace-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 326px; gap: 10px; padding: 10px; animation: workspaceBodyIn 400ms var(--ease-emphasized) 80ms both; }
 .browser-stage { min-width: 0; min-height: 0; }
 .browser-frame, .progress-panel { height: 100%; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-low); }
 .browser-frame { display: flex; flex-direction: column; }
-.browser-toolbar { height: 44px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); background: var(--color-surface-soft); font-size:var(--type-control); }
+.browser-toolbar { height: 38px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--color-border); color: var(--color-text-secondary); background: var(--color-surface-soft); font-size:var(--type-meta); }
 .browser-toolbar > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.browser-note { margin-left: auto; color: var(--color-primary-hover); font-weight: 700; }
+.browser-note { margin-left: auto; color: var(--color-primary); font-weight: 700; }
 .browser-viewport { position: relative; flex: 1; min-height: 0; }
-.workspace-webview { width: 100%; height: 100%; display: flex; }
+.workspace-webview { position:absolute; inset:0; width: 100%; height: 100%; display: flex; border:0; background:#fff; }
 .browser-loading { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; background: rgba(252,252,253,.97); }
 .browser-loading strong { font-size: var(--type-card); color: var(--color-text); }
 .browser-loading p { margin: 0; font-size: var(--type-control); color: var(--color-text-secondary); }
@@ -259,7 +280,7 @@ const {
 
 .browser-mock { height: 100%; background: #f5f6f8; }
 .mock-site-header { height: 56px; display: flex; align-items: center; gap: 24px; padding: 0 22px; color: white; background: #111827; }
-.mock-site-header strong { color: var(--color-warning); }
+.mock-site-header strong { color: var(--color-execution-text); }
 .mock-site-header span { width: 38%; height: 28px; border-radius: 6px; background: white; }
 .mock-site-header i { width: 28px; height: 28px; margin-left: auto; border-radius: 50%; background: #475569; }
 .mock-page { height: calc(100% - 56px); display: flex; }
@@ -274,8 +295,8 @@ const {
 .mock-table { margin-top: 18px; padding: 14px 18px; border: 1px solid var(--color-border); border-radius: 9px; background: white; }
 .mock-table span { display: block; height: 9px; margin: 13px 0; border-radius: 5px; background: #e2e8f0; }
 
-.progress-panel { display: flex; flex-direction: column; padding: 22px; animation: workspacePanelIn 420ms var(--ease-emphasized) 130ms both; }
-.demo-disclosure { margin: -4px 0 14px; padding: 10px 11px; border: 1px solid rgba(45,95,202,.16); border-radius: 9px; color: var(--color-primary); background: var(--color-primary-soft); font-size: var(--type-meta); line-height: 1.55; }
+.progress-panel { display: flex; flex-direction: column; padding: 18px; animation: workspacePanelIn 420ms var(--ease-emphasized) 130ms both; }
+.demo-disclosure { margin: 0 0 12px; padding: 8px 10px; border: 1px solid rgba(45,95,202,.16); border-radius: 9px; color: var(--color-primary); background: var(--color-primary-soft); font-size: var(--type-meta); line-height: 1.45; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); }
 .panel-heading span { font-size: 17px; font-weight: 800; }
 .panel-heading strong { color: var(--color-primary); font-size:var(--type-meta); }
@@ -306,6 +327,8 @@ const {
 .cancelled .result-icon { color: var(--color-text-secondary); background: var(--color-surface-soft); }
 .result-card h2 { margin: 0 0 9px; font-size: 19px; }
 .result-card p { margin: 0 0 20px; color: var(--color-text-secondary); font-size:var(--type-control); line-height: 1.7; }
+.result-proof-grid{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 14px}.result-proof-grid>div{display:grid;gap:3px;padding:9px;border:1px solid var(--color-border);border-radius:9px;background:var(--color-surface-soft);text-align:left}.result-proof-grid span{color:var(--color-text-tertiary);font-size:var(--type-micro)}.result-proof-grid strong{color:var(--color-text);font-size:var(--type-meta)}
+.freight-result{width:100%;display:grid;gap:10px;margin:0 0 14px;padding:13px;border-radius:11px;color:var(--color-execution-text);background:linear-gradient(145deg,var(--color-ink),var(--color-ink-soft));text-align:left}.freight-result header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.freight-result header>div{display:grid;gap:3px}.freight-result header span,.freight-result>small{color:rgba(255,255,255,.58);font-size:var(--type-micro)}.freight-result header strong{font-size:var(--type-control)}.freight-result header>b{color:#d8c39d;font-size:19px}.freight-result header small{font-size:var(--type-meta)}.freight-breakdown{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.freight-breakdown span{display:flex;justify-content:space-between;padding:6px 7px;border:1px solid rgba(255,255,255,.08);border-radius:7px;color:rgba(255,255,255,.6);font-size:var(--type-micro)}.freight-breakdown b{color:#fff}.execution-evidence{width:100%;margin:0 0 14px;padding:9px 10px;border:1px solid var(--color-border);border-radius:9px;text-align:left}.execution-evidence summary{cursor:pointer;color:var(--color-text-secondary);font-size:var(--type-meta);font-weight:700}.execution-evidence p{margin:8px 0 0;font:var(--type-micro)/1.55 var(--font-mono);word-break:break-all}
 .problem-code { margin: -5px 0 18px; padding: 9px; border-radius: 7px; color: var(--color-text-secondary); background: var(--color-surface-soft); font-size:var(--type-meta); }
 .primary-action, .secondary-action { width: 100%; min-height: 40px; border-radius: 8px; font-size:var(--type-control); font-weight: 800; cursor: pointer; }
 .primary-action { border: 0; color: white; background: var(--color-primary); }

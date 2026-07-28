@@ -8,6 +8,7 @@ const viteUrl = 'http://127.0.0.1:3000'
 const electronCommand = process.platform === 'win32'
   ? path.join(projectRoot, 'node_modules', 'electron', 'dist', 'electron.exe')
   : path.join(projectRoot, 'node_modules', '.bin', 'electron')
+const viteEntry = path.join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js')
 
 let viteProcess
 let electronProcess
@@ -95,6 +96,9 @@ async function main() {
   if (!existsSync(electronCommand)) {
     throw new Error('Electron is not installed. Run npm ci first.')
   }
+  if (!existsSync(viteEntry)) {
+    throw new Error('Vite is not installed. Run npm ci first.')
+  }
 
   console.log('[DEV] Compiling the Electron main process...')
   const compile = npmInvocation(['run', 'electron:compile'])
@@ -104,10 +108,9 @@ async function main() {
     console.log(`[DEV] Reusing the existing Vite server at ${viteUrl}`)
   } else {
     console.log(`[DEV] Starting Vite at ${viteUrl}`)
-    const vite = npmInvocation(['run', 'dev', '--', '--host', '127.0.0.1', '--port', '3000', '--strictPort'])
     viteProcess = spawn(
-      vite.command,
-      vite.args,
+      process.execPath,
+      [viteEntry, '--mode', 'development', '--host', '127.0.0.1', '--port', '3000', '--strictPort'],
       {
         cwd: projectRoot,
         env: process.env,

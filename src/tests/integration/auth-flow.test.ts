@@ -87,6 +87,8 @@ describe('认证流程集成测试', () => {
       expect(sessionStorage.getItem('toolbox_token')).toBe('user-jwt-token')
 
       // Step 7: 验证跳转
+      await vi.advanceTimersByTimeAsync(430)
+      await flushPromises()
       expect(mockPush).toHaveBeenCalledWith('/user/tools')
     })
 
@@ -117,6 +119,8 @@ describe('认证流程集成测试', () => {
       await flushPromises()
 
       expect(wrapper.find('.success-message').exists()).toBe(false)
+      await vi.advanceTimersByTimeAsync(430)
+      await flushPromises()
       expect(mockPush).toHaveBeenCalledWith('/user/tools')
     })
   })

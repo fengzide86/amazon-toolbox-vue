@@ -7,14 +7,13 @@ import string
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy import delete, func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from core.audit import log_admin_action
 from core.dependencies import get_current_admin
-from core.exceptions import ConflictException, NotFoundException
+from core.exceptions import NotFoundException
 from core.logging import get_logger
 from database import get_db
 from models import AuthCode, AuthSeat, Device, Plan
@@ -52,6 +51,40 @@ async def _calculate_device_used(db: AsyncSession, auth_code_id: int) -> int:
     return result.scalar() or 0
 
 
+async def _build_auth_code_response(db: AsyncSession, code: AuthCode) -> AuthCodeResponse:
+    """Build the public admin shape from the persisted string-backed model."""
+    seat_used = await _calculate_seat_used(db, code.id)
+    device_used = await _calculate_device_used(db, code.id)
+    plan_result = await db.execute(
+        select(Plan.name, Plan.product_type, Plan.entitlements).where(Plan.id == code.plan_id)
+    )
+    plan_row = plan_result.first()
+    plan_name = plan_row[0] if plan_row else "未关联套餐"
+    product_type = (plan_row[1] if plan_row else None) or "consumer"
+    plan_entitlements = plan_row[2] if plan_row else None
+    return AuthCodeResponse(**{
+        "id": code.id,
+        "code": code.code,
+        "plan_id": code.plan_id,
+        "user_id": code.user_id,
+        "device_id": code.device_id,
+        "device_name": code.device_name,
+        "max_devices": code.max_devices,
+        "status": code.status,
+        "expires_at": code.expires_at,
+        "created_at": code.created_at,
+        "devices": code.devices,
+        "platform_scope": _parse_platform_scope(code.platform_scope),
+        "scene_type": code.scene_type,
+        "seat_limit": code.seat_limit,
+        "seat_used": seat_used,
+        "device_used": device_used,
+        "plan_name": plan_name,
+        "product_type": product_type,
+        "entitlements": normalize_entitlements(plan_entitlements, product_type),
+    })
+
+
 def generate_random_code(length: int = 6) -> str:
     """生成随机大写字母和数字组合"""
     chars = string.ascii_uppercase + string.digits
@@ -63,6 +96,7 @@ async def get_auth_codes(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=100),
     platform_key: str = None,
+    include_deleted: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
 ):
@@ -100,6 +134,9 @@ async def get_auth_codes(
     query = query.outerjoin(Plan, AuthCode.plan_id == Plan.id)
     
     count_query = select(func.count(AuthCode.id))
+    if not include_deleted:
+        query = query.where(AuthCode.status != "deleted")
+        count_query = count_query.where(AuthCode.status != "deleted")
     if platform_key:
         query = query.where(AuthCode.platform_scope.contains(platform_key))
         count_query = count_query.where(AuthCode.platform_scope.contains(platform_key))
@@ -161,42 +198,7 @@ async def get_auth_code_detail(
     if not code:
         raise NotFoundException("授权码不存在")
     
-    # 计算统计字段
-    seat_used = await _calculate_seat_used(db, code.id)
-    device_used = await _calculate_device_used(db, code.id)
-    plan_result = await db.execute(
-        select(Plan.name, Plan.product_type, Plan.entitlements).where(Plan.id == code.plan_id)
-    )
-    plan_row = plan_result.first()
-    plan_name = plan_row[0] if plan_row else "未关联套餐"
-    product_type = (plan_row[1] if plan_row else None) or "consumer"
-    plan_entitlements = plan_row[2] if plan_row else None
-    
-    # 构建响应
-    code_dict = {
-        "id": code.id,
-        "code": code.code,
-        "plan_id": code.plan_id,
-        "user_id": code.user_id,
-        "device_id": code.device_id,
-        "device_name": code.device_name,
-        "max_devices": code.max_devices,
-        "status": code.status,
-        "expires_at": code.expires_at,
-        "created_at": code.created_at,
-        "devices": code.devices,
-        # 1.5 新增字段
-        "platform_scope": _parse_platform_scope(code.platform_scope),
-        "scene_type": code.scene_type,
-        "seat_limit": code.seat_limit,
-        "seat_used": seat_used,
-        "device_used": device_used,
-        "plan_name": plan_name,
-        "product_type": product_type,
-        "entitlements": normalize_entitlements(plan_entitlements, product_type),
-    }
-    
-    return AuthCodeResponse(**code_dict)
+    return await _build_auth_code_response(db, code)
 
 
 @router.post("/batch-generate")
@@ -324,43 +326,44 @@ async def update_auth_code(code_id: int, req: AuthCodeUpdate, request: Request, 
         request=request,
     )
     await db.commit()
-    await db.refresh(code_obj)
     logger.info(f"更新授权码: {code_obj.code}")
     
-    return code_obj
+    return await _build_auth_code_response(db, code_obj)
 
 
 @router.delete("/{code_id}")
 async def delete_auth_code(code_id: int, request: Request, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
-    """删除授权码"""
+    """软删除授权码并撤销席位，保留关联业务与审计记录。"""
     result = await db.execute(select(AuthCode).where(AuthCode.id == code_id))
     code_obj = result.scalars().first()
     if not code_obj:
         raise NotFoundException("授权码不存在")
-    
-    try:
-        # 先删除关联的设备记录，避免外键约束失败
-        await db.execute(delete(Device).where(Device.auth_code_id == code_id))
-        await db.delete(code_obj)
-        # 审计日志
-        await log_admin_action(
-            db,
-            user_id=_admin.get("staff_id"),
-            user_name=_admin.get("username"),
-            action="delete_auth_code",
-            target_type="auth_code",
-            target_id=code_id,
-            detail={
-                "role": _admin.get("role"),
-                "before": {"code": code_obj.code, "status": code_obj.status},
-                "after": {"deleted": True},
-                "reason": None,
-            },
-            request=request,
-        )
-        await db.commit()
-        logger.info(f"删除授权码: {code_obj.code}")
+
+    if code_obj.status == "deleted":
         return {"success": True}
-    except IntegrityError as error:
-        await db.rollback()
-        raise ConflictException("该授权码存在关联数据，无法删除") from error
+
+    previous_status = code_obj.status
+    code_obj.status = "deleted"
+    await db.execute(
+        update(AuthSeat)
+        .where(AuthSeat.auth_code_id == code_id, AuthSeat.status == "active")
+        .values(status="inactive")
+    )
+    await log_admin_action(
+        db,
+        user_id=_admin.get("staff_id"),
+        user_name=_admin.get("username"),
+        action="delete_auth_code",
+        target_type="auth_code",
+        target_id=code_id,
+        detail={
+            "role": _admin.get("role"),
+            "before": {"code": code_obj.code, "status": previous_status},
+            "after": {"deleted": True, "status": "deleted"},
+            "reason": None,
+        },
+        request=request,
+    )
+    await db.commit()
+    logger.info(f"删除授权码: {code_obj.code}")
+    return {"success": True}

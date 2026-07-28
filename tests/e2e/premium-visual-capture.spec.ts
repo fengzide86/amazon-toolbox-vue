@@ -3,8 +3,13 @@ import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
 import type { UpdateSnapshot } from '../../src/shared/ipc/update-contract'
 
-const outputRoot = join(process.cwd(), 'test-results', 'visual-1.7.6')
-const widths = [1365, 1024, 768] as const
+const outputRoot = join(process.cwd(), 'test-results', 'visual-1.8.0')
+const viewports = [
+  { width: 1440, height: 900 },
+  { width: 1365, height: 768 },
+  { width: 1280, height: 800 },
+  { width: 1024, height: 768 },
+] as const
 
 const businessPlan = {
   id: 6,
@@ -60,6 +65,14 @@ const consumerUser = {
   entitlements: { desktop_notification: true },
 }
 
+const adminUser = {
+  role: 'super_admin',
+  username: 'visual-owner',
+  display_name: '视觉验收管理员',
+  status: 'active',
+  force_password_reset: false,
+}
+
 const consumerTool = {
   id: 'tool_register',
   name: '亚马逊账号自动处理',
@@ -69,6 +82,10 @@ const consumerTool = {
   target_url: 'https://sellercentral.amazon.com/',
   available_plans: [1],
   capability_tags: ['自动填报', '页面核验', '结果确认'],
+  availability: 'demo_only',
+  demo_scenario_id: 'register-example',
+  supports_demo_single: true,
+  supports_live_single: false,
   supports_batch: false,
 }
 
@@ -77,11 +94,12 @@ function response(data: unknown): string {
 }
 
 async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', withUpdate = false): Promise<void> {
-  const user = role === 'business' ? businessUser : consumerUser
+  const user = role === 'admin' ? adminUser : role === 'business' ? businessUser : consumerUser
   await page.addInitScript(({ currentRole, currentUser, updateEnabled }) => {
-    sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'visual-token' }))
+    const storedRole = currentRole === 'admin' ? 'super_admin' : 'user'
+    sessionStorage.setItem('toolbox_auth', JSON.stringify({ token: 'visual-token', role: storedRole }))
     sessionStorage.setItem('toolbox_token', 'visual-token')
-    sessionStorage.setItem('toolbox_role', currentRole === 'admin' ? 'admin' : 'user')
+    sessionStorage.setItem('toolbox_role', storedRole)
     localStorage.setItem('toolbox_user', JSON.stringify(currentUser))
     localStorage.setItem('toolbox_device_id', 'visual-device')
     localStorage.setItem('toolbox_device_name', '视觉验收设备')
@@ -90,9 +108,9 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
       const snapshot: UpdateSnapshot = {
         supported: true,
         status: 'available',
-        currentVersion: '1.7.5',
-        availableVersion: '1.7.6',
-        releaseNotes: ['优化专业工作台体验', '提升亚马逊页面打开稳定性'],
+        currentVersion: '1.8.0',
+        availableVersion: '1.8.1',
+        releaseNotes: ['增强精密执行工作台', '提升模拟平台与费率包稳定性'],
         downloadBytes: 52_428_800,
         canRestart: false,
       }
@@ -116,7 +134,7 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
     const path = url.pathname
     let data: unknown = []
 
-    if (path === '/api/auth/me') data = role === 'admin' ? { role: 'admin' } : user
+    if (path === '/api/auth/me') data = user
     else if (path === '/api/business/bootstrap') data = { ...businessUser, tools: [] }
     else if (path === '/api/business/batches') data = []
     else if (path === '/api/plans/admin') data = [consumerPlan, businessPlan]
@@ -142,6 +160,8 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
       data = [{ key: 'business_workspace_enabled', value: 'true' }]
     } else if (path === '/api/tools') {
       data = role === 'consumer' ? [consumerTool] : []
+    } else if (path === '/api/freight-rate-packs') {
+      data = []
     } else if (path === '/api/announcements/feed') {
       data = []
     } else if (path === '/api/admin/action-center') {
@@ -166,24 +186,38 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
 }
 
 async function capture(page: Page, width: number, name: string): Promise<void> {
-  await expect(page.locator('main')).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 15_000 })
   await page.waitForTimeout(250)
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)
+  const clippedShellPixels = await page.locator('.studio-header, main').evaluateAll(elements =>
+    elements.reduce((maximum, element) => {
+      if (getComputedStyle(element).display === 'none') return maximum
+      return Math.max(maximum, element.getBoundingClientRect().right - window.innerWidth)
+    }, 0),
+  )
+  expect(clippedShellPixels).toBeLessThanOrEqual(1)
 
   const undersizedControls = await page.locator('button:visible, input:visible, [role="menuitem"]:visible').evaluateAll(elements =>
     elements.filter(element => Number.parseFloat(getComputedStyle(element).fontSize) < 14).length,
   )
   expect(undersizedControls).toBe(0)
 
+  const focusedLandmarkOutline = await page.evaluate(() => {
+    const active = document.activeElement
+    if (!active || (active.tagName !== 'MAIN' && !active.hasAttribute('data-route-focus'))) return 'not-landmark'
+    return getComputedStyle(active).outlineStyle
+  })
+  expect(focusedLandmarkOutline === 'not-landmark' || focusedLandmarkOutline === 'none').toBe(true)
+
   const directory = join(outputRoot, String(width))
   mkdirSync(directory, { recursive: true })
   await page.screenshot({ path: join(directory, `${name}.png`), animations: 'disabled' })
 }
 
-for (const width of widths) {
-  test(`1.7.6 ${width}px C/B/Admin visual capture`, async ({ browser }) => {
-    const loginPage = await browser.newPage({ viewport: { width, height: 768 } })
+for (const { width, height } of viewports) {
+  test(`1.8.0 ${width}x${height} C/B/Admin visual capture`, async ({ browser }) => {
+    const loginPage = await browser.newPage({ viewport: { width, height } })
     await loginPage.goto('/#/user/login', { waitUntil: 'networkidle' })
     await expect(loginPage.locator('.login-page')).toBeVisible()
     const loginOverflow = await loginPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
@@ -193,30 +227,40 @@ for (const width of widths) {
     await loginPage.screenshot({ path: join(loginDirectory, 'login.png'), animations: 'disabled' })
     await loginPage.close()
 
-    const consumerPage = await browser.newPage({ viewport: { width, height: 768 } })
+    const consumerPage = await browser.newPage({ viewport: { width, height } })
     await prepareRole(consumerPage, 'consumer', true)
-    await consumerPage.goto('/#/user/tools', { waitUntil: 'networkidle' })
-    await capture(consumerPage, width, 'consumer-tools-update')
+    for (const [route, title] of [['tools', '选择一个工具开始处理'], ['logs', '工具记录'], ['plans', '套餐与授权']] as const) {
+      await consumerPage.goto(`/#/user/${route}`, { waitUntil: 'networkidle' })
+      await expect(consumerPage.locator('.shell-page-copy h1')).toHaveText(title)
+      await capture(consumerPage, width, `consumer-${route}`)
+      if (route === 'tools') {
+        await consumerPage.getByTestId(`tool-card-${consumerTool.name}`).click()
+        await expect(consumerPage.locator('.tool-detail-drawer')).toBeVisible()
+        await consumerPage.locator('.drawer-primary').click()
+        await expect(consumerPage.getByTestId('tool-workspace')).toBeVisible()
+        await capture(consumerPage, width, 'consumer-workspace-mock')
+        await consumerPage.getByRole('button', { name: '返回工具箱' }).click()
+        await expect(consumerPage.getByText('退出交互演示？')).toBeVisible()
+        await consumerPage.getByRole('button', { name: '退出演示', exact: true }).click()
+        await expect(consumerPage.locator('.toolbox-page')).toBeVisible()
+      }
+    }
     await consumerPage.close()
 
-    const businessPage = await browser.newPage({ viewport: { width, height: 768 } })
+    const businessPage = await browser.newPage({ viewport: { width, height } })
     await prepareRole(businessPage, 'business')
-    for (const route of ['overview', 'workspace', 'records', 'license']) {
+    for (const [route, title] of [['overview', '专业工作台已就绪'], ['workspace', '批量自动化工作台'], ['records', '批量流程记录'], ['license', '授权信息']] as const) {
       await businessPage.goto(`/#/business/${route}`, { waitUntil: 'networkidle' })
+      await expect(businessPage.locator('.shell-page-copy h1')).toHaveText(title)
       await capture(businessPage, width, `business-${route}`)
     }
     await businessPage.close()
 
-    const adminPage = await browser.newPage({ viewport: { width, height: 768 } })
+    const adminPage = await browser.newPage({ viewport: { width, height } })
     await prepareRole(adminPage, 'admin')
-    for (const route of ['business-access', 'authcodes?product=business']) {
+    for (const [route, title] of [['dashboard', '行动中心'], ['authcodes?product=business', '授权码管理'], ['announcements', '公告中心'], ['business-access', '专业工作台'], ['freight-rates', '物流费率中心']] as const) {
       await adminPage.goto(`/#/admin/${route}`, { waitUntil: 'networkidle' })
-      if (width === 768 && route.startsWith('authcodes')) {
-        const columns = await adminPage.locator('.generate-form').evaluate(element =>
-          getComputedStyle(element).gridTemplateColumns.split(' ').filter(Boolean).length,
-        )
-        expect(columns).toBe(1)
-      }
+      await expect(adminPage.locator('.shell-page-copy h1')).toHaveText(title)
       await capture(adminPage, width, `admin-${route.split('?')[0]}`)
     }
     await adminPage.close()

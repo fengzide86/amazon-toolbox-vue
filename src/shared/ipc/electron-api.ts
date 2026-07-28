@@ -19,6 +19,10 @@ export interface BatchSnapshot {
 }
 
 export interface BatchBridge {
+  storeDemoImport(payload: unknown): Promise<unknown>
+  loadSampleImport(options: unknown): Promise<unknown>
+  saveSampleTemplate(): Promise<unknown>
+  remapImportItems(payload: unknown): Promise<unknown>
   selectImportFile(options: unknown): Promise<unknown>
   parseImportFile(options: unknown): Promise<unknown>
   exportImportErrors(errors: unknown): Promise<unknown>
@@ -52,6 +56,13 @@ export interface CredentialStoreBridge {
   clearUserCode(): Promise<boolean>
 }
 
+export interface FreightBridge {
+  getDefaultPack(): Promise<unknown>
+  parseWorkbook(options: unknown): Promise<unknown>
+  reparseWorkbook(options: unknown): Promise<unknown>
+  quote(payload: unknown): Promise<unknown>
+}
+
 export interface NotificationFocusPayload {
   mode?: 'single' | 'batch'
   itemId?: string
@@ -69,5 +80,6 @@ export interface ToolboxElectronApi {
   automation?: AutomationBridge
   credentialStore?: CredentialStoreBridge
   notifications?: NotificationBridge
+  freight?: FreightBridge
   [key: string]: unknown
 }

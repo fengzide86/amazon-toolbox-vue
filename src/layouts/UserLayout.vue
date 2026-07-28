@@ -54,7 +54,9 @@ import AppHeader from '@/components/AppHeader.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import ToolWorkspace from '@/components/ToolWorkspace.vue'
 import UserSidebar from '@/components/UserSidebar.vue'
+import { provideShellPageHeader } from '@/features/shell/pageHeaderContext'
 
+provideShellPageHeader()
 const appStore = useAppStore()
 const router = useRouter()
 const route = useRoute()
@@ -151,6 +153,7 @@ onUnmounted(() => {
 
 <style scoped>
 .app-layout {
+  --shell-header-height: 88px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -160,21 +163,31 @@ onUnmounted(() => {
 
 .app-layout :deep(.studio-header) {
   margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+  box-sizing: border-box;
 }
 
 .main-container {
-  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100vh - var(--shell-header-height));
   display: flex;
   width: 100%;
 }
 
 .content-studio {
   min-width: 0;
-  flex: 1;
+  width: calc(100% - var(--sidebar-width));
+  flex: 0 0 auto;
   margin-left: var(--sidebar-width);
-  padding: 32px clamp(24px, 3vw, 42px) 48px;
+  padding: 24px clamp(24px, 3vw, 42px) 48px;
+  box-sizing: border-box;
+  overflow-x: hidden;
   overflow-y: auto;
 }
+
+/* Route changes focus the main landmark for screen-reader context. Chromium's
+   native focus ring surrounds the whole desktop viewport, so suppress it on
+   this non-interactive container while retaining focus styles on controls. */
+.content-studio:focus { outline: none; }
 
 .sidebar-overlay {
   position: fixed;
@@ -229,17 +242,20 @@ onUnmounted(() => {
 }
 
 @media (max-width: 1024px) {
+  .app-layout { --shell-header-height: 72px; }
   .app-layout :deep(.studio-header),
   .content-studio {
     margin-left: 0;
   }
 
   .content-studio {
+    width: 100%;
     padding: 18px 16px 36px;
   }
 }
 
 @media (max-width: 768px) {
+  .app-layout { --shell-header-height: 64px; }
   .content-studio { padding: 20px 16px 36px; }
 }
 </style>

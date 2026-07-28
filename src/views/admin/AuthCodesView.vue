@@ -223,10 +223,10 @@
         <el-button @click="showGeneratedDrawer = false">继续生成</el-button>
         <el-button @click="copyCodes">复制全部</el-button>
         <el-button
-          v-if="generatorProductType === 'business' && generatedCodes[0]"
+          v-if="generatedCodes[0]"
           type="primary"
           @click="loginWithGeneratedCode"
-        >退出管理并用此码登录</el-button>
+        >{{ generatorProductType === 'business' ? '用此码登录专业工作台' : '用此码登录普通工具箱' }}</el-button>
       </template>
     </AdminDetailDrawer>
 
@@ -559,7 +559,8 @@ async function handleGenerate() {
 
 async function toggleFreeze(rawCode: unknown) {
   const code = adminAuthCodeSchema.parse(rawCode)
-  const newStatus = code.status === 'frozen' ? 'active' : 'frozen'
+  const restoredStatus = code.seat_used > 0 || code.device_used > 0 || code.devices.length > 0 ? 'active' : 'unused'
+  const newStatus = code.status === 'frozen' ? restoredStatus : 'frozen'
   try {
     await updateAuthCode(code.id, { status: newStatus })
     showToast(newStatus === 'frozen' ? '已冻结' : '已解冻', 'success')

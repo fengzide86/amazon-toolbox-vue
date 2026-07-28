@@ -34,6 +34,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body' | 'headers'>
 
 export interface ApiGetOptions extends Pick<ApiRequestOptions, 'signal' | 'timeoutMs' | 'retry' | 'trackConnection'> {
   cache?: boolean
+  responseMode?: 'data' | 'raw'
 }
 
 export class ApiError extends Error {
@@ -326,14 +327,16 @@ export const api = {
     }
 
     if (options.cache !== false && shouldCache(url)) {
-      const cacheKey = generateCacheKey(`${cacheIdentityScope()}:${fullUrl}`)
+      const cacheKey = generateCacheKey(`${cacheIdentityScope()}:${options.responseMode ?? 'data'}:${fullUrl}`)
       const cached = getCache<T>(cacheKey)
       if (cached !== null) return cached
-      const result = unwrapData(await request(fullUrl, requestOptions)) as T
+      const raw = await request(fullUrl, requestOptions)
+      const result = (options.responseMode === 'raw' ? raw : unwrapData(raw)) as T
       setCache(cacheKey, result, CACHE_TTL)
       return result
     }
-    return unwrapData(await request(fullUrl, requestOptions)) as T
+    const raw = await request(fullUrl, requestOptions)
+    return (options.responseMode === 'raw' ? raw : unwrapData(raw)) as T
   },
 
   async post<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
@@ -372,6 +375,7 @@ export { createChatSession, getChatSession, sendChatMessage, resolveChatSession,
 export { getAnnouncements, getAnnouncementFeed, markAnnouncementRead, dismissAnnouncement, createAnnouncement, updateAnnouncement, deleteAnnouncement } from './announcements'
 export { getTools, getToolCategories, updateTools, updateToolCategories, createToolLaunchGrant } from './tools'
 export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases'
+export { getFreightRateReleases, createFreightRateDraft, publishFreightRatePack, rollbackFreightRatePack, getCurrentFreightRatePack } from './freight-rates'
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback'
 export { getLogs, exportLogs, getLogTools, createLog } from './logs'
 export { createDemoRun, updateDemoRun, finishDemoRun, cancelDemoRun, getDemoRuns, createDemoBatch, updateDemoBatch, updateDemoBatchItem, finishDemoBatch, getDemoBatches } from './demo'

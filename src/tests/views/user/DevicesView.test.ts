@@ -44,8 +44,8 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      expect(wrapper.find('.page-title').exists()).toBe(true)
-      expect(wrapper.find('.page-title').text()).toBe('设备授权')
+      expect(wrapper.find('.page-header-v6 h2').exists()).toBe(true)
+      expect(wrapper.find('.page-header-v6 h2').text()).toBe('设备授权')
     })
 
     it('应该显示设备数量提示', async () => {

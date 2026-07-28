@@ -1,4 +1,5 @@
 import { api, type ApiQueryParams } from './index'
+import { normalizePaginatedResponse } from '@/shared/api/pagination'
 
 type EntityId = string | number
 type Payload = Record<string, unknown>
@@ -11,10 +12,12 @@ export const resolveChatSession = (sessionId: EntityId, satisfaction: number | n
   api.post(`/api/ai-chat/session/${sessionId}/resolve`, { satisfaction })
 export const transferChatToHuman = (sessionId: EntityId): Promise<unknown> => api.post(`/api/ai-chat/session/${sessionId}/transfer`)
 export const rateChatSession = (sessionId: EntityId, satisfaction: number): Promise<unknown> => api.post(`/api/ai-chat/session/${sessionId}/rate`, { satisfaction })
-export const getChatHistory = (page = 1, pageSize = 10): Promise<unknown> => api.get('/api/ai-chat/history', { page, page_size: pageSize })
+export const getChatHistory = async (page = 1, pageSize = 10): Promise<unknown> =>
+  normalizePaginatedResponse(await api.get('/api/ai-chat/history', { page, page_size: pageSize }, { responseMode: 'raw' }))
 export const getAIChatConfig = (): Promise<unknown> => api.get('/api/ai-chat/admin/config')
 export const updateAIChatConfig = (data: Payload): Promise<unknown> => api.put('/api/ai-chat/admin/config', data)
-export const getAdminChatSessions = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/ai-chat/admin/sessions', params)
+export const getAdminChatSessions = async (params: ApiQueryParams = {}): Promise<unknown> =>
+  normalizePaginatedResponse(await api.get('/api/ai-chat/admin/sessions', params, { responseMode: 'raw' }))
 export const getAdminChatSession = (sessionId: EntityId): Promise<unknown> => api.get(`/api/ai-chat/admin/sessions/${sessionId}`)
 export const getAIChatStats = (): Promise<unknown> => api.get('/api/ai-chat/admin/stats')
 export const debugAIChat = (data: Payload): Promise<unknown> => api.post('/api/ai-chat/admin/debug', data)

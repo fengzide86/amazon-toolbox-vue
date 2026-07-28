@@ -123,7 +123,7 @@ function parseJsonBody(request: PlaywrightRequest): Record<string, unknown> {
   return parsed as Record<string, unknown>
 }
 
-test('C 端单工具只进入 Demo，并且不会写真实执行接口或显示真实成功结论', async ({ page }) => {
+test('C 端单工具即使记录接口失败也进入 Demo，并且不会写真实执行接口或显示真实成功结论', async ({ page }) => {
   await installSession(page, 'user')
   const requestedPaths: string[] = []
   await installApi(page, (request, path) => {
@@ -143,36 +143,7 @@ test('C 端单工具只进入 Demo，并且不会写真实执行接口或显示�
       }])
     }
     if (path === '/api/demo/runs' && request.method() === 'POST') {
-      return wrapped({
-        id: 'demo-run-1',
-        record_kind: 'demo',
-        execution_scope: 'single',
-        tool_id: 'demo-register',
-        tool_name_snapshot: '注册流程演示',
-        platform_key: 'amazon',
-        scenario_id: 'register-example',
-        status: 'created',
-        completed_step_count: 0,
-        total_step_count: 6,
-        created_at: now,
-      })
-    }
-    if (path === '/api/demo/runs/demo-run-1/finish') {
-      return wrapped({
-        id: 'demo-run-1',
-        record_kind: 'demo',
-        execution_scope: 'single',
-        tool_id: 'demo-register',
-        tool_name_snapshot: '注册流程演示',
-        platform_key: 'amazon',
-        scenario_id: 'register-example',
-        status: 'completed',
-        completed_step_count: 6,
-        total_step_count: 6,
-        simulated_outcome: 'completed_example',
-        created_at: now,
-        finished_at: now,
-      })
+      return { status: 503, body: { detail: 'demo telemetry unavailable' } }
     }
     return undefined
   })
@@ -192,6 +163,72 @@ test('C 端单工具只进入 Demo，并且不会写真实执行接口或显示�
   expect(requestedPaths.some(path => path.startsWith('/api/logs'))).toBe(false)
   expect(requestedPaths.some(path => path.includes('launch-grant'))).toBe(false)
   expect(requestedPaths.some(path => path.startsWith('/api/business/batches'))).toBe(false)
+})
+
+test('消息中心抽屉位于页面根层，不会被工具卡片覆盖', async ({ page }) => {
+  await installSession(page, 'user')
+  await installApi(page, (_request, path) => {
+    if (path === '/api/tools') {
+      return wrapped([
+        {
+          id: 'demo-register',
+          name: '注册流程演示',
+          description: '展示模拟注册流程',
+          category: 'automation',
+          platform_key: 'amazon',
+          release_status: 'available',
+          supports_demo_single: true,
+        },
+        {
+          id: 'demo-listing',
+          name: '上品流程演示',
+          description: '展示模拟上品流程',
+          category: 'automation',
+          platform_key: 'amazon',
+          release_status: 'available',
+          supports_demo_single: true,
+        },
+      ])
+    }
+    if (path === '/api/announcements/feed') {
+      return wrapped([{
+        id: 1,
+        title: '1.7.9 更新说明',
+        content: '消息中心层级修复验收',
+        type: 'update',
+        audience: 'all',
+        category: 'update',
+        severity: 'info',
+        presentation: 'banner',
+        app_version: '1.7.9',
+        priority: 10,
+        published_at: now,
+        revision: 1,
+        created_at: now,
+        is_read: false,
+        is_dismissed: false,
+      }])
+    }
+    return undefined
+  })
+
+  await page.setViewportSize({ width: 1365, height: 900 })
+  await page.goto('/#/user/tools')
+  await page.getByRole('button', { name: /消息中心/ }).click()
+
+  const layer = page.locator('body > .drawer-layer')
+  const drawer = layer.locator('.message-drawer')
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByText('1.7.9 更新说明')).toBeVisible()
+  expect(await drawer.evaluate(element => getComputedStyle(element).position)).toBe('absolute')
+  expect(await layer.evaluate(element => Number.parseInt(getComputedStyle(element).zIndex, 10))).toBeGreaterThan(1000)
+
+  const box = await drawer.boundingBox()
+  expect(box).not.toBeNull()
+  const topElementIsDrawer = await page.evaluate(({ x, y }) => {
+    return Boolean(document.elementFromPoint(x, y)?.closest('.message-drawer'))
+  }, { x: Math.round((box?.x || 0) + 30), y: Math.round((box?.y || 0) + 360) })
+  expect(topElementIsDrawer).toBe(true)
 })
 
 test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号与 Cookie 不离开浏览器', async ({ page }) => {
@@ -442,6 +479,22 @@ test('订单人工确认收款走独立动作接口，随后可见分润，退�
 
   await page.goto('/#/admin/profit')
   await expect(page.getByText('¥100.00', { exact: true })).toBeVisible()
+  await expect(page.locator('.profit-summary')).toBeVisible()
+  await expect(page.locator('.distribution-item')).toHaveCount(6)
+  await expect(page.locator('.stat-icon')).toHaveCount(0)
+  for (const width of [1365, 1024, 768, 520]) {
+    await page.setViewportSize({ width, height: 800 })
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(overflow).toBeLessThanOrEqual(1)
+    const rowCounts = await page.locator('.distribution-item').evaluateAll((items) => {
+      const tops = items.map(item => Math.round(item.getBoundingClientRect().top))
+      return [...new Set(tops)].map(top => tops.filter(value => value === top).length)
+    })
+    if (width === 1365) expect(rowCounts).toEqual([3, 3])
+    else if (width === 520) expect(rowCounts).toEqual([1, 1, 1, 1, 1, 1])
+    else expect(rowCounts).toEqual([2, 2, 2])
+  }
+  await page.setViewportSize({ width: 1365, height: 800 })
 
   await page.goto('/#/admin/orders')
   await page.getByRole('button', { name: '退款' }).click()
@@ -452,6 +505,65 @@ test('订单人工确认收款走独立动作接口，随后可见分润，退�
   await expect.poll(() => actionCalls.map(call => call.path)).toContain('/api/orders/1/refund')
   expect(JSON.parse(actionCalls.at(-1)?.body || '{}')).toEqual({ reason: '内部验收退款' })
   await expect(page.getByRole('row', { name: /INTERNAL-ORDER-001.*已退款/ })).toBeVisible()
+})
+
+test('知识库和客服按区域降级，分页元数据与规则预览保持可用', async ({ page }) => {
+  await installSession(page, 'super_admin')
+  await installApi(page, (request, path) => {
+    if (path === '/api/knowledge') {
+      const item = {
+        id: 801,
+        category: '授权说明',
+        title: '如何更换授权设备',
+        content: '先解绑旧设备，再登录新设备。',
+        keywords: ['换设备'],
+        priority: 'high',
+        status: 'active',
+        view_count: 3,
+      }
+      return { body: { data: [item], items: [item], total: 21, page: 1, page_size: 20 } }
+    }
+    if (path === '/api/knowledge/categories') return { body: { success: true, data: { unexpected: true } } }
+    if (path === '/api/knowledge/stats') return wrapped({ total: 21, active: 20, categories: 4 })
+    if (path === '/api/ai-chat/admin/config') {
+      return { body: {
+        welcome_message: '欢迎咨询工具规则',
+        suggested_questions: '["如何换设备"]',
+        transfer_keywords: '["退款","投诉"]',
+        max_unmatched: '3',
+      } }
+    }
+    if (path === '/api/ai-chat/admin/sessions') return { body: { success: true, data: { unexpected: true } } }
+    if (path === '/api/ai-chat/admin/stats') {
+      return { body: { total_sessions: 4, today_sessions: 1, resolve_rate: 50, transfer_rate: 25 } }
+    }
+    if (path === '/api/ai-chat/admin/debug' && request.method() === 'POST') {
+      return { body: {
+        reply: '请先解绑旧设备，再登录新设备。',
+        answer_mode: 'faq',
+        ai_used: false,
+        knowledge_refs: [],
+        fallback_reason: null,
+        should_transfer: false,
+        diagnostics: { total_ms: 2 },
+      } }
+    }
+    return undefined
+  })
+
+  await page.goto('/#/admin/knowledge')
+  await expect(page.getByText('如何更换授权设备')).toBeVisible()
+  await expect(page.getByText('共 21 条')).toBeVisible()
+  await expect(page.getByText('知识库统计暂时无法加载')).toBeVisible()
+
+  await page.goto('/#/admin/ai-chat')
+  await expect(page.locator('.panel-left textarea').first()).toHaveValue('欢迎咨询工具规则')
+  await expect(page.locator('.stat-value-mini').first()).toHaveText('4')
+  await expect(page.getByText('分页响应缺少数据列表')).toBeVisible()
+  await page.getByPlaceholder('输入测试问题...').fill('如何换设备')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByText('请先解绑旧设备，再登录新设备。')).toBeVisible()
+  await expect(page.getByText('转人工建议：否')).toBeVisible()
 })
 
 test('规则客服覆盖 FAQ、fallback，并通过转人工接口创建工单', async ({ page }) => {

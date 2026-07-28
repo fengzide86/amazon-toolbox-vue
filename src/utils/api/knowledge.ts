@@ -1,8 +1,10 @@
 import { api, type ApiQueryParams } from './index'
+import { normalizePaginatedResponse } from '@/shared/api/pagination'
 
 type EntityId = string | number
 
-export const getKnowledgeList = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/knowledge', params)
+export const getKnowledgeList = async (params: ApiQueryParams = {}): Promise<unknown> =>
+  normalizePaginatedResponse(await api.get('/api/knowledge', params, { responseMode: 'raw' }))
 export const getKnowledgeCategories = (): Promise<unknown> => api.get('/api/knowledge/categories')
 export const getKnowledgeStats = (): Promise<unknown> => api.get('/api/knowledge/stats')
 export const getKnowledge = (id: EntityId): Promise<unknown> => api.get(`/api/knowledge/${id}`)

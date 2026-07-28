@@ -193,6 +193,12 @@ const routes = [
         meta: { title: '应用更新', skeleton: 'table', roles: ['super_admin'] }
       },
       {
+        path: 'freight-rates',
+        name: 'AdminFreightRates',
+        component: () => import('@/views/admin/FreightRatesView.vue'),
+        meta: { title: '物流费率中心', skeleton: 'default', roles: ['super_admin'] }
+      },
+      {
         path: 'staff-accounts',
         name: 'AdminStaffAccounts',
         component: () => import('@/views/admin/StaffAccountsView.vue'),

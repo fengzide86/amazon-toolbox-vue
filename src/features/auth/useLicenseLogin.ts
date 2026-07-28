@@ -8,12 +8,12 @@ import { saveRememberedUserCode } from '@/utils/credentialStore'
 import { licenseLoginResponseSchema, publicSettingsSchema } from './model'
 
 const stats = [
-  { value: '本地', unit: '', desc: '演示流程 · 不登录真实店铺' },
-  { value: '授权', unit: '', desc: '套餐与设备边界清晰' },
-  { value: '记录', unit: '', desc: '演示过程可查看回顾' },
+  { value: '90', unit: '%', desc: '操作提效 · 一键完成物料/发货' },
+  { value: '10', unit: '×', desc: '上品速度 · 批量处理告别手动' },
+  { value: '24', unit: 'h', desc: 'AI 客服 · 问题秒级响应' },
 ]
 
-const featureTags = ['流程演示', '本地表格', '授权控制', '执行记录', '工具帮助', '人工支持']
+const featureTags = ['自动上品', '物流模板', '自动发货', 'FBA / AGL', '广告脚本', '批量操作']
 
 const helpSteps = [
   '联系人工客服确认套餐后，您会收到一个授权码',
@@ -44,6 +44,7 @@ export function useLicenseLogin() {
   const copySuccess = ref(false)
   const errorMessage = ref('')
   const inputFocused = ref(false)
+  const loginSucceeded = ref(false)
   const deviceName = ref('')
   const deviceId = ref('')
   const wechatId = ref('AmazonToolbox_Support')
@@ -110,7 +111,10 @@ export function useLicenseLogin() {
       if (result.data.platform_scope) {
         localStorage.setItem('toolbox_platform_scope', JSON.stringify(result.data.platform_scope))
       }
-      window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 440 } }))
+      loginSucceeded.value = true
+      await new Promise(resolve => window.setTimeout(resolve, 160))
+      window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 780 } }))
+      await new Promise(resolve => window.setTimeout(resolve, 270))
       const businessAccess = result.data.product_type === 'business'
         && result.data.business_workspace_enabled === true
         && result.data.entitlements?.batch_execution === true
@@ -200,7 +204,7 @@ export function useLicenseLogin() {
   })
 
   return {
-    authCode, authCodeInput, isLoading, showError, showHelpModal, showContactModal, copySuccess,
+    authCode, authCodeInput, isLoading, loginSucceeded, showError, showHelpModal, showContactModal, copySuccess,
     errorMessage, inputFocused, deviceName, wechatId, stats, featureTags, helpSteps,
     connectionStatusClass, connectionStatusText, handleLogin, showHelp, showContact, copyWechatId, closeModals,
   }

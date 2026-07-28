@@ -11,7 +11,13 @@ const verifyResponseSchema = z.object({
   data: authenticatedUserSchema.extend({ token: z.string() }).optional(),
 }).passthrough()
 
+export function isBackofficeEntry(hash = window.location.hash): boolean {
+  return /^#\/admin(?:\/|$)/.test(hash)
+}
+
 export async function initializeRememberedLogin(): Promise<boolean> {
+  // 管理员直达预览不能被已记住的 C 端授权码抢占；凭据本身继续保留。
+  if (isBackofficeEntry()) return false
   if (sessionStorage.getItem('toolbox_token')) return true
 
   const code = await loadRememberedUserCode()

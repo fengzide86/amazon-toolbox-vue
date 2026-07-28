@@ -39,6 +39,8 @@ describe('desktop renderer trust policy', () => {
   it('keeps webviews on credential-free HTTPS and known partitions', () => {
     expect(isAllowedWebviewUrl('https://sellercentral.amazon.com/home')).toBe(true)
     expect(isAllowedWebviewUrl('http://sellercentral.amazon.com/home')).toBe(false)
+    expect(isAllowedWebviewUrl('http://127.0.0.1:49152/automation-sandbox')).toBe(true)
+    expect(isAllowedWebviewUrl('http://localhost:49152/automation-sandbox')).toBe(true)
     expect(isAllowedWebviewUrl('https://user:pass@example.com/')).toBe(false)
     expect(isAllowedWebviewPartition('persist:tool-workspace')).toBe(true)
     expect(isAllowedWebviewPartition('batch-demo_account-1')).toBe(true)
@@ -95,17 +97,21 @@ describe('app protocol renderer entrypoint', () => {
 })
 
 describe('internal desktop package profile', () => {
-  it('cannot ship the runner or bundled backend in the formal installer', () => {
+  it('ships the explicitly enabled local runner but never bundles the control backend', () => {
     const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
-      toolbox?: { distribution?: string }
+      toolbox?: { distribution?: string; automationRuntime?: boolean }
       scripts?: Record<string, string>
       build?: { extraResources?: unknown[]; files?: string[] }
     }
     expect(metadata.toolbox?.distribution).toBe('internal')
-    expect(metadata.build?.extraResources).toEqual([])
+    expect(metadata.toolbox?.automationRuntime).toBe(true)
+    expect(metadata.build?.extraResources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: 'resources/templates', to: 'templates' }),
+      expect.objectContaining({ from: 'resources/rates', to: 'rates' }),
+    ]))
     expect(metadata.scripts?.['electron:release']).not.toContain('backend:build')
-    expect(metadata.build?.files).toContain('!dist-electron/electron/automation-runner.cjs')
-    expect(metadata.build?.files).toContain('!dist-electron/electron/automation/scripts/**')
+    expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation-runner.cjs')
+    expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation/scripts/**')
   })
 
   it('removes tool-launch IPC from the internal renderer bridge', () => {

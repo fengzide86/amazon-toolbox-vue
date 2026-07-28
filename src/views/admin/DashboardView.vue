@@ -1,9 +1,10 @@
 <template>
   <div class="action-center">
-    <header class="page-heading">
-      <div><span>OPERATIONS</span><h2>行动中心</h2><p>先处理会影响客户使用的事项，再查看日常经营数据。</p></div>
-      <button class="refresh-button" :disabled="loading" @click="loadData"><RefreshCw :size="15" :class="{ spin: loading }" />刷新</button>
-    </header>
+    <PageHeader eyebrow="OPERATIONS" title="行动中心" description="先处理会影响客户使用的事项，再查看日常经营数据。">
+      <template #actions>
+        <button class="refresh-button" :disabled="loading" @click="loadData"><RefreshCw :size="15" :class="{ spin: loading }" />刷新</button>
+      </template>
+    </PageHeader>
 
     <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载行动中心…" @retry="loadData" />
 
@@ -89,6 +90,7 @@ import { computed, onMounted, ref } from 'vue'
 import { CheckCircle2, ChevronRight, KeyRound, LoaderCircle, MessageSquareText, MonitorSmartphone, RefreshCw, ShieldAlert, ShieldCheck, TicketCheck, TimerReset, UserRoundCheck, WifiOff } from '@lucide/vue'
 import EmptyState from '@/components/EmptyState.vue'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { getAdminActionCenter, getAdminBusinessBatch } from '@/utils/api'
 import { showToast } from '@/utils'
 import {

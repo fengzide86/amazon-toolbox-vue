@@ -24,7 +24,7 @@ describe('PlansView 套餐与授权', () => {
     const wrapper = mount(PlansView)
     await flushPromises()
 
-    expect(wrapper.find('.plans-header h2').text()).toBe('套餐与授权')
+    expect(wrapper.find('.page-header-v6 h2').text()).toBe('套餐与授权')
     expect(wrapper.text()).toContain('Y15 体验包')
     expect(wrapper.text()).not.toContain('授权码前缀')
   })

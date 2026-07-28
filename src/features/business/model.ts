@@ -32,6 +32,8 @@ export const importPreviewSchema = z.object({
   fileName: z.string().optional(),
   validCount: z.number().nonnegative(),
   errorCount: z.number().nonnegative().optional(),
+  worksheetName: z.string().optional(),
+  templateVersion: z.string().nullable().optional(),
   rows: z.array(z.object({
     itemId: z.string(),
     preview: z.record(z.string(), z.unknown()),

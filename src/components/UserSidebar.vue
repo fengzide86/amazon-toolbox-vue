@@ -11,15 +11,15 @@
     <!-- 导航菜单 -->
     <nav class="sidebar-menu-nav">
       <router-link to="/user/tools" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/tools') ? 'page' : undefined">
-        <Zap :size="14" class="menu-icon" aria-hidden="true" />
+        <Zap :size="16" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">工具箱</span>
       </router-link>
       <router-link to="/user/logs" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/logs') ? 'page' : undefined">
-        <ClipboardList :size="14" class="menu-icon" aria-hidden="true" />
+        <ClipboardList :size="16" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">执行记录</span>
       </router-link>
       <router-link to="/user/plans" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/plans') ? 'page' : undefined">
-        <ShieldCheck :size="14" class="menu-icon" aria-hidden="true" />
+        <ShieldCheck :size="16" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">套餐与授权</span>
       </router-link>
       <router-link to="/user/devices" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/devices') ? 'page' : undefined">
@@ -27,7 +27,7 @@
         <span class="menu-label">设备授权</span>
       </router-link>
       <router-link to="/user/ai-chat" class="menu-nav-item" active-class="is-active" :aria-current="isActive('/user/ai-chat') ? 'page' : undefined">
-        <MessageCircle :size="14" class="menu-icon" aria-hidden="true" />
+        <MessageCircle :size="16" class="menu-icon" aria-hidden="true" />
         <span class="menu-label">工具帮助</span>
       </router-link>
     </nav>
@@ -66,7 +66,7 @@ function isActive(path: string) {
 }
 
 .sidebar-brand-zone {
-  height: var(--header-height);
+  height: var(--shell-header-height, 88px);
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -76,13 +76,13 @@ function isActive(path: string) {
 }
 
 .brand-badge {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: 9px;
+  border-radius: 10px;
   color: #fff;
   background: var(--color-primary);
   box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
@@ -90,14 +90,14 @@ function isActive(path: string) {
 
 .brand-text {
   color: var(--color-text);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 750;
   letter-spacing: -.01em;
 }
 
 .sidebar-menu-nav {
   flex-grow: 1;
-  padding: 20px 12px;
+  padding: 22px 12px;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -144,6 +144,7 @@ function isActive(path: string) {
 .menu-nav-item:hover .menu-label { color: var(--color-text); }
 
 .menu-nav-item.is-active { background: var(--color-primary-soft); }
+.menu-nav-item.is-active { box-shadow: inset 0 0 0 1px rgba(45, 95, 202, .045); }
 
 .menu-nav-item.is-active .menu-icon,
 .menu-nav-item.is-active .menu-label {

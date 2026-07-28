@@ -89,6 +89,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const loading = ref(false)
   const syncState = ref<'synced' | 'syncing' | 'offline'>('synced')
   const error = ref<string | null>(null)
+  const bootstrapStale = ref(false)
 
   let removeEventListener: (() => void) | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
@@ -99,6 +100,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   let demoBatchEventSeq = 0
   let flushingOutbox: Promise<void> | null = null
   const provisioning = new Set<string>()
+  const demoItemSequences = new Map<string, number>()
   const itemOutbox = new Map<string, PendingItemSync>()
   let batchOutbox: PendingBatchSync | null = null
   let finishOutbox: PendingFinishSync | null = null
@@ -131,6 +133,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   async function refreshBootstrap(): Promise<BusinessBootstrap> {
     loading.value = true
     error.value = null
+    bootstrapStale.value = false
     try {
       bootstrap.value = businessBootstrapSchema.parse(await getBusinessBootstrap())
       if (selectedTool.value && !bootstrap.value.tools.some(tool => tool.id === selectedTool.value?.id)) {
@@ -140,6 +143,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       return bootstrap.value
     } catch (refreshError) {
       error.value = errorMessage(refreshError, '工作台状态刷新失败')
+      bootstrapStale.value = bootstrap.value !== null
       throw refreshError
     } finally {
       loading.value = false
@@ -172,32 +176,53 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     error.value = null
   }
 
+  function toolCapabilityKey(tool: BusinessTool): string {
+    const direct = typeof tool.capability_key === 'string' ? tool.capability_key : ''
+    if (direct) return direct
+    const scriptKey = typeof tool.script_key === 'string' ? tool.script_key : ''
+    return scriptKey
+      .replace(/^demo\./, '')
+      .replace(/^amazon\./, '')
+      .replace(/_walkthrough_v\d+$/, '')
+      .replace(/\.v\d+$/, '')
+  }
+
+  function importOptions(tool: BusinessTool) {
+    return {
+      capabilityKey: toolCapabilityKey(tool),
+      schema: tool.batch_input_schema || [],
+      maxRows: entitlements.value.max_batch_rows || 50,
+    }
+  }
+
+  async function loadSampleImport(): Promise<ImportPreview> {
+    if (!selectedTool.value) throw new Error('请先选择批量工具')
+    loading.value = true
+    error.value = null
+    try {
+      const payload = await requireBatchApi().loadSampleImport(importOptions(selectedTool.value))
+      importPreview.value = importPreviewSchema.parse(payload)
+      return importPreview.value
+    } catch (importError) {
+      error.value = errorMessage(importError, '内置演示数据载入失败')
+      throw importError
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function saveSampleTemplate(): Promise<unknown> {
+    return requireBatchApi().saveSampleTemplate()
+  }
+
   async function selectImportFile(): Promise<ImportPreview> {
     if (!selectedTool.value) throw new Error('请先选择批量工具')
     loading.value = true
     error.value = null
     try {
-      if (selectedTool.value.availability === 'demo_only') {
-        const validCount = Math.min(entitlements.value.max_batch_rows || 6, 6)
-        const payload = {
-          importId: `demo_import_${Date.now()}`,
-          fileName: '内置演示样例（不含真实客户数据）',
-          validCount,
-          errorCount: 0,
-          rows: Array.from({ length: validCount }, (_, index) => ({
-            itemId: `demo_row_${index + 1}`,
-            preview: { account_label: `演示项 ${String(index + 1).padStart(2, '0')}` },
-          })),
-          errors: [],
-        }
-        importPreview.value = importPreviewSchema.parse(payload)
-        return importPreview.value
-      }
       const batch = requireBatchApi()
-      const payload = await batch.selectImportFile({
-        schema: selectedTool.value.batch_input_schema || [],
-        maxRows: entitlements.value.max_batch_rows || 50,
-      })
+      const payload = await batch.selectImportFile(importOptions(selectedTool.value))
+      if (!payload) throw new Error('未选择 Excel 文件')
       importPreview.value = importPreviewSchema.parse(payload)
       return importPreview.value
     } catch (importError) {
@@ -240,24 +265,26 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
         })
         const itemRefs = created.items?.map(item => item.item_ref)
           || Array.from({ length: created.row_count }, (_, index) => `demo_item_${index + 1}`)
-        const localSnapshot = businessBatchSnapshotSchema.parse({
+        const batchApi = requireBatchApi()
+        const localImport = importPreviewSchema.parse(await batchApi.remapImportItems({
+          importId: importPreview.value.importId,
+          itemIds: itemRefs,
+        }))
+        const localSnapshot = businessBatchSnapshotSchema.parse(await batchApi.create({
+          importId: localImport.importId,
           batchId: `demo_${batchId}`,
           serverBatchId: created.id,
+          tool: {
+            ...selectedTool.value,
+            executionMode: 'demo',
+            scriptKey: selectedTool.value.script_key,
+            launchGrant: { scriptKey: selectedTool.value.script_key },
+          },
+          maxOpenSessions: 1,
           recordKind: 'demo',
-          tool: selectedTool.value,
-          status: 'running',
-          activeItemId: itemRefs[0] || null,
-          counts: { total: created.row_count, pending: created.row_count, running: 0, waiting: 0, completed: 0, failed: 0 },
-          items: itemRefs.map((itemRef, index) => ({
-            itemId: itemRef,
-            accountLabelMasked: `演示项 ${String(index + 1).padStart(2, '0')}`,
-            status: 'pending',
-            browserReady: false,
-          })),
-        })
+        }))
         importPreview.value = null
         applySnapshot(localSnapshot)
-        scheduleDemoItem(created.id, 0)
         return localSnapshot
       }
       const serverBatch = serverBatchSchema.parse(unwrapData(await createBusinessBatch({
@@ -378,7 +405,8 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
 
   async function registerBrowser(itemId: string, webContentsId: number): Promise<void> {
     await requireBatchApi().registerBrowser(itemId, webContentsId)
-    await startProvisionedItem(itemId)
+    if (isDemoBatch.value) await startDemoProvisionedItem(itemId)
+    else await startProvisionedItem(itemId)
   }
 
   async function startProvisionedItem(itemId: string): Promise<void> {
@@ -390,7 +418,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       const platformKey = tool.platform_key || tool.platformKey || 'amazon'
       const envelope = launchGrantEnvelopeSchema.parse(await createToolLaunchGrant(tool.id, {
         platformKey,
-        deviceId: localStorage.getItem('toolbox_device_id') || '',
+        deviceId: window.electronAPI?.runtime?.deviceId || localStorage.getItem('toolbox_device_id') || '',
         executionMode: 'batch',
         clientBatchId: snapshot.value.batchId,
         clientItemId: itemId,
@@ -404,6 +432,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
           ...tool,
           platformKey: grant.platform_key || platformKey,
           targetUrl: grant.target_url || tool.target_url || tool.targetUrl,
+          executionMode: 'live',
           launchGrant: {
             token: grant.token,
             expiresAt: grant.expires_at || envelope.expires_at,
@@ -448,6 +477,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     if (isDemoBatch.value) {
       if (demoTimer) clearTimeout(demoTimer)
       demoTimer = null
+      await window.electronAPI?.batch?.cancel(status).catch(() => undefined)
       if (serverBatchId !== undefined) {
         const total = snapshot.value.counts.total || snapshot.value.items.length
         const played = snapshot.value.counts.completed || 0
@@ -476,12 +506,13 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     if (isActive.value) throw new Error('当前批次仍在执行')
     if (demoTimer) clearTimeout(demoTimer)
     demoTimer = null
-    if (!isDemoBatch.value) await window.electronAPI?.batch?.cancel(snapshot.value.status || 'completed')
+    await window.electronAPI?.batch?.cancel(snapshot.value.status || 'completed')
     snapshot.value = emptyBatchSnapshot()
     selectedItemId.value = null
     selectedTool.value = null
     importPreview.value = null
     provisioning.clear()
+    demoItemSequences.clear()
   }
 
   function handleBatchEvent(input: unknown): void {
@@ -489,17 +520,84 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     if (!parsed.success) return
     const event: BatchEvent = parsed.data
     if (event.snapshot) applySnapshot(event.snapshot)
-    if (event.type === 'batch.item_ready' && event.itemId) selectItem(event.itemId)
-    if (event.type === 'batch.item_updated' && event.itemId) void syncItem(event.itemId)
+    if (event.type === 'batch.item_ready' && event.itemId) {
+      selectItem(event.itemId)
+    }
+    if (event.type === 'batch.item_updated' && event.itemId) {
+      if (event.snapshot?.recordKind === 'demo') void syncDemoRunnerItem(event.itemId)
+      else void syncItem(event.itemId)
+    }
     if (event.type === 'batch.finished') {
       const finalStatus = event.snapshot?.status === 'completed' ? 'completed' : 'cancelled'
       const serverBatchId = event.snapshot?.serverBatchId
-      if (serverBatchId !== undefined) {
+      if (serverBatchId !== undefined && event.snapshot?.recordKind === 'demo') {
+        demoBatchEventSeq += 1
+        if (finalStatus === 'completed') {
+          void finishDemoBatch(serverBatchId, { event_seq: demoBatchEventSeq })
+            .then(() => loadDemoHistory())
+            .catch(syncError => { error.value = errorMessage(syncError, '演示记录同步失败'); syncState.value = 'offline' })
+        }
+      } else if (serverBatchId !== undefined) {
         finishOutbox = { batchId: serverBatchId, status: finalStatus }
         void flushOutbox()
       }
     }
     scheduleSummarySync()
+  }
+
+  async function startDemoProvisionedItem(itemId: string): Promise<void> {
+    if (provisioning.has(itemId) || snapshot.value.provisioningItemId !== itemId) return
+    provisioning.add(itemId)
+    try {
+      const tool = snapshot.value.tool || selectedTool.value
+      if (!tool) throw new Error('当前演示缺少工具配置')
+      await requireBatchApi().start({
+        itemId,
+        tool: {
+          ...tool,
+          executionMode: 'demo',
+          scriptKey: tool.script_key,
+          launchGrant: { scriptKey: tool.script_key },
+        },
+      })
+    } catch (startError) {
+      error.value = errorMessage(startError, '本地交互演示启动失败')
+      await requireBatchApi().failItem({ itemId, message: error.value }).catch(() => null)
+    } finally {
+      provisioning.delete(itemId)
+    }
+  }
+
+  async function syncDemoRunnerItem(itemId: string): Promise<void> {
+    const batchId = snapshot.value.serverBatchId
+    const item = items.value.find(candidate => candidate.itemId === itemId)
+    if (batchId === undefined || !item || !['running', 'completed', 'failed', 'cancelled'].includes(item.status)) return
+    const terminal = ['completed', 'failed', 'cancelled'].includes(item.status)
+    const eventSeq = terminal ? 2 : 1
+    if ((demoItemSequences.get(itemId) || 0) >= eventSeq) return
+    demoItemSequences.set(itemId, eventSeq)
+    syncState.value = 'syncing'
+    try {
+      await updateDemoBatchItem(batchId, itemId, {
+        event_seq: eventSeq,
+        status: terminal ? (item.status === 'completed' ? 'played' : item.status === 'cancelled' ? 'skipped' : 'error') : 'playing',
+        simulated_outcome: terminal ? (item.status === 'completed' ? 'completed_example' : 'failure_example') : null,
+      })
+      demoBatchEventSeq += 1
+      await updateDemoBatch(batchId, {
+        event_seq: demoBatchEventSeq,
+        status: 'running',
+        queued_count: snapshot.value.counts.pending || 0,
+        playing_count: snapshot.value.counts.running || 0,
+        played_count: snapshot.value.counts.completed || 0,
+        skipped_count: 0,
+        error_count: snapshot.value.counts.failed || 0,
+      })
+      syncState.value = 'synced'
+    } catch (syncError) {
+      error.value = errorMessage(syncError, '演示记录同步失败')
+      syncState.value = 'offline'
+    }
   }
 
   function applySnapshot(input: unknown): void {
@@ -655,9 +753,9 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const statusText = (status: string): string => STATUS_MESSAGE[status] || status
 
   return {
-    bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error,
+    bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale,
     entitlements, tools, items, openItems, isActive, isDemoBatch,
-    init, refreshBootstrap, loadHistory, loadDemoHistory, chooseTool, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
+    init, refreshBootstrap, loadHistory, loadDemoHistory, chooseTool, loadSampleImport, saveSampleTemplate, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
     completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,
   }
 })

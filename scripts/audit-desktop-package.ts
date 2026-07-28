@@ -22,11 +22,21 @@ const forbidden = entries.filter(entry => {
   if (/\.(?:ts|cts|map)$/i.test(normalized)) return true
   if (/(?:^|\/)(?:tests?|docs)(?:\/|$)/i.test(normalized)) return true
   if (/(?:^|\/)smoke(?:\/|$)/i.test(normalized)) return true
-  if (/(?:^|\/)automation-runner\.cjs$/i.test(normalized)) return true
-  if (normalized.includes('/dist-electron/electron/automation/scripts/')) return true
-  if (/(?:^|\/)scripts(?:\/|$)/i.test(normalized)) return true
+  if (/^\/?scripts(?:\/|$)/i.test(normalized)) return true
   return /(?:admin_)?token\.txt$/i.test(normalized)
 })
+
+const requiredAutomationEntries = [
+  '/dist-electron/electron/automation-runner.cjs',
+  '/dist-electron/electron/automation/adapter-loader.cjs',
+  '/dist-electron/electron/automation/scripts/registry.cjs',
+]
+const missingAutomationEntries = requiredAutomationEntries.filter(required => (
+  !entries.some(entry => entry.replaceAll('\\', '/').endsWith(required))
+))
+if (missingAutomationEntries.length) {
+  throw new Error(`Missing packaged automation runtime:\n${missingAutomationEntries.join('\n')}`)
+}
 
 if (forbidden.length) {
   throw new Error(`Forbidden package entries:\n${forbidden.slice(0, 30).join('\n')}`)

@@ -24,6 +24,7 @@ const mockRouter = createRouter({
     { path: '/admin/ai-chat', name: 'AdminAIChat', component: { template: '<div />' } },
     { path: '/admin/announcements', name: 'AdminAnnouncements', component: { template: '<div />' } },
     { path: '/admin/updates', name: 'AdminUpdates', component: { template: '<div />' } },
+    { path: '/admin/freight-rates', name: 'AdminFreightRates', component: { template: '<div />' } },
     { path: '/admin/settings', name: 'AdminSettings', component: { template: '<div />' } },
     { path: '/admin/staff-accounts', name: 'AdminStaffAccounts', component: { template: '<div />' } },
     { path: '/admin/login', name: 'AdminLogin', component: { template: '<div />' } },
@@ -76,7 +77,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      expect(menuItems.length).toBe(13)
+      expect(menuItems.length).toBe(14)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -96,6 +97,7 @@ describe('AdminSidebar', () => {
       expect(labels).toContain('客服规则管理')
       expect(labels).toContain('公告管理')
       expect(labels).toContain('应用更新')
+      expect(labels).toContain('物流费率中心')
       expect(labels).toContain('系统设置')
       expect(labels).toContain('后台账号管理')
       expect(labels).not.toContain('退出登录')

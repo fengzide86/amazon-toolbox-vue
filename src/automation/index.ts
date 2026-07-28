@@ -15,8 +15,10 @@ export interface AutomationAdapterOptions {
 
 export function createAutomationAdapter(options: AutomationAdapterOptions): AutomationAdapter {
   if (options.adapter) return options.adapter
-  if (options.mode === 'demo') return new DemoAutomationAdapter(options.mock)
   const api = typeof window !== 'undefined' ? window.electronAPI?.automation : undefined
+  // 桌面端的 Demo 也交给真实 Runner，在本机沙盒页面中完成真实填写、点击和核验。
+  // 浏览器版没有本地 Runner 时继续使用轻量预览适配器。
+  if (options.mode === 'demo') return api ? new ElectronAutomationAdapter(api) : new DemoAutomationAdapter(options.mock)
   if (!api) throw new Error('LIVE_RUNTIME_UNAVAILABLE: 真实工具仅支持桌面客户端')
   return new ElectronAutomationAdapter(api)
 }

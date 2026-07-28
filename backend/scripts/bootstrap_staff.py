@@ -10,18 +10,51 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import os
 import re
-
-from sqlalchemy import func, select
-
-from core.security import hash_password_async
-from database import async_session_maker
-from models import StaffRole, StaffStatus, StaffUser
+import sqlite3
+from pathlib import Path
 
 USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{2,49}$")
 
 
+def local_database_path() -> Path:
+    configured = os.environ.get("DB_PATH", "").strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    runtime_root = os.environ.get("TOOLBOX_RUNTIME_DIR", "").strip()
+    if runtime_root:
+        base = Path(runtime_root)
+    else:
+        base = Path(os.environ.get("APPDATA") or Path.home())
+    return base / "AmazonToolbox" / "toolbox.db"
+
+
+def staff_account_count() -> int:
+    """Read the local SQLite status without importing the full backend."""
+    database_path = local_database_path()
+    if not database_path.is_file():
+        return 0
+    connection = sqlite3.connect(f"file:{database_path.as_posix()}?mode=ro", uri=True)
+    try:
+        table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'staff_users'"
+        ).fetchone()
+        if not table:
+            return 0
+        row = connection.execute("SELECT COUNT(*) FROM staff_users").fetchone()
+        return int(row[0] if row else 0)
+    finally:
+        connection.close()
+
+
 async def bootstrap(username: str, display_name: str, password: str) -> None:
+    from sqlalchemy import func, select
+
+    from core.security import hash_password_async
+    from database import async_session_maker
+    from models import StaffRole, StaffStatus, StaffUser
+
     username = username.strip().lower()
     display_name = display_name.strip()
     if not USERNAME_PATTERN.fullmatch(username):
@@ -54,7 +87,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="创建首个后台超级管理员")
     parser.add_argument("--username", default="admin")
     parser.add_argument("--display-name", default="超级管理员")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="只检查是否已经配置后台账号；未配置时返回退出码 3",
+    )
     args = parser.parse_args()
+    if args.check:
+        count = staff_account_count()
+        if count > 0:
+            print(f"已配置后台账号: {count} 个")
+            return
+        print("尚未配置后台账号")
+        raise SystemExit(3)
     password = getpass.getpass("新密码（至少 10 个字符）: ")
     confirmation = getpass.getpass("再次输入新密码: ")
     if password != confirmation:

@@ -1,6 +1,6 @@
 <template>
   <div class="license-page">
-    <header><span>BUSINESS LICENSE</span><h1>授权信息</h1><p>这里展示当前专业套餐、本机授权状态和演示模式边界。</p></header>
+    <PageHeader eyebrow="BUSINESS LICENSE" title="授权信息" description="这里展示当前专业套餐、本机授权状态和演示模式边界。" />
     <section class="license-card">
       <div class="license-mark"><BadgeCheck :size="26" /></div>
       <div><small>当前专业授权</small><h2>{{ user.plan_name || '专业批量版' }}</h2><p>有效期至 {{ formatDate(user.expires_at) }}</p></div>
@@ -19,6 +19,7 @@ import { computed } from 'vue'
 import { BadgeCheck, ShieldCheck } from '@lucide/vue'
 import { z } from 'zod'
 import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
+import PageHeader from '@/components/PageHeader.vue'
 
 const storedBusinessUserSchema = z.object({
   plan_name: z.string().optional(),

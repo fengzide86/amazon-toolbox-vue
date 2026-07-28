@@ -1,20 +1,89 @@
-"""Read-only, verified real-execution records.
-
-The internal demo build deliberately exposes no write endpoint. A future
-Runner-specific authenticated API must be designed before a record can enter
-this collection.
-"""
+"""Verified real-execution records reported with a consumed launch grant."""
 from __future__ import annotations
 
+import json
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.dependencies import get_current_user
+from core.response import success_response
 from database import get_db
-from models.feedback import ExecutionVerification, RunLog
+from domains.catalog.tool_config import normalize_tool_configs
+from models import LaunchToken, Setting
+from models.feedback import ExecutionVerification, LogStatus, RunLog
 
 router = APIRouter()
+
+
+class RunnerExecutionReport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=20, max_length=255)
+    run_id: str = Field(min_length=1, max_length=120)
+    status: str = Field(pattern="^(succeeded|failed)$")
+    error_code: str | None = Field(default=None, max_length=100)
+    adapter_version: str | None = Field(default=None, max_length=50)
+    page_fingerprint: str | None = Field(default=None, min_length=64, max_length=64)
+    page_changed: bool = False
+    completed_steps: int = Field(default=0, ge=0, le=500)
+
+
+@router.post("/report")
+async def report_execution(req: RunnerExecutionReport, db: AsyncSession = Depends(get_db)):
+    """Accept one sanitized terminal report for a consumed single-run grant."""
+    if settings.TOOL_EXECUTION_MODE != "live":
+        raise HTTPException(status_code=409, detail="FEATURE_DISABLED: 当前为演示模式")
+    result = await db.execute(select(LaunchToken).where(LaunchToken.token == req.token).with_for_update())
+    launch = result.scalar_one_or_none()
+    if not launch:
+        raise HTTPException(status_code=404, detail="启动授权不存在")
+    if launch.execution_mode != "single":
+        raise HTTPException(status_code=409, detail="批量任务应由批次接口同步")
+    if launch.status == "reported":
+        return success_response({"accepted": True, "duplicate": True})
+    if launch.status != "used" or not launch.used_at:
+        raise HTTPException(status_code=409, detail="启动授权尚未被本地 Runner 验证")
+    if launch.used_at < datetime.now() - timedelta(hours=24):
+        raise HTTPException(status_code=410, detail="执行结果上报时间已过")
+
+    setting_result = await db.execute(select(Setting.value).where(Setting.key == "tool_configs"))
+    try:
+        tools = normalize_tool_configs(json.loads(setting_result.scalar() or "[]"))
+    except (TypeError, ValueError):
+        tools = []
+    tool = next((item for item in tools if item.get("id") == launch.tool_id), {})
+    detail = json.dumps({
+        "run_id": req.run_id,
+        "adapter_version": req.adapter_version,
+        "page_fingerprint": req.page_fingerprint,
+        "page_changed": req.page_changed,
+        "completed_steps": req.completed_steps,
+    }, ensure_ascii=False)
+    log = RunLog(
+        user_id=launch.user_id,
+        auth_code_id=launch.auth_code_id,
+        device_id=launch.device_id,
+        platform_key=launch.platform_key,
+        tool_id=launch.tool_id,
+        tool_name=tool.get("name") or launch.tool_id,
+        module=tool.get("module"),
+        capability_key=tool.get("capability_key"),
+        script_key=launch.script_key,
+        status=LogStatus.SUCCESS if req.status == "succeeded" else LogStatus.FAILED,
+        error_code=req.error_code,
+        detail=detail,
+        verification_state=ExecutionVerification.VERIFIED,
+    )
+    db.add(log)
+    launch.status = "reported"
+    await db.commit()
+    await db.refresh(log)
+    return success_response({"accepted": True, "duplicate": False, "execution_id": log.id})
 
 
 def _owner_id(current_user: dict) -> int:

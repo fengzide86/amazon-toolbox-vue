@@ -42,7 +42,10 @@ export function isAllowedWebviewUrl(url: string): boolean {
   if (url === 'about:blank') return true
   try {
     const parsed = new URL(url)
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password
+    if (parsed.username || parsed.password) return false
+    if (parsed.protocol === 'https:') return true
+    return parsed.protocol === 'http:'
+      && (parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost')
   } catch {
     return false
   }

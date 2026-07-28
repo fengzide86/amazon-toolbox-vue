@@ -50,6 +50,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     unregisterBrowser: (): Promise<unknown> => ipcRenderer.invoke('automation:unregister-browser'),
     onEvent: (callback: UnknownCallback): Unsubscribe => subscribe('automation:event', callback),
   }, batch: {
+    storeDemoImport: (payload: unknown): Promise<unknown> => ipcRenderer.invoke('batch:store-demo-import', payload),
+    loadSampleImport: (options: unknown): Promise<unknown> => ipcRenderer.invoke('batch:load-sample-import', options),
+    saveSampleTemplate: (): Promise<unknown> => ipcRenderer.invoke('batch:save-sample-template'),
+    remapImportItems: (payload: unknown): Promise<unknown> => ipcRenderer.invoke('batch:remap-import-items', payload),
     selectImportFile: (options: unknown): Promise<unknown> => ipcRenderer.invoke('batch:select-import-file', options),
     parseImportFile: (options: unknown): Promise<unknown> => ipcRenderer.invoke('batch:parse-import-file', options),
     exportImportErrors: (errors: unknown): Promise<unknown> => ipcRenderer.invoke('batch:export-import-errors', errors),
@@ -70,5 +74,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onLaunchToolSuccess: (callback: UnknownCallback): Unsubscribe => subscribe('launch-tool-success', callback),
   } : {}),
   notifications: { onFocus: (callback: UnknownCallback): Unsubscribe => subscribe('toolbox:notification-focus', callback) },
+  ...(automationEnabled ? { freight: {
+    getDefaultPack: (): Promise<unknown> => ipcRenderer.invoke('freight:get-default-pack'),
+    parseWorkbook: (options: unknown): Promise<unknown> => ipcRenderer.invoke('freight:parse-workbook', options),
+    reparseWorkbook: (options: unknown): Promise<unknown> => ipcRenderer.invoke('freight:reparse-workbook', options),
+    quote: (payload: unknown): Promise<unknown> => ipcRenderer.invoke('freight:quote', payload),
+  } } : {}),
   openExternal: (url: string): Promise<unknown> => ipcRenderer.invoke('open-external', url),
 })
