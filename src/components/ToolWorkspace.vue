@@ -77,7 +77,7 @@
       </main>
 
       <aside class="progress-panel">
-        <div class="demo-disclosure" role="note">
+        <div class="demo-disclosure" role="note" data-testid="execution-scope-note">
           {{ isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
         </div>
         <template v-if="!isTerminal">
@@ -106,7 +106,7 @@
 
           <div v-else class="running-note">
             <LoaderCircle :size="17" class="spin" />
-            <div><strong>{{ runningMessage }}</strong><span>{{ isDemo ? '结果只代表本地沙盒操作成功' : '只有通过平台结果核验才会标记成功' }}</span></div>
+            <div><strong>{{ runningMessage }}</strong><span data-testid="result-boundary">{{ isDemo ? '结果只代表本地沙盒操作成功' : '只有通过平台结果核验才会标记成功' }}</span></div>
           </div>
         </template>
 

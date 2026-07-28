@@ -25,6 +25,15 @@ npm run electron:dev
 
 Electron 会编译 TypeScript、构建前端并启动桌面程序。自动化测试使用隔离的本机配置；开发预览根据下述本地配置选择控制面。
 
+需要使用与 CI 一致的 MariaDB、Redis 和后端容器时，按 `docs/DOCKER_OPTIMIZATION_PLAN.md` 复制 `.env.docker.example` 并运行 `npm run docker:up`。Electron 与本地 Runner 仍然在 Windows 原生环境运行。
+
+如果 Playwright 自带浏览器尚未下载，可以临时复用已安装的 Chrome：
+
+```powershell
+$env:PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH='C:\Program Files\Google\Chrome\Application\chrome.exe'
+npm run test:e2e:internal
+```
+
 根目录 BAT 只保留稳定的入口，实际逻辑统一由 `scripts/toolbox-cli.mjs` 执行，避免多个 BAT 各自维护一套易漂移的判断。
 
 ## 提交前检查
@@ -117,7 +126,7 @@ SSH 连接信息统一放在忽略提交的 `.env.deploy`。服务器使用非 2
 1. 用真实 C 端授权运行一次工具。
 2. 用真实 B 端授权导入一个小批次并处理一次登录或验证码现场。
 3. 登录管理后台，检查行动中心、公告和更新发布。
-生产服务器使用 `/etc/systemd/system/toolbox-backend.service`，通过 Uvicorn 运行后端；服务器未安装 Docker。仓库已删除未使用的 Docker Compose 部署入口。
+生产服务器当前仍使用 `/etc/systemd/system/toolbox-backend.service`，通过 Uvicorn 运行后端；服务器尚未安装 Docker。仓库中的 Compose 先用于本地一致性和 MariaDB 集成测试，生产容器迁移必须按 `docs/DOCKER_OPTIMIZATION_PLAN.md` 的旁路验证与回滚步骤分阶段执行。
 
 2026-07-16 已将生产控制面升级到 1.7.2，并完成 MariaDB 备份、Alembic 迁移、Python 3.10 兼容检查、CORS 桌面协议检查和失败自动回滚验证。服务器保留 `pre-1.7.2-*` 数据库与代码备份，以及 `pre-cors-*` 代码备份。
 

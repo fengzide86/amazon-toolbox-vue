@@ -1,5 +1,5 @@
 <template>
-  <div :class="['batch-workspace', { 'has-batch': store.isActive || store.snapshot.status === 'completed' }]">
+  <div data-testid="business-workspace-page" :class="['batch-workspace', { 'has-batch': store.isActive || store.snapshot.status === 'completed' }]">
     <PageHeader
       eyebrow="BATCH AUTOMATION"
       title="批量自动化工作台"
@@ -73,7 +73,7 @@
               <button class="import-choice featured" :disabled="!store.selectedTool || store.loading" @click="loadSample">
                 <Sparkles :size="18" /><span><strong>一键载入演示数据</strong><small>自动匹配当前工具的 8 条样例</small></span>
               </button>
-              <button class="import-choice" :disabled="!store.selectedTool || store.loading" @click="chooseFile">
+              <button data-testid="business-file-upload" class="import-choice" :disabled="!store.selectedTool || store.loading" @click="chooseFile">
                 <Upload :size="18" /><span><strong>选择自己的 Excel</strong><small>.xlsx / .csv，最多 {{ store.entitlements.max_batch_rows || 50 }} 行</small></span>
               </button>
               <button class="import-choice compact" :disabled="store.loading" @click="downloadSample">
@@ -176,7 +176,7 @@
             <div class="business-stage"><span>业务阶段</span><div><i :class="{done: stageIndex>0,active:stageIndex===0}"></i><i :class="{done:stageIndex>1,active:stageIndex===1}"></i><i :class="{done:stageIndex>2,active:stageIndex===2}"></i><i :class="{done:stageIndex>3,active:stageIndex===3}"></i></div><small>准备 · 执行 · 核验 · 完成</small></div>
             <button v-if="store.selectedItem.status === 'waiting_user'" class="primary-action warning" @click="completeAction">我已完成，继续处理</button>
             <button v-else-if="store.selectedItem.status === 'failed'" class="primary-action" @click="restartItem">重新发起此账号</button>
-            <div class="security-note"><ShieldCheck :size="15" /><span>{{ store.isDemoBatch ? '这是本地交互沙盒，不访问外部平台。' : '账号登录现场仅保存在本机，服务器只接收脱敏状态。' }}</span></div>
+            <div class="security-note" data-testid="business-execution-scope"><ShieldCheck :size="15" /><span>{{ store.isDemoBatch ? '这是本地交互沙盒，不访问外部平台。' : '账号登录现场仅保存在本机，服务器只接收脱敏状态。' }}</span></div>
           </template>
         </aside>
       </div>

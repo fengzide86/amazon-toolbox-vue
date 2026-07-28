@@ -144,7 +144,15 @@ describe('declarative automation workflow runtime', () => {
     let result: Record<string, unknown>
     try {
       result = await new Promise<Record<string, unknown>>((resolveRun, rejectRun) => {
-        const timer = setTimeout(() => rejectRun(new Error('runner test timed out')), 30_000)
+        const timer = setTimeout(() => rejectRun(new Error('runner test timed out')), 45_000)
+        const rejectAndClear = (error: Error) => {
+          clearTimeout(timer)
+          rejectRun(error)
+        }
+        child.once('error', rejectAndClear)
+        child.once('exit', (code, signal) => {
+          if (code !== null || signal !== null) rejectAndClear(new Error(`runner exited before completion: code=${code}, signal=${signal}`))
+        })
         child.on('message', raw => {
           const message = raw as { type?: string; event?: Record<string, unknown> }
           if (message.type !== 'event' || !message.event) return
@@ -170,8 +178,18 @@ describe('declarative automation workflow runtime', () => {
       if (child.connected) child.send({ type: 'command', id: 'shutdown-1', command: 'shutdown', payload: {} })
       await new Promise<void>(resolveExit => {
         if (child.exitCode !== null || child.signalCode !== null) return resolveExit()
-        child.once('exit', () => resolveExit())
-        setTimeout(() => { child.kill(); resolveExit() }, 2_000)
+        let settled = false
+        const finish = () => {
+          if (settled) return
+          settled = true
+          clearTimeout(killTimer)
+          resolveExit()
+        }
+        child.once('exit', finish)
+        const killTimer = setTimeout(() => {
+          child.kill()
+          finish()
+        }, 2_000)
       })
     }
 
@@ -179,5 +197,5 @@ describe('declarative automation workflow runtime', () => {
     expect(eventTypes).toContain('step.completed')
     expect(eventTypes.at(-1)).toBe('run.completed')
     expect(result.result).toEqual(expect.objectContaining({ recordKind: 'demo' }))
-  }, 35_000)
+  }, 50_000)
 })

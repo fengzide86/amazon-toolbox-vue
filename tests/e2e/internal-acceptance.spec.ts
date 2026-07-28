@@ -1,5 +1,4 @@
 import { expect, test, type Page, type Request as PlaywrightRequest, type Route } from '@playwright/test'
-import ExcelJS from 'exceljs'
 
 type StaffRole = 'super_admin' | 'operator' | 'support'
 type SessionRole = StaffRole | 'user'
@@ -115,6 +114,63 @@ async function installApi(page: Page, responder?: ApiResponder): Promise<void> {
   })
 }
 
+async function installBatchDesktopBridge(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const maskedRows = [
+      { itemId: 'local-alpha', preview: { account_label: 'se***@example.com' } },
+      { itemId: 'local-beta', preview: { account_label: 'se***@example.com' } },
+    ]
+    let remappedRows = maskedRows
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        batch: {
+          onEvent: () => () => undefined,
+          getSnapshot: async () => null,
+          selectImportFile: async () => ({
+            importId: 'desktop-import-1',
+            fileName: 'internal-demo.xlsx',
+            validCount: 2,
+            errorCount: 0,
+            worksheetName: 'demo',
+            rows: maskedRows,
+            errors: [],
+          }),
+          remapImportItems: async (payload: { itemIds?: string[] }) => {
+            remappedRows = (payload.itemIds || []).map((itemId, index) => ({
+              itemId,
+              preview: maskedRows[index]?.preview || { account_label: '' },
+            }))
+            return {
+              importId: 'desktop-import-1-remapped',
+              fileName: 'internal-demo.xlsx',
+              validCount: remappedRows.length,
+              errorCount: 0,
+              worksheetName: 'demo',
+              rows: remappedRows,
+              errors: [],
+            }
+          },
+          create: async (payload: Record<string, unknown>) => ({
+            batchId: payload.batchId,
+            serverBatchId: payload.serverBatchId,
+            tool: payload.tool,
+            status: 'running',
+            recordKind: payload.recordKind,
+            counts: { total: remappedRows.length, pending: remappedRows.length, running: 0, waiting: 0, completed: 0, failed: 0 },
+            items: remappedRows.map(row => ({
+              itemId: row.itemId,
+              accountLabelMasked: String(row.preview.account_label || ''),
+              status: 'pending',
+              browserReady: false,
+            })),
+          }),
+        },
+      },
+    })
+  })
+}
+
 function parseJsonBody(request: PlaywrightRequest): Record<string, unknown> {
   const raw = request.postData()
   if (!raw) return {}
@@ -149,13 +205,13 @@ test('C 端单工具即使记录接口失败也进入 Demo，并且不会写真�
   })
 
   await page.goto('/#/user/tools')
-  await expect(page.getByRole('heading', { name: '选择一个工具体验演示' })).toBeVisible()
+  await expect(page.getByTestId('tools-page')).toBeVisible()
   await page.getByTestId('tool-card-注册流程演示').click()
 
   const workspace = page.getByTestId('tool-workspace')
   await expect(workspace).toBeVisible()
-  await expect(workspace.getByText('演示模式：不会登录、读取或修改真实店铺数据。')).toBeVisible()
-  await expect(workspace.getByText('演示结果不代表真实任务结果')).toBeVisible()
+  await expect(workspace.getByTestId('execution-scope-note')).toContainText('数据只存在本地沙盒')
+  await expect(workspace.getByTestId('result-boundary')).toHaveText('结果只代表本地沙盒操作成功')
   await expect(workspace.locator('webview')).toHaveCount(0)
   await expect(workspace.getByText('成功率')).toHaveCount(0)
   await expect(workspace.getByText(/预计.*时间/)).toHaveCount(0)
@@ -231,7 +287,7 @@ test('消息中心抽屉位于页面根层，不会被工具卡片覆盖', async
   expect(topElementIsDrawer).toBe(true)
 })
 
-test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号与 Cookie 不离开浏览器', async ({ page }) => {
+test('B 端接收桌面端脱敏预览，只发送行数和工具元数据，原文账号与 Cookie 不离开渲染进程', async ({ page }) => {
   await installSession(page, 'user', {
     product_type: 'business',
     business_workspace_enabled: true,
@@ -242,6 +298,7 @@ test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号�
       max_open_sessions: 4,
     },
   })
+  await installBatchDesktopBridge(page)
 
   const demoBatchRequests: PlaywrightRequest[] = []
   const itemRefs = ['item_ref_alpha', 'item_ref_beta']
@@ -308,24 +365,10 @@ test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号�
   })
 
   await page.goto('/#/business/workspace')
-  await expect(page.getByRole('heading', { name: '体验批量流程演示' })).toBeVisible()
+  await expect(page.getByTestId('business-workspace-page')).toBeVisible()
   await page.getByRole('button', { name: /批量注册流程演示/ }).click()
 
-  const workbook = new ExcelJS.Workbook()
-  const sheet = workbook.addWorksheet('demo')
-  sheet.addRow(['account_label', 'password', 'cookie'])
-  sheet.addRow(['secret.account@example.com', 'PASSWORD_SHOULD_NEVER_LEAVE', 'COOKIE_SHOULD_NEVER_LEAVE'])
-  sheet.addRow(['second.internal@example.com', 'SECOND_PASSWORD_PRIVATE', 'SECOND_COOKIE_PRIVATE'])
-  const xlsx = Buffer.from(await workbook.xlsx.writeBuffer())
-
-  const fileChooserPromise = page.waitForEvent('filechooser')
-  await page.getByRole('button', { name: /选择 .xlsx 演示表格/ }).click()
-  const fileChooser = await fileChooserPromise
-  await fileChooser.setFiles({
-    name: 'internal-demo.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer: xlsx,
-  })
+  await page.getByTestId('business-file-upload').click()
 
   await expect(page.getByText('se***@example.com').first()).toBeVisible()
   await expect(page.getByText('secret.account@example.com')).toHaveCount(0)
@@ -355,7 +398,7 @@ test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号�
     'SECOND_COOKIE_PRIVATE',
   ]) expect(serializedRequests).not.toContain(secret)
   expect(demoBatchRequests.some(request => new URL(request.url()).pathname.startsWith('/api/business/batches'))).toBe(false)
-  await expect(page.getByText('不访问真实平台')).toBeVisible()
+  await expect(page.getByTestId('business-execution-scope')).toContainText('不访问外部平台')
 })
 
 const roleExpectations: Array<{

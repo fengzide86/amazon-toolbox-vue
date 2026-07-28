@@ -1,0 +1,204 @@
+name: ${COMPOSE_PROJECT_NAME:-amazon-toolbox}
+
+x-api-environment: &api-environment
+  APP_ENV: internal
+  DEBUG: "false"
+  TOOL_EXECUTION_MODE: demo
+  AI_SUPPORT_MODE: rules
+  BUNDLED_BACKEND_ENABLED: "false"
+  DB_TYPE: mysql
+  MYSQL_HOST: mariadb
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env.docker}
+  MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER in .env.docker}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env.docker}
+  REDIS_URL: redis://redis:6379/0
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in .env.docker}
+  CORS_ORIGINS: ${CORS_ORIGINS:?set CORS_ORIGINS in .env.docker}
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+  LOG_LEVEL: INFO
+  LOG_FORMAT: json
+  TOOLBOX_RUNTIME_DIR: /var/lib/amazon-toolbox
+  UPDATE_RELEASE_DIR: /app/backend/updates
+  CHROMA_PERSIST_DIR: /app/backend/chroma_db
+
+x-container-hardening: &container-hardening
+  init: true
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  logging:
+    driver: local
+    options:
+      max-size: 10m
+      max-file: "5"
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?set MARIADB_ROOT_PASSWORD in .env.docker}
+      MARIADB_DATABASE: ${MYSQL_DATABASE:?set MYSQL_DATABASE in .env.docker}
+      MARIADB_USER: ${MYSQL_USER:?set MYSQL_USER in .env.docker}
+      MARIADB_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env.docker}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-flush-log-at-trx-commit=1
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    mem_limit: 1g
+    cpus: 2.0
+    pids_limit: 256
+    networks:
+      - toolbox
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    networks:
+      - toolbox
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  migrate:
+    image: amazon-toolbox-backend:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    environment:
+      <<: *api-environment
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      - toolbox_runtime:/var/lib/amazon-toolbox
+      - toolbox_updates:/app/backend/updates
+      - toolbox_update_staging:/app/backend/.updates-staging
+      - toolbox_chroma:/app/backend/chroma_db
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    networks:
+      - toolbox
+    <<: *container-hardening
+
+  api:
+    image: amazon-toolbox-backend:local
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    restart: unless-stopped
+    environment:
+      <<: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${TOOLBOX_API_PORT:-8000}:8000
+    volumes:
+      - toolbox_runtime:/var/lib/amazon-toolbox
+      - toolbox_updates:/app/backend/updates
+      - toolbox_update_staging:/app/backend/.updates-staging
+      - toolbox_chroma:/app/backend/chroma_db
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+    networks:
+      - toolbox
+    <<: *container-hardening
+
+  backend-tests:
+    profiles: ["test"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: test
+    environment:
+      APP_ENV: test
+      DEBUG: "true"
+      DB_TYPE: mysql
+      MYSQL_HOST: mariadb
+      MYSQL_PORT: "3306"
+      REDIS_URL: redis://redis:6379/1
+      TOOLBOX_RUNTIME_DIR: /var/lib/amazon-toolbox
+      MARIADB_TEST_URL: mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}
+    command:
+      - python
+      - -m
+      - pytest
+      - tests/integration/test_mariadb_order_concurrency.py
+      - --rootdir=.
+      - -q
+      - -rs
+      - -p
+      - no:cacheprovider
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/lib/amazon-toolbox:size=64m,mode=0700,uid=10001,gid=10001
+    mem_limit: 768m
+    cpus: 2.0
+    pids_limit: 256
+    networks:
+      - toolbox
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+networks:
+  toolbox:
+    driver: bridge
+
+volumes:
+  mariadb_data:
+  redis_data:
+  toolbox_runtime:
+  toolbox_updates:
+  toolbox_update_staging:
+  toolbox_chroma:

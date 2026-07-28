@@ -1,5 +1,5 @@
 <template>
-  <div class="toolbox-page">
+  <div class="toolbox-page" data-testid="tools-page">
     <PageHeader
       eyebrow="流程演示工具"
       title="选择一个工具开始处理"
