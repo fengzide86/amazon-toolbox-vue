@@ -325,6 +325,13 @@ function privileged(command) {
   return `if [ "$(id -u)" -eq 0 ]; then bash -lc ${shellQuote(command)}; else sudo -n bash -lc ${shellQuote(command)}; fi`
 }
 
+function verifyDeploymentAccess() {
+  const connection = sshConfiguration()
+  log(`验证生产 SSH 与免交互 sudo：${connection.target}`)
+  run('ssh', [...connection.sshArgs, connection.target, privileged('true')])
+  return connection
+}
+
 function deploymentArchive(version) {
   const archive = path.join(os.tmpdir(), `amazon-toolbox-backend-${version}-${Date.now()}.tar.gz`)
   const listPath = `${archive}.files.txt`
@@ -430,7 +437,7 @@ async function release(args) {
   const publish = args.includes('--publish')
   const dryRun = args.includes('--dry-run') || process.env.TOOLBOX_DRY_RUN === '1'
   if (dryRun) {
-    if (publish) sshConfiguration()
+    if (publish) verifyDeploymentAccess()
     log(`发布入口配置通过：当前 v${current}${publish ? '，目标为生产发布' : '，目标为本地构建'}。`)
     return
   }
@@ -456,6 +463,7 @@ async function release(args) {
     const latest = /^version:\s*['"]?([^'"\s]+)['"]?\s*$/m.exec(await response.text())?.[1]
     if (!latest) fail('线上 latest.yml 缺少版本号')
     if (compareSemver(version, latest) <= 0) fail(`生产发布版本必须高于线上 v${latest}`)
+    verifyDeploymentAccess()
   }
   if (publish && process.env.TOOLBOX_AUTO_PUBLISH !== '1') {
     if (!process.stdin.isTTY) fail('非交互生产发布需要 TOOLBOX_AUTO_PUBLISH=1')
