@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_user
 from core.logging import get_logger
+from core.response import CompatibleResponse
 from database import get_db
 from models import RunLog
 from schemas import LogCreate, LogResponse
@@ -22,7 +23,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_logs(
     user_id: int | None = Query(None, description="用户ID"),
     start_date: str | None = Query(None, description="开始日期 (YYYY-MM-DD)"),
@@ -106,7 +107,7 @@ async def get_logs(
     }
 
 
-@router.get("/export")
+@router.get("/export", response_model=CompatibleResponse)
 async def export_logs(
     user_id: int | None = Query(None, description="用户ID"),
     start_date: str | None = Query(None, description="开始日期 (YYYY-MM-DD)"),
@@ -181,7 +182,7 @@ async def export_logs(
     )
 
 
-@router.get("/tools")
+@router.get("/tools", response_model=CompatibleResponse)
 async def get_log_tools(
     user_id: int | None = Query(None, description="用户ID"),
     db: AsyncSession = Depends(get_db),

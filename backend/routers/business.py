@@ -1,18 +1,27 @@
 """B 端批量工作台控制面。仅接收脱敏状态，不接收 Excel 原文。"""
 import json
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
-from core.response import success_response
+from core.response import APIResponse, success_response
 from database import get_db
+from domains.access import require_business_access
 from domains.catalog.tool_config import force_demo_only_tool_configs, normalize_tool_configs
 from models import AutomationBatch, AutomationBatchItem, Setting
-from schemas.business import BatchCreate, BatchFinish, BatchItemUpdate, BatchUpdate
-from services.entitlement_service import require_business_access
+from schemas.business import (
+    BatchCreate,
+    BatchFinish,
+    BatchItemUpdate,
+    BatchUpdate,
+    BusinessBatchItemResponse,
+    BusinessBatchResponse,
+    BusinessBootstrapResponse,
+)
 
 router = APIRouter()
 
@@ -108,7 +117,7 @@ def _require_live_batch_write() -> None:
         )
 
 
-@router.get("/bootstrap")
+@router.get("/bootstrap", response_model=APIResponse[BusinessBootstrapResponse], response_model_exclude_unset=True)
 async def bootstrap(context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
     return success_response({
         "product_type": context["product_type"],
@@ -118,12 +127,12 @@ async def bootstrap(context: dict = Depends(require_business_access), db: AsyncS
     })
 
 
-@router.get("/tools")
+@router.get("/tools", response_model=APIResponse[list[dict[str, Any]]], response_model_exclude_unset=True)
 async def get_tools(_context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
     return success_response(await _business_tools(db))
 
 
-@router.post("/batches")
+@router.post("/batches", response_model=APIResponse[BusinessBatchResponse], response_model_exclude_unset=True)
 async def create_batch(req: BatchCreate, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
     _require_live_batch_write()
     if req.total_count > context["entitlements"]["max_batch_rows"]:
@@ -156,7 +165,7 @@ async def create_batch(req: BatchCreate, context: dict = Depends(require_busines
     return success_response(_serialize_batch(batch), message="批次已创建")
 
 
-@router.get("/batches")
+@router.get("/batches", response_model=APIResponse[list[BusinessBatchResponse]], response_model_exclude_unset=True)
 async def list_batches(
     limit: int = Query(30, ge=1, le=100),
     context: dict = Depends(require_business_access),
@@ -171,7 +180,7 @@ async def list_batches(
     return success_response([_serialize_batch(item) for item in result.scalars().all()])
 
 
-@router.get("/batches/{batch_id}")
+@router.get("/batches/{batch_id}", response_model=APIResponse[BusinessBatchResponse], response_model_exclude_unset=True)
 async def get_batch(batch_id: int, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
     batch = await _owned_batch(db, batch_id, context)
     result = await db.execute(
@@ -180,7 +189,7 @@ async def get_batch(batch_id: int, context: dict = Depends(require_business_acce
     return success_response(_serialize_batch(batch, result.scalars().all()))
 
 
-@router.patch("/batches/{batch_id}")
+@router.patch("/batches/{batch_id}", response_model=APIResponse[BusinessBatchResponse], response_model_exclude_unset=True)
 async def update_batch(req: BatchUpdate, batch_id: int, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
     _require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context)
@@ -198,7 +207,7 @@ async def update_batch(req: BatchUpdate, batch_id: int, context: dict = Depends(
     return success_response(_serialize_batch(batch))
 
 
-@router.put("/batches/{batch_id}/items/{client_item_id}")
+@router.put("/batches/{batch_id}/items/{client_item_id}", response_model=APIResponse[BusinessBatchItemResponse], response_model_exclude_unset=True)
 async def upsert_batch_item(
     req: BatchItemUpdate,
     batch_id: int,
@@ -234,7 +243,7 @@ async def upsert_batch_item(
     return success_response(_serialize_item(item))
 
 
-@router.post("/batches/{batch_id}/finish")
+@router.post("/batches/{batch_id}/finish", response_model=APIResponse[BusinessBatchResponse], response_model_exclude_unset=True)
 async def finish_batch(req: BatchFinish, batch_id: int, context: dict = Depends(require_business_access), db: AsyncSession = Depends(get_db)):
     _require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context)

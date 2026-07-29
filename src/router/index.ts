@@ -1,9 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 import { authService } from '@/utils/auth'
 import { hasBusinessWorkspaceAccess } from '@/features/auth/model'
 import type { BackofficeRole } from '@/features/auth/model'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   // 用户端路由
   {
     path: '/',

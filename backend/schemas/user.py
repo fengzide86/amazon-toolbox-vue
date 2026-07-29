@@ -1,27 +1,27 @@
 """
 用户相关 Schema
 """
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    total_seats: Optional[int] = None
-    extra_devices: Optional[int] = None
+    name: str | None = None
+    phone: str | None = None
+    total_seats: int | None = None
+    extra_devices: int | None = None
 
 
 class UserResponse(BaseModel):
     id: int
-    name: Optional[str] = None
-    phone: Optional[str] = None
-    auth_code_id: Optional[int] = None
-    device_id: Optional[str] = None
-    device_name: Optional[str] = None
+    name: str | None = None
+    phone: str | None = None
+    auth_code_id: int | None = None
+    device_id: str | None = None
+    device_name: str | None = None
     total_seats: int
     extra_devices: int
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.dependencies import get_current_user
-from core.response import success_response
+from core.response import CompatibleResponse, success_response
 from database import get_db
 from domains.catalog.tool_config import normalize_tool_configs
 from models import LaunchToken, Setting
@@ -33,7 +33,7 @@ class RunnerExecutionReport(BaseModel):
     completed_steps: int = Field(default=0, ge=0, le=500)
 
 
-@router.post("/report")
+@router.post("/report", response_model=CompatibleResponse)
 async def report_execution(req: RunnerExecutionReport, db: AsyncSession = Depends(get_db)):
     """Accept one sanitized terminal report for a consumed single-run grant."""
     if settings.TOOL_EXECUTION_MODE != "live":
@@ -115,7 +115,7 @@ def _serialize(log: RunLog) -> dict:
     }
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def list_executions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -151,7 +151,7 @@ async def list_executions(
     }
 
 
-@router.get("/{execution_id}")
+@router.get("/{execution_id}", response_model=CompatibleResponse)
 async def get_execution(
     execution_id: int,
     db: AsyncSession = Depends(get_db),

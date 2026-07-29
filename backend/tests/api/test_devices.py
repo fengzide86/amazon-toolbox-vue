@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Device, AuthCode, AuthSeat, User, Plan
+from models import AuthCode, AuthSeat, Device, Plan, User
 from tests.conftest import get_data
 
 

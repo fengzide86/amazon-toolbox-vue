@@ -3,9 +3,9 @@
 提供后台任务执行功能，避免阻塞主请求
 """
 import asyncio
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, Any, Optional
-from datetime import datetime
+
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -18,7 +18,7 @@ class TaskManager:
         self._tasks: set[asyncio.Task] = set()
         self._running = True
     
-    def create_task(self, coro, name: str = None) -> asyncio.Task:
+    def create_task(self, coro, name: str = None) -> asyncio.Task | None:
         """创建后台任务
         
         Args:
@@ -197,7 +197,7 @@ class PeriodicTask:
         self.func = func
         self.interval = interval
         self.name = name or func.__name__
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._running = False
     
     def start(self):

@@ -34,49 +34,17 @@ import {
   type ServerBatchHistory,
 } from '@/features/business/model'
 import { demoBatchListSchema, demoBatchSchema, unwrapApiData, type DemoBatch } from '@/features/demo/model'
-
-const STATUS_MESSAGE: Record<string, string> = {
-  pending: '等待处理',
-  running: '正在处理',
-  waiting_user: '需要操作',
-  completed: '已完成',
-  failed: '未完成',
-  cancelled: '已结束',
-}
+import {
+  createClientBatchId,
+  errorMessage,
+  importOptions,
+  requireBatchApi,
+  statusText,
+  unwrapData,
+} from '@/features/business/workspace-helpers'
+import { BusinessWorkspaceOutbox } from '@/features/business/workspace-outbox'
 
 const historySchema = z.array(serverBatchHistorySchema)
-const OUTBOX_RETRY_DELAYS = [2_000, 5_000, 15_000, 30_000] as const
-
-interface PendingItemSync {
-  batchId: string | number
-  itemId: string
-  payload: Record<string, unknown>
-}
-
-interface PendingBatchSync {
-  batchId: string | number
-  payload: Record<string, unknown>
-}
-
-interface PendingFinishSync {
-  batchId: string | number
-  status: string
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error && error.message ? error.message : fallback
-}
-
-function unwrapData(value: unknown): unknown {
-  if (typeof value !== 'object' || value === null || !('data' in value)) return value
-  return (value as { data: unknown }).data
-}
-
-function requireBatchApi() {
-  const api = window.electronAPI?.batch
-  if (!api) throw new Error('批量工作台仅支持桌面客户端')
-  return api
-}
 
 export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => {
   const bootstrap = ref<BusinessBootstrap | null>(null)
@@ -94,16 +62,16 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   let removeEventListener: (() => void) | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setTimeout> | null = null
-  let outboxRetryTimer: ReturnType<typeof setTimeout> | null = null
-  let outboxRetryIndex = 0
   let demoTimer: ReturnType<typeof setTimeout> | null = null
   let demoBatchEventSeq = 0
-  let flushingOutbox: Promise<void> | null = null
   const provisioning = new Set<string>()
   const demoItemSequences = new Map<string, number>()
-  const itemOutbox = new Map<string, PendingItemSync>()
-  let batchOutbox: PendingBatchSync | null = null
-  let finishOutbox: PendingFinishSync | null = null
+  const outbox = new BusinessWorkspaceOutbox({
+    updateItem: updateBusinessBatchItem,
+    updateBatch: updateBusinessBatch,
+    finishBatch: finishBusinessBatch,
+    onState: state => { syncState.value = state },
+  })
 
   const entitlements = computed(() => bootstrap.value?.entitlements || {})
   const tools = computed(() => bootstrap.value?.tools || [])
@@ -176,31 +144,12 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     error.value = null
   }
 
-  function toolCapabilityKey(tool: BusinessTool): string {
-    const direct = typeof tool.capability_key === 'string' ? tool.capability_key : ''
-    if (direct) return direct
-    const scriptKey = typeof tool.script_key === 'string' ? tool.script_key : ''
-    return scriptKey
-      .replace(/^demo\./, '')
-      .replace(/^amazon\./, '')
-      .replace(/_walkthrough_v\d+$/, '')
-      .replace(/\.v\d+$/, '')
-  }
-
-  function importOptions(tool: BusinessTool) {
-    return {
-      capabilityKey: toolCapabilityKey(tool),
-      schema: tool.batch_input_schema || [],
-      maxRows: entitlements.value.max_batch_rows || 50,
-    }
-  }
-
   async function loadSampleImport(): Promise<ImportPreview> {
     if (!selectedTool.value) throw new Error('请先选择批量工具')
     loading.value = true
     error.value = null
     try {
-      const payload = await requireBatchApi().loadSampleImport(importOptions(selectedTool.value))
+      const payload = await requireBatchApi().loadSampleImport(importOptions(selectedTool.value, entitlements.value.max_batch_rows || 50))
       importPreview.value = importPreviewSchema.parse(payload)
       return importPreview.value
     } catch (importError) {
@@ -221,7 +170,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     error.value = null
     try {
       const batch = requireBatchApi()
-      const payload = await batch.selectImportFile(importOptions(selectedTool.value))
+      const payload = await batch.selectImportFile(importOptions(selectedTool.value, entitlements.value.max_batch_rows || 50))
       if (!payload) throw new Error('未选择 Excel 文件')
       importPreview.value = importPreviewSchema.parse(payload)
       return importPreview.value
@@ -241,7 +190,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
 
   async function startBatch(): Promise<BusinessBatchSnapshot> {
     if (!selectedTool.value || !importPreview.value?.validCount) throw new Error('请先导入有效数据')
-    const batchId = `batch_${Date.now()}_${cryptoRandom()}`
+    const batchId = createClientBatchId()
     loading.value = true
     try {
       if (selectedTool.value.availability === 'demo_only') {
@@ -497,7 +446,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     }
     applySnapshot(await requireBatchApi().cancel(status))
     if (serverBatchId !== undefined) {
-      finishOutbox = { batchId: serverBatchId, status }
+      outbox.queueFinish({ batchId: serverBatchId, status })
       await flushOutboxWithin(1_500)
     }
   }
@@ -538,7 +487,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
             .catch(syncError => { error.value = errorMessage(syncError, '演示记录同步失败'); syncState.value = 'offline' })
         }
       } else if (serverBatchId !== undefined) {
-        finishOutbox = { batchId: serverBatchId, status: finalStatus }
+        outbox.queueFinish({ batchId: serverBatchId, status: finalStatus })
         void flushOutbox()
       }
     }
@@ -616,7 +565,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     const batchId = snapshot.value.serverBatchId
     const item = items.value.find(candidate => candidate.itemId === itemId)
     if (batchId === undefined || !item) return
-    itemOutbox.set(itemId, {
+    outbox.queueItem({
       batchId,
       itemId,
       payload: {
@@ -626,7 +575,6 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
         customer_message: item.message || undefined,
       },
     })
-    void flushOutbox()
   }
 
   function scheduleSummarySync(): void {
@@ -638,7 +586,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     const batchId = snapshot.value.serverBatchId
     if (isDemoBatch.value || batchId === undefined || snapshot.value.status === 'idle') return
     const counts = snapshot.value.counts
-    batchOutbox = {
+    outbox.queueBatch({
       batchId,
       payload: {
         status: snapshot.value.status === 'completed' ? 'completed' : 'running',
@@ -648,79 +596,23 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
         completed_count: counts.completed || 0,
         failed_count: counts.failed || 0,
       },
-    }
-    void flushOutbox()
+    })
   }
 
   function hasPendingSync(): boolean {
-    return itemOutbox.size > 0 || batchOutbox !== null || finishOutbox !== null
-  }
-
-  function clearOutboxRetry(): void {
-    if (outboxRetryTimer) clearTimeout(outboxRetryTimer)
-    outboxRetryTimer = null
-  }
-
-  function scheduleOutboxRetry(): void {
-    if (outboxRetryTimer || !hasPendingSync()) return
-    const delay = OUTBOX_RETRY_DELAYS[Math.min(outboxRetryIndex, OUTBOX_RETRY_DELAYS.length - 1)]
-    outboxRetryIndex += 1
-    outboxRetryTimer = setTimeout(() => {
-      outboxRetryTimer = null
-      void flushOutbox()
-    }, delay)
+    return outbox.hasPending()
   }
 
   async function flushOutbox(): Promise<void> {
-    if (flushingOutbox) return flushingOutbox
-    if (!hasPendingSync()) {
-      syncState.value = 'synced'
-      return
-    }
-    clearOutboxRetry()
-    syncState.value = 'syncing'
-    let completedWithoutError = false
-    flushingOutbox = (async () => {
-      try {
-        for (const [key, pending] of [...itemOutbox.entries()]) {
-          await updateBusinessBatchItem(pending.batchId, pending.itemId, pending.payload)
-          if (itemOutbox.get(key) === pending) itemOutbox.delete(key)
-        }
-        const pendingBatch = batchOutbox
-        if (pendingBatch) {
-          await updateBusinessBatch(pendingBatch.batchId, pendingBatch.payload)
-          if (batchOutbox === pendingBatch) batchOutbox = null
-        }
-        const pendingFinish = finishOutbox
-        if (pendingFinish) {
-          await finishBusinessBatch(pendingFinish.batchId, pendingFinish.status)
-          if (finishOutbox === pendingFinish) finishOutbox = null
-        }
-        outboxRetryIndex = 0
-        syncState.value = hasPendingSync() ? 'syncing' : 'synced'
-        completedWithoutError = true
-      } catch {
-        syncState.value = 'offline'
-        scheduleOutboxRetry()
-      } finally {
-        flushingOutbox = null
-        if (completedWithoutError && hasPendingSync()) void flushOutbox()
-      }
-    })()
-    return flushingOutbox
+    return outbox.flush()
   }
 
   async function flushOutboxWithin(timeoutMs: number): Promise<boolean> {
-    await Promise.race([
-      flushOutbox(),
-      new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
-    ])
-    return !hasPendingSync()
+    return outbox.flushWithin(timeoutMs)
   }
 
   function handleReconnect(): void {
-    clearOutboxRetry()
-    if (hasPendingSync()) void flushOutbox()
+    outbox.reconnect()
   }
 
   function handleVisibilityChange(): void {
@@ -740,7 +632,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     removeEventListener = null
     if (heartbeatTimer) clearInterval(heartbeatTimer)
     if (syncTimer) clearTimeout(syncTimer)
-    clearOutboxRetry()
+    outbox.dispose()
     if (demoTimer) clearTimeout(demoTimer)
     demoTimer = null
     heartbeatTimer = null
@@ -750,8 +642,6 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
 
-  const statusText = (status: string): string => STATUS_MESSAGE[status] || status
-
   return {
     bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale,
     entitlements, tools, items, openItems, isActive, isDemoBatch,
@@ -759,12 +649,3 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,
   }
 })
-
-function cryptoRandom(): string {
-  if (globalThis.crypto?.getRandomValues) {
-    const bytes = new Uint32Array(2)
-    globalThis.crypto.getRandomValues(bytes)
-    return Array.from(bytes, value => value.toString(16)).join('')
-  }
-  return Math.random().toString(16).slice(2)
-}

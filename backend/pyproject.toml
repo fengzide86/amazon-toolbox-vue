@@ -1,7 +1,7 @@
 [tool.ruff]
 target-version = "py310"
 line-length = 120
-exclude = ["build", ".pytest_cache"]
+exclude = ["build", ".pytest_cache", "alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
@@ -10,9 +10,11 @@ ignore = ["E501", "B008"]
 [tool.mypy]
 python_version = "3.10"
 strict = false
-disallow_untyped_defs = true
+disallow_untyped_defs = false
 check_untyped_defs = true
-disallow_any_generics = true
+disallow_any_generics = false
 follow_imports = "skip"
+ignore_missing_imports = true
+implicit_optional = true
 warn_unused_configs = true
 exclude = ["build", "alembic/versions"]

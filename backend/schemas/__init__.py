@@ -14,79 +14,86 @@ Pydantic Schema 模块 - 统一导出所有 schema
 """
 
 # 认证相关
+# AI客服相关
+from schemas.ai_chat import (
+    ChatConfigResponse,
+    ChatConfigUpdate,
+    ChatMessageCreate,
+    ChatMessageResponse,
+    ChatSessionCreate,
+    ChatSessionResponse,
+    KnowledgeBaseCreate,
+    KnowledgeBaseResponse,
+    KnowledgeBaseUpdate,
+)
 from schemas.auth import (
-    VerifyRequest,
-    VerifyResponse,
     AdminLoginRequest,
     AdminLoginResponse,
-)
-
-# 套餐相关
-from schemas.plan import (
-    PlanCreate,
-    PlanUpdate,
-    PlanResponse,
+    VerifyRequest,
+    VerifyResponse,
 )
 
 # 授权码相关
 from schemas.auth_code import (
-    DeviceResponse,
     AuthCodeGenerate,
-    AuthCodeUpdate,
     AuthCodeResponse,
+    AuthCodeUpdate,
     AuthSeatResponse,
+    DeviceResponse,
+)
+from schemas.business import (
+    BatchCreate,
+    BatchFinish,
+    BatchItemUpdate,
+    BatchUpdate,
+    BusinessBatchItemResponse,
+    BusinessBatchResponse,
+    BusinessBootstrapResponse,
+)
+
+# 看板相关
+from schemas.dashboard import DashboardData
+
+# 反馈/日志相关
+from schemas.feedback import (
+    FeedbackCreate,
+    FeedbackResponse,
+    FeedbackUpdate,
+    LogCreate,
+    LogResponse,
 )
 
 # 订单相关
 from schemas.order import (
     OrderCreate,
-    OrderUpdate,
     OrderResponse,
+    OrderUpdate,
 )
 
-# 用户相关
-from schemas.user import (
-    UserUpdate,
-    UserResponse,
-)
-
-# 反馈/日志相关
-from schemas.feedback import (
-    LogCreate,
-    LogResponse,
-    FeedbackCreate,
-    FeedbackUpdate,
-    FeedbackResponse,
+# 套餐相关
+from schemas.plan import (
+    PlanCreate,
+    PlanResponse,
+    PlanUpdate,
 )
 
 # 分润相关
 from schemas.profit import ProfitRecordResponse
 
-# 看板相关
-from schemas.dashboard import DashboardData
-
 # 系统设置/公告相关
 from schemas.system import (
-    SettingUpdate,
-    SettingResponse,
     AnnouncementCreate,
-    AnnouncementUpdate,
     AnnouncementOut,
+    AnnouncementUpdate,
+    SettingResponse,
+    SettingUpdate,
 )
 
-# AI客服相关
-from schemas.ai_chat import (
-    KnowledgeBaseCreate,
-    KnowledgeBaseUpdate,
-    KnowledgeBaseResponse,
-    ChatSessionCreate,
-    ChatSessionResponse,
-    ChatMessageCreate,
-    ChatMessageResponse,
-    ChatConfigUpdate,
-    ChatConfigResponse,
+# 用户相关
+from schemas.user import (
+    UserResponse,
+    UserUpdate,
 )
-from schemas.business import BatchCreate, BatchUpdate, BatchItemUpdate, BatchFinish
 
 __all__ = [
     # 认证
@@ -141,4 +148,7 @@ __all__ = [
     "BatchUpdate",
     "BatchItemUpdate",
     "BatchFinish",
+    "BusinessBatchItemResponse",
+    "BusinessBatchResponse",
+    "BusinessBootstrapResponse",
 ]

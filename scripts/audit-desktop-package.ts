@@ -46,7 +46,10 @@ function packagedSource(filename: string): string {
   return extractFile(asarPath, filename).toString('utf8')
 }
 
-const mainSource = packagedSource(path.join('dist-electron', 'electron', 'main.cjs'))
+const mainSource = [
+  packagedSource(path.join('dist-electron', 'electron', 'main.cjs')),
+  packagedSource(path.join('dist-electron', 'electron', 'desktop-application.cjs')),
+].join('\n')
 const preloadSource = packagedSource(path.join('dist-electron', 'electron', 'preload.cjs'))
 const updateManagerSource = packagedSource(path.join('dist-electron', 'electron', 'core', 'update-manager.cjs'))
 const indexSource = packagedSource(path.join('dist', 'index.html'))

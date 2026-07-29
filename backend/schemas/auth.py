@@ -1,8 +1,8 @@
 """
 认证相关 Schema
 """
+
 from pydantic import BaseModel
-from typing import Optional
 
 
 class VerifyRequest(BaseModel):
@@ -14,7 +14,7 @@ class VerifyRequest(BaseModel):
 class VerifyResponse(BaseModel):
     success: bool
     message: str
-    data: Optional[dict] = None
+    data: dict | None = None
 
 
 class AdminLoginRequest(BaseModel):
@@ -25,4 +25,4 @@ class AdminLoginRequest(BaseModel):
 class AdminLoginResponse(BaseModel):
     success: bool
     message: str
-    data: Optional[dict] = None
+    data: dict | None = None

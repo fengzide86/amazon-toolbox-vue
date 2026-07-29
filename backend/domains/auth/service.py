@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.logging import get_logger
 from core.response import ErrorCodes, error_response, success_response
 from core.security import create_access_token
+from domains.access import normalize_entitlements, resolve_product_access
 from models import AuthCode, AuthSeat, Device, Plan, User
-from services.entitlement_service import normalize_entitlements, resolve_product_access
 from services.staff_service import authenticate_staff, create_staff_access_token, staff_to_dict
 
 logger = get_logger(__name__)

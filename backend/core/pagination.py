@@ -2,10 +2,11 @@
 分页模块
 提供标准化的分页查询功能
 """
-from typing import TypeVar, Generic, List, Optional, Any, Tuple
 from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
+
 from fastapi import Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -62,7 +63,7 @@ class PageInfo:
 @dataclass
 class PaginatedResult(Generic[T]):
     """分页查询结果"""
-    items: List[T]
+    items: list[T]
     page_info: PageInfo
     
     def to_response(self, serializer=None) -> dict:
@@ -91,7 +92,7 @@ async def paginate(
     query: Select,
     db: AsyncSession,
     pagination: PaginationParams
-) -> Tuple[List[Any], int]:
+) -> tuple[list[Any], int]:
     """执行分页查询
     
     Args:

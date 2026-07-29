@@ -3,6 +3,7 @@
 使用服务层 + 统一响应格式
 """
 from datetime import datetime
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -12,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_user
+from core.response import CompatibleResponse
 from core.security import create_access_token, verify_token
 from core.token_blacklist import is_token_blacklisted
 from database import get_db
@@ -25,7 +27,7 @@ router = APIRouter()
 auth_limiter = Limiter(key_func=get_remote_address)
 
 
-@router.post("/verify")
+@router.post("/verify", response_model=CompatibleResponse)
 @auth_limiter.limit("10/minute")  # 每分钟最多10次尝试
 async def verify_auth_code(request: Request, req: VerifyRequest, db: AsyncSession = Depends(get_db)):
     """授权码验证（用户登录）"""
@@ -33,7 +35,7 @@ async def verify_auth_code(request: Request, req: VerifyRequest, db: AsyncSessio
     return await service.verify_auth_code(req.code, req.device_id, req.device_name)
 
 
-@router.post("/admin-login")
+@router.post("/admin-login", response_model=CompatibleResponse)
 @auth_limiter.limit("5/minute")  # 管理员登录更严格：每分钟5次
 async def admin_login(request: Request, req: AdminLoginRequest, db: AsyncSession = Depends(get_db)):
     """兼容旧客户端的后台登录 URL；身份数据只来自 staff_users。"""
@@ -41,7 +43,7 @@ async def admin_login(request: Request, req: AdminLoginRequest, db: AsyncSession
     return await service.admin_login(req.password, req.username, request=request)
 
 
-@router.post("/check")
+@router.post("/check", response_model=CompatibleResponse)
 async def check_auth_status(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -57,7 +59,7 @@ async def check_auth_status(
     return await service.check_auth_status(current_user.get("auth_code_id"))
 
 
-@router.get("/me")
+@router.get("/me", response_model=CompatibleResponse)
 async def get_current_user_info(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -67,9 +69,9 @@ async def get_current_user_info(
         return {"success": True, "message": "ok", "data": current_user}
     service = AuthService(db)
     return await service.get_user_info(
-        current_user.get("user_id"),
+        cast(int, current_user.get("user_id")),
         current_user.get("auth_code_id"),
-        current_user.get("role")
+        cast(str, current_user.get("role"))
     )
 
 
@@ -77,7 +79,7 @@ async def get_current_user_info(
 optional_security = HTTPBearer(auto_error=True)
 
 
-@router.post("/refresh")
+@router.post("/refresh", response_model=CompatibleResponse)
 async def refresh_token(
     credentials: HTTPAuthorizationCredentials = Depends(optional_security),
     db: AsyncSession = Depends(get_db)

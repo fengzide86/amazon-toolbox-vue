@@ -6,6 +6,7 @@
 import json
 import secrets
 from datetime import datetime, timedelta
+from typing import cast
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -16,8 +17,9 @@ from core.config import settings
 from core.dependencies import get_current_admin, get_current_user
 from core.deprecation import log_deprecated_api_call
 from core.logging import get_logger
-from core.response import ErrorCodes, error_response, success_response
+from core.response import CompatibleResponse, ErrorCodes, error_response, success_response
 from database import get_db
+from domains.access import resolve_product_access
 from domains.catalog import (
     DEFAULT_CATEGORIES,
     force_demo_only_tool_configs,
@@ -29,7 +31,6 @@ from domains.catalog import (
     plan_code as _plan_code,
 )
 from models import AuthCode, AutomationBatch, LaunchToken, Setting
-from services.entitlement_service import resolve_product_access
 from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
 
 logger = get_logger(__name__)
@@ -37,7 +38,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.get("/categories")
+@router.get("/categories", response_model=CompatibleResponse)
 async def get_tool_categories(db: AsyncSession = Depends(get_db)):
     """获取工具分类列表"""
     result = await db.execute(select(Setting).where(Setting.key == "tool_categories"))
@@ -47,7 +48,7 @@ async def get_tool_categories(db: AsyncSession = Depends(get_db)):
     return DEFAULT_CATEGORIES
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_tools(
     category: str | None = Query(None, description="分类ID"),
     search: str | None = Query(None, description="搜索关键词"),
@@ -88,7 +89,7 @@ async def get_tools(
     return tools
 
 
-@router.put("")
+@router.put("", response_model=CompatibleResponse)
 async def update_tools(
     request: Request,
     tools: list[dict] = Body(...),
@@ -126,7 +127,7 @@ async def update_tools(
     return {"success": True, "data": normalized_tools}
 
 
-@router.put("/categories")
+@router.put("/categories", response_model=CompatibleResponse)
 async def update_tool_categories(
     categories: list,
     request: Request,
@@ -182,7 +183,7 @@ DEFAULT_PLATFORMS = [
 ]
 
 
-@router.get("/platforms")
+@router.get("/platforms", response_model=CompatibleResponse)
 async def get_platforms(db: AsyncSession = Depends(get_db)):
     """获取平台配置列表"""
     result = await db.execute(select(Setting).where(Setting.key == "platform_configs"))
@@ -195,7 +196,7 @@ async def get_platforms(db: AsyncSession = Depends(get_db)):
     return sorted(platforms, key=lambda p: p.get("sort_order", 0))
 
 
-@router.put("/platforms")
+@router.put("/platforms", response_model=CompatibleResponse)
 async def update_platforms(
     platforms: list,
     request: Request,
@@ -232,8 +233,8 @@ async def update_platforms(
 
 # ===== 工具启动授权（云端控制面） =====
 
-@router.post("/{tool_id}/launch-grant")
-@router.post("/{tool_id}/launch-token")
+@router.post("/{tool_id}/launch-grant", response_model=CompatibleResponse)
+@router.post("/{tool_id}/launch-token", response_model=CompatibleResponse)
 async def create_launch_token(
     request: Request,
     tool_id: str,
@@ -443,7 +444,7 @@ async def create_launch_token(
         new_device = Device(
             auth_code_id=auth_code_id,
             device_id=device_id,
-            device_name=f"Device-{device_id[:8]}",
+            device_name=f"Device-{cast(str, device_id)[:8]}",
         )
         db.add(new_device)
         await db.flush()
@@ -546,8 +547,8 @@ async def create_launch_token(
         }
     })
 
-@router.post("/launch-grant/verify")
-@router.post("/launch-token/verify")
+@router.post("/launch-grant/verify", response_model=CompatibleResponse)
+@router.post("/launch-token/verify", response_model=CompatibleResponse)
 async def verify_launch_token(
     request: Request,
     token: str,

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_user
 from core.logging import get_logger
-from core.response import error_response, success_response
+from core.response import CompatibleResponse, error_response, success_response
 from database import get_db
 from domains.knowledge import faq_service
 from domains.knowledge.chat_service import RULE_FALLBACK_REPLY
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-@router.post("/query")
+@router.post("/query", response_model=CompatibleResponse)
 async def query_help(
     request: dict,
     db: AsyncSession = Depends(get_db),
@@ -139,10 +139,10 @@ async def _match_faq(
     
     # 关键词匹配评分
     best_match = None
-    best_score = 0
+    best_score = 0.0
     
     for faq in faqs:
-        score = 0
+        score = 0.0
         
         # 标题匹配
         title_lower = faq.title.lower()
@@ -178,7 +178,7 @@ async def _match_faq(
             best_match = faq
     
     # 最低匹配阈值
-    if best_score >= 2:
+    if best_score >= 2 and best_match is not None:
         return {
             "id": best_match.id,
             "title": best_match.title,
@@ -188,7 +188,7 @@ async def _match_faq(
     return None
 
 
-@router.get("/faq/list")
+@router.get("/faq/list", response_model=CompatibleResponse)
 async def get_faq_list(
     platform_key: str | None = None,
     capability_key: str | None = None,

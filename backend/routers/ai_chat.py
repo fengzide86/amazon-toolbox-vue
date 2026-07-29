@@ -3,6 +3,7 @@ AI 客服对话路由模块
 提供会话管理、消息收发（SSE 流式）、转人工等 API
 """
 import json
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin, get_current_user
+from core.response import CompatibleResponse
 from database import get_db
 from domains.knowledge import chat_service as ai_chat_service
 
@@ -51,7 +53,7 @@ class UpdateConfig(BaseModel):
 
 # ===== 用户端路由 =====
 
-@router.post("/session")
+@router.post("/session", response_model=CompatibleResponse)
 async def create_session(
     req: CreateSession | None = None,
     db: AsyncSession = Depends(get_db),
@@ -62,6 +64,7 @@ async def create_session(
     result = await ai_chat_service.create_session(db, user_id=user_id)
     if req:
         record = await ai_chat_service.get_session_record(db, result["session_id"])
+        assert record is not None
         record.platform_key = req.platform_key
         record.capability_key = req.capability_key
         await db.commit()
@@ -77,7 +80,7 @@ async def _require_session_owner(db: AsyncSession, session_id: str, current_user
     return record
 
 
-@router.get("/session/{session_id}")
+@router.get("/session/{session_id}", response_model=CompatibleResponse)
 async def get_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
@@ -91,7 +94,7 @@ async def get_session(
     return session
 
 
-@router.post("/session/{session_id}/message")
+@router.post("/session/{session_id}/message", response_model=CompatibleResponse)
 async def send_message(
     session_id: str,
     req: SendMessage,
@@ -115,7 +118,7 @@ async def send_message(
     }
 
 
-@router.post("/session/{session_id}/message/stream")
+@router.post("/session/{session_id}/message/stream", response_model=CompatibleResponse)
 async def send_message_stream(
     session_id: str,
     req: SendMessage,
@@ -146,7 +149,7 @@ async def send_message_stream(
     )
 
 
-@router.post("/session/{session_id}/resolve")
+@router.post("/session/{session_id}/resolve", response_model=CompatibleResponse)
 async def resolve_session(
     session_id: str,
     req: ResolveSession,
@@ -161,7 +164,7 @@ async def resolve_session(
     return {"message": "已标记为已解决"}
 
 
-@router.post("/session/{session_id}/transfer")
+@router.post("/session/{session_id}/transfer", response_model=CompatibleResponse)
 async def transfer_to_human(
     session_id: str,
     db: AsyncSession = Depends(get_db),
@@ -169,12 +172,12 @@ async def transfer_to_human(
 ):
     """转人工（自动创建工单）"""
     await _require_session_owner(db, session_id, current_user)
-    user_id = current_user.get("user_id")
+    user_id = cast(int, current_user.get("user_id"))
     feedback_id = await ai_chat_service.transfer_to_human(db, session_id, user_id=user_id)
     return {"message": "已转人工客服", "feedback_id": feedback_id}
 
 
-@router.post("/session/{session_id}/rate")
+@router.post("/session/{session_id}/rate", response_model=CompatibleResponse)
 async def rate_session(
     session_id: str,
     req: RateSession,
@@ -189,7 +192,7 @@ async def rate_session(
     return {"message": "评分已记录"}
 
 
-@router.get("/history")
+@router.get("/history", response_model=CompatibleResponse)
 async def get_history(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=50),
@@ -197,13 +200,13 @@ async def get_history(
     current_user: dict = Depends(get_current_user),
 ):
     """获取我的对话历史"""
-    user_id = current_user.get("user_id")
+    user_id = cast(int, current_user.get("user_id"))
     return await ai_chat_service.get_user_history(db, user_id, page, page_size)
 
 
 # ===== 管理端路由 =====
 
-@router.post("/admin/debug")
+@router.post("/admin/debug", response_model=CompatibleResponse)
 async def debug_chat(
     req: DebugChatRequest,
     db: AsyncSession = Depends(get_db),
@@ -229,7 +232,7 @@ async def debug_chat(
         },
     }
 
-@router.get("/admin/config")
+@router.get("/admin/config", response_model=CompatibleResponse)
 async def get_config(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
@@ -238,7 +241,7 @@ async def get_config(
     return await ai_chat_service.get_config(db)
 
 
-@router.put("/admin/config")
+@router.put("/admin/config", response_model=CompatibleResponse)
 async def update_config(
     req: UpdateConfig,
     request: Request,
@@ -257,7 +260,7 @@ async def update_config(
     return await ai_chat_service.update_config(db, updates, actor=actor, request=request)
 
 
-@router.get("/admin/sessions")
+@router.get("/admin/sessions", response_model=CompatibleResponse)
 async def get_admin_sessions(
     status: str | None = Query(None, description="状态过滤"),
     page: int = Query(1, ge=1),
@@ -269,7 +272,7 @@ async def get_admin_sessions(
     return await ai_chat_service.get_admin_sessions(db, status=status, page=page, page_size=page_size)
 
 
-@router.get("/admin/sessions/{session_id}")
+@router.get("/admin/sessions/{session_id}", response_model=CompatibleResponse)
 async def get_admin_session_detail(
     session_id: str,
     db: AsyncSession = Depends(get_db),
@@ -282,7 +285,7 @@ async def get_admin_session_detail(
     return session
 
 
-@router.get("/admin/stats")
+@router.get("/admin/stats", response_model=CompatibleResponse)
 async def get_admin_stats(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),

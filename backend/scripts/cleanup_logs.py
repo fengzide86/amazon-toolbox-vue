@@ -17,9 +17,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import delete, func, select
+
+from core.logging import get_logger, setup_logging
 from database import async_session_maker, engine
 from models import RunLog
-from core.logging import setup_logging, get_logger
 
 # 配置日志
 setup_logging()
@@ -57,11 +58,10 @@ async def cleanup_old_logs(days: int = RETENTION_DAYS) -> dict:
             logger.info(f"找到 {delete_count} 条过期日志")
             
             # 分批删除，避免长时间锁定
-            batch_size = 1000
             total_deleted = 0
             
             while total_deleted < delete_count:
-                result = await session.execute(
+                await session.execute(
                     delete(RunLog)
                     .where(RunLog.created_at < cutoff_date)
                     .execution_options(synchronize_session=False)

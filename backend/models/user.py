@@ -2,7 +2,8 @@
 用户数据模型
 包含: User
 """
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Index, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, func
+
 from models.base import Base
 
 

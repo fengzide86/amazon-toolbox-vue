@@ -2,9 +2,8 @@
 Token 黑名单模块
 用于使 JWT Token 失效（如用户登出、修改密码等场景）
 """
-from datetime import datetime, timedelta, timezone
-from typing import Set, Dict, Optional
-from core.config import settings
+from datetime import datetime, timezone
+
 from core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -19,7 +18,7 @@ class TokenBlacklist:
     """
     
     def __init__(self):
-        self._memory_blacklist: Dict[str, datetime] = {}  # token -> 过期时间
+        self._memory_blacklist: dict[str, datetime] = {}  # token -> 过期时间
         self._redis = None
         self._initialized = False
     
@@ -165,7 +164,7 @@ class LogoutManager:
     """
     
     def __init__(self):
-        self._logout_times: Dict[int, datetime] = {}  # user_id -> 登出时间
+        self._logout_times: dict[int, datetime] = {}  # user_id -> 登出时间
         self._redis = None
         self._initialized = False
     
@@ -201,7 +200,7 @@ class LogoutManager:
             self._logout_times[user_id] = logout_time
             return True
     
-    async def get_logout_time(self, user_id: int) -> Optional[datetime]:
+    async def get_logout_time(self, user_id: int) -> datetime | None:
         """获取用户最后登出时间
         
         Args:

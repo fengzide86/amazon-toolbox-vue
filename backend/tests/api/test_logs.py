@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import RunLog, User, AuthCode, Plan
+from models import Plan, RunLog, User
 from tests.conftest import get_data
 
 

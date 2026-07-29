@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.audit import log_admin_action
 from core.dependencies import require_super_admin
 from core.logging import get_logger
+from core.response import CompatibleResponse
 from database import get_db
 from models import Setting
 from schemas import SettingResponse, SettingUpdate
@@ -21,7 +22,7 @@ router = APIRouter()
 
 # ===== 公开接口 =====
 
-@router.get("/public")
+@router.get("/public", response_model=CompatibleResponse)
 async def get_public_settings(db: AsyncSession = Depends(get_db)):
     """获取公开系统设置（无需登录）
     
@@ -77,7 +78,7 @@ async def get_all_settings(
     return settings
 
 
-@router.put("")
+@router.put("", response_model=CompatibleResponse)
 async def update_setting(
     req: SettingUpdate,
     request: Request,

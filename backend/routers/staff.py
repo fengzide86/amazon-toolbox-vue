@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
 from core.dependencies import get_authenticated_staff, require_super_admin
+from core.response import CompatibleResponse
 from core.security import hash_password_async, verify_password_fallback_async
 from database import get_db
 from models import StaffRole, StaffStatus, StaffUser
@@ -45,7 +46,7 @@ async def _active_super_admin_count(db: AsyncSession) -> int:
     return int(result.scalar() or 0)
 
 
-@router.post("/auth/login")
+@router.post("/auth/login", response_model=CompatibleResponse)
 async def login(req: StaffLogin, request: Request, db: AsyncSession = Depends(get_db)):
     staff = await authenticate_staff(db, req.username, req.password, request=request)
     if not staff:
@@ -63,12 +64,12 @@ async def login(req: StaffLogin, request: Request, db: AsyncSession = Depends(ge
     }
 
 
-@router.get("/auth/me")
+@router.get("/auth/me", response_model=CompatibleResponse)
 async def me(staff: dict = Depends(get_authenticated_staff)):
     return {"success": True, "message": "ok", "data": staff}
 
 
-@router.post("/auth/change-password")
+@router.post("/auth/change-password", response_model=CompatibleResponse)
 async def change_password(
     req: StaffPasswordChange,
     request: Request,
@@ -113,7 +114,7 @@ async def change_password(
     }
 
 
-@router.post("/auth/logout")
+@router.post("/auth/logout", response_model=CompatibleResponse)
 async def logout(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -144,7 +145,7 @@ async def logout(
     return {"success": True, "message": "已退出，当前账号全部旧凭证已失效"}
 
 
-@router.get("/accounts")
+@router.get("/accounts", response_model=CompatibleResponse)
 async def list_accounts(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -173,7 +174,7 @@ async def list_accounts(
     }
 
 
-@router.post("/accounts", status_code=status.HTTP_201_CREATED)
+@router.post("/accounts", status_code=status.HTTP_201_CREATED, response_model=CompatibleResponse)
 async def create_account(
     req: StaffAccountCreate,
     request: Request,
@@ -220,7 +221,7 @@ async def create_account(
     }
 
 
-@router.patch("/accounts/{staff_id}")
+@router.patch("/accounts/{staff_id}", response_model=CompatibleResponse)
 async def update_account(
     staff_id: int,
     req: StaffAccountUpdate,
@@ -287,7 +288,7 @@ async def update_account(
     }
 
 
-@router.post("/accounts/{staff_id}/reset-password")
+@router.post("/accounts/{staff_id}/reset-password", response_model=CompatibleResponse)
 async def reset_password(
     staff_id: int,
     req: StaffPasswordReset,

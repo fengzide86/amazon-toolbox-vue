@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from core.dependencies import get_current_admin
-from core.response import success_response
+from core.response import CompatibleResponse, success_response
 from database import get_db
 from services.tool_release_service import (
     canonical_artifact,
@@ -32,7 +32,7 @@ def _require_live_tool_stage() -> None:
         )
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def list_tool_releases(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
@@ -41,7 +41,7 @@ async def list_tool_releases(
     return success_response(await load_releases(db))
 
 
-@router.post("")
+@router.post("", response_model=CompatibleResponse)
 async def add_tool_release(
     payload: dict = Body(...),
     db: AsyncSession = Depends(get_db),
@@ -69,7 +69,7 @@ async def add_tool_release(
     return success_response(release, "工具版本已创建并签名")
 
 
-@router.get("/{tool_id}/{version}/artifact")
+@router.get("/{tool_id}/{version}/artifact", response_model=CompatibleResponse)
 async def get_tool_release_artifact(
     tool_id: str,
     version: str,
@@ -98,7 +98,7 @@ async def get_tool_release_artifact(
     )
 
 
-@router.post("/{tool_id}/{version}/publish")
+@router.post("/{tool_id}/{version}/publish", response_model=CompatibleResponse)
 async def publish_tool_release(
     tool_id: str,
     version: str,
@@ -126,7 +126,7 @@ async def publish_tool_release(
     return success_response(release, "工具版本已发布")
 
 
-@router.post("/{tool_id}/rollback")
+@router.post("/{tool_id}/rollback", response_model=CompatibleResponse)
 async def rollback_tool_release(
     tool_id: str,
     payload: dict = Body(...),

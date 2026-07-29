@@ -23,6 +23,13 @@ const { startSandboxServer } = require('./automation/sandbox-server.cjs');
 const { parseFreightWorkbook } = require('./freight/rate-pack.cjs');
 const { quoteFreight } = require('../src/shared/freight/rate-engine.js');
 const { resolveSignedAdapter } = require('./automation/adapter-loader.cjs');
+const {
+  AUTOMATION_PROTOCOL_ERROR_CODE,
+  hostRequestSchema,
+  hostToRunnerMessageSchema,
+  runnerEventEnvelopeSchema,
+  runnerResponseSchema,
+} = require('../src/shared/ipc/automation-contract.js');
 
 const PROFILE_ROOT = process.env.TOOLBOX_PROFILE_ROOT || path.join(process.cwd(), '.automation-profiles');
 const ARTIFACT_ROOT = process.env.TOOLBOX_ARTIFACT_ROOT || path.join(process.cwd(), '.automation-artifacts');
@@ -126,7 +133,7 @@ class AutomationRuntime {
 
   emit(type: string, payload: UnknownRecord = {}): void {
     this.eventSequence += 1;
-    process.send?.({
+    process.send?.(runnerEventEnvelopeSchema.parse({
       type: 'event',
       event: {
         protocolVersion: PROTOCOL_VERSION,
@@ -136,7 +143,7 @@ class AutomationRuntime {
         runId: this.runId,
         ...payload,
       },
-    });
+    }));
   }
 
   async start(tool: RunnerTool = {}) {
@@ -572,7 +579,7 @@ class AutomationRuntime {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.hostPending.delete(id); reject(this.runnerError('BROWSER_HOST_TIMEOUT', `浏览器动作超时: ${action}`)); }, timeoutMs);
       this.hostPending.set(id, { resolve, reject, timer });
-      process.send?.({ type: 'host-request', id, action, payload });
+      process.send?.(hostRequestSchema.parse({ type: 'host-request', id, action, payload }));
     });
   }
 
@@ -595,9 +602,19 @@ class AutomationRuntime {
 const runtime = new AutomationRuntime();
 
 process.on('message', async (rawMessage: unknown) => {
-  const message = asRecord(rawMessage);
+  const parsedMessage = hostToRunnerMessageSchema.safeParse(rawMessage);
+  if (!parsedMessage.success) {
+    const raw = asRecord(rawMessage);
+    if (typeof raw.id === 'string') {
+      process.send?.(runnerResponseSchema.parse({
+        type: 'response', id: raw.id, ok: false,
+        error: { code: AUTOMATION_PROTOCOL_ERROR_CODE, message: 'Runner protocol payload is invalid' },
+      }));
+    }
+    return;
+  }
+  const message = parsedMessage.data;
   if (message.type === 'host-response') { runtime.handleHostResponse(message); return; }
-  if (message.type !== 'command') return;
   const id = message.id;
   const command = message.command;
   const payload = asRecord(message.payload);
@@ -610,11 +627,11 @@ process.on('message', async (rawMessage: unknown) => {
     else if (command === 'cancel') data = await runtime.cancel();
     else if (command === 'shutdown') data = await runtime.shutdown();
     else throw Object.assign(new Error(`Unknown runner command: ${command}`), { code: 'UNKNOWN_COMMAND' });
-    process.send?.({ type: 'response', id, ok: true, data });
+    process.send?.(runnerResponseSchema.parse({ type: 'response', id, ok: true, data }));
     if (command === 'shutdown') process.exit(0);
   } catch (error) {
     const commandError = failure(error, 'Runner 命令执行失败');
-    process.send?.({ type: 'response', id, ok: false, error: { code: commandError.code || 'RUNNER_COMMAND_FAILED', message: commandError.message } });
+    process.send?.(runnerResponseSchema.parse({ type: 'response', id, ok: false, error: { code: commandError.code || 'RUNNER_COMMAND_FAILED', message: commandError.message } }));
   }
 });
 

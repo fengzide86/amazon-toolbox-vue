@@ -40,6 +40,7 @@ amazon-toolbox/
 # ===== 日志文件 =====
 *.log
 logs/
+backend/.openapi-runtime/
 
 # ===== 上传文件 =====
 backend/uploads/
@@ -56,6 +57,7 @@ backend/uploads/
 coverage/
 htmlcov/
 .coverage
+backend/coverage.xml
 *.cover
 
 # ===== Python 构建 =====

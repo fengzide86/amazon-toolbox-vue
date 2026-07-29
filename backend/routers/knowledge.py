@@ -2,11 +2,14 @@
 知识库管理路由模块
 提供规则式知识库 CRUD 与批量导入 API
 """
+from typing import cast
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin
+from core.response import CompatibleResponse
 from database import get_db
 from domains.knowledge import service as knowledge_service
 
@@ -54,7 +57,7 @@ class RetrievalTestRequest(BaseModel):
 
 # ===== 路由 =====
 
-@router.post("/retrieval-test")
+@router.post("/retrieval-test", response_model=CompatibleResponse)
 async def retrieval_test(
     req: RetrievalTestRequest,
     _admin: dict = Depends(get_current_admin),
@@ -66,7 +69,7 @@ async def retrieval_test(
         detail={"code": "FEATURE_DISABLED", "message": "当前为规则式客服模式"},
     )
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_knowledge_list(
     category: str | None = Query(None, description="分类过滤"),
     status: str | None = Query(None, description="状态过滤"),
@@ -86,7 +89,7 @@ async def get_knowledge_list(
     )
 
 
-@router.get("/categories")
+@router.get("/categories", response_model=CompatibleResponse)
 async def get_categories(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
@@ -95,7 +98,7 @@ async def get_categories(
     return await knowledge_service.get_categories(db)
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=CompatibleResponse)
 async def get_stats(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
@@ -104,7 +107,7 @@ async def get_stats(
     return await knowledge_service.get_stats(db)
 
 
-@router.get("/{knowledge_id:int}")
+@router.get("/{knowledge_id:int}", response_model=CompatibleResponse)
 async def get_knowledge(
     knowledge_id: int,
     db: AsyncSession = Depends(get_db),
@@ -117,7 +120,7 @@ async def get_knowledge(
     return item
 
 
-@router.post("")
+@router.post("", response_model=CompatibleResponse)
 async def create_knowledge(
     req: KnowledgeCreate,
     request: Request,
@@ -131,7 +134,7 @@ async def create_knowledge(
         title=req.title,
         content=req.content,
         keywords=req.keywords,
-        priority=req.priority,
+        priority=cast(str, req.priority),
         platform_key=req.platform_key,
         capability_key=req.capability_key,
         actor=_admin,
@@ -141,7 +144,7 @@ async def create_knowledge(
     return result
 
 
-@router.put("/{knowledge_id:int}")
+@router.put("/{knowledge_id:int}", response_model=CompatibleResponse)
 async def update_knowledge(
     knowledge_id: int,
     req: KnowledgeUpdate,
@@ -169,7 +172,7 @@ async def update_knowledge(
     return item
 
 
-@router.delete("/{knowledge_id:int}")
+@router.delete("/{knowledge_id:int}", response_model=CompatibleResponse)
 async def delete_knowledge(
     knowledge_id: int,
     request: Request,
@@ -189,7 +192,7 @@ async def delete_knowledge(
     return {"message": "删除成功"}
 
 
-@router.post("/batch-import")
+@router.post("/batch-import", response_model=CompatibleResponse)
 async def batch_import(
     items: list[BatchImportItem],
     request: Request,
@@ -201,7 +204,7 @@ async def batch_import(
     return await knowledge_service.batch_import(db, data, actor=actor, request=request)
 
 
-@router.post("/sync-vector")
+@router.post("/sync-vector", response_model=CompatibleResponse)
 async def sync_to_vector(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),

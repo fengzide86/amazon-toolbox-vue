@@ -3,8 +3,8 @@
 支持 Redis 缓存，提供统一的缓存接口
 """
 import json
-from typing import Any, Optional, Dict, List
-from datetime import timedelta
+from typing import Any
+
 from core.config import settings
 from core.logging import get_logger
 
@@ -43,7 +43,7 @@ class CacheManager:
             logger.info("未配置 Redis，使用内存缓存")
             self._initialized = True
     
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """获取缓存数据"""
         if self.redis:
             try:
@@ -114,7 +114,7 @@ class CacheManager:
                 logger.error(f"Redis EXISTS 错误 [{key}]: {e}")
         return False
     
-    async def incr(self, key: str, amount: int = 1, ttl: int = None) -> Optional[int]:
+    async def incr(self, key: str, amount: int = 1, ttl: int = None) -> int | None:
         """原子递增"""
         if self.redis:
             try:
@@ -204,11 +204,11 @@ class CacheKeys:
         return cls.AUTH_CODE_INFO.format(code=code)
     
     @classmethod
-    def dashboard_stats(cls, platform: str = "all") -> str:
+    def dashboard_stats(cls, platform: str | None = "all") -> str:
         return cls.DASHBOARD_STATS.format(platform=platform or "all")
     
     @classmethod
-    def dashboard_charts(cls, platform: str = "all") -> str:
+    def dashboard_charts(cls, platform: str | None = "all") -> str:
         return cls.DASHBOARD_CHARTS.format(platform=platform or "all")
     
     @classmethod

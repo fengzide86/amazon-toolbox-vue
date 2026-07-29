@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import require_commerce_operator, require_super_admin
+from core.response import CompatibleResponse
 from database import get_db
 from schemas.profit import ProfitPolicyUpdate
 from services.profit_service import ProfitService, _serialize_ratios
@@ -11,7 +12,7 @@ from services.profit_service import ProfitService, _serialize_ratios
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_profit_records(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -28,7 +29,7 @@ async def get_profit_records(
     )
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=CompatibleResponse)
 async def get_profit_summary(
     platform_key: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -37,7 +38,7 @@ async def get_profit_summary(
     return await ProfitService(db).summary(platform_key)
 
 
-@router.get("/policy")
+@router.get("/policy", response_model=CompatibleResponse)
 async def get_profit_policy(
     db: AsyncSession = Depends(get_db),
     _staff: dict = Depends(require_commerce_operator),
@@ -50,7 +51,7 @@ async def get_profit_policy(
     }
 
 
-@router.put("/policy")
+@router.put("/policy", response_model=CompatibleResponse)
 async def update_profit_policy(
     req: ProfitPolicyUpdate,
     request: Request,

@@ -20,7 +20,7 @@ describe('packaged local automation runtime', () => {
   })
 
   it('keeps Runner, batch and webview capabilities behind an explicit package/runtime gate', () => {
-    const main = readFileSync(resolve('electron/main.cts'), 'utf8')
+    const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
 
     expect(main).toContain('packageMetadata.toolbox?.automationRuntime === true')
     expect(main).toContain("process.env.TOOLBOX_AUTOMATION_ENABLED === 'true'")

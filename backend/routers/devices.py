@@ -13,6 +13,7 @@ from core.audit import log_admin_action
 from core.dependencies import get_current_admin, get_current_user
 from core.exceptions import ConflictException, NotFoundException
 from core.logging import get_logger
+from core.response import CompatibleResponse
 from database import get_db
 from models import AuthCode, AuthSeat, Device, User
 
@@ -35,7 +36,7 @@ async def release_device_seat(db: AsyncSession, device: Device) -> None:
         seat.updated_at = datetime.utcnow()
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_devices(
     auth_code_id: int | None = Query(None, description="授权码ID"),
     page: int = Query(1, ge=1),
@@ -81,7 +82,7 @@ async def get_devices(
     }
 
 
-@router.get("/my")
+@router.get("/my", response_model=CompatibleResponse)
 async def get_my_devices(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user)
@@ -118,7 +119,7 @@ async def get_my_devices(
     } for d in auth_code.devices]
 
 
-@router.post("/unbind")
+@router.post("/unbind", response_model=CompatibleResponse)
 async def unbind_device(
     request: Request,
     device_id: int = Query(..., description="设备记录ID"),
@@ -161,7 +162,7 @@ async def unbind_device(
     return {"success": True, "message": f"设备 {device_name} 已解绑"}
 
 
-@router.post("/user-unbind")
+@router.post("/user-unbind", response_model=CompatibleResponse)
 async def user_unbind_device(
     device_id: int = Query(..., description="设备记录ID"),
     db: AsyncSession = Depends(get_db),

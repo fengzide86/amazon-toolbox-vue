@@ -2,8 +2,9 @@
 授权相关数据模型
 包含: AuthCode, Device, AuthSeat, LaunchToken
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import relationship
+
 from models.base import Base
 
 

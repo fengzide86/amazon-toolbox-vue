@@ -1,10 +1,11 @@
 """
 数据看板 API 集成测试
 """
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 
 from models import AuthCode, ExecutionVerification, Feedback, Order, Plan, RunLog, User
 from tests.conftest import get_data

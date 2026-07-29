@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin, get_current_user
 from core.pagination import PaginationParams
+from core.response import CompatibleResponse
 from database import get_db
 from schemas import FeedbackCreate, FeedbackUpdate
 from services.feedback_service import FeedbackService
@@ -15,7 +16,7 @@ from services.feedback_service import FeedbackService
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_feedback_list(
     status: str | None = Query(None, description="状态过滤"),
     platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
@@ -30,7 +31,7 @@ async def get_feedback_list(
     return await service.get_feedback_list(status=status, platform_key=platform_key, pagination=pagination)
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=CompatibleResponse)
 async def get_feedback_stats(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin)
@@ -40,7 +41,7 @@ async def get_feedback_stats(
     return await service.get_feedback_stats()
 
 
-@router.get("/my")
+@router.get("/my", response_model=CompatibleResponse)
 async def get_my_feedback(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -56,7 +57,7 @@ async def get_my_feedback(
     )
 
 
-@router.get("/{feedback_id}")
+@router.get("/{feedback_id}", response_model=CompatibleResponse)
 async def get_feedback(
     feedback_id: int,
     db: AsyncSession = Depends(get_db),
@@ -67,7 +68,7 @@ async def get_feedback(
     return await service.get_feedback_by_id(feedback_id)
 
 
-@router.post("")
+@router.post("", response_model=CompatibleResponse)
 async def create_feedback(
     req: FeedbackCreate,
     db: AsyncSession = Depends(get_db),
@@ -80,7 +81,7 @@ async def create_feedback(
     return await service.create_feedback(data)
 
 
-@router.put("/{feedback_id}")
+@router.put("/{feedback_id}", response_model=CompatibleResponse)
 async def update_feedback(
     feedback_id: int,
     req: FeedbackUpdate,
@@ -98,7 +99,7 @@ async def update_feedback(
     )
 
 
-@router.delete("/{feedback_id}")
+@router.delete("/{feedback_id}", response_model=CompatibleResponse)
 async def delete_feedback(
     feedback_id: int,
     request: Request,

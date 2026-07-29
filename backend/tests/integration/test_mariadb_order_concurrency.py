@@ -19,6 +19,8 @@ from services.staff_service import create_staff_access_token
 def _mariadb_test_url() -> str:
     raw_url = os.getenv("MARIADB_TEST_URL", "").strip()
     if not raw_url:
+        if os.getenv("REQUIRE_MARIADB_TEST") == "1":
+            pytest.fail("MARIADB_TEST_URL is required for this verification run")
         pytest.skip("MARIADB_TEST_URL is not configured; real row-lock test skipped")
 
     url = make_url(raw_url)

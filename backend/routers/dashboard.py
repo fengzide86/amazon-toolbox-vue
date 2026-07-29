@@ -8,13 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
 from core.dependencies import get_current_admin
+from core.response import CompatibleResponse
 from database import get_db
-from services.dashboard_service import DashboardService
+from domains.platform import DashboardService
 
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_dashboard(
     platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
@@ -25,7 +26,7 @@ async def get_dashboard(
     return await service.get_dashboard_stats(platform_key=platform_key)
 
 
-@router.get("/charts")
+@router.get("/charts", response_model=CompatibleResponse)
 async def get_dashboard_charts(
     platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
@@ -36,7 +37,7 @@ async def get_dashboard_charts(
     return await service.get_dashboard_charts(platform_key=platform_key)
 
 
-@router.post("/refresh-cache")
+@router.post("/refresh-cache", response_model=CompatibleResponse)
 async def refresh_dashboard_cache(
     request: Request,
     db: AsyncSession = Depends(get_db),

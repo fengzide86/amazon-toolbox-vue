@@ -15,10 +15,11 @@ from core.audit import log_admin_action
 from core.dependencies import get_current_admin
 from core.exceptions import NotFoundException
 from core.logging import get_logger
+from core.response import CompatibleResponse
 from database import get_db
+from domains.access import normalize_entitlements
 from models import AuthCode, AuthSeat, Device, Plan
 from schemas import AuthCodeGenerate, AuthCodeResponse, AuthCodeUpdate
-from services.entitlement_service import normalize_entitlements
 
 logger = get_logger(__name__)
 
@@ -91,7 +92,7 @@ def generate_random_code(length: int = 6) -> str:
     return ''.join(random.choices(chars, k=length))
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_auth_codes(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=100),
@@ -201,7 +202,7 @@ async def get_auth_code_detail(
     return await _build_auth_code_response(db, code)
 
 
-@router.post("/batch-generate")
+@router.post("/batch-generate", response_model=CompatibleResponse)
 async def batch_generate_codes(req: AuthCodeGenerate, request: Request, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     """批量生成授权码
     
@@ -331,7 +332,7 @@ async def update_auth_code(code_id: int, req: AuthCodeUpdate, request: Request, 
     return await _build_auth_code_response(db, code_obj)
 
 
-@router.delete("/{code_id}")
+@router.delete("/{code_id}", response_model=CompatibleResponse)
 async def delete_auth_code(code_id: int, request: Request, db: AsyncSession = Depends(get_db), _admin: dict = Depends(get_current_admin)):
     """软删除授权码并撤销席位，保留关联业务与审计记录。"""
     result = await db.execute(select(AuthCode).where(AuthCode.id == code_id))

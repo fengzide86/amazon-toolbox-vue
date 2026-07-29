@@ -1,10 +1,13 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "面向跨境电商业务的桌面自动化效率工具箱",
   "author": "Amazon Toolbox Team",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "main": "dist-electron/electron/desktop-main.cjs",
   "toolbox": {
     "controlApiUrl": "https://8.130.113.104",
@@ -31,6 +34,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage --exclude src/tests/electron/automationWorkflow.test.ts && npm run test:electron-workflow",
     "test:backend": "python -m pytest backend --rootdir=backend -q",
+    "test:backend:coverage": "python -m pytest backend --rootdir=backend --cov=backend --cov-report=term-missing --cov-report=xml:backend/coverage.xml -q",
+    "test:backend:diff-coverage": "python scripts/check_diff_coverage.py --base HEAD --working-tree --threshold 80",
+    "test:mariadb": "python -m pytest backend/tests/integration/test_mariadb_order_concurrency.py --rootdir=backend -q -rs",
+    "test:mariadb:required": "set \"REQUIRE_MARIADB_TEST=1\"&& npm run test:mariadb",
     "test:e2e": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test",
     "test:e2e:business": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.business.config.ts",
     "test:e2e:internal": "set \"PLAYWRIGHT_BROWSERS_PATH=D:\\AmazonToolboxData\\playwright-browsers\"&& playwright test --config=playwright.internal.config.ts",
@@ -41,19 +48,25 @@
     "test:automation-smoke": "npm run electron:compile && node scripts/automation-smoke.mjs",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\"",
+    "openapi:generate": "python scripts/export_openapi.py --output backend/openapi.json && python scripts/generate_openapi_types.py",
+    "openapi:check": "python scripts/export_openapi.py --output backend/openapi.json --check && python scripts/check_openapi_compat.py && python scripts/generate_openapi_types.py --check",
+    "architecture:check": "python scripts/check_backend_architecture.py",
     "security:audit": "python scripts/audit_secrets.py",
     "security:audit-history": "python scripts/audit_secrets.py --history",
     "deadcode": "tsx scripts/audit-dead-code.ts",
     "package:audit": "tsx scripts/audit-desktop-package.ts",
+    "desktop:verify-package": "npm run electron:compile && npm run build:desktop && set \"ELECTRON_CACHE=D:\\AmazonToolboxData\\electron-cache\"&& set \"ELECTRON_BUILDER_CACHE=D:\\AmazonToolboxData\\electron-builder-cache\"&& set CSC_IDENTITY_AUTO_DISCOVERY=false&& electron-builder --win --dir && npm run package:audit",
     "docker:config": "docker compose --env-file .env.docker -f compose.yaml config",
     "docker:up": "docker compose --env-file .env.docker -f compose.yaml up -d --build --wait",
     "docker:down": "docker compose --env-file .env.docker -f compose.yaml down",
     "docker:logs": "docker compose --env-file .env.docker -f compose.yaml logs --tail=200 -f api",
     "docker:test:mariadb": "docker compose --env-file .env.docker -f compose.yaml --profile test run --rm backend-tests",
     "build:verify": "npm run build && tsx scripts/verify-build.ts",
-    "verify:backend": "python -m pytest backend --rootdir=backend -q && python -m ruff check backend/domains/auth backend/domains/knowledge backend/domains/catalog backend/core/deprecation.py backend/app/lifecycle.py backend/routers/auth.py backend/routers/ai_chat.py backend/routers/knowledge.py backend/routers/help.py backend/routers/tools.py backend/routers/announcements.py backend/routers/updates.py && python -m mypy --config-file backend/pyproject.toml backend/app backend/domains",
+    "verify:backend:static": "python -m ruff check backend && python -m mypy --config-file backend/pyproject.toml backend/app backend/core backend/domains backend/services backend/routers",
+    "verify:backend": "npm run test:backend && npm run verify:backend:static",
     "verify:quick": "npm test && npm run test:backend",
-    "verify": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run deadcode && npm test && npm run build:desktop && npm run verify:backend"
+    "verify": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run deadcode && npm test && npm run build:desktop && npm run verify:backend",
+    "verify:release": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run deadcode && npm run test:coverage && npm run test:backend:coverage && npm run test:backend:diff-coverage && npm run verify:backend:static && npm run test:mariadb:required && npm run test:e2e:business && npm run test:e2e:internal && npm run desktop:verify-package"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",

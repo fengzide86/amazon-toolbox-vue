@@ -91,7 +91,7 @@ describe('app protocol renderer entrypoint', () => {
     expect(scriptPolicy).not.toContain("'unsafe-eval'")
     expect(html).not.toMatch(/<script\b(?![^>]*\bsrc\s*=)[^>]*>/i)
     expect(html).toContain('startup-loading')
-    expect(readFileSync(resolve('electron/main.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
+    expect(readFileSync(resolve('electron/desktop-application.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
     expect(readFileSync(resolve('electron/core/app-protocol.cts'), 'utf8')).toContain("scheme: 'app'")
   })
 })
@@ -115,7 +115,7 @@ describe('internal desktop package profile', () => {
   })
 
   it('removes tool-launch IPC from the internal renderer bridge', () => {
-    const main = readFileSync(resolve('electron/main.cts'), 'utf8')
+    const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
     const preload = readFileSync(resolve('electron/preload.cts'), 'utf8')
     expect(main).toContain("if (AUTOMATION_RUNTIME_ENABLED) registerTrustedOn('launch-tool'")
     expect(preload.indexOf('launchTool:')).toBeGreaterThan(preload.indexOf('...(automationEnabled'))

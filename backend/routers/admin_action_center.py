@@ -6,14 +6,14 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin
-from core.response import success_response
+from core.response import CompatibleResponse, success_response
 from database import get_db
 from models import AuthCode, AuthSeat, Device, Feedback
 
 router = APIRouter()
 
 
-@router.get("/action-center")
+@router.get("/action-center", response_model=CompatibleResponse)
 async def get_action_center(
     _admin: dict = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
@@ -84,7 +84,7 @@ async def get_action_center(
     })
 
 
-@router.get("/business-batches/{batch_id}")
+@router.get("/business-batches/{batch_id}", response_model=CompatibleResponse)
 async def get_business_batch(batch_id: int, _admin: dict = Depends(get_current_admin), db: AsyncSession = Depends(get_db)):
     del batch_id, _admin, db
     raise HTTPException(

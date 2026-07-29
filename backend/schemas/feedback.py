@@ -1,56 +1,56 @@
 """
 反馈/日志相关 Schema
 """
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class LogCreate(BaseModel):
-    user_id: Optional[int] = None
-    device_id: Optional[str] = None
-    tool_name: Optional[str] = None
-    module: Optional[str] = None
-    status: Optional[str] = None
-    error_code: Optional[str] = None
-    detail: Optional[str] = None
+    user_id: int | None = None
+    device_id: str | None = None
+    tool_name: str | None = None
+    module: str | None = None
+    status: str | None = None
+    error_code: str | None = None
+    detail: str | None = None
 
 
 class LogResponse(BaseModel):
     id: int
-    user_id: Optional[int] = None
-    device_id: Optional[str] = None
-    tool_name: Optional[str] = None
-    module: Optional[str] = None
-    status: Optional[str] = None
-    error_code: Optional[str] = None
-    detail: Optional[str] = None
-    created_at: Optional[datetime] = None
+    user_id: int | None = None
+    device_id: str | None = None
+    tool_name: str | None = None
+    module: str | None = None
+    status: str | None = None
+    error_code: str | None = None
+    detail: str | None = None
+    created_at: datetime | None = None
     verification_state: str = "legacy_unverified"
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class FeedbackCreate(BaseModel):
-    user_id: Optional[int] = None
-    title: Optional[str] = None
-    content: Optional[str] = None
-    screenshot: Optional[str] = None
+    user_id: int | None = None
+    title: str | None = None
+    content: str | None = None
+    screenshot: str | None = None
 
 
 class FeedbackUpdate(BaseModel):
-    status: Optional[str] = None
-    admin_reply: Optional[str] = None
+    status: str | None = None
+    admin_reply: str | None = None
 
 
 class FeedbackResponse(BaseModel):
     id: int
-    user_id: Optional[int] = None
-    title: Optional[str] = None
-    content: Optional[str] = None
-    screenshot: Optional[str] = None
+    user_id: int | None = None
+    title: str | None = None
+    content: str | None = None
+    screenshot: str | None = None
     status: str
-    admin_reply: Optional[str] = None
-    created_at: Optional[datetime] = None
+    admin_reply: str | None = None
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

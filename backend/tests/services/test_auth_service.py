@@ -1,11 +1,9 @@
 """
 认证服务测试
 """
-import pytest
 from datetime import datetime, timedelta, timezone
-from domains.auth import AuthService
-from core.security import create_access_token, verify_token, hash_password, verify_password
-from models import User
+
+from core.security import create_access_token, hash_password, verify_password, verify_token
 
 
 class TestAuthService:

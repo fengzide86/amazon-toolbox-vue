@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin, get_current_user
-from core.response import success_response
+from core.response import CompatibleResponse, success_response
 from database import get_db
 from services.freight_rate_service import (
     canonical_pack,
@@ -24,7 +24,7 @@ router = APIRouter()
 ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,100}$")
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def list_rate_releases(
     db: AsyncSession = Depends(get_db),
     _admin: dict = Depends(get_current_admin),
@@ -32,7 +32,7 @@ async def list_rate_releases(
     return success_response([public_release(item) for item in await load_rate_releases(db)])
 
 
-@router.post("/drafts")
+@router.post("/drafts", response_model=CompatibleResponse)
 async def create_draft(
     payload: dict = Body(...),
     db: AsyncSession = Depends(get_db),
@@ -53,7 +53,7 @@ async def create_draft(
     return success_response(public_release(draft), "费率草稿已保存")
 
 
-@router.post("/{pack_id}/{version}/publish")
+@router.post("/{pack_id}/{version}/publish", response_model=CompatibleResponse)
 async def publish_rate_pack(
     pack_id: str,
     version: str,
@@ -70,7 +70,7 @@ async def publish_rate_pack(
     return success_response(public_release(target), "费率版本已签名发布")
 
 
-@router.post("/{pack_id}/rollback")
+@router.post("/{pack_id}/rollback", response_model=CompatibleResponse)
 async def rollback_rate_pack(
     pack_id: str,
     payload: dict = Body(...),
@@ -90,7 +90,7 @@ async def rollback_rate_pack(
     return success_response(public_release(target), "费率版本已回退并重新签名")
 
 
-@router.get("/current")
+@router.get("/current", response_model=CompatibleResponse)
 async def get_current_rate_pack(
     pack_id: str | None = None,
     db: AsyncSession = Depends(get_db),
@@ -102,7 +102,7 @@ async def get_current_rate_pack(
     return success_response(public_release(release))
 
 
-@router.get("/{pack_id}/{version}/artifact")
+@router.get("/{pack_id}/{version}/artifact", response_model=CompatibleResponse)
 async def get_rate_artifact(
     pack_id: str,
     version: str,

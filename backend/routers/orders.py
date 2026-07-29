@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import require_any_staff, require_commerce_operator
 from core.exceptions import ValidationException
+from core.response import CompatibleResponse
 from database import get_db
 from models import Order, OrderStatus
 from schemas.order import OrderCreate, OrderTransitionRequest, OrderUpdate
@@ -19,7 +20,7 @@ from services.order_service import OrderService
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=CompatibleResponse)
 async def get_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -38,7 +39,7 @@ async def get_orders(
     )
 
 
-@router.get("/export")
+@router.get("/export", response_model=CompatibleResponse)
 async def export_orders(
     status_filter: str | None = Query(default=None, alias="status"),
     start_date: str | None = None,
@@ -115,7 +116,7 @@ async def export_orders(
     )
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=CompatibleResponse)
 async def create_order(
     req: OrderCreate,
     request: Request,
@@ -126,7 +127,7 @@ async def create_order(
     return {"success": True, "message": "订单已创建", "data": OrderService.serialize(order)}
 
 
-@router.get("/{order_id}")
+@router.get("/{order_id}", response_model=CompatibleResponse)
 async def get_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -136,8 +137,8 @@ async def get_order(
     return {"success": True, "message": "ok", "data": OrderService.serialize(order)}
 
 
-@router.patch("/{order_id}")
-@router.put("/{order_id}", deprecated=True)
+@router.patch("/{order_id}", response_model=CompatibleResponse)
+@router.put("/{order_id}", deprecated=True, response_model=CompatibleResponse)
 async def update_order(
     order_id: int,
     req: OrderUpdate,
@@ -154,7 +155,7 @@ async def update_order(
     return {"success": True, "message": "订单已更新", "data": OrderService.serialize(order)}
 
 
-@router.post("/{order_id}/mark-paid")
+@router.post("/{order_id}/mark-paid", response_model=CompatibleResponse)
 async def mark_order_paid(
     order_id: int,
     request: Request,
@@ -165,7 +166,7 @@ async def mark_order_paid(
     return {"success": True, "message": "订单已确认收款并生成分润", "data": OrderService.serialize(order)}
 
 
-@router.post("/{order_id}/cancel")
+@router.post("/{order_id}/cancel", response_model=CompatibleResponse)
 async def cancel_order(
     order_id: int,
     req: OrderTransitionRequest,
@@ -177,7 +178,7 @@ async def cancel_order(
     return {"success": True, "message": "订单已取消", "data": OrderService.serialize(order)}
 
 
-@router.post("/{order_id}/refund")
+@router.post("/{order_id}/refund", response_model=CompatibleResponse)
 async def refund_order(
     order_id: int,
     req: OrderTransitionRequest,
