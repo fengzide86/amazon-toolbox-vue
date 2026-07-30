@@ -167,13 +167,16 @@ function ensureDependencies() {
 
 function localBackendEnvironment() {
   const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
+  const defaultRuntimeRoot = isWindows
+    ? path.win32.join('D:\\', 'AmazonToolboxData')
+    : path.join(localAppData, 'AmazonToolboxData')
   return {
     ...process.env,
     APP_ENV: 'development',
     TOOL_EXECUTION_MODE: 'demo',
     AI_SUPPORT_MODE: 'rules',
     BUNDLED_BACKEND_ENABLED: 'false',
-    TOOLBOX_RUNTIME_DIR: process.env.TOOLBOX_RUNTIME_DIR || path.join(localAppData, 'AmazonToolboxData'),
+    TOOLBOX_RUNTIME_DIR: process.env.TOOLBOX_RUNTIME_DIR || defaultRuntimeRoot,
     PYTHONUTF8: process.env.PYTHONUTF8 || '1',
     PYTHONIOENCODING: process.env.PYTHONIOENCODING || 'utf-8',
   }

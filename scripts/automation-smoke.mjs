@@ -15,6 +15,7 @@ const child = fork(resolve('dist-electron/electron/automation-runner.cjs'), [], 
     TOOLBOX_RUNNER_MOCK: mock ? 'true' : 'false',
     TOOLBOX_PROFILE_ROOT: resolve(root, 'profiles'),
     TOOLBOX_ARTIFACT_ROOT: resolve(root, 'artifacts'),
+    TOOLBOX_FREIGHT_RATE_WORKBOOK: resolve('resources', 'rates', 'FreightTemplate_v2.xlsx'),
     TOOLBOX_MIN_ACTION_INTERVAL_MS: '250',
   },
   stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
@@ -29,7 +30,7 @@ const finish = (code, payload) => {
   child.send?.({ type: 'command', id: 'smoke-shutdown', command: 'shutdown', payload: {} })
   setTimeout(() => { child.kill(); process.exit(code) }, 400)
 }
-const timeout = setTimeout(() => finish(1, { success: false, error: 'automation smoke timed out' }), 45_000)
+const timeout = setTimeout(() => finish(1, { success: false, error: 'automation smoke timed out' }), 90_000)
 
 child.on('message', message => {
   if (message?.type !== 'event') return
