@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
 
-import { createClientBatchId, importOptions, statusText, toolCapabilityKey, unwrapData } from './workspace-helpers'
+import { createClientBatchId, importOptions, ipcPayload, statusText, toolCapabilityKey, unwrapData } from './workspace-helpers'
 
 describe('business workspace helpers', () => {
   it('derives stable importer capabilities without changing tool objects', () => {
@@ -16,6 +17,24 @@ describe('business workspace helpers', () => {
     expect(toolCapabilityKey(tool)).toBe('listing_script')
     expect(importOptions(tool, 45)).toEqual({ capabilityKey: 'listing_script', schema: [], maxRows: 45 })
     expect(tool).not.toHaveProperty('capability_key')
+  })
+
+  it('converts reactive tool data into values that Electron IPC can clone', () => {
+    const tool = reactive({
+      id: 'listing',
+      name: 'Listing',
+      availability: 'demo_only' as const,
+      demo_scenario_id: 'listing-demo',
+      supports_demo_batch: true,
+      supports_live_batch: false,
+      script_key: 'demo.listing_script_walkthrough_v1',
+      batch_input_schema: [{ key: 'sku', label: 'SKU', required: true, options: ['one'] }],
+    })
+
+    const options = importOptions(tool, 45)
+    expect(() => structuredClone(options)).not.toThrow()
+    expect(() => structuredClone(ipcPayload({ tool }))).not.toThrow()
+    expect(options.schema).toEqual(tool.batch_input_schema)
   })
 
   it('unwraps API envelopes and preserves raw values', () => {

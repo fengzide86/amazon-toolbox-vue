@@ -37,6 +37,7 @@ import { demoBatchListSchema, demoBatchSchema, unwrapApiData, type DemoBatch } f
 import {
   createClientBatchId,
   errorMessage,
+  ipcPayload,
   importOptions,
   requireBatchApi,
   statusText,
@@ -185,7 +186,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   async function exportImportErrors(): Promise<unknown> {
     if (!importPreview.value?.errors.length) return null
     if (selectedTool.value?.availability === 'demo_only') return null
-    return requireBatchApi().exportImportErrors(importPreview.value.errors)
+    return requireBatchApi().exportImportErrors(ipcPayload(importPreview.value.errors))
   }
 
   async function startBatch(): Promise<BusinessBatchSnapshot> {
@@ -219,7 +220,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
           importId: importPreview.value.importId,
           itemIds: itemRefs,
         }))
-        const localSnapshot = businessBatchSnapshotSchema.parse(await batchApi.create({
+        const localSnapshot = businessBatchSnapshotSchema.parse(await batchApi.create(ipcPayload({
           importId: localImport.importId,
           batchId: `demo_${batchId}`,
           serverBatchId: created.id,
@@ -231,7 +232,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
           },
           maxOpenSessions: 1,
           recordKind: 'demo',
-        }))
+        })))
         importPreview.value = null
         applySnapshot(localSnapshot)
         return localSnapshot
@@ -242,14 +243,14 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
         tool_name: selectedTool.value.name,
         total_count: importPreview.value.validCount,
       })))
-      const localSnapshot = businessBatchSnapshotSchema.parse(await requireBatchApi().create({
+      const localSnapshot = businessBatchSnapshotSchema.parse(await requireBatchApi().create(ipcPayload({
         importId: importPreview.value.importId,
         batchId,
         serverBatchId: serverBatch.id,
         tool: selectedTool.value,
         maxOpenSessions: entitlements.value.max_open_sessions || 6,
         recordKind: 'live',
-      }))
+      })))
       importPreview.value = null
       applySnapshot(localSnapshot)
       return localSnapshot
@@ -375,7 +376,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       }))
       const grant = envelope.launch_data || envelope.grant || (envelope.token ? launchGrantSchema.parse(envelope) : null)
       if (!grant) throw new Error('批量启动授权不完整')
-      await requireBatchApi().start({
+      await requireBatchApi().start(ipcPayload({
         itemId,
         tool: {
           ...tool,
@@ -395,7 +396,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
             signatureRequired: Boolean(grant.signature_required),
           },
         },
-      })
+      }))
     } catch (startError) {
       error.value = errorMessage(startError, '无法启动该账号')
       const failed = await requireBatchApi().failItem({ itemId, message: error.value }).catch(() => null)
@@ -500,7 +501,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     try {
       const tool = snapshot.value.tool || selectedTool.value
       if (!tool) throw new Error('当前演示缺少工具配置')
-      await requireBatchApi().start({
+      await requireBatchApi().start(ipcPayload({
         itemId,
         tool: {
           ...tool,
@@ -508,7 +509,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
           scriptKey: tool.script_key,
           launchGrant: { scriptKey: tool.script_key },
         },
-      })
+      }))
     } catch (startError) {
       error.value = errorMessage(startError, '本地交互演示启动失败')
       await requireBatchApi().failItem({ itemId, message: error.value }).catch(() => null)

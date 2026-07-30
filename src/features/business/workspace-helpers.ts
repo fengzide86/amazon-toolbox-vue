@@ -24,6 +24,11 @@ export function requireBatchApi() {
   return api
 }
 
+export function ipcPayload<T>(value: T): T {
+  if (value === undefined) return value
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
 export function toolCapabilityKey(tool: BusinessTool): string {
   const direct = typeof tool.capability_key === 'string' ? tool.capability_key : ''
   if (direct) return direct
@@ -36,11 +41,11 @@ export function toolCapabilityKey(tool: BusinessTool): string {
 }
 
 export function importOptions(tool: BusinessTool, maxRows: number) {
-  return {
+  return ipcPayload({
     capabilityKey: toolCapabilityKey(tool),
     schema: tool.batch_input_schema || [],
     maxRows,
-  }
+  })
 }
 
 export function statusText(status: string): string {
