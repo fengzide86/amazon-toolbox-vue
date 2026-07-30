@@ -73,6 +73,47 @@ test('C端即使工具配置支持批量，也不出现批量入口', async ({ p
   await expectNoOverflow(page)
 })
 
+test('载入演示数据后准备页可滚动到开始按钮', async ({ page }) => {
+  await mockControlPlane(page, 'business')
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        batch: {
+          onEvent: () => () => {},
+          getSnapshot: async () => ({ status: 'idle', items: [] }),
+          loadSampleImport: async () => ({
+            importId: 'responsive-import',
+            fileName: 'B端批量自动化测试数据.xlsx',
+            validCount: 8,
+            errorCount: 0,
+            rows: Array.from({ length: 8 }, (_, index) => ({
+              itemId: `item-${index + 1}`,
+              preview: { account_label: `演示项 ${index + 1}` },
+            })),
+            errors: [],
+          }),
+        },
+      },
+    })
+  })
+  await page.setViewportSize({ width: 1365, height: 720 })
+  await page.goto('/#/business/workspace', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('button', { name: '注册自动处理' }).click()
+  await page.getByRole('button', { name: /一键载入演示数据/ }).click()
+
+  const workspace = page.getByTestId('business-workspace-page')
+  const startButton = page.getByRole('button', { name: '开始批量演示' })
+  await expect(startButton).toBeEnabled()
+  await expect.poll(() => workspace.evaluate(element => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY,
+  }))).toMatchObject({ overflowY: 'auto' })
+  await startButton.scrollIntoViewIfNeeded()
+  await expect(startButton).toBeInViewport()
+})
+
 test('管理员行动中心在 1024 和 768 下保持完整卡片矩阵', async ({ page }) => {
   await mockControlPlane(page, 'super_admin')
   for (const width of [1024, 768]) {
