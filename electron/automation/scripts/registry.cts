@@ -180,7 +180,9 @@ const DEFINITIONS = {
     fields: [field('template_name', '模板名称'), field('country', '配送国家', { type: 'select', options: ['美国', '加拿大', '英国', '德国'] }), field('weight_kg', '目标重量（kg）', { type: 'number' }), field('length_cm', '长度（cm）', { type: 'number', required: false }), field('width_cm', '宽度（cm）', { type: 'number', required: false }), field('height_cm', '高度（cm）', { type: 'number', required: false }), field('shipping_price', '固定运费', { type: 'number' })],
     defaults: { template_name: '演示物流模板', country: '美国', weight_kg: 0.5, length_cm: 20, width_cm: 15, height_cm: 8, shipping_price: 5.99 },
     steps: [workflow('calculate_logistics', '计算物流模板运费', [freightCalculation()]), workflow('fill_logistics', '填写物流模板', [
-      fillAction('template_name', '填写模板名称'), selectAction('country', '选择配送国家'), fillAction('shipping_price', '填写固定运费'),
+      fillAction('template_name', '填写模板名称'), selectAction('country', '选择配送国家'), fillAction('weight_kg', '填写目标重量'),
+      fillAction('length_cm', '填写长度'), fillAction('width_cm', '填写宽度'), fillAction('height_cm', '填写高度'),
+      fillAction('shipping_price', '填写固定运费'),
     ]), workflow('submit_logistics', '保存物流模板', [submitAction(['保存模板', '保存', '提交'])])],
   },
   logistics_cost: {
@@ -213,7 +215,9 @@ const DEFINITIONS = {
     fields: [field('order_id', '订单号'), field('country', '配送国家', { type: 'select', options: ['美国', '加拿大', '英国', '德国'] }), field('weight_kg', '重量（kg）', { type: 'number' }), field('length_cm', '长度（cm）', { type: 'number', required: false }), field('width_cm', '宽度（cm）', { type: 'number', required: false }), field('height_cm', '高度（cm）', { type: 'number', required: false }), field('carrier', '物流承运商', { type: 'select', options: ['UPS 全球快捷', 'e邮宝', '燕文航空挂号小包', '中国邮政挂号小包'] }), field('tracking_number', '物流单号')],
     defaults: { order_id: 'DEMO-ORDER-001', country: '美国', weight_kg: 0.5, length_cm: 20, width_cm: 15, height_cm: 8, carrier: 'UPS 全球快捷', tracking_number: '1ZDEMO000001' },
     steps: [workflow('calculate_shipping', '计算并选择物流渠道', [freightCalculation()]), workflow('fill_shipping', '填写发货信息', [
-      fillAction('order_id', '填写订单号'), selectAction('carrier', '选择物流承运商'), fillAction('tracking_number', '填写物流单号'),
+      fillAction('order_id', '填写订单号'), selectAction('country', '选择配送国家'), fillAction('weight_kg', '填写重量'),
+      fillAction('length_cm', '填写长度'), fillAction('width_cm', '填写宽度'), fillAction('height_cm', '填写高度'),
+      selectAction('carrier', '选择物流承运商'), fillAction('tracking_number', '填写物流单号'),
     ]), workflow('submit_shipping', '确认发货', [submitAction(['确认发货', '标记为已发货', '提交'])])],
   },
   fba_agl: {

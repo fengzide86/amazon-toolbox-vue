@@ -25,7 +25,12 @@ describe('declarative automation workflow runtime', () => {
     ]
 
     for (const capability of capabilities) {
-      const demo = resolveScript(`demo.${capability}_walkthrough_v1`) as { sandbox?: boolean; steps?: unknown[]; allowedHosts?: string[] }
+      const demo = resolveScript(`demo.${capability}_walkthrough_v1`) as {
+        sandbox?: boolean
+        steps?: Array<{ actions?: Array<{ kind?: string; inputKey?: string }> }>
+        allowedHosts?: string[]
+        inputSchema?: Array<{ key: string; required?: boolean; type?: string }>
+      }
       const live = resolveScript(`amazon.${capability}.v1`) as { sandbox?: boolean; steps?: unknown[]; allowedHosts?: string[] }
       expect(demo.sandbox).toBe(true)
       expect(demo.steps?.length).toBeGreaterThan(0)
@@ -33,9 +38,14 @@ describe('declarative automation workflow runtime', () => {
       expect(live.steps?.length).toBeGreaterThan(0)
       expect(live.allowedHosts).toContain('idtrade.cn')
       expect(live.allowedHosts?.some(host => host.includes('sellercentral'))).toBe(false)
-      const inputTypes = new Map((demo as { inputSchema?: Array<{ key: string; type?: string }> }).inputSchema?.map(field => [field.key, field.type]) || [])
-      const actions = (demo.steps as Array<{ actions?: Array<{ kind?: string; inputKey?: string }> }>).flatMap(step => step.actions || [])
+      const inputTypes = new Map(demo.inputSchema?.map(field => [field.key, field.type]) || [])
+      const actions = (demo.steps || []).flatMap(step => step.actions || [])
       for (const action of actions.filter(item => item.kind === 'select')) expect(inputTypes.get(action.inputKey || '')).toBe('select')
+      const actionInputKeys = new Set(actions.map(action => action.inputKey).filter((key): key is string => Boolean(key)))
+      const missingRequiredInputs = (demo.inputSchema || [])
+        .filter(field => field.required !== false && !actionInputKeys.has(field.key))
+        .map(field => field.key)
+      expect(missingRequiredInputs, `${capability} must write every required input`).toEqual([])
       if (capability === 'replenishment') expect(actions).toContainEqual(expect.objectContaining({ kind: 'calculate', formula: 'replenishment' }))
     }
   })
