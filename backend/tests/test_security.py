@@ -363,6 +363,7 @@ class TestCORSSonfiguration:
         
         assert "Content-Type" in headers
         assert "Authorization" in headers
+        assert "Idempotency-Key" in headers
     
     def test_cors_max_age(self):
         """测试 CORS 预检缓存时间"""

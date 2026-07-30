@@ -56,6 +56,21 @@ class TestHealthCheck:
         assert "PATCH" in response.headers["access-control-allow-methods"]
         assert "X-Toolbox-Version" in response.headers["access-control-allow-headers"]
 
+    @pytest.mark.asyncio
+    async def test_demo_batch_cors_allows_idempotency_header(self, client: AsyncClient):
+        response = await client.options(
+            "/api/demo/batches",
+            headers={
+                "Origin": "http://127.0.0.1:3000",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type,idempotency-key,x-toolbox-version",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:3000"
+        assert "Idempotency-Key" in response.headers["access-control-allow-headers"]
+
 
 class TestAdminLogin:
     """管理员登录测试"""
