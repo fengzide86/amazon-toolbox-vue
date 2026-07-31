@@ -152,6 +152,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '分润管理', skeleton: 'table', roles: ['super_admin', 'operator'] }
       },
       {
+        path: 'expenses',
+        name: 'AdminExpenses',
+        component: () => import('@/views/admin/ExpensesView.vue'),
+        meta: { title: '公账支出', skeleton: 'dashboard', roles: ['super_admin', 'operator'] }
+      },
+      {
         path: 'settings',
         name: 'AdminSettings',
         component: () => import('@/views/admin/SettingsView.vue'),

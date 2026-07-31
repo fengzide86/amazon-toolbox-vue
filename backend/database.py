@@ -16,7 +16,7 @@ from models.base import Base
 logger = get_logger(__name__)
 
 DATABASE_URL = settings.get_database_url()
-SCHEMA_REVISION = "20260718_audit_target_id_string"
+SCHEMA_REVISION = "20260731_company_expenses"
 
 logger.info("数据库类型: %s", settings.DB_TYPE)
 logger.info("数据库连接: %s", DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL)

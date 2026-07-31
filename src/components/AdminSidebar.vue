@@ -28,6 +28,10 @@
         <Percent :size="14" class="menu-icon" />
         <span class="menu-label">分润管理</span>
       </router-link>
+      <router-link v-if="can('expenses.read')" to="/admin/expenses" class="menu-nav-item" active-class="is-active">
+        <WalletCards :size="14" class="menu-icon" />
+        <span class="menu-label">公账支出</span>
+      </router-link>
       <router-link to="/admin/users" class="menu-nav-item" active-class="is-active">
         <Users :size="14" class="menu-icon" />
         <span class="menu-label">用户管理</span>
@@ -75,7 +79,7 @@ import { authService } from '@/utils/auth'
 import { hasStaffPermission, staffRoleLabel, type StaffPermission } from '@/features/auth/permissions'
 import {
   LayoutDashboard, Key, BriefcaseBusiness, Receipt, Percent, Users, Wrench,
-  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser, Truck
+  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser, Truck, WalletCards
 } from '@lucide/vue'
 
 const role = computed(() => authService.getRole())

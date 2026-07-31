@@ -1,6 +1,1013 @@
 {
   "components": {
     "schemas": {
+      "APIResponse_BusinessBatchItemResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessBatchItemResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[BusinessBatchItemResponse]",
+        "type": "object"
+      },
+      "APIResponse_BusinessBatchResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessBatchResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[BusinessBatchResponse]",
+        "type": "object"
+      },
+      "APIResponse_BusinessBootstrapResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessBootstrapResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[BusinessBootstrapResponse]",
+        "type": "object"
+      },
+      "APIResponse_ExpenseAttachmentResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseAttachmentResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[ExpenseAttachmentResponse]",
+        "type": "object"
+      },
+      "APIResponse_ExpenseCategoryResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseCategoryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[ExpenseCategoryResponse]",
+        "type": "object"
+      },
+      "APIResponse_ExpenseRecordResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseRecordResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[ExpenseRecordResponse]",
+        "type": "object"
+      },
+      "APIResponse_ExpenseRenewalConfirmResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseRenewalConfirmResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[ExpenseRenewalConfirmResponse]",
+        "type": "object"
+      },
+      "APIResponse_ExpenseRenewalResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseRenewalResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[ExpenseRenewalResponse]",
+        "type": "object"
+      },
+      "APIResponse_ExpenseSummaryResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseSummaryResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[ExpenseSummaryResponse]",
+        "type": "object"
+      },
+      "APIResponse_NoneType_": {
+        "properties": {
+          "data": {
+            "description": "响应数据",
+            "title": "Data",
+            "type": "null"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[NoneType]",
+        "type": "object"
+      },
+      "APIResponse_list_BusinessBatchResponse__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BusinessBatchResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[list[BusinessBatchResponse]]",
+        "type": "object"
+      },
+      "APIResponse_list_ExpenseCategoryResponse__": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpenseCategoryResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[list[ExpenseCategoryResponse]]",
+        "type": "object"
+      },
+      "APIResponse_list_dict_str__Any___": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[list[dict[str, Any]]]",
+        "type": "object"
+      },
       "AdminLoginRequest": {
         "properties": {
           "password": {
@@ -876,6 +1883,20 @@
         "title": "BatchUpdate",
         "type": "object"
       },
+      "Body_add_expense_attachment_api_expenses__expense_id__attachments_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_add_expense_attachment_api_expenses__expense_id__attachments_post",
+        "type": "object"
+      },
       "Body_stage_release_api_updates_releases_stage_post": {
         "properties": {
           "files": {
@@ -930,6 +1951,234 @@
           "categories"
         ],
         "title": "Body_update_tool_categories_api_tools_categories_put",
+        "type": "object"
+      },
+      "BusinessBatchItemResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "account_label_masked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Label Masked"
+          },
+          "client_item_id": {
+            "title": "Client Item Id",
+            "type": "string"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "customer_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Message"
+          },
+          "intervention_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Intervention Type"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "client_item_id",
+          "status"
+        ],
+        "title": "BusinessBatchItemResponse",
+        "type": "object"
+      },
+      "BusinessBatchResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "client_batch_id": {
+            "title": "Client Batch Id",
+            "type": "string"
+          },
+          "completed_count": {
+            "title": "Completed Count",
+            "type": "integer"
+          },
+          "failed_count": {
+            "title": "Failed Count",
+            "type": "integer"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BusinessBatchItemResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "last_heartbeat_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Heartbeat At"
+          },
+          "pending_count": {
+            "title": "Pending Count",
+            "type": "integer"
+          },
+          "running_count": {
+            "title": "Running Count",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tool_id": {
+            "title": "Tool Id",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "total_count": {
+            "title": "Total Count",
+            "type": "integer"
+          },
+          "waiting_count": {
+            "title": "Waiting Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "client_batch_id",
+          "tool_id",
+          "tool_name",
+          "status",
+          "total_count",
+          "pending_count",
+          "running_count",
+          "waiting_count",
+          "completed_count",
+          "failed_count"
+        ],
+        "title": "BusinessBatchResponse",
+        "type": "object"
+      },
+      "BusinessBootstrapResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "entitlements": {
+            "title": "Entitlements",
+            "type": "object"
+          },
+          "product_type": {
+            "title": "Product Type",
+            "type": "string"
+          },
+          "seat_limit": {
+            "title": "Seat Limit",
+            "type": "integer"
+          },
+          "tools": {
+            "items": {
+              "type": "object"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "product_type",
+          "entitlements",
+          "seat_limit",
+          "tools"
+        ],
+        "title": "BusinessBootstrapResponse",
         "type": "object"
       },
       "CreateSession": {
@@ -1340,7 +2589,7 @@
           "playing_count": {
             "anyOf": [
               {
-                "maximum": 1.0,
+                "maximum": 50.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -1743,6 +2992,1236 @@
           "device_id"
         ],
         "title": "DeviceResponse",
+        "type": "object"
+      },
+      "ExpenseAttachmentResponse": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "expense_id": {
+            "title": "Expense Id",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "original_name": {
+            "title": "Original Name",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "expense_id",
+          "original_name",
+          "mime_type",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "ExpenseAttachmentResponse",
+        "type": "object"
+      },
+      "ExpenseCategoryCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "sort_order": {
+            "default": 100,
+            "maximum": 10000.0,
+            "minimum": 0.0,
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ExpenseCategoryCreate",
+        "type": "object"
+      },
+      "ExpenseCategoryResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_system": {
+            "title": "Is System",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sort_order": {
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status",
+          "sort_order",
+          "is_system"
+        ],
+        "title": "ExpenseCategoryResponse",
+        "type": "object"
+      },
+      "ExpenseCategoryTotal": {
+        "properties": {
+          "category_id": {
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          },
+          "percentage": {
+            "title": "Percentage",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_id",
+          "category_name",
+          "total",
+          "percentage"
+        ],
+        "title": "ExpenseCategoryTotal",
+        "type": "object"
+      },
+      "ExpenseCategoryUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "sort_order": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sort Order"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "archived"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "title": "ExpenseCategoryUpdate",
+        "type": "object"
+      },
+      "ExpenseRecordCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "category_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "expense_date": {
+            "format": "date",
+            "title": "Expense Date",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "expense_date",
+          "title",
+          "category_id"
+        ],
+        "title": "ExpenseRecordCreate",
+        "type": "object"
+      },
+      "ExpenseRecordResponse": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ExpenseAttachmentResponse"
+            },
+            "title": "Attachments",
+            "type": "array"
+          },
+          "category_id": {
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Name"
+          },
+          "created_by_staff_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Staff Id"
+          },
+          "currency": {
+            "const": "CNY",
+            "default": "CNY",
+            "enum": [
+              "CNY"
+            ],
+            "title": "Currency",
+            "type": "string"
+          },
+          "expense_date": {
+            "format": "date",
+            "title": "Expense Date",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "renewal_due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renewal Due On"
+          },
+          "renewal_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renewal Id"
+          },
+          "renewal_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renewal Name"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "voided"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by_staff_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Staff Id"
+          },
+          "void_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Void Reason"
+          },
+          "voided_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided At"
+          },
+          "voided_by_staff_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Voided By Staff Id"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "expense_date",
+          "title",
+          "category_id",
+          "category_name",
+          "status"
+        ],
+        "title": "ExpenseRecordResponse",
+        "type": "object"
+      },
+      "ExpenseRecordUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "category_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "expense_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Date"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "payee": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payee"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ExpenseRecordUpdate",
+        "type": "object"
+      },
+      "ExpenseRenewalConfirmRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "expense_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Date"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "due_on"
+        ],
+        "title": "ExpenseRenewalConfirmRequest",
+        "type": "object"
+      },
+      "ExpenseRenewalConfirmResponse": {
+        "properties": {
+          "expense": {
+            "$ref": "#/components/schemas/ExpenseRecordResponse"
+          },
+          "renewal": {
+            "$ref": "#/components/schemas/ExpenseRenewalResponse"
+          }
+        },
+        "required": [
+          "renewal",
+          "expense"
+        ],
+        "title": "ExpenseRenewalConfirmResponse",
+        "type": "object"
+      },
+      "ExpenseRenewalCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "category_id": {
+            "exclusiveMinimum": 0.0,
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "semiannual",
+              "annual"
+            ],
+            "title": "Cycle",
+            "type": "string"
+          },
+          "default_amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Default Amount"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "next_due_on": {
+            "format": "date",
+            "title": "Next Due On",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reminder_days": {
+            "default": 7,
+            "maximum": 90.0,
+            "minimum": 0.0,
+            "title": "Reminder Days",
+            "type": "integer"
+          },
+          "vendor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor"
+          }
+        },
+        "required": [
+          "name",
+          "default_amount",
+          "category_id",
+          "cycle",
+          "next_due_on"
+        ],
+        "title": "ExpenseRenewalCreate",
+        "type": "object"
+      },
+      "ExpenseRenewalOccurrenceResponse": {
+        "properties": {
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "expense_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expense Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "processed_by_staff_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed By Staff Id"
+          },
+          "renewal_id": {
+            "title": "Renewal Id",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "paid",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "renewal_id",
+          "due_on",
+          "status"
+        ],
+        "title": "ExpenseRenewalOccurrenceResponse",
+        "type": "object"
+      },
+      "ExpenseRenewalResponse": {
+        "properties": {
+          "category_id": {
+            "title": "Category Id",
+            "type": "integer"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "created_by_staff_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By Staff Id"
+          },
+          "cycle": {
+            "enum": [
+              "monthly",
+              "quarterly",
+              "semiannual",
+              "annual"
+            ],
+            "title": "Cycle",
+            "type": "string"
+          },
+          "default_amount": {
+            "title": "Default Amount",
+            "type": "string"
+          },
+          "due_state": {
+            "enum": [
+              "upcoming",
+              "due",
+              "overdue",
+              "scheduled",
+              "paused",
+              "ended"
+            ],
+            "title": "Due State",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_due_on": {
+            "format": "date",
+            "title": "Next Due On",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "occurrences": {
+            "items": {
+              "$ref": "#/components/schemas/ExpenseRenewalOccurrenceResponse"
+            },
+            "title": "Occurrences",
+            "type": "array"
+          },
+          "paused_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused At"
+          },
+          "reminder_days": {
+            "title": "Reminder Days",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "paused",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by_staff_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By Staff Id"
+          },
+          "vendor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "default_amount",
+          "category_id",
+          "category_name",
+          "cycle",
+          "next_due_on",
+          "reminder_days",
+          "status",
+          "due_state"
+        ],
+        "title": "ExpenseRenewalResponse",
+        "type": "object"
+      },
+      "ExpenseRenewalResumeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "next_due_on": {
+            "format": "date",
+            "title": "Next Due On",
+            "type": "string"
+          }
+        },
+        "required": [
+          "next_due_on"
+        ],
+        "title": "ExpenseRenewalResumeRequest",
+        "type": "object"
+      },
+      "ExpenseRenewalSkipRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "due_on": {
+            "format": "date",
+            "title": "Due On",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "required": [
+          "due_on"
+        ],
+        "title": "ExpenseRenewalSkipRequest",
+        "type": "object"
+      },
+      "ExpenseRenewalUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "cycle": {
+            "anyOf": [
+              {
+                "enum": [
+                  "monthly",
+                  "quarterly",
+                  "semiannual",
+                  "annual"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cycle"
+          },
+          "default_amount": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Amount"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "next_due_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due On"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "reminder_days": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminder Days"
+          },
+          "vendor": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vendor"
+          }
+        },
+        "title": "ExpenseRenewalUpdate",
+        "type": "object"
+      },
+      "ExpenseSummaryResponse": {
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/ExpenseCategoryTotal"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "change_percent": {
+            "title": "Change Percent",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "overdue_renewals": {
+            "title": "Overdue Renewals",
+            "type": "integer"
+          },
+          "previous_total": {
+            "title": "Previous Total",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          },
+          "trend": {
+            "items": {
+              "$ref": "#/components/schemas/ExpenseTrendPoint"
+            },
+            "title": "Trend",
+            "type": "array"
+          },
+          "upcoming_renewals": {
+            "title": "Upcoming Renewals",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "total",
+          "previous_total",
+          "change_percent",
+          "count",
+          "upcoming_renewals",
+          "overdue_renewals",
+          "trend",
+          "categories"
+        ],
+        "title": "ExpenseSummaryResponse",
+        "type": "object"
+      },
+      "ExpenseTrendPoint": {
+        "properties": {
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "total"
+        ],
+        "title": "ExpenseTrendPoint",
+        "type": "object"
+      },
+      "ExpenseVoidRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 2,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ExpenseVoidRequest",
         "type": "object"
       },
       "FeedbackCreate": {
@@ -2406,6 +4885,124 @@
           "total"
         ],
         "title": "PaginatedDemoRuns",
+        "type": "object"
+      },
+      "PaginatedResponse_ExpenseRecordResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpenseRecordResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "description": "当前页码",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "每页数量",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "description": "总数",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "总页数",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "PaginatedResponse[ExpenseRecordResponse]",
+        "type": "object"
+      },
+      "PaginatedResponse_ExpenseRenewalResponse_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpenseRenewalResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "description": "当前页码",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "每页数量",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "description": "总数",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "总页数",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "PaginatedResponse[ExpenseRenewalResponse]",
         "type": "object"
       },
       "PlanCreate": {
@@ -3323,7 +5920,7 @@
   },
   "info": {
     "title": "跨境电商赛训效率工具箱",
-    "version": "1.8.1"
+    "version": "1.8.3"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3334,7 +5931,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Action Center Api Admin Action Center Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3369,7 +5968,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Business Batch Api Admin Business Batches  Batch Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3404,7 +6005,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Config Api Ai Chat Admin Config Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3437,7 +6040,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Config Api Ai Chat Admin Config Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -3482,7 +6087,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Debug Chat Api Ai Chat Admin Debug Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -3560,7 +6167,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Admin Sessions Api Ai Chat Admin Sessions Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3606,7 +6215,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Admin Session Detail Api Ai Chat Admin Sessions  Session Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3641,7 +6252,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Admin Stats Api Ai Chat Admin Stats Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3691,7 +6304,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get History Api Ai Chat History Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3743,7 +6358,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Session Api Ai Chat Session Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -3789,7 +6406,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Session Api Ai Chat Session  Session Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -3845,7 +6464,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Send Message Api Ai Chat Session  Session Id  Message Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -3901,7 +6522,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Send Message Stream Api Ai Chat Session  Session Id  Message Stream Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -3957,7 +6580,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Rate Session Api Ai Chat Session  Session Id  Rate Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4013,7 +6638,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Resolve Session Api Ai Chat Session  Session Id  Resolve Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4059,7 +6686,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Transfer To Human Api Ai Chat Session  Session Id  Transfer Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4527,7 +7156,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Auth Codes Api Auth Codes Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -4572,7 +7203,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Batch Generate Codes Api Auth Codes Batch Generate Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4618,7 +7251,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Delete Auth Code Api Auth Codes  Code Id  Delete"
+                }
               }
             },
             "description": "Successful Response"
@@ -4765,7 +7400,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Admin Login Api Auth Admin Login Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4795,7 +7432,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Check Auth Status Api Auth Check Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4820,7 +7459,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Current User Info Api Auth Me Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -4845,7 +7486,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Refresh Token Api Auth Refresh Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4880,7 +7523,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Verify Auth Code Api Auth Verify Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -4923,7 +7568,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_list_BusinessBatchResponse__"
+                }
               }
             },
             "description": "Successful Response"
@@ -4965,7 +7612,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_BusinessBatchResponse_"
+                }
               }
             },
             "description": "Successful Response"
@@ -5010,7 +7659,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_BusinessBatchResponse_"
+                }
               }
             },
             "description": "Successful Response"
@@ -5063,7 +7714,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_BusinessBatchResponse_"
+                }
               }
             },
             "description": "Successful Response"
@@ -5118,7 +7771,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_BusinessBatchResponse_"
+                }
               }
             },
             "description": "Successful Response"
@@ -5182,7 +7837,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_BusinessBatchItemResponse_"
+                }
               }
             },
             "description": "Successful Response"
@@ -5216,7 +7873,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_BusinessBootstrapResponse_"
+                }
               }
             },
             "description": "Successful Response"
@@ -5240,7 +7899,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_list_dict_str__Any___"
+                }
               }
             },
             "description": "Successful Response"
@@ -5285,7 +7946,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Dashboard Api Dashboard Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -5340,7 +8003,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Dashboard Charts Api Dashboard Charts Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -5375,7 +8040,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Refresh Dashboard Cache Api Dashboard Refresh Cache Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -6164,7 +8831,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Devices Api Devices Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6199,7 +8868,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get My Devices Api Devices My Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6250,7 +8921,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Unbind Device Api Devices Unbind Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -6298,7 +8971,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response User Unbind Device Api Devices User Unbind Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -6391,7 +9066,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response List Executions Api Executions Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6436,7 +9113,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Report Execution Api Executions Report Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -6476,7 +9155,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Execution Api Executions  Execution Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6500,6 +9181,1327 @@
         "summary": "Get Execution",
         "tags": [
           "真实执行记录"
+        ]
+      }
+    },
+    "/api/expenses": {
+      "get": {
+        "operationId": "get_expenses_api_expenses_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_ExpenseRecordResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Expenses",
+        "tags": [
+          "公账支出"
+        ]
+      },
+      "post": {
+        "operationId": "create_expense_api_expenses_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRecordCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRecordResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Expense",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/categories": {
+      "get": {
+        "operationId": "get_expense_categories_api_expenses_categories_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_list_ExpenseCategoryResponse__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Expense Categories",
+        "tags": [
+          "公账支出"
+        ]
+      },
+      "post": {
+        "operationId": "create_expense_category_api_expenses_categories_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseCategoryCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseCategoryResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Expense Category",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/categories/{category_id}": {
+      "patch": {
+        "operationId": "update_expense_category_api_expenses_categories__category_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "category_id",
+            "required": true,
+            "schema": {
+              "title": "Category Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseCategoryUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseCategoryResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Expense Category",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/export": {
+      "get": {
+        "operationId": "export_expenses_api_expenses_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Export Expenses",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals": {
+      "get": {
+        "operationId": "get_expense_renewals_api_expenses_renewals_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "due_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Due State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Expense Renewals",
+        "tags": [
+          "公账支出"
+        ]
+      },
+      "post": {
+        "operationId": "create_expense_renewal_api_expenses_renewals_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRenewalCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals/{renewal_id}": {
+      "get": {
+        "operationId": "get_expense_renewal_api_expenses_renewals__renewal_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      },
+      "patch": {
+        "operationId": "update_expense_renewal_api_expenses_renewals__renewal_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRenewalUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals/{renewal_id}/confirm": {
+      "post": {
+        "operationId": "confirm_expense_renewal_api_expenses_renewals__renewal_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRenewalConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalConfirmResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals/{renewal_id}/end": {
+      "post": {
+        "operationId": "end_expense_renewal_api_expenses_renewals__renewal_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "End Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals/{renewal_id}/pause": {
+      "post": {
+        "operationId": "pause_expense_renewal_api_expenses_renewals__renewal_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Pause Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals/{renewal_id}/resume": {
+      "post": {
+        "operationId": "resume_expense_renewal_api_expenses_renewals__renewal_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRenewalResumeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resume Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/renewals/{renewal_id}/skip": {
+      "post": {
+        "operationId": "skip_expense_renewal_api_expenses_renewals__renewal_id__skip_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "renewal_id",
+            "required": true,
+            "schema": {
+              "title": "Renewal Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRenewalSkipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRenewalResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Skip Expense Renewal",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/summary": {
+      "get": {
+        "operationId": "get_expense_summary_api_expenses_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseSummaryResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Expense Summary",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/{expense_id}": {
+      "get": {
+        "operationId": "get_expense_api_expenses__expense_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRecordResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Expense",
+        "tags": [
+          "公账支出"
+        ]
+      },
+      "patch": {
+        "operationId": "update_expense_api_expenses__expense_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseRecordUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRecordResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Expense",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/{expense_id}/attachments": {
+      "post": {
+        "operationId": "add_expense_attachment_api_expenses__expense_id__attachments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_add_expense_attachment_api_expenses__expense_id__attachments_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseAttachmentResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Add Expense Attachment",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/{expense_id}/attachments/{attachment_id}": {
+      "delete": {
+        "operationId": "delete_expense_attachment_api_expenses__expense_id__attachments__attachment_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_NoneType_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Expense Attachment",
+        "tags": [
+          "公账支出"
+        ]
+      },
+      "get": {
+        "operationId": "download_expense_attachment_api_expenses__expense_id__attachments__attachment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Download Expense Attachment",
+        "tags": [
+          "公账支出"
+        ]
+      }
+    },
+    "/api/expenses/{expense_id}/void": {
+      "post": {
+        "operationId": "void_expense_api_expenses__expense_id__void_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "expense_id",
+            "required": true,
+            "schema": {
+              "title": "Expense Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseVoidRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_ExpenseRecordResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Void Expense",
+        "tags": [
+          "公账支出"
         ]
       }
     },
@@ -6572,7 +10574,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Feedback List Api Feedback Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6615,7 +10619,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Feedback Api Feedback Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -6675,7 +10681,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get My Feedback Api Feedback My Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6710,7 +10718,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Feedback Stats Api Feedback Stats Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6746,7 +10756,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Delete Feedback Api Feedback  Feedback Id  Delete"
+                }
               }
             },
             "description": "Successful Response"
@@ -6790,7 +10802,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Feedback Api Feedback  Feedback Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6844,7 +10858,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Feedback Api Feedback  Feedback Id  Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -6878,7 +10894,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response List Rate Releases Api Freight Rate Packs Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6920,7 +10938,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Current Rate Pack Api Freight Rate Packs Current Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -6965,7 +10985,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Draft Api Freight Rate Packs Drafts Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7021,7 +11043,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Rollback Rate Pack Api Freight Rate Packs  Pack Id  Rollback Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7075,7 +11099,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Rate Artifact Api Freight Rate Packs  Pack Id   Version  Artifact Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7129,7 +11155,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Publish Rate Pack Api Freight Rate Packs  Pack Id   Version  Publish Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7271,7 +11299,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Faq List Api Help Faq List Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7312,7 +11342,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Query Help Api Help Query Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7462,7 +11494,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Knowledge List Api Knowledge Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7505,7 +11539,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Knowledge Api Knowledge Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7554,7 +11590,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Batch Import Api Knowledge Batch Import Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7589,7 +11627,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Categories Api Knowledge Categories Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7624,7 +11664,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Retrieval Test Api Knowledge Retrieval Test Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7659,7 +11701,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Stats Api Knowledge Stats Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7684,7 +11728,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Sync To Vector Api Knowledge Sync Vector Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -7720,7 +11766,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Delete Knowledge Api Knowledge  Knowledge Id  Delete"
+                }
               }
             },
             "description": "Successful Response"
@@ -7764,7 +11812,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Knowledge Api Knowledge  Knowledge Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -7818,7 +11868,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Knowledge Api Knowledge  Knowledge Id  Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -7986,7 +12038,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Logs Api Logs Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8158,7 +12212,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Export Logs Api Logs Export Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8213,7 +12269,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Log Tools Api Logs Tools Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8321,7 +12379,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Orders Api Orders Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8363,7 +12423,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Order Api Orders Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -8463,7 +12525,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Export Orders Api Orders Export Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8508,7 +12572,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Order Api Orders  Order Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8561,7 +12627,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Order Api Orders  Order Id  Patch"
+                }
               }
             },
             "description": "Successful Response"
@@ -8615,7 +12683,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Order Api Orders  Order Id  Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -8670,7 +12740,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Cancel Order Api Orders  Order Id  Cancel Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -8715,7 +12787,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Mark Order Paid Api Orders  Order Id  Mark Paid Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -8770,7 +12844,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Refund Order Api Orders  Order Id  Refund Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -8805,7 +12881,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Plans Api Plans Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8832,7 +12910,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Plan Api Plans Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -8907,7 +12987,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Plans Admin Api Plans Admin Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -8954,7 +13036,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Archive Plan Compatibility Api Plans  Plan Id  Delete"
+                }
               }
             },
             "description": "Successful Response"
@@ -8997,7 +13081,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Plan Api Plans  Plan Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9045,7 +13131,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Plan Api Plans  Plan Id  Patch"
+                }
               }
             },
             "description": "Successful Response"
@@ -9099,7 +13187,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Plan Api Plans  Plan Id  Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -9144,7 +13234,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Archive Plan Api Plans  Plan Id  Archive Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9189,7 +13281,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Disable Plan Api Plans  Plan Id  Disable Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9234,7 +13328,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Enable Plan Api Plans  Plan Id  Enable Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9279,7 +13375,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Plan Stats Api Plans  Plan Id  Stats Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9370,7 +13468,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Profit Records Api Profit Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9404,7 +13504,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Profit Policy Api Profit Policy Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9436,7 +13538,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Profit Policy Api Profit Policy Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -9488,7 +13592,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Profit Summary Api Profit Summary Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9562,7 +13668,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Setting Api Settings Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -9597,7 +13705,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Public Settings Api Settings Public Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9641,7 +13751,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response List Accounts Api Staff Accounts Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9683,7 +13795,9 @@
           "201": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Account Api Staff Accounts Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9738,7 +13852,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Account Api Staff Accounts  Staff Id  Patch"
+                }
               }
             },
             "description": "Successful Response"
@@ -9793,7 +13909,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Reset Password Api Staff Accounts  Staff Id  Reset Password Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9837,7 +13955,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Change Password Api Staff Auth Change Password Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9881,7 +14001,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Login Api Staff Auth Login Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9910,7 +14032,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Logout Api Staff Auth Logout Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -9934,7 +14058,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Me Api Staff Auth Me Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -9977,7 +14103,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response List Tool Releases Api Tool Releases Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -10010,7 +14138,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Add Tool Release Api Tool Releases Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -10066,7 +14196,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Rollback Tool Release Api Tool Releases  Tool Id  Rollback Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -10121,7 +14253,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Tool Release Artifact Api Tool Releases  Tool Id   Version  Artifact Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -10181,7 +14315,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Publish Tool Release Api Tool Releases  Tool Id   Version  Publish Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -10272,7 +14408,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Tools Api Tools Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -10314,7 +14452,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Tools Api Tools Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -10349,7 +14489,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Tool Categories Api Tools Categories Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -10377,7 +14519,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Tool Categories Api Tools Categories Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -10423,7 +14567,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Verify Launch Token Api Tools Launch Grant Verify Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -10464,7 +14610,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Verify Launch Token Api Tools Launch Token Verify Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -10494,7 +14642,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Platforms Api Tools Platforms Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -10522,7 +14672,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update Platforms Api Tools Platforms Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -10639,7 +14791,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Launch Token Api Tools  Tool Id  Launch Grant Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -10756,7 +14910,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Create Launch Token Api Tools  Tool Id  Launch Token Post"
+                }
               }
             },
             "description": "Successful Response"
@@ -11026,7 +15182,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get Users Api Users Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -11061,7 +15219,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get User Stats Api Users Stats Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -11097,7 +15257,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get User Api Users  User Id  Get"
+                }
               }
             },
             "description": "Successful Response"
@@ -11151,7 +15313,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Update User Api Users  User Id  Put"
+                }
               }
             },
             "description": "Successful Response"
@@ -11197,7 +15361,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Get User Devices Api Users  User Id  Devices Get"
+                }
               }
             },
             "description": "Successful Response"

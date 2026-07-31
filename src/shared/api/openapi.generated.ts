@@ -5,7 +5,15 @@ export interface components {
     "APIResponse_BusinessBatchItemResponse_": { "data"?: components['schemas']["BusinessBatchItemResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_BusinessBatchResponse_": { "data"?: components['schemas']["BusinessBatchResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_BusinessBootstrapResponse_": { "data"?: components['schemas']["BusinessBootstrapResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_ExpenseAttachmentResponse_": { "data"?: components['schemas']["ExpenseAttachmentResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_ExpenseCategoryResponse_": { "data"?: components['schemas']["ExpenseCategoryResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_ExpenseRecordResponse_": { "data"?: components['schemas']["ExpenseRecordResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_ExpenseRenewalConfirmResponse_": { "data"?: components['schemas']["ExpenseRenewalConfirmResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_ExpenseRenewalResponse_": { "data"?: components['schemas']["ExpenseRenewalResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_ExpenseSummaryResponse_": { "data"?: components['schemas']["ExpenseSummaryResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_NoneType_": { "data"?: null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_list_BusinessBatchResponse__": { "data"?: Array<components['schemas']["BusinessBatchResponse"]> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_list_ExpenseCategoryResponse__": { "data"?: Array<components['schemas']["ExpenseCategoryResponse"]> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_list_dict_str__Any___": { "data"?: Array<{  }> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "AdminLoginRequest": { "password": string; "username"?: string }
     "AnnouncementCreate": { "app_version"?: string | null; "audience"?: "all" | "consumer" | "business"; "category"?: "system" | "update" | "activity" | "maintenance" | null; "content": string; "expires_at"?: string | null; "presentation"?: "banner" | "modal" | null; "priority"?: number; "severity"?: "info" | "important" | "critical"; "starts_at"?: string | null; "status"?: "draft" | "published" | "expired"; "title": string; "type"?: string | null }
@@ -18,6 +26,7 @@ export interface components {
     "BatchImportItem": { "category": string; "content": string; "keywords"?: Array<string> | null; "priority"?: string | null; "title": string }
     "BatchItemUpdate": { "account_label_masked": string; "customer_message"?: string | null; "intervention_type"?: "login" | "captcha" | "two_factor" | "page_confirmation" | "other" | null; "status": "pending" | "running" | "waiting_user" | "completed" | "failed" | "cancelled" }
     "BatchUpdate": { "completed_count"?: number; "failed_count"?: number; "pending_count"?: number; "running_count"?: number; "status"?: "running" | "completed" | "cancelled" | "interrupted" | null; "waiting_count"?: number }
+    "Body_add_expense_attachment_api_expenses__expense_id__attachments_post": { "file": string }
     "Body_stage_release_api_updates_releases_stage_post": { "files": Array<string>; "version"?: string | null }
     "Body_update_platforms_api_tools_platforms_put": { "platforms": Array<unknown> }
     "Body_update_tool_categories_api_tools_categories_put": { "categories": Array<unknown> }
@@ -37,6 +46,25 @@ export interface components {
     "DemoRunResponse": { "completed_step_count": number; "created_at": string; "current_step_id"?: string | null; "error_code"?: string | null; "event_seq": number; "execution_scope"?: "single"; "finished_at"?: string | null; "id": string; "platform_key": string; "record_kind"?: "demo"; "scenario_id": string; "simulated_outcome"?: "completed_example" | "attention_example" | "failure_example" | null; "started_at"?: string | null; "status": "created" | "running" | "paused" | "completed" | "cancelled" | "error"; "tool_id": string; "tool_name_snapshot": string; "total_step_count": number; "updated_at": string }
     "DemoRunUpdate": { "completed_step_count"?: number | null; "current_step_id"?: string | null; "error_code"?: string | null; "event_seq": number; "status": "created" | "running" | "paused" | "completed" | "cancelled" | "error" }
     "DeviceResponse": { "created_at"?: string | null; "device_id": string; "device_name"?: string | null; "id": number }
+    "ExpenseAttachmentResponse": { "created_at"?: string | null; "expense_id": number; "id": number; "mime_type": string; "original_name": string; "sha256": string; "size_bytes": number }
+    "ExpenseCategoryCreate": { "name": string; "sort_order"?: number }
+    "ExpenseCategoryResponse": { "code": string; "created_at"?: string | null; "id": number; "is_system": boolean; "name": string; "sort_order": number; "status": "active" | "archived"; "updated_at"?: string | null }
+    "ExpenseCategoryTotal": { "category_id": number; "category_name": string; "percentage": string; "total": string }
+    "ExpenseCategoryUpdate": { "name"?: string | null; "sort_order"?: number | null; "status"?: "active" | "archived" | null }
+    "ExpenseRecordCreate": { "amount": number | string; "category_id": number; "expense_date": string; "note"?: string | null; "payee"?: string | null; "title": string }
+    "ExpenseRecordResponse": { "amount": string; "attachments"?: Array<components['schemas']["ExpenseAttachmentResponse"]>; "category_id": number; "category_name": string; "created_at"?: string | null; "created_by_name"?: string | null; "created_by_staff_id"?: number | null; "currency"?: "CNY"; "expense_date": string; "id": number; "note"?: string | null; "payee"?: string | null; "renewal_due_on"?: string | null; "renewal_id"?: number | null; "renewal_name"?: string | null; "status": "active" | "voided"; "title": string; "updated_at"?: string | null; "updated_by_staff_id"?: number | null; "void_reason"?: string | null; "voided_at"?: string | null; "voided_by_staff_id"?: number | null }
+    "ExpenseRecordUpdate": { "amount"?: number | string | null; "category_id"?: number | null; "expense_date"?: string | null; "note"?: string | null; "payee"?: string | null; "title"?: string | null }
+    "ExpenseRenewalConfirmRequest": { "amount"?: number | string | null; "due_on": string; "expense_date"?: string | null; "note"?: string | null }
+    "ExpenseRenewalConfirmResponse": { "expense": components['schemas']["ExpenseRecordResponse"]; "renewal": components['schemas']["ExpenseRenewalResponse"] }
+    "ExpenseRenewalCreate": { "category_id": number; "cycle": "monthly" | "quarterly" | "semiannual" | "annual"; "default_amount": number | string; "name": string; "next_due_on": string; "note"?: string | null; "reminder_days"?: number; "vendor"?: string | null }
+    "ExpenseRenewalOccurrenceResponse": { "due_on": string; "expense_id"?: number | null; "id": number; "note"?: string | null; "processed_at"?: string | null; "processed_by_staff_id"?: number | null; "renewal_id": number; "status": "paid" | "skipped" }
+    "ExpenseRenewalResponse": { "category_id": number; "category_name": string; "created_at"?: string | null; "created_by_staff_id"?: number | null; "cycle": "monthly" | "quarterly" | "semiannual" | "annual"; "default_amount": string; "due_state": "upcoming" | "due" | "overdue" | "scheduled" | "paused" | "ended"; "ended_at"?: string | null; "id": number; "name": string; "next_due_on": string; "note"?: string | null; "occurrences"?: Array<components['schemas']["ExpenseRenewalOccurrenceResponse"]>; "paused_at"?: string | null; "reminder_days": number; "status": "active" | "paused" | "ended"; "updated_at"?: string | null; "updated_by_staff_id"?: number | null; "vendor"?: string | null }
+    "ExpenseRenewalResumeRequest": { "next_due_on": string }
+    "ExpenseRenewalSkipRequest": { "due_on": string; "note"?: string | null }
+    "ExpenseRenewalUpdate": { "category_id"?: number | null; "cycle"?: "monthly" | "quarterly" | "semiannual" | "annual" | null; "default_amount"?: number | string | null; "name"?: string | null; "next_due_on"?: string | null; "note"?: string | null; "reminder_days"?: number | null; "vendor"?: string | null }
+    "ExpenseSummaryResponse": { "categories": Array<components['schemas']["ExpenseCategoryTotal"]>; "change_percent": string; "count": number; "month": string; "overdue_renewals": number; "previous_total": string; "total": string; "trend": Array<components['schemas']["ExpenseTrendPoint"]>; "upcoming_renewals": number }
+    "ExpenseTrendPoint": { "month": string; "total": string }
+    "ExpenseVoidRequest": { "reason": string }
     "FeedbackCreate": { "content"?: string | null; "screenshot"?: string | null; "title"?: string | null; "user_id"?: number | null }
     "FeedbackUpdate": { "admin_reply"?: string | null; "status"?: string | null }
     "HTTPValidationError": { "detail"?: Array<components['schemas']["ValidationError"]> }
@@ -49,6 +77,8 @@ export interface components {
     "OrderUpdate": { "amount"?: number | string | null; "channel"?: string | null; "plan_id"?: number | null; "platform_key"?: string | null; "responsible"?: string | null }
     "PaginatedDemoBatches": { "data": Array<components['schemas']["DemoBatchResponse"]>; "page": number; "page_size": number; "total": number }
     "PaginatedDemoRuns": { "data": Array<components['schemas']["DemoRunResponse"]>; "page": number; "page_size": number; "total": number }
+    "PaginatedResponse_ExpenseRecordResponse_": { "data"?: Array<components['schemas']["ExpenseRecordResponse"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "PaginatedResponse_ExpenseRenewalResponse_": { "data"?: Array<components['schemas']["ExpenseRenewalResponse"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
     "PlanCreate": { "code_prefix"?: string | null; "duration_days": number; "entitlements"?: {  } | null; "features"?: string | null; "name": string; "price": number | string; "product_type"?: "consumer" | "business"; "sort_order"?: number }
     "PlanUpdate": { "code_prefix"?: string | null; "duration_days"?: number | null; "entitlements"?: {  } | null; "features"?: string | null; "name"?: string | null; "price"?: number | string | null; "product_type"?: "consumer" | "business" | null; "sort_order"?: number | null }
     "ProfitPolicyUpdate": { "ratios": components['schemas']["ProfitRatios"] }
@@ -397,6 +427,116 @@ export interface operations {
     parameters: { "path": { "execution_id": number } }
     requestBody: never
     responses: { "200": unknown; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "get_expenses_api_expenses_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "month"?: string | null; "category_id"?: number | null; "status"?: string | null; "q"?: string | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["PaginatedResponse_ExpenseRecordResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_expense_api_expenses_post": {
+    parameters: never
+    requestBody: components['schemas']["ExpenseRecordCreate"]
+    responses: { "201": components['schemas']["APIResponse_ExpenseRecordResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "get_expense_categories_api_expenses_categories_get": {
+    parameters: { "query": { "include_archived"?: boolean } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_list_ExpenseCategoryResponse__"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_expense_category_api_expenses_categories_post": {
+    parameters: never
+    requestBody: components['schemas']["ExpenseCategoryCreate"]
+    responses: { "201": components['schemas']["APIResponse_ExpenseCategoryResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "update_expense_category_api_expenses_categories__category_id__patch": {
+    parameters: { "path": { "category_id": number } }
+    requestBody: components['schemas']["ExpenseCategoryUpdate"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseCategoryResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "export_expenses_api_expenses_export_get": {
+    parameters: { "query": { "month"?: string | null; "category_id"?: number | null; "status"?: string | null; "q"?: string | null } }
+    requestBody: never
+    responses: { "200": unknown; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "get_expense_renewals_api_expenses_renewals_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "status"?: string | null; "due_state"?: string | null; "q"?: string | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["PaginatedResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_expense_renewal_api_expenses_renewals_post": {
+    parameters: never
+    requestBody: components['schemas']["ExpenseRenewalCreate"]
+    responses: { "201": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "get_expense_renewal_api_expenses_renewals__renewal_id__get": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "update_expense_renewal_api_expenses_renewals__renewal_id__patch": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: components['schemas']["ExpenseRenewalUpdate"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "confirm_expense_renewal_api_expenses_renewals__renewal_id__confirm_post": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: components['schemas']["ExpenseRenewalConfirmRequest"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalConfirmResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "end_expense_renewal_api_expenses_renewals__renewal_id__end_post": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "pause_expense_renewal_api_expenses_renewals__renewal_id__pause_post": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "resume_expense_renewal_api_expenses_renewals__renewal_id__resume_post": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: components['schemas']["ExpenseRenewalResumeRequest"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "skip_expense_renewal_api_expenses_renewals__renewal_id__skip_post": {
+    parameters: { "path": { "renewal_id": number } }
+    requestBody: components['schemas']["ExpenseRenewalSkipRequest"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseRenewalResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "get_expense_summary_api_expenses_summary_get": {
+    parameters: { "query": { "month"?: string | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_ExpenseSummaryResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "get_expense_api_expenses__expense_id__get": {
+    parameters: { "path": { "expense_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_ExpenseRecordResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "update_expense_api_expenses__expense_id__patch": {
+    parameters: { "path": { "expense_id": number } }
+    requestBody: components['schemas']["ExpenseRecordUpdate"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseRecordResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "add_expense_attachment_api_expenses__expense_id__attachments_post": {
+    parameters: { "path": { "expense_id": number } }
+    requestBody: components['schemas']["Body_add_expense_attachment_api_expenses__expense_id__attachments_post"]
+    responses: { "201": components['schemas']["APIResponse_ExpenseAttachmentResponse_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "download_expense_attachment_api_expenses__expense_id__attachments__attachment_id__get": {
+    parameters: { "path": { "expense_id": number; "attachment_id": number } }
+    requestBody: never
+    responses: { "200": unknown; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "delete_expense_attachment_api_expenses__expense_id__attachments__attachment_id__delete": {
+    parameters: { "path": { "expense_id": number; "attachment_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_NoneType_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "void_expense_api_expenses__expense_id__void_post": {
+    parameters: { "path": { "expense_id": number } }
+    requestBody: components['schemas']["ExpenseVoidRequest"]
+    responses: { "200": components['schemas']["APIResponse_ExpenseRecordResponse_"]; "422": components['schemas']["HTTPValidationError"] }
   }
   "get_feedback_list_api_feedback_get": {
     parameters: { "query": { "status"?: string | null; "platform_key"?: string | null; "page"?: number; "page_size"?: number } }
@@ -1038,6 +1178,60 @@ export interface paths {
   }
   "/api/executions/{execution_id}": {
     get: operations["get_execution_api_executions__execution_id__get"]
+  }
+  "/api/expenses": {
+    get: operations["get_expenses_api_expenses_get"]
+    post: operations["create_expense_api_expenses_post"]
+  }
+  "/api/expenses/categories": {
+    get: operations["get_expense_categories_api_expenses_categories_get"]
+    post: operations["create_expense_category_api_expenses_categories_post"]
+  }
+  "/api/expenses/categories/{category_id}": {
+    patch: operations["update_expense_category_api_expenses_categories__category_id__patch"]
+  }
+  "/api/expenses/export": {
+    get: operations["export_expenses_api_expenses_export_get"]
+  }
+  "/api/expenses/renewals": {
+    get: operations["get_expense_renewals_api_expenses_renewals_get"]
+    post: operations["create_expense_renewal_api_expenses_renewals_post"]
+  }
+  "/api/expenses/renewals/{renewal_id}": {
+    get: operations["get_expense_renewal_api_expenses_renewals__renewal_id__get"]
+    patch: operations["update_expense_renewal_api_expenses_renewals__renewal_id__patch"]
+  }
+  "/api/expenses/renewals/{renewal_id}/confirm": {
+    post: operations["confirm_expense_renewal_api_expenses_renewals__renewal_id__confirm_post"]
+  }
+  "/api/expenses/renewals/{renewal_id}/end": {
+    post: operations["end_expense_renewal_api_expenses_renewals__renewal_id__end_post"]
+  }
+  "/api/expenses/renewals/{renewal_id}/pause": {
+    post: operations["pause_expense_renewal_api_expenses_renewals__renewal_id__pause_post"]
+  }
+  "/api/expenses/renewals/{renewal_id}/resume": {
+    post: operations["resume_expense_renewal_api_expenses_renewals__renewal_id__resume_post"]
+  }
+  "/api/expenses/renewals/{renewal_id}/skip": {
+    post: operations["skip_expense_renewal_api_expenses_renewals__renewal_id__skip_post"]
+  }
+  "/api/expenses/summary": {
+    get: operations["get_expense_summary_api_expenses_summary_get"]
+  }
+  "/api/expenses/{expense_id}": {
+    get: operations["get_expense_api_expenses__expense_id__get"]
+    patch: operations["update_expense_api_expenses__expense_id__patch"]
+  }
+  "/api/expenses/{expense_id}/attachments": {
+    post: operations["add_expense_attachment_api_expenses__expense_id__attachments_post"]
+  }
+  "/api/expenses/{expense_id}/attachments/{attachment_id}": {
+    get: operations["download_expense_attachment_api_expenses__expense_id__attachments__attachment_id__get"]
+    delete: operations["delete_expense_attachment_api_expenses__expense_id__attachments__attachment_id__delete"]
+  }
+  "/api/expenses/{expense_id}/void": {
+    post: operations["void_expense_api_expenses__expense_id__void_post"]
   }
   "/api/feedback": {
     get: operations["get_feedback_list_api_feedback_get"]

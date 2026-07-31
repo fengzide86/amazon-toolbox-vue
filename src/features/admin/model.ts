@@ -73,6 +73,7 @@ const actionSummarySchema = z.object({
   pending_tickets: z.coerce.number().int().nonnegative().default(0),
   waiting_interventions: z.coerce.number().int().nonnegative().default(0),
   stale_batches: z.coerce.number().int().nonnegative().default(0),
+  expense_renewals_due: z.coerce.number().int().nonnegative().default(0),
 })
 
 export const adminActionCenterSchema = z.object({
@@ -108,6 +109,15 @@ export const adminActionCenterSchema = z.object({
     tool_name: z.string(),
     last_heartbeat_at: nullableText,
   })).default([]),
+  expense_renewals: z.array(z.object({
+    id: entityIdSchema,
+    name: z.string(),
+    vendor: nullableText,
+    default_amount: z.coerce.number().positive(),
+    category_name: z.string(),
+    next_due_on: z.string(),
+    due_state: z.string(),
+  }).passthrough()).default([]),
 })
 
 export type AdminActionCenter = z.infer<typeof adminActionCenterSchema>

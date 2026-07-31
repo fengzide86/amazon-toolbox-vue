@@ -20,12 +20,14 @@ const actionCenter = {
     pending_tickets: 0,
     waiting_interventions: 0,
     stale_batches: 0,
+    expense_renewals_due: 0,
   },
   expiring_authorizations: [],
   device_anomalies: [],
   pending_tickets: [],
   waiting_interventions: [],
   stale_batches: [],
+  expense_renewals: [],
 }
 
 function json(route: Route, response: MockResponse): Promise<void> {
@@ -398,7 +400,7 @@ test('B 端接收桌面端脱敏预览，只发送行数和工具元数据，原
     'SECOND_COOKIE_PRIVATE',
   ]) expect(serializedRequests).not.toContain(secret)
   expect(demoBatchRequests.some(request => new URL(request.url()).pathname.startsWith('/api/business/batches'))).toBe(false)
-  await expect(page.getByTestId('business-execution-scope')).toContainText('不访问外部平台')
+  await expect(page.getByText(/演示工具运行本地沙盒/)).toBeVisible()
 })
 
 const roleExpectations: Array<{
@@ -409,19 +411,19 @@ const roleExpectations: Array<{
 }> = [
   {
     role: 'super_admin',
-    visible: ['分润管理', '应用更新', '系统设置', '后台账号管理'],
+    visible: ['分润管理', '公账支出', '应用更新', '系统设置', '后台账号管理'],
     hidden: [],
   },
   {
     role: 'operator',
-    visible: ['订单与套餐', '分润管理', '客服规则管理'],
+    visible: ['订单与套餐', '分润管理', '公账支出', '客服规则管理'],
     hidden: ['应用更新', '系统设置', '后台账号管理'],
     forbiddenPath: '/admin/settings',
   },
   {
     role: 'support',
     visible: ['订单与套餐', '工单管理', '客服规则管理', '公告管理'],
-    hidden: ['专业工作台', '分润管理', '应用更新', '系统设置', '后台账号管理'],
+    hidden: ['专业工作台', '分润管理', '公账支出', '应用更新', '系统设置', '后台账号管理'],
     forbiddenPath: '/admin/profit',
   },
 ]
@@ -448,6 +450,120 @@ for (const expectation of roleExpectations) {
     }
   })
 }
+
+test('公账支出完成记账、创建续费并确认生成实际流水', async ({ page }) => {
+  await installSession(page, 'super_admin')
+  const categories = [
+    { id: 1, code: 'development', name: '开发', status: 'active', sort_order: 10, is_system: true },
+    { id: 2, code: 'tool_membership', name: '工具会员', status: 'active', sort_order: 30, is_system: true },
+  ]
+  const expenses: Array<Record<string, unknown>> = []
+  const renewals: Array<Record<string, unknown>> = []
+  const expenseFrom = (body: Record<string, unknown>, id: number, renewal?: Record<string, unknown>) => ({
+    id,
+    amount: String(Number(body.amount).toFixed(2)),
+    currency: 'CNY',
+    expense_date: body.expense_date,
+    title: body.title,
+    category_id: body.category_id,
+    category_name: categories.find(item => item.id === Number(body.category_id))?.name || '其他',
+    payee: body.payee || null,
+    note: body.note || null,
+    status: 'active',
+    renewal_id: renewal?.id || null,
+    renewal_name: renewal?.name || null,
+    renewal_due_on: renewal?.next_due_on || null,
+    created_by_name: '超级管理员',
+    created_at: now,
+    updated_at: now,
+    attachments: [],
+  })
+
+  await installApi(page, (request, path) => {
+    const method = request.method()
+    if (path === '/api/expenses/categories' && method === 'GET') return wrapped(categories)
+    if (path === '/api/expenses/summary' && method === 'GET') {
+      const total = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+      return wrapped({
+        month: '2026-07', total: total.toFixed(2), previous_total: '0.00', change_percent: total ? '100.00' : '0.00',
+        count: expenses.length, upcoming_renewals: renewals.length, overdue_renewals: 0,
+        trend: [{ month: '2026-07', total: total.toFixed(2) }],
+        categories: total ? [{ category_id: 1, category_name: '开发', total: total.toFixed(2), percentage: '100.00' }] : [],
+      })
+    }
+    if (path === '/api/expenses' && method === 'GET') return { body: { success: true, data: expenses, total: expenses.length, page: 1, page_size: 20, total_pages: expenses.length ? 1 : 0 } }
+    if (path === '/api/expenses' && method === 'POST') {
+      const created = expenseFrom(parseJsonBody(request), expenses.length + 1)
+      expenses.unshift(created)
+      return { status: 201, body: { success: true, data: created } }
+    }
+    if (path === '/api/expenses/renewals' && method === 'GET') return { body: { success: true, data: renewals, total: renewals.length, page: 1, page_size: 20, total_pages: renewals.length ? 1 : 0 } }
+    if (path === '/api/expenses/renewals' && method === 'POST') {
+      const body = parseJsonBody(request)
+      const created = {
+        id: renewals.length + 1,
+        ...body,
+        default_amount: String(Number(body.default_amount).toFixed(2)),
+        category_name: categories.find(item => item.id === Number(body.category_id))?.name || '工具会员',
+        status: 'active',
+        due_state: 'upcoming',
+        occurrences: [],
+      }
+      renewals.unshift(created)
+      return { status: 201, body: { success: true, data: created } }
+    }
+    const confirmMatch = path.match(/^\/api\/expenses\/renewals\/(\d+)\/confirm$/)
+    if (confirmMatch && method === 'POST') {
+      const renewal = renewals.find(item => Number(item.id) === Number(confirmMatch[1]))!
+      const body = parseJsonBody(request)
+      const expense = expenseFrom({
+        amount: body.amount || renewal.default_amount,
+        expense_date: body.expense_date,
+        title: renewal.name,
+        category_id: renewal.category_id,
+        payee: renewal.vendor,
+        note: body.note,
+      }, expenses.length + 1, renewal)
+      expenses.unshift(expense)
+      renewal.next_due_on = '2026-08-31'
+      renewal.due_state = 'scheduled'
+      renewal.occurrences = [{ id: 1, renewal_id: renewal.id, due_on: body.due_on, status: 'paid', expense_id: expense.id }]
+      return wrapped({ renewal, expense })
+    }
+    const renewalDetail = path.match(/^\/api\/expenses\/renewals\/(\d+)$/)
+    if (renewalDetail && method === 'GET') return wrapped(renewals.find(item => Number(item.id) === Number(renewalDetail[1])))
+    return undefined
+  })
+
+  await page.goto('/#/admin/expenses')
+  await expect(page.getByRole('heading', { name: '公账支出' })).toBeVisible()
+  await page.getByRole('button', { name: '记一笔支出' }).click()
+  let drawer = page.locator('.el-drawer').last()
+  await drawer.locator('.el-input-number input').fill('320.50')
+  await drawer.getByPlaceholder('例如：7 月阿里云服务器').fill('测试云服务器')
+  await drawer.getByRole('button', { name: '确认入账' }).click()
+  await expect(page.getByText('测试云服务器')).toBeVisible()
+  await expect(page.getByText('¥320.50', { exact: true }).first()).toBeVisible()
+
+  await page.getByRole('tab', { name: /续费项目/ }).click()
+  await page.getByRole('button', { name: '新建续费项目' }).click()
+  drawer = page.locator('.el-drawer').last()
+  await drawer.getByPlaceholder('例如：Figma Professional').fill('设计工具会员')
+  await drawer.locator('.el-input-number input').first().fill('99.00')
+  await drawer.getByRole('button', { name: '创建项目' }).click()
+  await expect(page.getByText('设计工具会员', { exact: true }).first()).toBeVisible()
+
+  await page.getByRole('button', { name: '确认续费' }).first().click()
+  drawer = page.locator('.el-drawer').last()
+  await drawer.locator('.el-input-number input').fill('118.00')
+  await drawer.getByRole('button', { name: '确认续费并入账' }).click()
+  await expect(page.getByText('¥438.50', { exact: true }).first()).toBeVisible()
+
+  await page.getByRole('tab', { name: /支出流水/ }).click()
+  await expect(page.getByText('设计工具会员', { exact: true }).first()).toBeVisible()
+  expect(expenses).toHaveLength(2)
+  expect(renewals[0]?.next_due_on).toBe('2026-08-31')
+})
 
 test('订单人工确认收款走独立动作接口，随后可见分润，退款保留终态', async ({ page }) => {
   await installSession(page, 'super_admin')

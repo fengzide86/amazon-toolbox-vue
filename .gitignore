@@ -44,6 +44,7 @@ backend/.openapi-runtime/
 
 # ===== 上传文件 =====
 backend/uploads/
+backend/data/expense-attachments/
 
 # ===== IDE 配置 =====
 .vscode/

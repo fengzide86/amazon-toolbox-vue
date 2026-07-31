@@ -36,6 +36,10 @@ Electron 的 `main.cts` 只做主进程组合，现有桌面生命周期实现�
 
 Business Workspace Store 保持原公开 state/action 契约。纯数据转换位于 `src/features/business/workspace-helpers.ts`，离线队列、重试与恢复位于 `src/features/business/workspace-outbox.ts`。
 
+公司公账支出属于 `commerce` 领域，但和订单收入、分润记录保持独立。五张表分别保存分类、实际支出、凭证元数据、续费项目与周期处理记录；待续费只按日期实时计算提醒，只有确认续费才会原子生成实际支出。确认和跳过请求必须携带当前 `due_on`，领域服务在行锁内核对周期并依赖唯一约束防止并发重复入账。凭证文件存入 `EXPENSE_ATTACHMENT_DIR` 指定的持久目录，数据库只保存元数据。
+
+后台页面入口为 `/admin/expenses`。超级管理员和运营可读写支出与处理续费，只有超级管理员能管理分类，客服路由和接口均不可达。前端编译期使用生成的 OpenAPI 类型，同时由 `src/features/admin/expenses/model.ts` 的 Zod 契约执行运行时解析。
+
 ## 检查命令
 
 快速开发检查：
@@ -47,6 +51,7 @@ npm run architecture:check
 npm run openapi:check
 npm test
 npm run verify:backend
+python -m pytest backend/tests/api/test_expenses.py --rootdir=backend -q
 ```
 
 完整发布候选检查（只检查和构建，不提交、不发布、不连接生产服务器）：

@@ -18,6 +18,7 @@ const mockRouter = createRouter({
     { path: '/admin/business-access', name: 'AdminBusinessAccess', component: { template: '<div />' } },
     { path: '/admin/orders', name: 'AdminOrders', component: { template: '<div />' } },
     { path: '/admin/profit', name: 'AdminProfit', component: { template: '<div />' } },
+    { path: '/admin/expenses', name: 'AdminExpenses', component: { template: '<div />' } },
     { path: '/admin/users', name: 'AdminUsers', component: { template: '<div />' } },
     { path: '/admin/feedback', name: 'AdminFeedback', component: { template: '<div />' } },
     { path: '/admin/knowledge', name: 'AdminKnowledge', component: { template: '<div />' } },
@@ -77,7 +78,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      expect(menuItems.length).toBe(14)
+      expect(menuItems.length).toBe(15)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -91,6 +92,7 @@ describe('AdminSidebar', () => {
       expect(labels).toContain('授权码管理')
       expect(labels).toContain('订单与套餐')
       expect(labels).toContain('分润管理')
+      expect(labels).toContain('公账支出')
       expect(labels).toContain('用户管理')
       expect(labels).toContain('工单管理')
       expect(labels).toContain('知识库管理')
@@ -113,6 +115,7 @@ describe('AdminSidebar', () => {
       const labels = wrapper.findAll('.menu-label').map(el => el.text())
       expect(labels).not.toContain('专业工作台')
       expect(labels).not.toContain('分润管理')
+      expect(labels).not.toContain('公账支出')
       expect(labels).not.toContain('应用更新')
       expect(labels).not.toContain('系统设置')
       expect(labels).not.toContain('后台账号管理')

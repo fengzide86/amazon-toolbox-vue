@@ -26,6 +26,18 @@ from models.auth import AuthCode, AuthCodeStatus, AuthSeat, Device, LaunchToken,
 from models.automation import AutomationBatch, AutomationBatchItem
 from models.base import Base
 from models.demo import DemoBatch, DemoBatchItem, DemoRun
+from models.expense import (
+    ExpenseAttachment,
+    ExpenseCategory,
+    ExpenseCategoryStatus,
+    ExpenseOccurrenceStatus,
+    ExpenseRecord,
+    ExpenseRecordStatus,
+    ExpenseRenewal,
+    ExpenseRenewalCycle,
+    ExpenseRenewalOccurrence,
+    ExpenseRenewalStatus,
+)
 
 # 反馈相关模型
 from models.feedback import ExecutionVerification, Feedback, FeedbackStatus, LogStatus, RunLog
@@ -59,6 +71,11 @@ __all__ = [
     "LaunchTokenStatus",
     "StaffRole",
     "StaffStatus",
+    "ExpenseCategoryStatus",
+    "ExpenseRecordStatus",
+    "ExpenseRenewalStatus",
+    "ExpenseRenewalCycle",
+    "ExpenseOccurrenceStatus",
     # 授权相关
     "AuthCode",
     "Device",
@@ -74,6 +91,11 @@ __all__ = [
     "Order",
     "Plan",
     "ProfitRecord",
+    "ExpenseCategory",
+    "ExpenseRecord",
+    "ExpenseAttachment",
+    "ExpenseRenewal",
+    "ExpenseRenewalOccurrence",
     # 反馈相关
     "Feedback",
     "RunLog",

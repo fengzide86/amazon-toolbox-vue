@@ -1,6 +1,7 @@
 import asyncio
 import os
 import uuid
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -12,7 +13,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from core.security import hash_password
 from database import Base, get_db
 from main import app
-from models import AuditLog, Order, Plan, ProfitRecord, StaffRole, StaffStatus, StaffUser
+from models import (
+    AuditLog,
+    ExpenseCategory,
+    ExpenseRecord,
+    ExpenseRenewal,
+    ExpenseRenewalOccurrence,
+    Order,
+    Plan,
+    ProfitRecord,
+    StaffRole,
+    StaffStatus,
+    StaffUser,
+)
 from services.staff_service import create_staff_access_token
 
 
@@ -139,6 +152,132 @@ async def test_twenty_concurrent_manual_paid_transitions_create_one_profit_recor
                     await session.execute(delete(Order).where(Order.id == order_id))
                 if plan_id is not None:
                     await session.execute(delete(Plan).where(Plan.id == plan_id))
+                if staff_id is not None:
+                    await session.execute(delete(StaffUser).where(StaffUser.id == staff_id))
+                await session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_renewal_confirmation_creates_one_expense_for_due_cycle():
+    engine = create_async_engine(
+        _mariadb_test_url(),
+        pool_size=20,
+        max_overflow=5,
+        pool_pre_ping=True,
+        isolation_level="READ COMMITTED",
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    suffix = uuid.uuid4().hex[:12]
+    staff_id: int | None = None
+    category_id: int | None = None
+    renewal_id: int | None = None
+    due_on = date(2027, 1, 31)
+
+    async def override_get_db():
+        async with sessions() as session:
+            try:
+                yield session
+            finally:
+                if session.in_transaction():
+                    await session.rollback()
+
+    previous_override = app.dependency_overrides.get(get_db)
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+
+        async with sessions() as session:
+            staff = StaffUser(
+                username=f"renewal-concurrency-{suffix}",
+                display_name="Renewal concurrency test",
+                password_hash=hash_password(f"Concurrency-{suffix}"),
+                role=StaffRole.SUPER_ADMIN,
+                status=StaffStatus.ACTIVE,
+                token_version=1,
+                force_password_reset=False,
+            )
+            category = ExpenseCategory(
+                code=f"concurrency_{suffix}",
+                name=f"并发测试 {suffix}",
+                status="active",
+                sort_order=999,
+                is_system=False,
+            )
+            session.add_all([staff, category])
+            await session.flush()
+            renewal = ExpenseRenewal(
+                name=f"并发续费 {suffix}",
+                vendor="Test vendor",
+                default_amount=Decimal("88.00"),
+                category_id=category.id,
+                cycle="monthly",
+                next_due_on=due_on,
+                reminder_days=7,
+                anchor_day=31,
+                anchor_month_end=True,
+                status="active",
+                created_by_staff_id=staff.id,
+                updated_by_staff_id=staff.id,
+            )
+            session.add(renewal)
+            await session.flush()
+            staff_id, category_id, renewal_id = staff.id, category.id, renewal.id
+            await session.commit()
+            token = create_staff_access_token(staff)
+
+        app.dependency_overrides[get_db] = override_get_db
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://mariadb-test") as client:
+            responses = await asyncio.gather(*[
+                client.post(
+                    f"/api/expenses/renewals/{renewal_id}/confirm",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={"due_on": due_on.isoformat(), "expense_date": date.today().isoformat()},
+                )
+                for _ in range(20)
+            ])
+
+        statuses = [response.status_code for response in responses]
+        assert statuses.count(200) == 1, [response.text for response in responses]
+        assert statuses.count(409) == 19, [response.text for response in responses]
+
+        async with sessions() as session:
+            expense_count = (
+                await session.execute(
+                    select(func.count(ExpenseRecord.id)).where(
+                        ExpenseRecord.renewal_id == renewal_id,
+                        ExpenseRecord.renewal_due_on == due_on,
+                    )
+                )
+            ).scalar_one()
+            occurrence_count = (
+                await session.execute(
+                    select(func.count(ExpenseRenewalOccurrence.id)).where(
+                        ExpenseRenewalOccurrence.renewal_id == renewal_id,
+                        ExpenseRenewalOccurrence.due_on == due_on,
+                    )
+                )
+            ).scalar_one()
+            assert expense_count == 1
+            assert occurrence_count == 1
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(get_db, None)
+        else:
+            app.dependency_overrides[get_db] = previous_override
+
+        if any(identifier is not None for identifier in (staff_id, category_id, renewal_id)):
+            async with sessions() as session:
+                if staff_id is not None:
+                    await session.execute(delete(AuditLog).where(AuditLog.user_id == staff_id))
+                if renewal_id is not None:
+                    await session.execute(delete(ExpenseRenewalOccurrence).where(ExpenseRenewalOccurrence.renewal_id == renewal_id))
+                    await session.execute(delete(ExpenseRecord).where(ExpenseRecord.renewal_id == renewal_id))
+                    await session.execute(delete(ExpenseRenewal).where(ExpenseRenewal.id == renewal_id))
+                if category_id is not None:
+                    await session.execute(delete(ExpenseCategory).where(ExpenseCategory.id == category_id))
                 if staff_id is not None:
                     await session.execute(delete(StaffUser).where(StaffUser.id == staff_id))
                 await session.commit()

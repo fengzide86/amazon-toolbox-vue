@@ -66,6 +66,14 @@
         </div>
         <EmptyState v-else :icon="CheckCircle2" title="工单已经处理完" description="当前没有等待回复的客户问题。" />
       </article>
+
+      <article v-if="canSeeExpenses" id="expense_renewals" class="action-panel">
+        <header><div><span>公账支出</span><h3>待续费项目</h3></div><router-link to="/admin/expenses?tab=renewals&due=1">进入续费账本</router-link></header>
+        <div v-if="data.expense_renewals?.length" class="simple-list">
+          <div v-for="item in data.expense_renewals.slice(0, 6)" :key="item.id"><span><WalletCards :size="15" />{{ item.name }}</span><strong>{{ formatDate(item.next_due_on) }} · ¥{{ Number(item.default_amount).toFixed(2) }}</strong></div>
+        </div>
+        <EmptyState v-else :icon="CheckCircle2" title="近期没有待续费项目" description="未来 7 天与逾期项目都会在这里提醒。" />
+      </article>
     </section>
 
     <el-drawer v-model="batchDrawerVisible" size="min(560px, 94vw)" title="批次详情" class="batch-detail-drawer">
@@ -87,7 +95,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { CheckCircle2, ChevronRight, KeyRound, LoaderCircle, MessageSquareText, MonitorSmartphone, RefreshCw, ShieldAlert, ShieldCheck, TicketCheck, TimerReset, UserRoundCheck, WifiOff } from '@lucide/vue'
+import { CheckCircle2, ChevronRight, KeyRound, LoaderCircle, MessageSquareText, MonitorSmartphone, RefreshCw, ShieldAlert, ShieldCheck, TicketCheck, TimerReset, UserRoundCheck, WalletCards, WifiOff } from '@lucide/vue'
 import EmptyState from '@/components/EmptyState.vue'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -100,6 +108,7 @@ import {
   type AdminBatchDetail,
 } from '@/features/admin/model'
 import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
+import { authService } from '@/utils/auth'
 
 const data = ref<AdminActionCenter>(adminActionCenterSchema.parse({
   summary: {},
@@ -108,6 +117,7 @@ const data = ref<AdminActionCenter>(adminActionCenterSchema.parse({
   pending_tickets: [],
   waiting_interventions: [],
   stale_batches: [],
+  expense_renewals: [],
 }))
 const loading = ref(false)
 const loadState = ref<AsyncDataState>('loading')
@@ -116,12 +126,14 @@ const hasLoaded = ref(false)
 const batchLoading = ref(false)
 const batchDrawerVisible = ref(false)
 const batchDetail = ref<AdminBatchDetail | null>(null)
+const canSeeExpenses = authService.getRole() !== 'support'
 
 const summaryCards = computed(() => [
   { key: 'expiring_authorizations', label: '即将到期授权', value: data.value.summary?.expiring_authorizations || 0, hint: '7 天内需要跟进', icon: TimerReset, tone: 'premium' },
   { key: 'device_anomalies', label: '设备与席位异常', value: data.value.summary?.device_anomalies || 0, hint: '检查授权使用边界', icon: ShieldAlert, tone: 'danger' },
   { key: 'pending_tickets', label: '待处理工单', value: data.value.summary?.pending_tickets || 0, hint: '等待运营回复', icon: TicketCheck, tone: 'neutral' },
   { key: 'waiting_interventions', label: '需要人工介入', value: data.value.summary?.waiting_interventions || 0, hint: '客户执行正在等待', icon: UserRoundCheck, tone: 'warning' },
+  ...(canSeeExpenses ? [{ key: 'expense_renewals', label: '待续费项目', value: data.value.summary?.expense_renewals_due || 0, hint: '7 天内及已逾期', icon: WalletCards, tone: 'premium' }] : []),
 ])
 
 async function loadData() {
@@ -136,6 +148,7 @@ async function loadData() {
       + (data.value.pending_tickets?.length || 0)
       + (data.value.waiting_interventions?.length || 0)
       + (data.value.stale_batches?.length || 0)
+      + (data.value.expense_renewals?.length || 0)
     loadState.value = settledDataState(itemCount)
   } catch (error) {
     loadError.value = error instanceof Error && error.message ? error.message : '行动中心加载失败，请稍后重试'

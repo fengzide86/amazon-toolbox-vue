@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.dependencies import get_current_admin
 from core.response import CompatibleResponse, success_response
 from database import get_db
+from domains.commerce import ExpenseService
 from models import AuthCode, AuthSeat, Device, Feedback
 
 router = APIRouter()
@@ -49,6 +50,11 @@ async def get_action_center(
         select(Feedback).where(Feedback.status == "pending").order_by(Feedback.created_at).limit(20)
     )
     tickets = feedback_result.scalars().all()
+    renewal_items = (
+        await ExpenseService(db).due_items()
+        if _admin.get("role") in {"super_admin", "operator"}
+        else []
+    )
 
     return success_response({
         "summary": {
@@ -57,6 +63,7 @@ async def get_action_center(
             "pending_tickets": len(tickets),
             "waiting_interventions": 0,
             "stale_batches": 0,
+            "expense_renewals_due": len(renewal_items),
         },
         "expiring_authorizations": [{
             "id": item.id,
@@ -81,6 +88,7 @@ async def get_action_center(
         # under /api/demo and never masquerade as operational execution alerts.
         "waiting_interventions": [],
         "stale_batches": [],
+        "expense_renewals": renewal_items,
     })
 
 
