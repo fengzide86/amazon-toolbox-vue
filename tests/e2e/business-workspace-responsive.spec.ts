@@ -38,10 +38,11 @@ async function mockControlPlane(page: Page, role: 'business' | 'consumer' | 'sup
     else if (url.includes('/api/auth/me') || url.includes('/api/staff/auth/me')) data = user
     else if (url.includes('/api/tools')) data = [{ ...batchTool, capability_tags: ['自动填报', '页面核验', '结果确认'] }]
     else if (url.includes('/api/admin/action-center')) data = {
-      summary: { expiring_authorizations: 2, device_anomalies: 1, pending_tickets: 3, waiting_interventions: 1, stale_batches: 0 },
+      summary: { expiring_authorizations: 2, device_anomalies: 1, pending_tickets: 3, waiting_interventions: 1, stale_batches: 0, expense_renewals_due: 1 },
       expiring_authorizations: [{ id: 1, code_masked: 'BUSI***001', expires_at: new Date(Date.now() + 86400000).toISOString() }],
       device_anomalies: [], pending_tickets: [], stale_batches: [],
       waiting_interventions: [{ batch_id: 1, tool_name: '注册自动处理', account_label_masked: '客***甲', intervention_type: 'captcha', updated_at: new Date().toISOString() }],
+      expense_renewals: [{ id: 1, name: '云服务续费', vendor: '云服务商', default_amount: 128, category_name: '服务器/云服务', next_due_on: new Date().toISOString().slice(0, 10), due_state: 'due' }],
     }
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data }) })
   })
@@ -191,7 +192,7 @@ test('管理员行动中心在 1024 和 768 下保持完整卡片矩阵', async 
   for (const width of [1024, 768]) {
     await page.setViewportSize({ width, height: 768 })
     await page.goto('/#/admin/dashboard', { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('.summary-card')).toHaveCount(4)
+    await expect(page.locator('.summary-card')).toHaveCount(5)
     await expect(page.getByText('工具成功率')).toHaveCount(0)
     await expectNoOverflow(page)
   }
