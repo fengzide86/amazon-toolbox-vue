@@ -3,7 +3,7 @@
     <PageHeader
       eyebrow="PROFESSIONAL OPERATIONS"
       title="专业工作台已就绪"
-      :description="hasTools ? '选择演示工具，体验多个虚拟项目按顺序推进的流程。' : '批量演示工具会根据验证场景逐个开放。'"
+      :description="hasTools ? '选择演示工具，在同一视图掌控多个虚拟账号的并发进度。' : '批量演示工具会根据验证场景逐个开放。'"
     >
       <template #actions>
         <span class="validation-badge">内部验证版</span>
@@ -18,12 +18,12 @@
     </section>
     <section class="capability-grid">
       <article><FileSpreadsheet :size="20" /><div><span>内置演示样例</span><strong>最多 {{ store.entitlements.max_batch_rows || 50 }} 个演示项</strong></div><small>不读取真实客户资料</small></article>
-      <article><PanelsTopLeft :size="20" /><div><span>批量队列演示</span><strong>按顺序播放流程</strong></div><small>所有页面与结果均为模拟</small></article>
+      <article><PanelsTopLeft :size="20" /><div><span>批量并发演示</span><strong>全部账号同步推进</strong></div><small>所有页面与结果均为模拟</small></article>
       <article><ShieldCheck :size="20" /><div><span>模拟人工提示</span><strong>展示完整交互状态</strong></div><small>不会登录或修改真实平台</small></article>
     </section>
     <section class="surface recent">
       <header><div><span>最近演示批次</span><small>模拟记录不计入真实执行统计</small></div><router-link to="/business/records">全部记录</router-link></header>
-      <AsyncStateNotice :state="historyState" :message="store.error || ''" loading-text="正在加载演示记录..." @retry="loadHistory" />
+      <AsyncStateNotice :state="historyState" :message="store.historyError || ''" loading-text="正在加载演示记录..." @retry="loadHistory" />
       <div v-if="(historyState === 'data' || historyState === 'stale') && store.demoHistory.length" class="batch-list">
         <article v-for="batch in store.demoHistory.slice(0, 5)" :key="batch.id">
           <div><strong>{{ batch.tool_name_snapshot }}</strong><span>{{ formatDate(batch.started_at || batch.created_at) }}</span></div>
@@ -46,13 +46,13 @@ import { ArrowRight, BellRing, FileSpreadsheet, Layers3, PanelsTopLeft, ShieldCh
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import type { AsyncDataState } from '@/features/async/state'
-import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
-const store = useBusinessDemoWorkspaceStore()
+import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
+const store = useBusinessWorkspaceStore()
 const waitingCount = computed(() => store.snapshot.counts?.waiting || 0)
 const hasTools = computed(() => store.tools.length > 0)
 const historyState = computed<AsyncDataState>(() => {
-  if (store.loading) return 'loading'
-  if (store.error) return store.demoHistory.length ? 'stale' : 'error'
+  if (store.historyLoading) return 'loading'
+  if (store.historyError) return store.demoHistory.length ? 'stale' : 'error'
   return store.demoHistory.length ? 'data' : 'empty'
 })
 const formatDate = (value: string | null | undefined): string => value

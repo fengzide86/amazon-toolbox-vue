@@ -52,6 +52,11 @@ export const batchItemSchema = z.object({
   interventionType: z.string().nullable().optional(),
   message: z.string().nullable().optional(),
   browserReady: z.boolean().default(false),
+  progressPercent: z.number().min(0).max(100).optional(),
+  stageIndex: z.number().int().min(0).max(4).optional(),
+  startedAtMs: z.number().nonnegative().optional(),
+  finishedAtMs: z.number().nonnegative().optional(),
+  simulatedOutcome: z.enum(['completed_example', 'attention_example', 'failure_example']).nullable().optional(),
 }).passthrough()
 export type BatchItem = z.infer<typeof batchItemSchema>
 

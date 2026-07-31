@@ -63,7 +63,7 @@ export const demoBatchSchema = z.object({
     status: z.enum(['queued', 'playing', 'played', 'skipped', 'error']).default('queued'),
     simulated_outcome: simulatedOutcomeSchema.nullable().optional(),
     event_seq: z.coerce.number().nonnegative().default(0),
-  }).passthrough()).optional(),
+  }).passthrough()).nullish().transform(items => items ?? []),
 }).passthrough()
 export type DemoBatch = z.infer<typeof demoBatchSchema>
 export const demoBatchListSchema = z.array(demoBatchSchema)

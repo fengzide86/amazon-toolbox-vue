@@ -1961,7 +1961,7 @@
           "playing_count": {
             "anyOf": [
               {
-                "maximum": 1.0,
+                "maximum": 50.0,
                 "minimum": 0.0,
                 "type": "integer"
               },

@@ -9,7 +9,7 @@
     <section class="limits-grid">
       <article><span>这台电脑</span><strong>{{ deviceAuthorized ? '已授权' : '等待授权' }}</strong><small>{{ user.device_used || 0 }} / {{ user.max_devices || 1 }} 台设备</small></article>
       <article><span>单批次上限</span><strong>{{ store.entitlements.max_batch_rows || 50 }}</strong><small>仅统计有效导入行</small></article>
-      <article><span>并行演示槽位</span><strong>{{ store.entitlements.max_open_sessions || 6 }}</strong><small>仅暂存本地模拟状态</small></article>
+      <article><span>并发演示上限</span><strong>{{ store.entitlements.max_batch_rows || 50 }}</strong><small>全部演示项同步推进</small></article>
     </section>
     <p class="security-note"><ShieldCheck :size="16" />客户密码、Cookie 和 Excel 原文不会上传到服务端。</p>
   </div>
@@ -18,7 +18,7 @@
 import { computed } from 'vue'
 import { BadgeCheck, ShieldCheck } from '@lucide/vue'
 import { z } from 'zod'
-import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
+import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import PageHeader from '@/components/PageHeader.vue'
 
 const storedBusinessUserSchema = z.object({
@@ -30,7 +30,7 @@ const storedBusinessUserSchema = z.object({
   max_devices: z.number().optional(),
 }).passthrough()
 
-const store = useBusinessDemoWorkspaceStore()
+const store = useBusinessWorkspaceStore()
 const user = computed(() => {
   try {
     return storedBusinessUserSchema.parse(JSON.parse(localStorage.getItem('toolbox_user') || '{}'))

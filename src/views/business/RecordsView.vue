@@ -33,11 +33,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Archive, CircleAlert, RefreshCw } from '@lucide/vue'
-import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
+import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
-const store = useBusinessDemoWorkspaceStore()
+const store = useBusinessWorkspaceStore()
 type RecordTab = 'demo' | 'live'
 interface BatchRow { id: string | number; toolName: string; startedAt?: string | null; total: number; processed: number; attention: number; status: string }
 const activeTab = ref<RecordTab>('demo')

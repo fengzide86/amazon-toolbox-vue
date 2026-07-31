@@ -143,6 +143,35 @@ async def _batch_response(db: AsyncSession, batch: DemoBatch, *, include_items: 
     )
 
 
+async def _locked_batch_items(db: AsyncSession, batch_id: str) -> list[DemoBatchItem]:
+    return list(
+        (
+            await db.execute(
+                select(DemoBatchItem)
+                .where(DemoBatchItem.batch_id == batch_id)
+                .order_by(DemoBatchItem.id)
+                .with_for_update()
+            )
+        ).scalars().all()
+    )
+
+
+def _batch_item_counts(items: list[DemoBatchItem]) -> dict[str, int]:
+    statuses = [item.status for item in items]
+    return {
+        "queued_count": statuses.count("queued"),
+        "playing_count": statuses.count("playing"),
+        "played_count": statuses.count("played"),
+        "skipped_count": statuses.count("skipped"),
+        "error_count": statuses.count("error"),
+    }
+
+
+def _apply_batch_item_counts(batch: DemoBatch, counts: dict[str, int]) -> None:
+    for field, value in counts.items():
+        setattr(batch, field, value)
+
+
 @router.post("/runs", response_model=DemoRunResponse, status_code=status.HTTP_201_CREATED)
 async def create_demo_run(
     req: DemoRunCreate,
@@ -440,10 +469,19 @@ async def update_demo_batch(
     }
     if sum(next_counts.values()) != batch.row_count:
         raise HTTPException(status_code=422, detail="演示批次数量汇总必须等于总行数")
+    if req.status == "cancelled":
+        now = datetime.now()
+        items = await _locked_batch_items(db, batch.id)
+        for item in items:
+            if item.status not in {"queued", "playing"}:
+                continue
+            item.status = "skipped"
+            item.event_seq += 1
+            item.finished_at = now
+        next_counts = _batch_item_counts(items)
     batch.event_seq = req.event_seq
     batch.status = req.status
-    for field, value in next_counts.items():
-        setattr(batch, field, value)
+    _apply_batch_item_counts(batch, next_counts)
     if req.status == "running" and not batch.started_at:
         batch.started_at = datetime.now()
     if req.status in {"cancelled", "error"}:
@@ -462,7 +500,7 @@ async def update_demo_batch_item(
     current_user: dict = Depends(get_current_user),
 ):
     user_id, _, _ = _owner(current_user)
-    await _owned_batch(db, batch_id, user_id)
+    batch = await _owned_batch(db, batch_id, user_id, lock=True)
     item = (
         await db.execute(
             select(DemoBatchItem)
@@ -472,6 +510,10 @@ async def update_demo_batch_item(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="演示项不存在")
+    if batch.status in {"completed", "cancelled", "error"}:
+        if req.event_seq <= item.event_seq:
+            return item
+        raise HTTPException(status_code=409, detail="当前批量演示已结束")
     if _ensure_event_seq(item.event_seq, req.event_seq):
         return item
     _ensure_transition(item.status, req.status, ITEM_TRANSITIONS)
@@ -502,10 +544,13 @@ async def finish_demo_batch(
         return await _batch_response(db, batch, include_items=True)
     if batch.status != "running":
         raise HTTPException(status_code=409, detail="当前批量演示不能完成")
-    if batch.queued_count or batch.playing_count:
+    items = await _locked_batch_items(db, batch.id)
+    counts = _batch_item_counts(items)
+    if counts["queued_count"] or counts["playing_count"]:
         raise HTTPException(status_code=409, detail="仍有演示项未结束")
     batch.event_seq = req.event_seq
     batch.status = "completed"
+    _apply_batch_item_counts(batch, counts)
     batch.finished_at = datetime.now()
     await db.commit()
     await db.refresh(batch)

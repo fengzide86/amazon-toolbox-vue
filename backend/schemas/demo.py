@@ -75,7 +75,7 @@ class DemoBatchUpdate(StrictModel):
     event_seq: int = Field(ge=1)
     status: DemoBatchStatus
     queued_count: int | None = Field(default=None, ge=0, le=1000)
-    playing_count: int | None = Field(default=None, ge=0, le=1)
+    playing_count: int | None = Field(default=None, ge=0, le=50)
     played_count: int | None = Field(default=None, ge=0, le=1000)
     skipped_count: int | None = Field(default=None, ge=0, le=1000)
     error_count: int | None = Field(default=None, ge=0, le=1000)

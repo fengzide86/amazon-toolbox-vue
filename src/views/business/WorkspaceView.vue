@@ -107,113 +107,26 @@
       </section>
     </template>
 
-    <template v-else>
-      <header class="workspace-header">
-        <div class="batch-identity"><span class="professional-badge">{{ store.isDemoBatch ? '交互演示' : '自动执行' }}</span><div><strong>{{ store.snapshot.tool?.name }}</strong><small>{{ store.snapshot.counts?.total || 0 }} 个任务项</small></div></div>
-        <div class="batch-counts">
-          <span><small>已处理</small><strong>{{ processedCount }}</strong></span>
-          <span><small>处理中</small><strong>{{ store.snapshot.counts?.running || 0 }}</strong></span>
-          <span :class="{ attention: store.snapshot.counts?.waiting }"><small>需要操作</small><strong>{{ store.snapshot.counts?.waiting || 0 }}</strong></span>
-        </div>
-        <div class="header-actions">
-          <span :class="['sync-state', `is-${store.syncState}`]">{{ syncText }}</span>
-          <button v-if="store.isActive" @click="endBatch"><Square :size="14" />结束批次</button>
-          <button v-else @click="newBatch"><Plus :size="14" />新建批次</button>
-        </div>
-      </header>
-
-      <div class="workspace-grid">
-        <aside :class="['account-queue', { 'mobile-open': queueOpen }]">
-          <header><div><strong>演示队列</strong><small>系统会自动继续</small></div><button class="mobile-close" @click="queueOpen=false"><X :size="16" /></button></header>
-          <div class="queue-list">
-            <button v-for="item in store.items" :key="item.itemId" :class="['queue-item', `is-${item.status}`, { selected: store.selectedItemId === item.itemId }]" @click="store.selectItem(item.itemId)">
-              <span class="queue-state">
-                <LoaderCircle v-if="item.status === 'running'" :size="15" class="spin" />
-                <CircleAlert v-else-if="item.status === 'waiting_user' || item.status === 'failed'" :size="15" />
-                <Check v-else-if="item.status === 'completed'" :size="15" />
-                <span v-else></span>
-              </span>
-              <span class="queue-copy"><strong>{{ item.accountLabelMasked }}</strong><small>{{ store.statusText(item.status) }}</small></span>
-              <ChevronRight :size="14" />
-            </button>
-          </div>
-        </aside>
-
-        <main class="browser-stage">
-          <div class="mobile-toolbar"><button @click="queueOpen=true"><List :size="16" />账号队列</button><span>{{ store.selectedItem?.accountLabelMasked }}</span><button @click="actionOpen=true"><PanelRight :size="16" />状态</button></div>
-          <div class="browser-shell">
-            <div class="browser-toolbar"><span class="traffic"><i></i><i></i><i></i></span><LockKeyhole :size="13" /><span>{{ displayUrl }}</span><small>{{ store.selectedItem?.accountLabelMasked || '选择一个账号' }}</small></div>
-            <div class="browser-viewport">
-              <div v-if="store.isDemoBatch && !store.openItems.length" class="demo-browser-preview">
-                <Layers3 :size="36" />
-                <strong>批量交互沙盒</strong>
-                <span>每个任务项都会在本地模拟页面中完成真实操作。</span>
-              </div>
-              <webview
-                v-for="item in store.openItems"
-                :key="item.itemId"
-                src="about:blank"
-                :partition="batchPartition(item.itemId)"
-                :class="['batch-webview', { active: store.selectedItemId === item.itemId }]"
-                @dom-ready="registerBatchBrowser(item.itemId, $event)"
-              />
-              <div v-if="store.selectedItem && !store.selectedItem.browserReady && store.selectedItem.itemId !== store.snapshot.provisioningItemId" class="browser-placeholder">
-                <Layers3 :size="34" /><strong>{{ store.statusText(store.selectedItem.status) }}</strong><span>{{ store.isDemoBatch ? '轮到该任务项时，系统会执行本地沙盒流程。' : '轮到该任务项时，系统会启动独立登录现场。' }}</span>
-              </div>
-              <div v-if="store.selectedItem?.status === 'running'" class="automation-shield"><LoaderCircle :size="15" class="spin" />{{ store.isDemoBatch ? '正在执行本地沙盒' : '正在自动操作页面' }}</div>
-            </div>
-          </div>
-        </main>
-
-        <aside :class="['action-panel', { 'mobile-open': actionOpen }]">
-          <header><div><span>当前账号</span><strong>{{ store.selectedItem?.accountLabelMasked || '未选择' }}</strong></div><button class="mobile-close" @click="actionOpen=false"><X :size="16" /></button></header>
-          <template v-if="store.selectedItem">
-            <div :class="['status-hero', `is-${store.selectedItem.status}`]">
-              <div class="status-symbol"><LoaderCircle v-if="store.selectedItem.status === 'running'" :size="22" class="spin"/><CircleAlert v-else-if="['waiting_user','failed'].includes(store.selectedItem.status)" :size="22"/><Check v-else-if="store.selectedItem.status === 'completed'" :size="22"/><Clock3 v-else :size="22"/></div>
-              <span>{{ store.statusText(store.selectedItem.status) }}</span>
-              <p>{{ actionDescription }}</p>
-            </div>
-            <div class="business-stage"><span>业务阶段</span><div><i :class="{done: stageIndex>0,active:stageIndex===0}"></i><i :class="{done:stageIndex>1,active:stageIndex===1}"></i><i :class="{done:stageIndex>2,active:stageIndex===2}"></i><i :class="{done:stageIndex>3,active:stageIndex===3}"></i></div><small>准备 · 执行 · 核验 · 完成</small></div>
-            <button v-if="store.selectedItem.status === 'waiting_user'" class="primary-action warning" @click="completeAction">我已完成，继续处理</button>
-            <button v-else-if="store.selectedItem.status === 'failed'" class="primary-action" @click="restartItem">重新发起此账号</button>
-            <div class="security-note" data-testid="business-execution-scope"><ShieldCheck :size="15" /><span>{{ store.isDemoBatch ? '这是本地交互沙盒，不访问外部平台。' : '账号登录现场仅保存在本机，服务器只接收脱敏状态。' }}</span></div>
-          </template>
-        </aside>
-      </div>
-      <div v-if="queueOpen || actionOpen" class="mobile-overlay" @click="queueOpen=false;actionOpen=false"></div>
-    </template>
+    <BusinessBatchRunConsole v-else @exit="endBatch" @new="newBatch" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { Boxes, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3, Download, FileSpreadsheet, Layers3, List, LoaderCircle, LockKeyhole, PanelRight, Play, Plus, RefreshCw, ShieldCheck, Sparkles, Square, Upload, X } from '@lucide/vue'
+import { Boxes, Check, CheckCircle2, CircleAlert, Download, FileSpreadsheet, Layers3, LoaderCircle, Play, RefreshCw, ShieldCheck, Sparkles, Upload } from '@lucide/vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { showToast } from '@/utils'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import BusinessBatchRunConsole from '@/features/business/BusinessBatchRunConsole.vue'
 
 const store = useBusinessWorkspaceStore()
-const queueOpen = ref(false)
-const actionOpen = ref(false)
-const syncLabels: Record<string, string> = { synced: '状态已同步', syncing: '正在同步', offline: '本地继续处理中' }
+const router = useRouter()
 
 const errorMessage = (error: unknown, fallback: string): string => error instanceof Error && error.message ? error.message : fallback
-const processedCount = computed(() => (store.snapshot.counts.completed || 0) + (store.snapshot.counts.failed || 0))
 const setupIsDemo = computed(() => store.selectedTool?.availability !== 'live' && store.selectedTool?.availability !== 'live_beta')
-const displayUrl = computed(() => store.isDemoBatch ? '本地交互沙盒' : (store.snapshot.tool?.target_url || store.snapshot.tool?.targetUrl || '比赛模拟平台'))
-const syncText = computed(() => syncLabels[store.syncState] || '')
-const actionDescription = computed(() => {
-  const item = store.selectedItem
-  if (!item) return ''
-  if (item.status === 'running') return store.isDemoBatch ? '正在操作该任务项的本地沙盒' : '正在操作该账号的平台页面'
-  if (item.status === 'waiting_user') return item.message || '请完成登录或页面验证后继续'
-  if (item.status === 'completed') return item.message || '该任务项已完成并通过结果核验'
-  if (item.status === 'failed') return item.message || '自动处理已安全停止，可以重新发起'
-  return '系统会在轮到该演示项时自动播放'
-})
-const stageIndex = computed<number>(() => store.selectedItem?.status === 'completed' ? 4 : store.selectedItem?.status === 'running' || store.selectedItem?.status === 'waiting_user' ? 1 : 0)
 const setupStageIndex = computed(() => store.isActive || store.snapshot.status === 'completed' ? 3 : store.importPreview ? 2 : store.selectedTool ? 1 : 0)
 async function chooseFile() { try { await store.selectImportFile() } catch (error) { showToast(errorMessage(error, '导入失败'), 'error') } }
 async function loadSample() { try { await store.loadSampleImport(); showToast('已载入当前工具的 8 条测试数据', 'success') } catch (error) { showToast(errorMessage(error, '样例载入失败'), 'error') } }
@@ -228,35 +141,34 @@ async function refreshTools() {
 }
 async function exportErrors() { try { const result = await store.exportImportErrors(); if (result) showToast('问题清单已导出', 'success') } catch (error) { showToast(errorMessage(error, '导出失败'), 'error') } }
 async function beginBatch() { try { await store.startBatch() } catch (error) { showToast(errorMessage(error, '无法开始批次'), 'error') } }
-async function completeAction() {
-  const itemId = store.selectedItemId
-  if (!itemId) return
-  try { await store.completeUserAction(itemId); actionOpen.value = false }
-  catch (error) { showToast(errorMessage(error, '无法继续'), 'error') }
-}
-async function restartItem() {
-  const itemId = store.selectedItemId
-  if (!itemId) return
-  try { await store.restartItem(itemId) }
-  catch (error) { showToast(errorMessage(error, '无法重新发起'), 'error') }
-}
 async function endBatch() {
   try {
-    await ElMessageBox.confirm('结束后会停止当前队列并清理本地浏览器现场。', '结束当前批次？', { confirmButtonText: '结束批次', cancelButtonText: '继续处理', type: 'warning' })
+    const isDemo = store.isDemoBatch
+    await ElMessageBox.confirm(
+      isDemo ? '退出后会停止全部演示账号，已完成的结果仍会保留。' : '结束后会停止当前队列并清理本地浏览器现场。',
+      isDemo ? '退出当前演示？' : '结束当前批次？',
+      { confirmButtonText: isDemo ? '退出演示' : '结束批次', cancelButtonText: '继续处理', type: 'warning' },
+    )
     await store.cancelBatch('cancelled')
+    if (isDemo) await router.push('/business/overview')
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') showToast(errorMessage(error, '结束失败'), 'error')
   }
 }
 async function newBatch() { try { await store.resetWorkspace() } catch (error) { showToast(errorMessage(error, '暂时不能新建批次'), 'error') } }
-function batchPartition(itemId: string): string { return `batch-${itemId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80)}` }
-function registerBatchBrowser(itemId: string, event: Event) {
-  const webview = event.currentTarget as HTMLElement & { getWebContentsId?: () => number }
-  const webContentsId = webview.getWebContentsId?.()
-  if (typeof webContentsId === 'number') void store.registerBrowser(itemId, webContentsId).catch(error => showToast(errorMessage(error, '浏览器启动失败'), 'error'))
-}
 onMounted(() => { void store.init() })
-onUnmounted(() => store.dispose())
+onBeforeRouteLeave(async () => {
+  if (!store.isActive) return true
+  try {
+    await ElMessageBox.confirm('离开工作台会停止当前批次并保存已有结果。', '离开批量工作台？', { confirmButtonText: '停止并离开', cancelButtonText: '留在这里', type: 'warning' })
+    await store.cancelBatch('interrupted')
+    return true
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return false
+    showToast(errorMessage(error, '暂时无法离开工作台'), 'error')
+    return false
+  }
+})
 </script>
 
 <style scoped>

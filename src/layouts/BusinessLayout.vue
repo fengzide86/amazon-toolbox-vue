@@ -21,7 +21,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import BusinessSidebar from '@/components/BusinessSidebar.vue'
 import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
-import { useBusinessDemoWorkspaceStore } from '@/stores/businessDemoWorkspace'
+import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { getCurrentUser } from '@/utils/api'
 import { authService } from '@/utils/auth'
 import { authenticatedUserSchema } from '@/features/auth/model'
@@ -30,7 +30,7 @@ import { provideShellPageHeader } from '@/features/shell/pageHeaderContext'
 provideShellPageHeader()
 const route = useRoute()
 const router = useRouter()
-const store = useBusinessDemoWorkspaceStore()
+const store = useBusinessWorkspaceStore()
 const showSidebar = ref(false)
 let removeAfterEach: (() => void) | undefined
 let accessTimer: ReturnType<typeof setInterval> | undefined
@@ -63,7 +63,8 @@ onMounted(async () => {
 onUnmounted(() => {
   if (accessTimer) clearInterval(accessTimer)
   removeAfterEach?.()
-  store.dispose()
+  if (store.isActive) void store.cancelBatch('interrupted').finally(() => store.dispose())
+  else store.dispose()
 })
 </script>
 

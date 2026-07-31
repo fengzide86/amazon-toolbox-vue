@@ -35,6 +35,12 @@ import {
 } from '@/features/business/model'
 import { demoBatchListSchema, demoBatchSchema, unwrapApiData, type DemoBatch } from '@/features/demo/model'
 import {
+  DemoConcurrencyController,
+  type DemoCompletion,
+  type DemoProgressUpdate,
+  type DemoSimulatedOutcome,
+} from '@/features/business/demo-concurrency'
+import {
   createClientBatchId,
   errorMessage,
   ipcPayload,
@@ -44,6 +50,7 @@ import {
   unwrapData,
 } from '@/features/business/workspace-helpers'
 import { BusinessWorkspaceOutbox } from '@/features/business/workspace-outbox'
+import { demoActivityToken, setDemoActivity } from '@/utils/demoActivity'
 
 const historySchema = z.array(serverBatchHistorySchema)
 
@@ -59,12 +66,17 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const syncState = ref<'synced' | 'syncing' | 'offline'>('synced')
   const error = ref<string | null>(null)
   const bootstrapStale = ref(false)
+  const historyLoading = ref(false)
+  const historyError = ref<string | null>(null)
 
   let removeEventListener: (() => void) | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setTimeout> | null = null
-  let demoTimer: ReturnType<typeof setTimeout> | null = null
   let demoBatchEventSeq = 0
+  let demoRunToken = 0
+  let activeDemoToken: string | null = null
+  let demoSummaryQueue: Promise<void> = Promise.resolve()
+  let demoController: DemoConcurrencyController | null = null
   const provisioning = new Set<string>()
   const demoItemSequences = new Map<string, number>()
   const outbox = new BusinessWorkspaceOutbox({
@@ -80,7 +92,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const selectedItem = computed(() => items.value.find(item => item.itemId === selectedItemId.value) || null)
   const isActive = computed(() => snapshot.value.status === 'running')
   const isDemoBatch = computed(() => snapshot.value.recordKind === 'demo')
-  const openItems = computed(() => items.value.filter(item =>
+  const openItems = computed(() => isDemoBatch.value ? [] : items.value.filter(item =>
     item.browserReady
     || item.itemId === snapshot.value.provisioningItemId
     || item.status === 'running'
@@ -91,7 +103,12 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     const batch = window.electronAPI?.batch
     if (!removeEventListener && batch) removeEventListener = batch.onEvent(handleBatchEvent)
     const localSnapshot = await batch?.getSnapshot()
-    if (localSnapshot) applySnapshot(localSnapshot)
+    const parsedLocalSnapshot = businessBatchSnapshotSchema.safeParse(localSnapshot)
+    if (parsedLocalSnapshot.success && parsedLocalSnapshot.data.recordKind === 'demo') {
+      if (snapshot.value.status === 'idle') await batch?.cancel('interrupted').catch(() => undefined)
+    } else if (localSnapshot) {
+      applySnapshot(localSnapshot)
+    }
     startHeartbeat()
     window.addEventListener('online', handleReconnect)
     window.addEventListener('focus', handleReconnect)
@@ -120,20 +137,29 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   async function loadHistory(): Promise<ServerBatchHistory[]> {
+    historyLoading.value = true
+    historyError.value = null
     try {
       history.value = historySchema.parse(await getBusinessBatches({ limit: 30 }))
-    } catch (historyError) {
-      error.value = errorMessage(historyError, '执行记录暂时无法加载')
+    } catch (cause) {
+      historyError.value = errorMessage(cause, '执行记录暂时无法加载')
+      throw cause
+    } finally {
+      historyLoading.value = false
     }
     return history.value
   }
 
   async function loadDemoHistory(): Promise<DemoBatch[]> {
+    historyLoading.value = true
+    historyError.value = null
     try {
-      demoHistory.value = demoBatchListSchema.parse(await getDemoBatches({ page_size: 30 }))
-    } catch (historyError) {
-      error.value = errorMessage(historyError, '演示记录暂时无法加载')
-      throw historyError
+      demoHistory.value = demoBatchListSchema.parse(unwrapApiData(await getDemoBatches({ page_size: 30 })))
+    } catch (cause) {
+      historyError.value = errorMessage(cause, '演示记录暂时无法加载')
+      throw cause
+    } finally {
+      historyLoading.value = false
     }
     return demoHistory.value
   }
@@ -203,18 +229,9 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
           scenario_id: selectedTool.value.demo_scenario_id,
           row_count: importPreview.value.validCount,
         })))
-        demoBatchEventSeq = 1
-        await updateDemoBatch(created.id, {
-          event_seq: demoBatchEventSeq,
-          status: 'running',
-          queued_count: created.row_count,
-          playing_count: 0,
-          played_count: 0,
-          skipped_count: 0,
-          error_count: 0,
-        })
-        const itemRefs = created.items?.map(item => item.item_ref)
-          || Array.from({ length: created.row_count }, (_, index) => `demo_item_${index + 1}`)
+        const itemRefs = created.items.length
+          ? created.items.map(item => item.item_ref)
+          : Array.from({ length: created.row_count }, (_, index) => `demo_item_${index + 1}`)
         const batchApi = requireBatchApi()
         const localImport = importPreviewSchema.parse(await batchApi.remapImportItems({
           importId: importPreview.value.importId,
@@ -230,12 +247,64 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
             scriptKey: selectedTool.value.script_key,
             launchGrant: { scriptKey: selectedTool.value.script_key },
           },
-          maxOpenSessions: 1,
+          maxOpenSessions: 0,
           recordKind: 'demo',
         })))
+        const startedAtMs = Date.now()
+        const concurrentSnapshot = businessBatchSnapshotSchema.parse({
+          ...localSnapshot,
+          status: 'running',
+          activeItemId: null,
+          provisioningItemId: null,
+          maxOpenSessions: 0,
+          counts: {
+            total: localSnapshot.items.length,
+            pending: 0,
+            running: localSnapshot.items.length,
+            waiting: 0,
+            completed: 0,
+            failed: 0,
+          },
+          items: localSnapshot.items.map(item => ({
+            ...item,
+            status: 'running',
+            browserReady: false,
+            progressPercent: 4,
+            stageIndex: 0,
+            startedAtMs,
+            finishedAtMs: undefined,
+            simulatedOutcome: null,
+            message: '演示账号已并发启动',
+          })),
+        })
         importPreview.value = null
-        applySnapshot(localSnapshot)
-        return localSnapshot
+        applySnapshot(concurrentSnapshot)
+        selectedItemId.value = concurrentSnapshot.items[0]?.itemId || null
+        syncState.value = 'syncing'
+        demoItemSequences.clear()
+        await Promise.all(concurrentSnapshot.items.map(async item => {
+          await updateDemoBatchItem(created.id, item.itemId, {
+            event_seq: 1,
+            status: 'playing',
+            simulated_outcome: null,
+          })
+          demoItemSequences.set(item.itemId, 1)
+        }))
+        demoBatchEventSeq = 1
+        await updateDemoBatch(created.id, {
+          event_seq: demoBatchEventSeq,
+          status: 'running',
+          queued_count: 0,
+          playing_count: concurrentSnapshot.items.length,
+          played_count: 0,
+          skipped_count: 0,
+          error_count: 0,
+        })
+        activeDemoToken = demoActivityToken('batch', created.id)
+        await setDemoActivity(activeDemoToken, true)
+        syncState.value = 'synced'
+        startDemoConcurrency(created.id)
+        return concurrentSnapshot
       }
       const serverBatch = serverBatchSchema.parse(unwrapData(await createBusinessBatch({
         client_batch_id: batchId,
@@ -254,90 +323,140 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       importPreview.value = null
       applySnapshot(localSnapshot)
       return localSnapshot
+    } catch (startError) {
+      error.value = errorMessage(startError, '无法开始批次')
+      if (selectedTool.value?.availability === 'demo_only') {
+        demoController?.stop()
+        demoController = null
+        await deactivateDemoActivity()
+      }
+      throw startError
     } finally {
       loading.value = false
     }
   }
 
-  function scheduleDemoItem(batchId: string | number, index: number): void {
-    if (demoTimer) clearTimeout(demoTimer)
-    const item = snapshot.value.items[index]
-    if (!item) {
-      demoTimer = setTimeout(() => { void completeDemoBatch(batchId) }, 450)
-      return
-    }
-    demoTimer = setTimeout(() => {
-      void (async () => {
-        try {
-          const completed = snapshot.value.counts.completed || 0
-          const total = snapshot.value.counts.total || snapshot.value.items.length
-          snapshot.value = businessBatchSnapshotSchema.parse({
-            ...snapshot.value,
-            activeItemId: item.itemId,
-            counts: { ...snapshot.value.counts, pending: Math.max(0, total - completed - 1), running: 1 },
-            items: snapshot.value.items.map(candidate => candidate.itemId === item.itemId
-              ? { ...candidate, status: 'running' }
-              : candidate),
-          })
-          await updateDemoBatchItem(batchId, item.itemId, { event_seq: 1, status: 'playing' })
-          demoBatchEventSeq += 1
-          await updateDemoBatch(batchId, {
-            event_seq: demoBatchEventSeq,
-            status: 'running',
-            queued_count: Math.max(0, total - completed - 1),
-            playing_count: 1,
-            played_count: completed,
-            skipped_count: 0,
-            error_count: 0,
-          })
-          demoTimer = setTimeout(() => { void finishDemoItem(batchId, index) }, 700)
-        } catch (demoError) {
-          failDemoPlayback(demoError)
-        }
-      })()
-    }, 450)
+  function startDemoConcurrency(batchId: string | number): void {
+    demoRunToken += 1
+    const token = demoRunToken
+    demoSummaryQueue = Promise.resolve()
+    demoController?.stop()
+    demoController = new DemoConcurrencyController({
+      onProgress: applyDemoProgress,
+      onItemComplete: completion => finishDemoConcurrentItem(batchId, token, completion),
+      onComplete: () => completeDemoBatch(batchId, token),
+      onError: failDemoPlayback,
+    })
+    demoController.start(snapshot.value.items.map(item => item.itemId))
   }
 
-  async function finishDemoItem(batchId: string | number, index: number): Promise<void> {
-    const item = snapshot.value.items[index]
-    if (!item) return
-    try {
-      const outcome = index % 4 === 2 ? 'attention_example' : index % 5 === 4 ? 'failure_example' : 'completed_example'
-      await updateDemoBatchItem(batchId, item.itemId, {
-        event_seq: 2,
-        status: 'played',
-        simulated_outcome: outcome,
-      })
-      const completed = (snapshot.value.counts.completed || 0) + 1
-      const total = snapshot.value.counts.total || snapshot.value.items.length
-      snapshot.value = businessBatchSnapshotSchema.parse({
-        ...snapshot.value,
-        counts: { ...snapshot.value.counts, pending: Math.max(0, total - completed), running: 0, completed },
-        items: snapshot.value.items.map(candidate => candidate.itemId === item.itemId
-          ? { ...candidate, status: 'completed', message: outcome === 'attention_example' ? '已展示人工操作案例' : outcome === 'failure_example' ? '已展示异常结果案例' : '已展示完成案例' }
-          : candidate),
-      })
+  function applyDemoProgress(updates: DemoProgressUpdate[]): void {
+    if (!isDemoBatch.value || snapshot.value.status !== 'running') return
+    const byId = new Map(updates.map(update => [update.itemId, update]))
+    snapshot.value = businessBatchSnapshotSchema.parse({
+      ...snapshot.value,
+      items: snapshot.value.items.map(item => {
+        const update = byId.get(item.itemId)
+        return update && item.status === 'running' ? { ...item, ...update } : item
+      }),
+    })
+  }
+
+  function demoLocalCounts(nextItems = snapshot.value.items) {
+    return {
+      total: nextItems.length,
+      pending: nextItems.filter(item => item.status === 'pending').length,
+      running: nextItems.filter(item => item.status === 'running').length,
+      waiting: nextItems.filter(item => item.status === 'waiting_user').length,
+      completed: nextItems.filter(item => item.status === 'completed').length,
+      failed: nextItems.filter(item => item.status === 'failed').length,
+    }
+  }
+
+  function demoServerCounts(nextItems = snapshot.value.items) {
+    return {
+      queued_count: nextItems.filter(item => item.status === 'pending').length,
+      playing_count: nextItems.filter(item => item.status === 'running').length,
+      played_count: nextItems.filter(item => item.status === 'completed' || item.status === 'waiting_user').length,
+      skipped_count: nextItems.filter(item => item.status === 'cancelled').length,
+      error_count: nextItems.filter(item => item.status === 'failed').length,
+    }
+  }
+
+  function demoResult(outcome: DemoSimulatedOutcome): { status: string; message: string } {
+    if (outcome === 'attention_example') return { status: 'waiting_user', message: '已展示需要关注的人工操作案例' }
+    if (outcome === 'failure_example') return { status: 'failed', message: '已展示异常结果案例' }
+    return { status: 'completed', message: '已展示完成案例' }
+  }
+
+  async function finishDemoConcurrentItem(
+    batchId: string | number,
+    token: number,
+    completion: DemoCompletion,
+  ): Promise<void> {
+    if (token !== demoRunToken || snapshot.value.status !== 'running') return
+    const serverStatus = completion.outcome === 'failure_example' ? 'error' : 'played'
+    await updateDemoBatchItem(batchId, completion.itemId, {
+      event_seq: 2,
+      status: serverStatus,
+      simulated_outcome: completion.outcome,
+    })
+    if (token !== demoRunToken || snapshot.value.status !== 'running') return
+
+    demoItemSequences.set(completion.itemId, 2)
+    const result = demoResult(completion.outcome)
+    const nextItems = snapshot.value.items.map(item => item.itemId === completion.itemId
+      ? {
+          ...item,
+          ...completion,
+          status: result.status,
+          message: result.message,
+          simulatedOutcome: completion.outcome,
+        }
+      : item)
+    snapshot.value = businessBatchSnapshotSchema.parse({
+      ...snapshot.value,
+      items: nextItems,
+      counts: demoLocalCounts(nextItems),
+    })
+  }
+
+  function queueDemoSummary(
+    batchId: string | number,
+    token: number,
+    nextItems = snapshot.value.items,
+  ): Promise<void> {
+    const counts = demoServerCounts(nextItems)
+    const request = demoSummaryQueue.catch(() => undefined).then(async () => {
+      if (token !== demoRunToken || snapshot.value.status !== 'running') return
       demoBatchEventSeq += 1
       await updateDemoBatch(batchId, {
         event_seq: demoBatchEventSeq,
         status: 'running',
-        queued_count: Math.max(0, total - completed),
-        playing_count: 0,
-        played_count: completed,
-        skipped_count: 0,
-        error_count: 0,
+        ...counts,
       })
-      scheduleDemoItem(batchId, index + 1)
-    } catch (demoError) {
-      failDemoPlayback(demoError)
-    }
+    })
+    demoSummaryQueue = request
+    return request
   }
 
-  async function completeDemoBatch(batchId: string | number): Promise<void> {
+  async function completeDemoBatch(batchId: string | number, token: number): Promise<void> {
+    if (token !== demoRunToken || snapshot.value.status !== 'running') return
     try {
+      await queueDemoSummary(batchId, token, snapshot.value.items)
+      if (token !== demoRunToken || snapshot.value.status !== 'running') return
       demoBatchEventSeq += 1
       await finishDemoBatch(batchId, { event_seq: demoBatchEventSeq })
-      snapshot.value = businessBatchSnapshotSchema.parse({ ...snapshot.value, status: 'completed', activeItemId: null })
+      snapshot.value = businessBatchSnapshotSchema.parse({
+        ...snapshot.value,
+        status: 'completed',
+        activeItemId: null,
+        provisioningItemId: null,
+        counts: demoLocalCounts(),
+      })
+      demoController?.stop()
+      demoController = null
+      await deactivateDemoActivity()
       syncState.value = 'synced'
       await loadDemoHistory().catch(() => undefined)
     } catch (demoError) {
@@ -346,17 +465,36 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   function failDemoPlayback(demoError: unknown): void {
-    if (demoTimer) clearTimeout(demoTimer)
-    demoTimer = null
+    demoRunToken += 1
+    demoController?.stop()
+    demoController = null
+    void deactivateDemoActivity()
     error.value = errorMessage(demoError, '批量演示同步失败，请重新开始')
     syncState.value = 'offline'
     snapshot.value = businessBatchSnapshotSchema.parse({ ...snapshot.value, status: 'error' })
   }
 
+  async function deactivateDemoActivity(): Promise<void> {
+    const token = activeDemoToken
+    activeDemoToken = null
+    if (token) await setDemoActivity(token, false)
+  }
+
+  async function settleWithin(work: Promise<void>, timeoutMs: number): Promise<boolean> {
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const completed = work.then(() => true, () => false)
+    const expired = new Promise<boolean>(resolve => {
+      timeout = setTimeout(() => resolve(false), timeoutMs)
+    })
+    const result = await Promise.race([completed, expired])
+    if (timeout) clearTimeout(timeout)
+    return result
+  }
+
   async function registerBrowser(itemId: string, webContentsId: number): Promise<void> {
+    if (isDemoBatch.value) return
     await requireBatchApi().registerBrowser(itemId, webContentsId)
-    if (isDemoBatch.value) await startDemoProvisionedItem(itemId)
-    else await startProvisionedItem(itemId)
+    await startProvisionedItem(itemId)
   }
 
   async function startProvisionedItem(itemId: string): Promise<void> {
@@ -425,24 +563,46 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   async function cancelBatch(status = 'cancelled'): Promise<void> {
     const serverBatchId = snapshot.value.serverBatchId
     if (isDemoBatch.value) {
-      if (demoTimer) clearTimeout(demoTimer)
-      demoTimer = null
-      await window.electronAPI?.batch?.cancel(status).catch(() => undefined)
-      if (serverBatchId !== undefined) {
-        const total = snapshot.value.counts.total || snapshot.value.items.length
-        const played = snapshot.value.counts.completed || 0
+      demoRunToken += 1
+      demoController?.stop()
+      demoController = null
+      const finishedAtMs = Date.now()
+      const unfinishedItems = snapshot.value.items.filter(item => item.status === 'pending' || item.status === 'running')
+      const nextItems = snapshot.value.items.map(item => unfinishedItems.some(candidate => candidate.itemId === item.itemId)
+        ? { ...item, status: 'cancelled', message: '演示已退出', progressPercent: item.progressPercent || 0, finishedAtMs }
+        : item)
+      snapshot.value = businessBatchSnapshotSchema.parse({
+        ...snapshot.value,
+        status: 'cancelled',
+        activeItemId: null,
+        provisioningItemId: null,
+        items: nextItems,
+        counts: demoLocalCounts(nextItems),
+      })
+
+      const remoteCancellation = (async () => {
+        await demoSummaryQueue.catch(() => undefined)
+        if (serverBatchId === undefined) return
+        await Promise.allSettled(unfinishedItems.map(item => updateDemoBatchItem(serverBatchId, item.itemId, {
+          event_seq: Math.max(2, (demoItemSequences.get(item.itemId) || 0) + 1),
+          status: 'skipped',
+          simulated_outcome: null,
+        })))
         demoBatchEventSeq += 1
         await updateDemoBatch(serverBatchId, {
           event_seq: demoBatchEventSeq,
           status: 'cancelled',
-          queued_count: 0,
-          playing_count: 0,
-          played_count: played,
-          skipped_count: Math.max(0, total - played),
-          error_count: 0,
+          ...demoServerCounts(nextItems),
         })
-      }
-      snapshot.value = businessBatchSnapshotSchema.parse({ ...snapshot.value, status: 'cancelled', activeItemId: null })
+      })()
+      const [persisted] = await Promise.all([
+        settleWithin(remoteCancellation, 2_400),
+        settleWithin(window.electronAPI?.batch?.cancel(status).then(() => undefined) || Promise.resolve(), 1_500),
+      ])
+      await deactivateDemoActivity()
+      syncState.value = persisted ? 'synced' : 'offline'
+      if (!persisted) error.value = '演示已在本地退出，记录将在网络恢复后刷新'
+      else await loadDemoHistory().catch(() => undefined)
       return
     }
     applySnapshot(await requireBatchApi().cancel(status))
@@ -454,8 +614,10 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
 
   async function resetWorkspace(): Promise<void> {
     if (isActive.value) throw new Error('当前批次仍在执行')
-    if (demoTimer) clearTimeout(demoTimer)
-    demoTimer = null
+    demoRunToken += 1
+    demoController?.stop()
+    demoController = null
+    await deactivateDemoActivity()
     await window.electronAPI?.batch?.cancel(snapshot.value.status || 'completed')
     snapshot.value = emptyBatchSnapshot()
     selectedItemId.value = null
@@ -469,85 +631,23 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     const parsed = batchEventSchema.safeParse(input)
     if (!parsed.success) return
     const event: BatchEvent = parsed.data
+    if (event.snapshot?.recordKind === 'demo') return
     if (event.snapshot) applySnapshot(event.snapshot)
     if (event.type === 'batch.item_ready' && event.itemId) {
       selectItem(event.itemId)
     }
     if (event.type === 'batch.item_updated' && event.itemId) {
-      if (event.snapshot?.recordKind === 'demo') void syncDemoRunnerItem(event.itemId)
-      else void syncItem(event.itemId)
+      void syncItem(event.itemId)
     }
     if (event.type === 'batch.finished') {
       const finalStatus = event.snapshot?.status === 'completed' ? 'completed' : 'cancelled'
       const serverBatchId = event.snapshot?.serverBatchId
-      if (serverBatchId !== undefined && event.snapshot?.recordKind === 'demo') {
-        demoBatchEventSeq += 1
-        if (finalStatus === 'completed') {
-          void finishDemoBatch(serverBatchId, { event_seq: demoBatchEventSeq })
-            .then(() => loadDemoHistory())
-            .catch(syncError => { error.value = errorMessage(syncError, '演示记录同步失败'); syncState.value = 'offline' })
-        }
-      } else if (serverBatchId !== undefined) {
+      if (serverBatchId !== undefined) {
         outbox.queueFinish({ batchId: serverBatchId, status: finalStatus })
         void flushOutbox()
       }
     }
     scheduleSummarySync()
-  }
-
-  async function startDemoProvisionedItem(itemId: string): Promise<void> {
-    if (provisioning.has(itemId) || snapshot.value.provisioningItemId !== itemId) return
-    provisioning.add(itemId)
-    try {
-      const tool = snapshot.value.tool || selectedTool.value
-      if (!tool) throw new Error('当前演示缺少工具配置')
-      await requireBatchApi().start(ipcPayload({
-        itemId,
-        tool: {
-          ...tool,
-          executionMode: 'demo',
-          scriptKey: tool.script_key,
-          launchGrant: { scriptKey: tool.script_key },
-        },
-      }))
-    } catch (startError) {
-      error.value = errorMessage(startError, '本地交互演示启动失败')
-      await requireBatchApi().failItem({ itemId, message: error.value }).catch(() => null)
-    } finally {
-      provisioning.delete(itemId)
-    }
-  }
-
-  async function syncDemoRunnerItem(itemId: string): Promise<void> {
-    const batchId = snapshot.value.serverBatchId
-    const item = items.value.find(candidate => candidate.itemId === itemId)
-    if (batchId === undefined || !item || !['running', 'completed', 'failed', 'cancelled'].includes(item.status)) return
-    const terminal = ['completed', 'failed', 'cancelled'].includes(item.status)
-    const eventSeq = terminal ? 2 : 1
-    if ((demoItemSequences.get(itemId) || 0) >= eventSeq) return
-    demoItemSequences.set(itemId, eventSeq)
-    syncState.value = 'syncing'
-    try {
-      await updateDemoBatchItem(batchId, itemId, {
-        event_seq: eventSeq,
-        status: terminal ? (item.status === 'completed' ? 'played' : item.status === 'cancelled' ? 'skipped' : 'error') : 'playing',
-        simulated_outcome: terminal ? (item.status === 'completed' ? 'completed_example' : 'failure_example') : null,
-      })
-      demoBatchEventSeq += 1
-      await updateDemoBatch(batchId, {
-        event_seq: demoBatchEventSeq,
-        status: 'running',
-        queued_count: snapshot.value.counts.pending || 0,
-        playing_count: snapshot.value.counts.running || 0,
-        played_count: snapshot.value.counts.completed || 0,
-        skipped_count: 0,
-        error_count: snapshot.value.counts.failed || 0,
-      })
-      syncState.value = 'synced'
-    } catch (syncError) {
-      error.value = errorMessage(syncError, '演示记录同步失败')
-      syncState.value = 'offline'
-    }
   }
 
   function applySnapshot(input: unknown): void {
@@ -634,8 +734,9 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     if (heartbeatTimer) clearInterval(heartbeatTimer)
     if (syncTimer) clearTimeout(syncTimer)
     outbox.dispose()
-    if (demoTimer) clearTimeout(demoTimer)
-    demoTimer = null
+    demoController?.stop()
+    demoController = null
+    void deactivateDemoActivity()
     heartbeatTimer = null
     syncTimer = null
     window.removeEventListener('online', handleReconnect)
@@ -644,7 +745,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   return {
-    bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale,
+    bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale, historyLoading, historyError,
     entitlements, tools, items, openItems, isActive, isDemoBatch,
     init, refreshBootstrap, loadHistory, loadDemoHistory, chooseTool, loadSampleImport, saveSampleTemplate, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
     completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,
