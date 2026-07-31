@@ -99,6 +99,25 @@ function packageVersion() {
   return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version
 }
 
+function syncOpenApiReleaseVersion(version) {
+  const filename = path.join(root, 'backend', 'openapi.json')
+  if (!fs.existsSync(filename)) fail(`OpenAPI 快照不存在：${filename}`)
+
+  const source = fs.readFileSync(filename, 'utf8')
+  const document = JSON.parse(source)
+  if (document.info?.version === version) return
+
+  const infoVersion = /("info"\s*:\s*\{[\s\S]*?"version"\s*:\s*")([^"]+)(")/
+  if (!infoVersion.test(source)) fail('OpenAPI 快照缺少 info.version')
+
+  fs.writeFileSync(
+    filename,
+    source.replace(infoVersion, (_match, prefix, _current, suffix) => `${prefix}${version}${suffix}`),
+    'utf8',
+  )
+  log(`OpenAPI 发布版本已同步：v${version}`)
+}
+
 function nextPatch(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)
   if (!match) fail(`当前版本不是标准 SemVer：${version}`)
@@ -475,6 +494,7 @@ async function release(args) {
   }
 
   if (version !== current) run('npm', ['version', version, '--no-git-tag-version'])
+  syncOpenApiReleaseVersion(version)
   if (!args.includes('--skip-verify')) run('npm', ['run', 'verify'])
   if (!args.includes('--skip-build')) run('npm', ['run', 'electron:release'])
   run('npm', ['run', 'package:audit'])
