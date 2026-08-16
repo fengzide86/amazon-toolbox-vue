@@ -89,6 +89,11 @@ requireText('scripts/toolbox-cli.mjs', [
   'current_session=',
   'flock -x 9',
   'verifyResumeCheckpoints(state)',
+  'verifyArtifactRecord(state.artifacts.backend)',
+  'const remoteBackendArchive =',
+  'const remoteScript = `${remoteStage}/ops/deploy/deploy-web.sh`',
+  'state.artifacts.web.path, state.artifacts.backend.path',
+  "shellQuote('ops/deploy/deploy-web.sh')",
   "gitOutput(['show-ref', '--verify', '--hash', `refs/tags/${tag}`])",
   'lockedPreflight = await productionPreflight(',
   'artifactsPrepared: false',
@@ -102,7 +107,10 @@ requireText('scripts/toolbox-cli.mjs', [
 ])
 requireCount('scripts/toolbox-cli.mjs', 'shellQuote(state.releaseId), shellQuote(state.controlUrl)', 2)
 requireCount('scripts/toolbox-cli.mjs', 'remoteLeaseGuardedCommand(state, deployCommand)', 2)
-rejectText('scripts/toolbox-cli.mjs', ['.venv/bin/python scripts/publish_update.py'])
+rejectText('scripts/toolbox-cli.mjs', [
+  '.venv/bin/python scripts/publish_update.py',
+  "path.join(root, 'ops', 'deploy', 'deploy-web.sh')",
+])
 requireText('scripts/verify-release-mariadb-gate.mjs', [
   "const headSha = commandOutput('git', ['rev-parse', 'HEAD'])",
   "attestedSha === headSha",

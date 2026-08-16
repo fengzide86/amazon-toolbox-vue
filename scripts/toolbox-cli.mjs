@@ -978,14 +978,20 @@ async function prepareRelease(state, ciAttestedSha) {
 async function publishWeb(state, connection) {
   const { target, sshArgs, scpArgs } = connection
   verifyArtifactRecord(state.artifacts.web)
+  verifyArtifactRecord(state.artifacts.backend)
   const remoteStage = `/tmp/amazon-toolbox-${state.releaseId}-${releaseSessionId}-web`
-  const remoteArchive = `${remoteStage}/${path.basename(state.artifacts.web.path)}`
-  const remoteScript = `${remoteStage}/deploy-web.sh`
+  const remoteWebArchive = `${remoteStage}/${path.basename(state.artifacts.web.path)}`
+  const remoteBackendArchive = `${remoteStage}/${path.basename(state.artifacts.backend.path)}`
+  const remoteScript = `${remoteStage}/ops/deploy/deploy-web.sh`
   try {
     run('ssh', [...sshArgs, target, `rm -rf ${shellQuote(remoteStage)} && mkdir -p ${shellQuote(remoteStage)} && chmod 700 ${shellQuote(remoteStage)}`])
-    run('scp', [...scpArgs, state.artifacts.web.path, path.join(root, 'ops', 'deploy', 'deploy-web.sh'), `${target}:${remoteStage}/`])
+    run('scp', [...scpArgs, state.artifacts.web.path, state.artifacts.backend.path, `${target}:${remoteStage}/`])
+    run('ssh', [...sshArgs, target, [
+      'tar -xzf', shellQuote(remoteBackendArchive), '-C', shellQuote(remoteStage),
+      shellQuote('ops/deploy/deploy-web.sh'),
+    ].join(' ')])
     const deployCommand = [
-      'bash', shellQuote(remoteScript), shellQuote(remoteArchive), shellQuote(state.version),
+      'bash', shellQuote(remoteScript), shellQuote(remoteWebArchive), shellQuote(state.version),
       shellQuote(state.commitSha), shellQuote(state.releaseId), shellQuote(state.controlUrl),
     ].join(' ')
     run('ssh', [...sshArgs, target, privileged(remoteLeaseGuardedCommand(state, deployCommand))], {

@@ -181,6 +181,7 @@ describe('internal desktop package profile', () => {
   it('keeps release venvs executable and restores decompressed database streams', () => {
     const deploy = readFileSync(resolve('ops/deploy/deploy-backend.sh'), 'utf8')
     const restore = readFileSync(resolve('ops/deploy/restore-backup.sh'), 'utf8')
+    const releaseCli = readFileSync(resolve('scripts/toolbox-cli.mjs'), 'utf8')
     const startBat = readFileSync(resolve('backend/start.bat'), 'utf8')
     const constraints = readFileSync(resolve('backend/constraints-py310.txt'), 'utf8')
     const workflow = readFileSync(resolve('.github/workflows/test.yml'), 'utf8')
@@ -224,6 +225,15 @@ describe('internal desktop package profile', () => {
     expect(constraints).toContain('async-timeout==5.0.1')
     expect(constraints).toContain('exceptiongroup==1.3.1')
     expect(workflow).toContain('scripts/check_python_constraint_closure.py')
+    const publishWeb = releaseCli.slice(
+      releaseCli.indexOf('async function publishWeb'),
+      releaseCli.indexOf('async function publishedDesktopMatches'),
+    )
+    expect(publishWeb).toContain('verifyArtifactRecord(state.artifacts.backend)')
+    expect(publishWeb).toContain('const remoteScript = `${remoteStage}/ops/deploy/deploy-web.sh`')
+    expect(publishWeb).toContain('state.artifacts.web.path, state.artifacts.backend.path')
+    expect(publishWeb).toContain("shellQuote('ops/deploy/deploy-web.sh')")
+    expect(publishWeb).not.toContain("path.join(root, 'ops', 'deploy', 'deploy-web.sh')")
 
     const gzipPreflight = restore.indexOf(
       '# Validate the complete compressed stream before changing the live schema.',
