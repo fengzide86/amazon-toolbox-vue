@@ -51,3 +51,7 @@ class AnnouncementOut(BaseModel):
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SettingUpdateResponse(BaseModel):
+    success: bool

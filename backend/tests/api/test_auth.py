@@ -6,12 +6,21 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.cache import cache
+from core.config import settings
 from core.security import hash_password
 from models import AuthCode, AuthSeat, Device, Plan, StaffRole, StaffStatus, StaffUser, User
 
 
 class TestHealthCheck:
     """健康检查测试"""
+
+    @pytest.fixture(autouse=True)
+    def isolate_redis_health(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Keep health assertions independent from a developer's local Redis."""
+        monkeypatch.setattr(settings, "REDIS_URL", "")
+        monkeypatch.setattr(cache, "redis", None)
+        monkeypatch.setattr(cache, "redis_error", None)
     
     @pytest.mark.asyncio
     async def test_health_check(self, client: AsyncClient):
@@ -31,6 +40,8 @@ class TestHealthCheck:
         assert response.status_code == 200
         assert response.json()["status"] == "ok"
         assert "checks" not in response.json()
+        assert "commit_sha" in response.json()
+        assert "release_id" in response.json()
 
     @pytest.mark.asyncio
     async def test_readiness_check_keeps_health_contract(self, client: AsyncClient):
@@ -39,6 +50,51 @@ class TestHealthCheck:
         data = response.json()
         assert data["status"] == "ok"
         assert data["checks"]["database"]["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_readiness_returns_503_when_database_is_unavailable(
+        self, client: AsyncClient, monkeypatch
+    ):
+        async def failed_database():
+            return {"status": "error", "type": "mysql", "error": "offline"}
+
+        monkeypatch.setattr("app.factory.check_db_health", failed_database)
+        response = await client.get("/api/health/ready")
+
+        assert response.status_code == 503
+        assert response.json()["status"] == "degraded"
+        assert response.json()["checks"]["database"]["status"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_configured_but_unavailable_redis_is_reported_as_error(
+        self, client: AsyncClient, monkeypatch
+    ):
+        monkeypatch.setattr(settings, "REDIS_URL", "redis://configured.example:6379/0")
+        monkeypatch.setattr(cache, "redis", None)
+        monkeypatch.setattr(cache, "redis_error", "connection refused")
+
+        response = await client.get("/api/health/ready")
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "degraded"
+        assert response.json()["checks"]["redis"] == {
+            "status": "error",
+            "error": "connection refused",
+        }
+
+    @pytest.mark.asyncio
+    async def test_health_exposes_release_identity(self, client: AsyncClient, monkeypatch):
+        monkeypatch.setattr(settings, "COMMIT_SHA", "abc1234")
+        monkeypatch.setattr(settings, "RELEASE_ID", "release-20260816")
+
+        live = await client.get("/api/health/live")
+        ready = await client.get("/api/health/ready")
+        system = await client.get("/api/system-info")
+
+        assert live.json()["commit_sha"] == "abc1234"
+        assert ready.json()["commit_sha"] == "abc1234"
+        assert ready.json()["release_id"] == "release-20260816"
+        assert system.json()["app"]["commit_sha"] == "abc1234"
 
     @pytest.mark.asyncio
     async def test_desktop_cors_contract(self, client: AsyncClient):

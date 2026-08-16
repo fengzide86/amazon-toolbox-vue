@@ -11,10 +11,10 @@ RUN groupadd --gid 10001 toolbox \
 
 WORKDIR /app
 
-COPY backend/requirements.txt backend/requirements-dev.txt /tmp/requirements/
+COPY backend/requirements.txt backend/requirements-dev.txt backend/constraints-py310.txt /tmp/requirements/
 RUN --mount=type=cache,target=/root/.cache/pip \
     python -m pip install --upgrade pip \
-    && python -m pip install -r /tmp/requirements/requirements.txt \
+    && python -m pip install -c /tmp/requirements/constraints-py310.txt -r /tmp/requirements/requirements.txt \
     && python -m pip check
 
 FROM dependencies AS source
@@ -24,6 +24,7 @@ COPY --chown=toolbox:toolbox backend /app/backend
 
 RUN mkdir -p \
       /var/lib/amazon-toolbox/AmazonToolbox/logs \
+      /var/lib/amazon-toolbox/expense-attachments \
       /app/backend/updates \
       /app/backend/.updates-staging \
       /app/backend/chroma_db \
@@ -55,6 +56,7 @@ ENV APP_ENV=internal \
     LOG_LEVEL=INFO \
     LOG_FORMAT=json \
     TOOLBOX_RUNTIME_DIR=/var/lib/amazon-toolbox \
+    EXPENSE_ATTACHMENT_DIR=/var/lib/amazon-toolbox/expense-attachments \
     UPDATE_RELEASE_DIR=/app/backend/updates \
     CHROMA_PERSIST_DIR=/app/backend/chroma_db
 

@@ -26,7 +26,7 @@ def _serialize_ratios(ratios: ProfitRatios) -> dict[str, str]:
 
 
 class ProfitService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def get_policy(self) -> tuple[int, ProfitRatios]:

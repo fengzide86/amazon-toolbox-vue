@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 class AuthService:
     """认证服务"""
     
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
     
     async def verify_auth_code(
@@ -48,11 +48,13 @@ class AuthService:
         """
         code = code.strip()
         
-        # 1. 查询授权码（同时 JOIN 获取 Plan 信息，避免后续重复查询）
+        # 1. 锁定授权码行。首次激活、席位与设备计数必须在同一事务内串行，
+        # 否则两个并发登录都可能在旧计数上创建记录并超卖配额。
         result = await self.db.execute(
             select(AuthCode, Plan.name, Plan.duration_days, Plan.product_type, Plan.entitlements)
             .outerjoin(Plan, AuthCode.plan_id == Plan.id)
             .where(AuthCode.code == code)
+            .with_for_update()
         )
         row = result.first()
         
@@ -116,14 +118,15 @@ class AuthService:
             select(AuthSeat).where(
                 AuthSeat.auth_code_id == code_obj.id,
                 AuthSeat.device_id == device_id,
-                AuthSeat.status == "active"
             )
         )
-        seat_obj = existing_seat.scalars().first()
+        matched_seat = existing_seat.scalars().first()
+        seat_obj = matched_seat if matched_seat and matched_seat.status == "active" else None
+        reusable_seat = matched_seat if matched_seat and matched_seat.status != "active" else None
 
         # Legacy clients deleted the local device ID on logout. Rebind only when the
         # retained device name identifies exactly one active seat for this auth code.
-        if not seat_obj and device_name:
+        if not seat_obj and not reusable_seat and device_name:
             legacy_seat_result = await self.db.execute(
                 select(AuthSeat).where(
                     AuthSeat.auth_code_id == code_obj.id,
@@ -184,16 +187,24 @@ class AuthService:
                     ErrorCodes.DEVICE_LIMIT_EXCEEDED
                 )
             
-            # 创建新席位
-            seat_obj = AuthSeat(
-                auth_code_id=code_obj.id,
-                user_id=code_obj.user_id,
-                device_id=device_id,
-                device_name=device_name,
-                seat_no=active_seats + 1,
-                status="active"
-            )
-            self.db.add(seat_obj)
+            # 解绑只释放席位而不删除历史记录。相同设备再次登录时复用
+            # 原席位，既保留审计历史，也避免与组合唯一约束冲突。
+            if reusable_seat:
+                seat_obj = reusable_seat
+                seat_obj.user_id = code_obj.user_id
+                seat_obj.device_name = device_name
+                seat_obj.status = "active"
+                seat_obj.updated_at = datetime.utcnow()
+            else:
+                seat_obj = AuthSeat(
+                    auth_code_id=code_obj.id,
+                    user_id=code_obj.user_id,
+                    device_id=device_id,
+                    device_name=device_name,
+                    seat_no=active_seats + 1,
+                    status="active"
+                )
+                self.db.add(seat_obj)
             await self.db.flush()
             
             # P2: 并发安全 - 创建后二次检查席位数

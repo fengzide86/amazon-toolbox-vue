@@ -2,7 +2,7 @@
 用户数据模型
 包含: User
 """
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
 
 from models.base import Base
 
@@ -24,5 +24,6 @@ class User(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     __table_args__ = (
+        UniqueConstraint('auth_code_id', name='ux_users_auth_code_id'),
         Index('ix_users_auth_code_active', 'auth_code_id', 'is_active'),
     )

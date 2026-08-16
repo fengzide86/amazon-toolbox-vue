@@ -8,9 +8,11 @@ import calendar
 from datetime import datetime, timedelta
 from typing import Any
 
+from fastapi import Request
 from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.audit import log_admin_action
 from core.cache import CacheKeys, cache
 from core.logging import get_logger
 from core.response import success_response
@@ -61,19 +63,15 @@ class DashboardService:
                 or_(AuthCode.platform_scope.contains(platform_key), AuthCode.platform_scope.is_(None))
             )
 
-        # 总收入（按平台过滤）
-        revenue_query = select(func.sum(Order.amount)).where(Order.status == "paid")
+        # 订单总量和当前留存收款使用一条条件聚合查询。
+        revenue_query = select(
+            func.coalesce(func.sum(case((Order.status == "paid", Order.amount), else_=0)), 0),
+            func.count(Order.id),
+        )
         for cond in order_filter:
             revenue_query = revenue_query.where(cond)
         revenue_result = await self.db.execute(revenue_query)
-        total_revenue = revenue_result.scalar() or 0
-
-        # 总订单数（按平台过滤）
-        orders_query = select(func.count(Order.id))
-        for cond in order_filter:
-            orders_query = orders_query.where(cond)
-        orders_result = await self.db.execute(orders_query)
-        total_orders = orders_result.scalar() or 0
+        total_revenue, total_orders = revenue_result.one()
 
         # 活跃授权码数
         active_codes_query = select(func.count(AuthCode.id)).where(AuthCode.status == "active")
@@ -87,16 +85,27 @@ class DashboardService:
         total_users = users_result.scalar() or 0
 
         # 今日运行次数（按平台过滤）
-        today = datetime.now().date()
-        today_query = select(func.count(RunLog.id)).where(func.date(RunLog.created_at) == today)
+        now = datetime.now()
+        today_start = datetime.combine(now.date(), datetime.min.time())
+        tomorrow_start = today_start + timedelta(days=1)
+        today_query = select(func.count(RunLog.id)).where(
+            RunLog.created_at >= today_start,
+            RunLog.created_at < tomorrow_start,
+        )
         for cond in run_log_filter:
             today_query = today_query.where(cond)
         today_runs_result = await self.db.execute(today_query)
         today_runs = today_runs_result.scalar() or 0
 
         # 演示指标与真实执行独立，只表示流程播放活动。
-        today_demo_runs_query = select(func.count(DemoRun.id)).where(func.date(DemoRun.created_at) == today)
-        today_demo_batches_query = select(func.count(DemoBatch.id)).where(func.date(DemoBatch.created_at) == today)
+        today_demo_runs_query = select(func.count(DemoRun.id)).where(
+            DemoRun.created_at >= today_start,
+            DemoRun.created_at < tomorrow_start,
+        )
+        today_demo_batches_query = select(func.count(DemoBatch.id)).where(
+            DemoBatch.created_at >= today_start,
+            DemoBatch.created_at < tomorrow_start,
+        )
         for cond in demo_run_filter:
             today_demo_runs_query = today_demo_runs_query.where(cond)
         for cond in demo_batch_filter:
@@ -162,7 +171,13 @@ class DashboardService:
 
         # 收入趋势（近7天）- 按平台过滤
         start_date = (now - timedelta(days=6)).date()
-        revenue_where = [func.date(Order.created_at) >= start_date, Order.status == "paid"]
+        start_datetime = datetime.combine(start_date, datetime.min.time())
+        end_datetime = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
+        revenue_where = [
+            Order.created_at >= start_datetime,
+            Order.created_at < end_datetime,
+            Order.status == "paid",
+        ]
         if platform_key:
             from sqlalchemy import or_
 
@@ -228,7 +243,29 @@ class DashboardService:
 
         return result
 
-    async def invalidate_cache(self) -> None:
-        """清除看板缓存"""
+    async def invalidate_cache(
+        self,
+        *,
+        actor: dict[str, Any] | None = None,
+        request: Request | None = None,
+    ) -> None:
+        """清除看板缓存，并在管理员操作时原子记录审计事件。"""
         await cache.delete_pattern("dashboard:stats:*")
         await cache.delete_pattern("dashboard:charts:*")
+        if actor:
+            await log_admin_action(
+                self.db,
+                user_id=actor.get("staff_id"),
+                user_name=actor.get("username"),
+                action="dashboard_cache_refresh",
+                target_type="dashboard_cache",
+                target_id="all",
+                detail={
+                    "role": actor.get("role"),
+                    "before": {"state": "cached_or_empty"},
+                    "after": {"state": "invalidated"},
+                    "reason": None,
+                },
+                request=request,
+            )
+            await self.db.commit()

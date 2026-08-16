@@ -68,17 +68,17 @@ class DemoBatchCreate(StrictModel):
     tool_name: str = Field(min_length=1, max_length=200)
     platform_key: str = Field(min_length=1, max_length=50)
     scenario_id: str = Field(min_length=1, max_length=100)
-    row_count: int = Field(ge=1, le=1000)
+    row_count: int = Field(ge=1, le=50)
 
 
 class DemoBatchUpdate(StrictModel):
     event_seq: int = Field(ge=1)
     status: DemoBatchStatus
-    queued_count: int | None = Field(default=None, ge=0, le=1000)
+    queued_count: int | None = Field(default=None, ge=0, le=50)
     playing_count: int | None = Field(default=None, ge=0, le=50)
-    played_count: int | None = Field(default=None, ge=0, le=1000)
-    skipped_count: int | None = Field(default=None, ge=0, le=1000)
-    error_count: int | None = Field(default=None, ge=0, le=1000)
+    played_count: int | None = Field(default=None, ge=0, le=50)
+    skipped_count: int | None = Field(default=None, ge=0, le=50)
+    error_count: int | None = Field(default=None, ge=0, le=50)
 
 
 class DemoBatchItemUpdate(StrictModel):

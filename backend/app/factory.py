@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -115,6 +116,8 @@ def create_app() -> FastAPI:
         health: dict[str, Any] = {
             "status": "ok" if database["status"] == "ok" else "degraded",
             "version": settings.APP_VERSION,
+            "commit_sha": settings.COMMIT_SHA,
+            "release_id": settings.RELEASE_ID,
             "checks": {"database": database},
         }
         if cache.redis:
@@ -124,6 +127,12 @@ def create_app() -> FastAPI:
             except Exception as error:
                 health["checks"]["redis"] = {"status": "error", "error": str(error)}
                 health["status"] = "degraded"
+        elif settings.REDIS_URL:
+            health["checks"]["redis"] = {
+                "status": "error",
+                "error": cache.redis_error or "Redis 已配置但连接不可用",
+            }
+            health["status"] = "degraded"
         else:
             health["checks"]["redis"] = {"status": "not_configured"}
         health["checks"]["pool"] = (await get_db_stats()).get("pool", {})
@@ -134,13 +143,25 @@ def create_app() -> FastAPI:
     @limiter.limit("60/minute")
     async def health_live(request: Request) -> dict[str, Any]:
         del request
-        return {"status": "ok", "version": settings.APP_VERSION}
+        return {
+            "status": "ok",
+            "version": settings.APP_VERSION,
+            "commit_sha": settings.COMMIT_SHA,
+            "release_id": settings.RELEASE_ID,
+        }
 
-    @app.get("/api/health/ready")
+    @app.get(
+        "/api/health/ready",
+        response_model=dict[str, Any],
+        responses={503: {"description": "数据库不可用，服务尚未就绪"}},
+    )
     @limiter.limit("30/minute")
-    async def health_ready(request: Request) -> dict[str, Any]:
+    async def health_ready(request: Request) -> Any:
         del request
-        return await readiness_snapshot()
+        snapshot = await readiness_snapshot()
+        if snapshot["checks"]["database"]["status"] == "error":
+            return JSONResponse(status_code=503, content=snapshot)
+        return snapshot
 
     @app.get("/api/health")
     @limiter.limit("30/minute")
@@ -153,7 +174,12 @@ def create_app() -> FastAPI:
     async def system_info(request: Request) -> dict[str, Any]:
         del request
         return {
-            "app": {"name": settings.APP_NAME, "version": settings.APP_VERSION},
+            "app": {
+                "name": settings.APP_NAME,
+                "version": settings.APP_VERSION,
+                "commit_sha": settings.COMMIT_SHA,
+                "release_id": settings.RELEASE_ID,
+            },
             "runtime": {"python": platform.python_version(), "platform": platform.platform()},
             "database": {"type": settings.DB_TYPE},
             "cache": {"enabled": cache.redis is not None, "type": "redis" if cache.redis else "memory"},

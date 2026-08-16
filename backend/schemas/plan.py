@@ -1,10 +1,11 @@
 """Validated plan schemas and explicit lifecycle requests."""
 
-from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from core.response import APIResponse
 
 
 class PlanCreate(BaseModel):
@@ -46,15 +47,50 @@ class PlanUpdate(BaseModel):
 class PlanResponse(BaseModel):
     id: int
     name: str
-    price: Decimal
+    price: float
     duration_days: int
+    duration_label: str
     features: str | None = None
     status: str
     code_prefix: str | None = None
     sort_order: int = 0
     product_type: str = "consumer"
     entitlements: dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    plan_code: str | None = None
+    benefits: list[Any] = Field(default_factory=list)
+    allowed_tools: list[Any] = Field(default_factory=list)
+    is_recommended: bool = False
+    display_badge: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PlanPageResponse(APIResponse[list[PlanResponse]]):
+    total: int
+    page: int
+    page_size: int
+
+
+class PlanCodeStats(BaseModel):
+    total: int
+    active: int
+    unused: int
+    expired: int
+
+
+class PlanOrderStats(BaseModel):
+    total: int
+    revenue: float
+
+
+class PlanStatsResponse(BaseModel):
+    plan: PlanResponse
+    codes: PlanCodeStats
+    orders: PlanOrderStats
+
+
+PlanEnvelope = APIResponse[PlanResponse]
+PlanListResponse = APIResponse[list[PlanResponse]]
+PlanStatsEnvelope = APIResponse[PlanStatsResponse]

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import AsyncIterator
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
@@ -36,6 +38,41 @@ from schemas.expense import (
 router = APIRouter()
 
 
+def _csv_row(values: list[object]) -> str:
+    output = io.StringIO(newline="")
+    csv.writer(output).writerow(values)
+    return output.getvalue()
+
+
+async def _stream_expenses_csv(
+    bind: Any,
+    query: Any,
+) -> AsyncIterator[str]:
+    yield "\ufeff" + _csv_row(
+        ["日期", "支出事项", "分类", "收款方", "金额", "币种", "状态", "记录人", "备注", "作废原因"]
+    )
+    status_labels = {"active": "有效", "voided": "已作废"}
+    async with AsyncSession(bind=bind, expire_on_commit=False) as session:
+        service = ExpenseService(session)
+        result = await session.stream(
+            query.execution_options(yield_per=500)
+        )
+        async for row in result:
+            item = service.serialize_expense_row(row)
+            yield _csv_row([
+                item["expense_date"].isoformat(),
+                item["title"],
+                item["category_name"],
+                item.get("payee") or "",
+                str(item["amount"]),
+                item["currency"],
+                status_labels.get(item["status"], item["status"]),
+                item.get("created_by_name") or "",
+                item.get("note") or "",
+                item.get("void_reason") or "",
+            ])
+
+
 @router.get("/summary", response_model=APIResponse[ExpenseSummaryResponse])
 async def get_expense_summary(
     month: str | None = None,
@@ -54,29 +91,10 @@ async def export_expenses(
     db: AsyncSession = Depends(get_db),
     _actor: dict = Depends(require_commerce_operator),
 ) -> StreamingResponse:
-    items = await ExpenseService(db).export_expenses(month, category_id, expense_status, q)
-    output = io.StringIO()
-    output.write("\ufeff")
-    writer = csv.writer(output)
-    writer.writerow(["日期", "支出事项", "分类", "收款方", "金额", "币种", "状态", "记录人", "备注", "作废原因"])
-    status_labels = {"active": "有效", "voided": "已作废"}
-    for item in items:
-        writer.writerow([
-            item["expense_date"].isoformat(),
-            item["title"],
-            item["category_name"],
-            item.get("payee") or "",
-            str(item["amount"]),
-            item["currency"],
-            status_labels.get(item["status"], item["status"]),
-            item.get("created_by_name") or "",
-            item.get("note") or "",
-            item.get("void_reason") or "",
-        ])
-    output.seek(0)
+    query = ExpenseService(db).expense_export_query(month, category_id, expense_status, q)
     filename = f"company_expenses_{datetime.utcnow():%Y%m%d_%H%M%S}.csv"
     return StreamingResponse(
-        iter([output.getvalue()]),
+        _stream_expenses_csv(db.bind, query),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )

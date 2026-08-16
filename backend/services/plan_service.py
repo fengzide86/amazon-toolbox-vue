@@ -22,7 +22,7 @@ class PlanService:
         {"price", "duration_days", "code_prefix", "product_type", "entitlements"}
     )
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def list_public(self, product_type: str = "consumer") -> dict:

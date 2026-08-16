@@ -13,6 +13,7 @@ from core.tasks import task_manager
 from core.token_blacklist import logout_manager, token_blacklist
 from database import engine, init_db
 from domains.catalog import seed_initial_data
+from domains.commerce import validate_expense_attachment_storage
 
 setup_logging(level=os.getenv("LOG_LEVEL", "INFO"), json_format=os.getenv("LOG_FORMAT", "") == "json")
 logger = get_logger(__name__)
@@ -22,6 +23,8 @@ logger = get_logger(__name__)
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info("正在初始化后端服务")
     await init_db()
+    attachment_root = validate_expense_attachment_storage()
+    logger.info("公账凭证持久目录已验证: %s", attachment_root)
     await seed_initial_data()
     await cache.init()
     await token_blacklist.init(cache.redis)

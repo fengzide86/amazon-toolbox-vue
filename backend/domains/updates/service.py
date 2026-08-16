@@ -12,10 +12,13 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import yaml
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, Request, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from core.audit import log_admin_action
 
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
 ALLOWED_SUFFIXES = {".exe": 300 * 1024 * 1024, ".blockmap": 20 * 1024 * 1024, ".yml": 256 * 1024}
@@ -36,7 +39,7 @@ class StagedFile(TypedDict):
 
 
 class UpdateReleaseService:
-    def __init__(self, releases_dir: str | Path):
+    def __init__(self, releases_dir: str | Path) -> None:
         self.releases_dir = Path(releases_dir).resolve()
         self.staging_dir = self.releases_dir.parent / ".updates-staging"
         self.releases_dir.mkdir(parents=True, exist_ok=True)
@@ -72,8 +75,7 @@ class UpdateReleaseService:
             os.replace(entry, target)
         if collisions:
             raise RuntimeError(
-                "旧更新暂存目录已移出公开目录，但存在待人工处理的版本冲突："
-                + ", ".join(sorted(collisions))
+                "旧更新暂存目录已移出公开目录，但存在待人工处理的版本冲突：" + ", ".join(sorted(collisions))
             )
         quarantine.rmdir()
 
@@ -145,10 +147,14 @@ class UpdateReleaseService:
         files = metadata.get("files") or []
         if not isinstance(files, list):
             raise HTTPException(409, "暂存版本文件清单无效")
-        manifest_name = next((
-            item.get("name") for item in files
-            if isinstance(item, dict) and str(item.get("name") or "").lower() == "latest.yml"
-        ), None)
+        manifest_name = next(
+            (
+                item.get("name")
+                for item in files
+                if isinstance(item, dict) and str(item.get("name") or "").lower() == "latest.yml"
+            ),
+            None,
+        )
         if not manifest_name:
             raise HTTPException(409, "暂存版本缺少 latest.yml")
         # stage.json 只是暂存时的记录。发布前必须重新读取磁盘中的实物，
@@ -166,11 +172,7 @@ class UpdateReleaseService:
                 if not self._published_files_match(verified_files, manifest_name):
                     raise HTTPException(409, f"v{version} 已发布，但线上文件与暂存内容不一致")
                 published_path = source / "published.json"
-                published = (
-                    json.loads(published_path.read_text(encoding="utf-8"))
-                    if published_path.exists()
-                    else {}
-                )
+                published = json.loads(published_path.read_text(encoding="utf-8")) if published_path.exists() else {}
                 return {
                     "version": version,
                     "status": "published",
@@ -195,7 +197,13 @@ class UpdateReleaseService:
         (source / "published.json").write_text(
             json.dumps({"version": version, "published_at": published_at}, ensure_ascii=False), encoding="utf-8"
         )
-        return {"version": version, "status": "published", "files": verified_files, "published_at": published_at, "is_latest": True}
+        return {
+            "version": version,
+            "status": "published",
+            "files": verified_files,
+            "published_at": published_at,
+            "is_latest": True,
+        }
 
     def list_releases(self) -> list[dict[str, object]]:
         releases: list[dict[str, object]] = []
@@ -224,6 +232,115 @@ class UpdateReleaseService:
             if (target / "published.json").exists():
                 raise HTTPException(409, "已发布版本不能删除")
             shutil.rmtree(target)
+
+    async def stage_with_audit(
+        self,
+        db: AsyncSession,
+        *,
+        version: str | None,
+        files: list[UploadFile],
+        actor: dict[str, object],
+        request: Request,
+    ) -> dict[str, object]:
+        release = await self.stage(version, files)
+        await self._record_audit(
+            db,
+            actor=actor,
+            action="stage_update_release",
+            target_id=str(release["version"]),
+            before=None,
+            after=release,
+            request=request,
+        )
+        await db.commit()
+        return release
+
+    async def publish_with_audit(
+        self,
+        db: AsyncSession,
+        *,
+        version: str,
+        actor: dict[str, object],
+        request: Request,
+    ) -> dict[str, object]:
+        before = self.find_release(version)
+        release = self.publish(version)
+        await self._record_audit(
+            db,
+            actor=actor,
+            action="publish_update_release",
+            target_id=version,
+            before=before,
+            after=release,
+            request=request,
+        )
+        await db.commit()
+        return release
+
+    async def delete_staged_with_audit(
+        self,
+        db: AsyncSession,
+        *,
+        version: str,
+        actor: dict[str, object],
+        request: Request,
+    ) -> None:
+        before = self.find_release(version)
+        self.delete_staged(version)
+        await self._record_audit(
+            db,
+            actor=actor,
+            action="delete_staged_update_release",
+            target_id=version,
+            before=before,
+            after=None,
+            request=request,
+        )
+        await db.commit()
+
+    def find_release(self, version: str) -> dict[str, object] | None:
+        return next(
+            (release for release in self.list_releases() if release.get("version") == version),
+            None,
+        )
+
+    @staticmethod
+    def _release_snapshot(release: dict[str, object] | None) -> dict[str, object] | None:
+        if release is None:
+            return None
+        return {
+            "version": release.get("version"),
+            "status": release.get("status"),
+            "is_latest": release.get("is_latest"),
+            "files": release.get("files", []),
+        }
+
+    async def _record_audit(
+        self,
+        db: AsyncSession,
+        *,
+        actor: dict[str, object],
+        action: str,
+        target_id: str,
+        before: dict[str, object] | None,
+        after: dict[str, object] | None,
+        request: Request,
+    ) -> None:
+        await log_admin_action(
+            db,
+            user_id=cast(int | None, actor.get("staff_id")),
+            user_name=cast(str | None, actor.get("username", "admin")),
+            action=action,
+            target_type="update_release",
+            target_id=target_id,
+            detail={
+                "role": actor.get("role"),
+                "before": self._release_snapshot(before),
+                "after": self._release_snapshot(after),
+                "reason": None,
+            },
+            request=request,
+        )
 
     async def _stream_upload(self, upload: UploadFile, target: Path, limit: int) -> tuple[int, str]:
         digest = hashlib.sha512()
@@ -390,7 +507,7 @@ class UpdateReleaseService:
         if not filename:
             raise HTTPException(400, "文件名不能为空")
         name = os.path.basename(filename)
-        if name != filename or name in {".", ".."} or any(character in name for character in ('/', '\\', '\0')):
+        if name != filename or name in {".", ".."} or any(character in name for character in ("/", "\\", "\0")):
             raise HTTPException(400, "更新文件名不安全")
         return name
 

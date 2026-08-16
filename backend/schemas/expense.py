@@ -10,7 +10,7 @@ CategoryStatusValue = Literal["active", "archived"]
 ExpenseStatusValue = Literal["active", "voided"]
 RenewalStatusValue = Literal["active", "paused", "ended"]
 RenewalCycleValue = Literal["monthly", "quarterly", "semiannual", "annual"]
-OccurrenceStatusValue = Literal["paid", "skipped"]
+OccurrenceStatusValue = Literal["paid", "skipped", "reversed"]
 
 
 class StrictModel(BaseModel):

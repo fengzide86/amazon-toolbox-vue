@@ -1,26 +1,26 @@
-"""
-AI客服相关 Schema
-"""
-from datetime import datetime
+"""Explicit request and response contracts for knowledge and rules-based chat APIs."""
 
-from pydantic import BaseModel, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+# ===== Knowledge base requests =====
 
 
-# ===== KnowledgeBase =====
-class KnowledgeBaseCreate(BaseModel):
+class KnowledgeCreateRequest(BaseModel):
+    category: str
     title: str
     content: str
-    category: str
     keywords: list[str] | None = None
-    priority: str = "medium"
+    priority: str | None = "medium"
     platform_key: str | None = None
     capability_key: str | None = None
 
 
-class KnowledgeBaseUpdate(BaseModel):
+class KnowledgeUpdateRequest(BaseModel):
+    category: str | None = None
     title: str | None = None
     content: str | None = None
-    category: str | None = None
     keywords: list[str] | None = None
     priority: str | None = None
     status: str | None = None
@@ -28,78 +28,242 @@ class KnowledgeBaseUpdate(BaseModel):
     capability_key: str | None = None
 
 
-class KnowledgeBaseResponse(BaseModel):
-    id: int
+class KnowledgeBatchImportItem(BaseModel):
+    category: str
     title: str
     content: str
-    category: str
     keywords: list[str] | None = None
-    priority: str
-    status: str
+    priority: str | None = "medium"
+
+
+class RetrievalTestRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=2000)
     platform_key: str | None = None
     capability_key: str | None = None
-    view_count: int = 0
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-    model_config = ConfigDict(from_attributes=True)
+    top_k: int = Field(default=5, ge=1, le=20)
+    min_score: float = Field(default=0.3, ge=-1, le=1)
 
 
-# ===== ChatSession =====
-class ChatSessionCreate(BaseModel):
-    user_id: int | None = None
-    platform_key: str | None = None
-    capability_key: str | None = None
+# ===== Knowledge base responses =====
 
 
-class ChatSessionResponse(BaseModel):
+class KnowledgeResponse(BaseModel):
     id: int
-    session_id: str
-    user_id: int | None = None
-    status: str
-    message_count: int = 0
-    ai_resolved: bool = False
-    transferred_to_human: bool = False
-    satisfaction: int | None = None
+    category: str
+    title: str
+    content: str
+    keywords: list[str]
+    priority: str | None
+    status: str | None
+    vector_id: str | None
+    view_count: int
+    platform_key: str | None
+    capability_key: str | None
+    created_at: str | None
+    updated_at: str | None
+
+
+class KnowledgeListResponse(BaseModel):
+    data: list[KnowledgeResponse]
+    items: list[KnowledgeResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class KnowledgeCategoryResponse(BaseModel):
+    name: str
+    count: int
+
+
+class KnowledgeVectorStoreResponse(BaseModel):
+    enabled: bool
+    reason: str
+
+
+class KnowledgeStatsResponse(BaseModel):
+    total: int
+    active: int
+    categories: int
+    vector_store: KnowledgeVectorStoreResponse
+
+
+class KnowledgeDeleteResponse(BaseModel):
+    message: str
+
+
+class KnowledgeBatchImportResponse(BaseModel):
+    success: int
+    failed: int
+    errors: list[str]
+
+
+class FeatureDisabledDetail(BaseModel):
+    code: str
+    message: str
+
+
+class FeatureDisabledResponse(BaseModel):
+    detail: FeatureDisabledDetail
+
+
+# ===== Chat requests =====
+
+
+class SendMessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
     platform_key: str | None = None
     capability_key: str | None = None
-    created_at: datetime | None = None
-    resolved_at: datetime | None = None
-
-    model_config = ConfigDict(from_attributes=True)
 
 
-# ===== ChatMessage =====
-class ChatMessageCreate(BaseModel):
+class CreateSessionRequest(BaseModel):
+    platform_key: str | None = None
+    capability_key: str | None = None
+
+
+class DebugChatRequest(SendMessageRequest):
+    """Rules-only preview input; legacy vector fields remain ignored as extras."""
+
+
+class ResolveSessionRequest(BaseModel):
+    satisfaction: int | None = None
+
+
+class RateSessionRequest(BaseModel):
+    satisfaction: int = Field(ge=1, le=5)
+
+
+class UpdateChatConfigRequest(BaseModel):
+    welcome_message: str | None = Field(default=None, max_length=1000)
+    suggested_questions: list[str] | None = None
+    max_unmatched: int | None = Field(default=None, ge=1, le=10)
+    transfer_keywords: list[str] | None = None
+    transfer_rules: dict[str, Any] | None = None
+
+
+# ===== Chat responses =====
+
+
+class ChatSessionCreatedResponse(BaseModel):
     session_id: str
-    role: str  # user/ai/system
-    content: str
-    knowledge_ids: list[str] | None = None
+    status: str
+    welcome_message: str
+    suggested_questions: list[str]
 
 
 class ChatMessageResponse(BaseModel):
-    id: int
-    session_id: str
     role: str
     content: str
-    knowledge_ids: list[str] | None = None
-    created_at: datetime | None = None
-
-    model_config = ConfigDict(from_attributes=True)
+    knowledge_ids: list[str]
+    created_at: str | None
 
 
-# ===== ChatConfig =====
-class ChatConfigUpdate(BaseModel):
-    key: str
-    value: str
-    description: str | None = None
+class ChatSessionDetailResponse(BaseModel):
+    session_id: str
+    status: str
+    message_count: int
+    ai_resolved: bool
+    transferred_to_human: bool
+    satisfaction: int | None
+    messages: list[ChatMessageResponse]
+    created_at: str | None
+
+
+class KnowledgeReferenceResponse(BaseModel):
+    id: int
+    knowledge_id: int
+    title: str
+    category: str
+    content: str
+    score: float
+    platform_key: str | None
+    capability_key: str | None
+
+
+class ChatReplyResponse(BaseModel):
+    session_id: str
+    reply: str
+    answer_mode: str
+    ai_used: bool
+    should_transfer: bool
+    knowledge_refs: list[KnowledgeReferenceResponse]
+
+
+class ChatActionResponse(BaseModel):
+    message: str
+
+
+class ChatTransferResponse(BaseModel):
+    message: str
+    feedback_id: int | None
+
+
+class ChatHistoryItemResponse(BaseModel):
+    session_id: str
+    status: str
+    message_count: int
+    ai_resolved: bool
+    satisfaction: int | None
+    created_at: str | None
+
+
+class ChatHistoryResponse(BaseModel):
+    data: list[ChatHistoryItemResponse]
+    items: list[ChatHistoryItemResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class ChatDiagnosticsResponse(BaseModel):
+    total_ms: int | float
+
+
+class DebugChatResponse(BaseModel):
+    reply: str
+    answer_mode: str
+    ai_used: bool
+    knowledge_refs: list[KnowledgeReferenceResponse]
+    fallback_reason: str | None
+    should_transfer: bool
+    diagnostics: ChatDiagnosticsResponse
 
 
 class ChatConfigResponse(BaseModel):
-    id: int
-    key: str
-    value: str | None = None
-    description: str | None = None
-    updated_at: datetime | None = None
+    welcome_message: str | None
+    suggested_questions: str | None
+    support_mode: str | None
+    max_unmatched: str | None
+    transfer_keywords: str | None
+    transfer_rules: str | None
 
-    model_config = ConfigDict(from_attributes=True)
+
+class AdminChatSessionItemResponse(BaseModel):
+    session_id: str
+    user_id: int | None
+    user_name: str
+    status: str
+    message_count: int
+    ai_resolved: bool
+    transferred_to_human: bool
+    satisfaction: int | None
+    created_at: str | None
+    resolved_at: str | None
+
+
+class AdminChatSessionsResponse(BaseModel):
+    data: list[AdminChatSessionItemResponse]
+    items: list[AdminChatSessionItemResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class AdminChatStatsResponse(BaseModel):
+    total_sessions: int
+    resolved: int
+    transferred: int
+    resolve_rate: int | float
+    transfer_rate: int | float
+    avg_satisfaction: float | None
+    today_sessions: int

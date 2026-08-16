@@ -1,10 +1,90 @@
 """
 工具配置接口测试
 """
+import json
+from decimal import Decimal
+
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
+from core.config import settings
+from core.security import create_access_token
+from models import AuthCode, AuthSeat, Device, LaunchToken, Plan, Setting, User
 from routers.tools import normalize_tool_config, resolve_tool_runtime
+
+
+async def _seed_live_launch_access(db_session) -> tuple[str, int]:
+    plan = Plan(
+        name="Y49 Live launch test",
+        price=Decimal("49.00"),
+        duration_days=30,
+        status="active",
+        product_type="consumer",
+    )
+    db_session.add(plan)
+    await db_session.flush()
+    auth_code = AuthCode(
+        code="LIVE-LAUNCH-TEST",
+        plan_id=plan.id,
+        max_devices=1,
+        seat_limit=1,
+        status="active",
+        platform_scope="amazon",
+    )
+    db_session.add(auth_code)
+    await db_session.flush()
+    user = User(
+        name="launch-owner",
+        auth_code_id=auth_code.id,
+        device_id="device-live",
+        device_name="Live test device",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    auth_code.user_id = user.id
+    db_session.add_all(
+        [
+            AuthSeat(
+                auth_code_id=auth_code.id,
+                user_id=user.id,
+                device_id="device-live",
+                device_name="Live test device",
+                status="active",
+            ),
+            Device(
+                auth_code_id=auth_code.id,
+                device_id="device-live",
+                device_name="Live test device",
+            ),
+            Setting(
+                key="tool_configs",
+                value=json.dumps(
+                    [
+                        {
+                            "id": "live_tool",
+                            "name": "真实工具测试",
+                            "module": "自动化",
+                            "category": "automation",
+                            "description": "Launch Grant 测试",
+                            "platform_key": "amazon",
+                            "capability_key": "live_tool",
+                            "availability": "live",
+                            "supports_live_single": True,
+                            "release_status": "available",
+                            "status": "online",
+                            "script_key": "amazon.live_tool.v1",
+                            "target_url": "https://example.test/live",
+                        }
+                    ],
+                    ensure_ascii=False,
+                ),
+            ),
+        ]
+    )
+    await db_session.commit()
+    token = create_access_token({"user_id": user.id, "device_id": "device-live"})
+    return token, auth_code.id
 
 
 def test_resolve_tool_runtime_supports_legacy_tool_config():
@@ -254,3 +334,115 @@ class TestUpdateTools:
         assert tool["supports_live_batch"] is False
         assert tool["target_url"] == ""
         assert tool["script_key"].startswith("demo.")
+
+
+@pytest.mark.asyncio
+async def test_launch_grant_create_and_verify_preserve_response_contract(
+    client: AsyncClient,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    access_token, auth_code_id = await _seed_live_launch_access(db_session)
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    created = await client.post(
+        "/api/tools/live_tool/launch-grant",
+        params={"platform_key": "amazon"},
+        headers=headers,
+    )
+
+    assert created.status_code == 200
+    payload = created.json()
+    assert set(payload) == {"success", "message", "data"}
+    assert payload["success"] is True
+    assert set(payload["data"]) == {"token", "expires_in", "expires_at", "launch_data"}
+    assert payload["data"]["launch_data"]["execution_mode"] == "single"
+    launch = (
+        await db_session.execute(
+            select(LaunchToken).where(LaunchToken.token == payload["data"]["token"])
+        )
+    ).scalar_one()
+    assert launch.auth_code_id == auth_code_id
+    assert launch.status == "pending"
+
+    verified = await client.post(
+        "/api/tools/launch-grant/verify",
+        params={"token": payload["data"]["token"]},
+    )
+
+    assert verified.status_code == 200
+    assert verified.json()["data"] == {
+        "valid": True,
+        "user_id": launch.user_id,
+        "auth_code_id": auth_code_id,
+        "platform_key": "amazon",
+        "tool_id": "live_tool",
+        "script_key": "amazon.live_tool.v1",
+        "device_id": "device-live",
+        "execution_mode": "single",
+        "client_batch_id": None,
+        "client_item_id": None,
+    }
+    await db_session.refresh(launch)
+    assert launch.status == "used"
+
+    duplicate = await client.post(
+        "/api/tools/launch-grant/verify",
+        params={"token": payload["data"]["token"]},
+    )
+    assert duplicate.status_code == 200
+    assert duplicate.json() == {
+        "success": False,
+        "message": "Token 已使用",
+        "error_code": 403,
+    }
+
+
+@pytest.mark.asyncio
+async def test_legacy_launch_token_paths_remain_compatible(
+    client: AsyncClient,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    access_token, _auth_code_id = await _seed_live_launch_access(db_session)
+
+    created = await client.post(
+        "/api/tools/live_tool/launch-token",
+        params={"platform_key": "amazon"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert created.status_code == 200
+    launch_token = created.json()["data"]["token"]
+
+    verified = await client.post(
+        "/api/tools/launch-token/verify",
+        params={"token": launch_token},
+    )
+    assert verified.status_code == 200
+    assert verified.json()["data"]["valid"] is True
+
+
+@pytest.mark.asyncio
+async def test_demo_mode_rejects_launch_grant_without_creating_state(
+    client: AsyncClient,
+    db_session,
+):
+    access_token, _auth_code_id = await _seed_live_launch_access(db_session)
+
+    response = await client.post(
+        "/api/tools/live_tool/launch-grant",
+        params={"platform_key": "amazon"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == {
+        "code": "FEATURE_DISABLED",
+        "message": "当前为演示模式，真实工具尚未接入",
+        "reason": "demo_only",
+    }
+    assert (
+        await db_session.execute(select(LaunchToken))
+    ).scalars().all() == []

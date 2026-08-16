@@ -49,7 +49,8 @@ class ExpenseRenewalCycle:
 class ExpenseOccurrenceStatus:
     PAID = "paid"
     SKIPPED = "skipped"
-    ALL = frozenset({PAID, SKIPPED})
+    REVERSED = "reversed"
+    ALL = frozenset({PAID, SKIPPED, REVERSED})
 
 
 class ExpenseCategory(Base):
@@ -135,7 +136,6 @@ class ExpenseRecord(Base):
         CheckConstraint("amount > 0", name="ck_expense_records_amount_positive"),
         CheckConstraint("currency = 'CNY'", name="ck_expense_records_currency"),
         CheckConstraint("status IN ('active', 'voided')", name="ck_expense_records_status"),
-        UniqueConstraint("renewal_id", "renewal_due_on", name="ux_expense_records_renewal_due"),
         Index("ix_expense_records_status_date", "status", "expense_date"),
         Index("ix_expense_records_category_date", "category_id", "expense_date"),
     )
@@ -173,7 +173,7 @@ class ExpenseRenewalOccurrence(Base):
     processed_at = Column(DateTime, nullable=False, server_default=func.now())
 
     __table_args__ = (
-        CheckConstraint("status IN ('paid', 'skipped')", name="ck_expense_occurrences_status"),
+        CheckConstraint("status IN ('paid', 'skipped', 'reversed')", name="ck_expense_occurrences_status"),
         UniqueConstraint("renewal_id", "due_on", name="ux_expense_occurrences_renewal_due"),
         Index("ix_expense_occurrences_renewal_processed", "renewal_id", "processed_at"),
     )

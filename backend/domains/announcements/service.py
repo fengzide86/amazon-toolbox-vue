@@ -207,6 +207,37 @@ async def update(
     return announcement
 
 
+async def delete(
+    db: AsyncSession,
+    announcement_id: int,
+    *,
+    actor: dict[str, Any],
+    request: Request | None = None,
+) -> None:
+    result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
+    announcement = result.scalar_one_or_none()
+    if not announcement:
+        raise HTTPException(status_code=404, detail="公告不存在")
+    before = serialize(announcement)
+    await db.delete(announcement)
+    await log_admin_action(
+        db,
+        user_id=cast(int | None, actor.get("staff_id")),
+        user_name=cast(str | None, actor.get("username")),
+        action="announcement_delete",
+        target_type="announcement",
+        target_id=announcement.id,
+        detail={
+            "role": actor.get("role"),
+            "before": before,
+            "after": {"deleted": True},
+            "reason": None,
+        },
+        request=request,
+    )
+    await db.commit()
+
+
 async def record_receipt(db: AsyncSession, announcement_id: int, current_user: dict[str, object], action: str) -> dict[str, object]:
     auth_code_id = current_user.get("auth_code_id")
     device_id = current_user.get("device_id")

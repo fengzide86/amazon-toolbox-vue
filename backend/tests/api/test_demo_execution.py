@@ -170,6 +170,26 @@ async def test_batch_payload_rejects_source_rows_and_writes_no_real_batch(client
 
 
 @pytest.mark.asyncio
+async def test_demo_batch_rejects_more_than_fifty_rows(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+
+    response = await client.post(
+        "/api/demo/batches",
+        json={
+            "tool_id": "tool_demo_batch",
+            "tool_name": "demo",
+            "platform_key": "amazon",
+            "scenario_id": "demo",
+            "row_count": 51,
+        },
+    )
+
+    assert response.status_code == 422
+    assert (await db_session.execute(select(func.count(DemoBatch.id)))).scalar() == 0
+
+
+@pytest.mark.asyncio
 async def test_demo_batch_supports_concurrent_items_and_recounts_before_finish(client, db_session):
     await _install_demo_tool(db_session)
     app.dependency_overrides[get_current_user] = _as_user()
@@ -188,12 +208,15 @@ async def test_demo_batch_supports_concurrent_items_and_recounts_before_finish(c
     batch_id = batch["id"]
     item_refs = [item["item_ref"] for item in batch["items"]]
 
-    for item_ref in item_refs:
+    for index, item_ref in enumerate(item_refs, start=1):
         response = await client.put(
             f"/api/demo/batches/{batch_id}/items/{item_ref}",
             json={"event_seq": 1, "status": "playing", "simulated_outcome": None},
         )
         assert response.status_code == 200
+        detail = await client.get(f"/api/demo/batches/{batch_id}")
+        assert detail.json()["playing_count"] == index
+        assert detail.json()["queued_count"] == len(item_refs) - index
 
     running = await client.patch(
         f"/api/demo/batches/{batch_id}",

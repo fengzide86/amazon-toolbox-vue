@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -15,6 +15,10 @@ from database import Base, get_db
 from main import app
 from models import (
     AuditLog,
+    AuthCode,
+    AuthSeat,
+    Device,
+    ExpenseAttachment,
     ExpenseCategory,
     ExpenseRecord,
     ExpenseRenewal,
@@ -25,6 +29,7 @@ from models import (
     StaffRole,
     StaffStatus,
     StaffUser,
+    User,
 )
 from services.staff_service import create_staff_access_token
 
@@ -276,6 +281,232 @@ async def test_concurrent_renewal_confirmation_creates_one_expense_for_due_cycle
                     await session.execute(delete(ExpenseRenewalOccurrence).where(ExpenseRenewalOccurrence.renewal_id == renewal_id))
                     await session.execute(delete(ExpenseRecord).where(ExpenseRecord.renewal_id == renewal_id))
                     await session.execute(delete(ExpenseRenewal).where(ExpenseRenewal.id == renewal_id))
+                if category_id is not None:
+                    await session.execute(delete(ExpenseCategory).where(ExpenseCategory.id == category_id))
+                if staff_id is not None:
+                    await session.execute(delete(StaffUser).where(StaffUser.id == staff_id))
+                await session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_twenty_concurrent_first_activations_do_not_oversell_seats_or_devices():
+    engine = create_async_engine(
+        _mariadb_test_url(),
+        pool_size=20,
+        max_overflow=5,
+        pool_pre_ping=True,
+        isolation_level="READ COMMITTED",
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    suffix = uuid.uuid4().hex[:12]
+    plan_id: int | None = None
+    auth_code_id: int | None = None
+
+    async def override_get_db():
+        async with sessions() as session:
+            try:
+                yield session
+            finally:
+                if session.in_transaction():
+                    await session.rollback()
+
+    previous_override = app.dependency_overrides.get(get_db)
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+
+        code_value = f"AUTH-CONCURRENCY-{suffix}"
+        async with sessions() as session:
+            plan = Plan(
+                name=f"Activation concurrency {suffix}",
+                price=Decimal("19.00"),
+                duration_days=30,
+                status="active",
+                product_type="consumer",
+            )
+            session.add(plan)
+            await session.flush()
+            auth_code = AuthCode(
+                code=code_value,
+                plan_id=plan.id,
+                max_devices=1,
+                seat_limit=1,
+                status="unused",
+            )
+            session.add(auth_code)
+            await session.flush()
+            plan_id, auth_code_id = plan.id, auth_code.id
+            await session.commit()
+
+        app.dependency_overrides[get_db] = override_get_db
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://mariadb-test") as client:
+            responses = await asyncio.gather(*[
+                client.post(
+                    "/api/auth/verify",
+                    json={
+                        "code": code_value,
+                        "device_id": f"device-{suffix}-{index}",
+                        "device_name": f"desktop-{suffix}-{index}",
+                    },
+                )
+                for index in range(20)
+            ])
+
+        bodies = [response.json() for response in responses]
+        assert sum(body["success"] is True for body in bodies) == 1, bodies
+        assert sum(body["success"] is False for body in bodies) == 19, bodies
+
+        async with sessions() as session:
+            user_count = int((await session.execute(
+                select(func.count(User.id)).where(User.auth_code_id == auth_code_id)
+            )).scalar_one())
+            seat_count = int((await session.execute(
+                select(func.count(AuthSeat.id)).where(
+                    AuthSeat.auth_code_id == auth_code_id,
+                    AuthSeat.status == "active",
+                )
+            )).scalar_one())
+            device_count = int((await session.execute(
+                select(func.count(Device.id)).where(Device.auth_code_id == auth_code_id)
+            )).scalar_one())
+            assert (user_count, seat_count, device_count) == (1, 1, 1)
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(get_db, None)
+        else:
+            app.dependency_overrides[get_db] = previous_override
+
+        if auth_code_id is not None or plan_id is not None:
+            async with sessions() as session:
+                if auth_code_id is not None:
+                    await session.execute(
+                        update(AuthCode).where(AuthCode.id == auth_code_id).values(user_id=None)
+                    )
+                    await session.execute(delete(AuthSeat).where(AuthSeat.auth_code_id == auth_code_id))
+                    await session.execute(delete(Device).where(Device.auth_code_id == auth_code_id))
+                    await session.execute(delete(User).where(User.auth_code_id == auth_code_id))
+                    await session.execute(delete(AuthCode).where(AuthCode.id == auth_code_id))
+                if plan_id is not None:
+                    await session.execute(delete(Plan).where(Plan.id == plan_id))
+                await session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_attachment_uploads_enforce_five_file_limit(tmp_path, monkeypatch):
+    engine = create_async_engine(
+        _mariadb_test_url(),
+        pool_size=10,
+        max_overflow=2,
+        pool_pre_ping=True,
+        isolation_level="READ COMMITTED",
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    suffix = uuid.uuid4().hex[:12]
+    staff_id: int | None = None
+    category_id: int | None = None
+    expense_id: int | None = None
+    monkeypatch.setenv("EXPENSE_ATTACHMENT_DIR", str(tmp_path))
+
+    async def override_get_db():
+        async with sessions() as session:
+            try:
+                yield session
+            finally:
+                if session.in_transaction():
+                    await session.rollback()
+
+    previous_override = app.dependency_overrides.get(get_db)
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+
+        async with sessions() as session:
+            staff = StaffUser(
+                username=f"attachment-concurrency-{suffix}",
+                display_name="Attachment concurrency test",
+                password_hash=hash_password(f"Concurrency-{suffix}"),
+                role=StaffRole.SUPER_ADMIN,
+                status=StaffStatus.ACTIVE,
+                token_version=1,
+                force_password_reset=False,
+            )
+            category = ExpenseCategory(
+                code=f"attachment_{suffix}",
+                name=f"附件并发测试 {suffix}",
+                status="active",
+                sort_order=999,
+                is_system=False,
+            )
+            session.add_all([staff, category])
+            await session.flush()
+            expense = ExpenseRecord(
+                amount=Decimal("12.34"),
+                currency="CNY",
+                expense_date=date.today(),
+                title=f"附件并发测试 {suffix}",
+                category_id=category.id,
+                status="active",
+                created_by_staff_id=staff.id,
+                updated_by_staff_id=staff.id,
+            )
+            session.add(expense)
+            await session.flush()
+            staff_id, category_id, expense_id = staff.id, category.id, expense.id
+            await session.commit()
+            token = create_staff_access_token(staff)
+
+        app.dependency_overrides[get_db] = override_get_db
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://mariadb-test") as client:
+            responses = await asyncio.gather(*[
+                client.post(
+                    f"/api/expenses/{expense_id}/attachments",
+                    headers={"Authorization": f"Bearer {token}"},
+                    files={
+                        "file": (
+                            f"receipt-{index}.png",
+                            b"\x89PNG\r\n\x1a\n" + bytes([index]),
+                            "image/png",
+                        )
+                    },
+                )
+                for index in range(10)
+            ])
+
+        statuses = [response.status_code for response in responses]
+        assert statuses.count(201) == 5, [response.text for response in responses]
+        assert statuses.count(409) == 5, [response.text for response in responses]
+
+        async with sessions() as session:
+            attachment_count = int((await session.execute(
+                select(func.count(ExpenseAttachment.id)).where(
+                    ExpenseAttachment.expense_id == expense_id
+                )
+            )).scalar_one())
+            assert attachment_count == 5
+        assert len(list(tmp_path.rglob("*.png"))) == 5
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(get_db, None)
+        else:
+            app.dependency_overrides[get_db] = previous_override
+
+        if any(identifier is not None for identifier in (staff_id, category_id, expense_id)):
+            async with sessions() as session:
+                if staff_id is not None:
+                    await session.execute(delete(AuditLog).where(AuditLog.user_id == staff_id))
+                if expense_id is not None:
+                    await session.execute(
+                        delete(ExpenseAttachment).where(
+                            ExpenseAttachment.expense_id == expense_id
+                        )
+                    )
+                    await session.execute(delete(ExpenseRecord).where(ExpenseRecord.id == expense_id))
                 if category_id is not None:
                     await session.execute(delete(ExpenseCategory).where(ExpenseCategory.id == category_id))
                 if staff_id is not None:

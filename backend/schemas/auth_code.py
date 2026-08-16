@@ -59,6 +59,23 @@ class AuthCodeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AuthCodePageResponse(BaseModel):
+    data: list[AuthCodeResponse]
+    page: int
+    page_size: int
+    total: int
+
+
+class AuthCodeBatchGenerateResponse(BaseModel):
+    success: bool
+    codes: list[str]
+    count: int
+
+
+class AuthCodeDeleteResponse(BaseModel):
+    success: bool
+
+
 # ===== AuthSeat (席位) =====
 class AuthSeatResponse(BaseModel):
     id: int

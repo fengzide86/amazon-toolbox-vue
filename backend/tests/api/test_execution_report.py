@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from domains.automation import service as execution_service
 from models import AuthCode, LaunchToken, Setting, User
 from models.feedback import ExecutionVerification, RunLog
 from tests.conftest import get_data
@@ -114,3 +115,51 @@ async def test_execution_report_rejects_unconsumed_grant(
     })
 
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_execution_read_model_only_returns_owned_verified_records(
+    db_session: AsyncSession,
+):
+    owner = User(name="Execution Owner", device_id="execution-owner")
+    other = User(name="Other Owner", device_id="execution-other")
+    db_session.add_all([owner, other])
+    await db_session.flush()
+    visible = RunLog(
+        user_id=owner.id,
+        tool_id="tool-visible",
+        tool_name="可见工具",
+        status="success",
+        verification_state=ExecutionVerification.VERIFIED,
+    )
+    db_session.add_all([
+        visible,
+        RunLog(
+            user_id=owner.id,
+            tool_id="tool-unverified",
+            status="success",
+            verification_state=ExecutionVerification.LEGACY_UNVERIFIED,
+        ),
+        RunLog(
+            user_id=other.id,
+            tool_id="tool-other",
+            status="success",
+            verification_state=ExecutionVerification.VERIFIED,
+        ),
+    ])
+    await db_session.commit()
+
+    page = await execution_service.list_executions(
+        db_session,
+        {"user_id": owner.id},
+        page=1,
+        page_size=20,
+        platform_key=None,
+        tool_id=None,
+    )
+
+    assert page["total"] == 1
+    assert [item["id"] for item in page["data"]] == [visible.id]
+    detail = await execution_service.get_execution(db_session, {"user_id": owner.id}, visible.id)
+    assert detail["record_kind"] == "live"
+    assert detail["verification"] == "verified"

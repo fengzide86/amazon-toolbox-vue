@@ -1,9 +1,10 @@
 """Validated schemas for the internal order state machine."""
 
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from core.response import APIResponse
 
 
 class OrderCreate(BaseModel):
@@ -37,22 +38,31 @@ class OrderResponse(BaseModel):
     order_no: str
     plan_id: int | None = None
     plan_name_snapshot: str
-    plan_price_snapshot: Decimal
+    plan_price_snapshot: float
     plan_duration_days_snapshot: int
-    amount: Decimal
+    amount: float
     channel: str | None = None
     responsible: str | None = None
     status: str
-    refund_amount: Decimal
+    refund_amount: float
     platform_key: str | None = None
     refund_reason: str | None = None
     cancel_reason: str | None = None
     created_by_staff_id: int | None = None
     updated_by_staff_id: int | None = None
-    created_at: datetime | None = None
-    paid_at: datetime | None = None
-    refunded_at: datetime | None = None
-    cancelled_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: str | None = None
+    paid_at: str | None = None
+    refunded_at: str | None = None
+    cancelled_at: str | None = None
+    updated_at: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class OrderPageResponse(APIResponse[list[OrderResponse]]):
+    total: int
+    page: int
+    page_size: int
+
+
+OrderEnvelope = APIResponse[OrderResponse]
