@@ -15,6 +15,9 @@ if (-not $smokeRoot.StartsWith(($runnerTemp.TrimEnd('\') + '\'), [System.StringC
 }
 $installDir = Join-Path $smokeRoot 'app'
 New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
+$installerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+$accessViolationExitCode = -1073741819 # 0xC0000005
+$maxInstallAttempts = 3
 
 function Stop-SmokeProcesses {
     Get-Process | ForEach-Object {
@@ -30,8 +33,28 @@ function Stop-SmokeProcesses {
 }
 
 try {
-    $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru -WindowStyle Hidden
-    if ($install.ExitCode -ne 0) { throw "NSIS silent install failed with exit code $($install.ExitCode)" }
+    for ($attempt = 1; $attempt -le $maxInstallAttempts; $attempt++) {
+        Write-Output "nsis_install_attempt=$attempt"
+        $install = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru -WindowStyle Hidden
+        if ($install.ExitCode -eq 0) { break }
+
+        $exitCodeHex = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$install.ExitCode), 0).ToString('X8')
+        if ($install.ExitCode -ne $accessViolationExitCode -or $attempt -eq $maxInstallAttempts) {
+            throw "NSIS silent install failed with exit code $($install.ExitCode) (0x$exitCodeHex)"
+        }
+
+        $currentInstallerHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+        if ($currentInstallerHash -ne $installerHash) {
+            throw 'NSIS installer changed after a transient install failure; refusing to retry'
+        }
+
+        Write-Warning "NSIS installer hit transient Windows access violation 0x$exitCodeHex; retrying ($attempt/$maxInstallAttempts)"
+        Stop-SmokeProcesses
+        if (Test-Path -LiteralPath $installDir) {
+            Remove-Item -LiteralPath $installDir -Recurse -Force -ErrorAction Stop
+        }
+        Start-Sleep -Seconds (2 * $attempt)
+    }
 
     $appExecutable = Join-Path $installDir ("{0}.exe" -f $metadata.build.productName)
     if (-not (Test-Path -LiteralPath $appExecutable -PathType Leaf)) {
