@@ -2,6 +2,7 @@
   <main class="terms-container">
     <div class="terms-card">
       <div class="terms-header">
+        <BrandLockup class="terms-brand" audience="login" layout="horizontal" />
         <h1>服务条款</h1>
         <p class="terms-date">最后更新：2026年7月19日</p>
       </div>
@@ -9,7 +10,7 @@
       <div class="terms-content">
         <section>
           <h2>1. 服务说明</h2>
-          <p>跨境电商赛训效率工具箱（以下简称“本工具”）是一款面向赛训、实训和内部验证场景的桌面演示工具，提供授权管理、流程演示、本地表格解析、执行记录和工具帮助等功能。</p>
+          <p>课赛通 KST（以下简称“本工具”）是一款面向赛训、实训和内部验证场景的桌面演示工具，提供授权管理、流程演示、本地表格解析、执行记录和工具帮助等功能。</p>
           <p>当前工具流程属于演示模式，不会登录、读取或修改真实店铺数据，演示结果也不代表第三方平台的真实处理结果。</p>
         </section>
 
@@ -74,6 +75,7 @@
 import { onMounted, ref } from 'vue'
 import { publicSettingsSchema } from '@/features/auth/model'
 import { getPublicSettings } from '@/utils/api'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 
 const wechatId = ref('请在登录页查看最新联系方式')
 
@@ -112,6 +114,7 @@ onMounted(async () => {
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--color-border);
 }
+.terms-brand { margin-bottom: 24px; }
 .terms-header h1 {
   font-family: var(--font-family);
   font-size: 1.875rem;

@@ -31,6 +31,14 @@ type BrowserWindowType = import('electron').BrowserWindow;
 type IpcInvokeEvent = import('electron').IpcMainInvokeEvent;
 type IpcEvent = import('electron').IpcMainEvent;
 
+const APPLICATION_NAME = packageMetadata.build?.productName || '课赛通 KST';
+const WINDOWS_APP_USER_MODEL_ID = packageMetadata.build?.appId || 'com.amazon.toolbox';
+
+// Set the stable desktop identity before creating windows so development and
+// packaged builds share the same visible name and Windows taskbar grouping.
+app.setName(APPLICATION_NAME);
+if (process.platform === 'win32') app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
+
 interface RunnerLike {
   start(tool: UnknownRecord): Promise<unknown>;
   pause(): Promise<unknown> | unknown;
@@ -607,8 +615,13 @@ function createWindow(): void {
   // 检测开发模式：环境变量或 dist 目录不存在
   const isDev = process.env.NODE_ENV === 'development'
     || !require('fs').existsSync(path.join(__dirname, '../../dist'));
+  const windowIconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'icon.ico')
+    : path.join(app.getAppPath(), 'build', 'icon.ico');
 
   const window: BrowserWindowType = new BrowserWindow({
+    title: APPLICATION_NAME,
+    icon: windowIconPath,
     width: 1280,
     height: 800,
     minWidth: 900,

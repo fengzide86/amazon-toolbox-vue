@@ -57,7 +57,7 @@
           <div class="preview-title"><span>双端预览</span><small>实际仅投放给所选人群</small></div>
           <div class="preview-grid">
             <article :class="['preview-card', { muted: form.audience === 'business' }]">
-              <label>C 端 · 自动化工具箱</label><strong>{{ form.title || '公告标题' }}</strong><p>{{ form.content || '公告正文会在这里呈现。' }}</p>
+              <label>C 端 · 个人效率工具箱</label><strong>{{ form.title || '公告标题' }}</strong><p>{{ form.content || '公告正文会在这里呈现。' }}</p>
             </article>
             <article :class="['preview-card', 'business', { muted: form.audience === 'consumer' }]">
               <label>B 端 · 专业批量工作台</label><strong>{{ form.title || '公告标题' }}</strong><p>{{ form.content || '公告正文会在这里呈现。' }}</p>

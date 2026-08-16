@@ -91,12 +91,54 @@ describe('app protocol renderer entrypoint', () => {
     expect(scriptPolicy).not.toContain("'unsafe-eval'")
     expect(html).not.toMatch(/<script\b(?![^>]*\bsrc\s*=)[^>]*>/i)
     expect(html).toContain('startup-loading')
+    expect(html).toContain('<meta name="theme-color" content="#101828">')
+    expect(html).toContain('href="/favicon-32x32.png"')
+    expect(html).toContain('href="/favicon-16x16.png"')
+    expect(html).toContain('rel="apple-touch-icon"')
     expect(readFileSync(resolve('electron/desktop-application.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
     expect(readFileSync(resolve('electron/core/app-protocol.cts'), 'utf8')).toContain("scheme: 'app'")
   })
 })
 
 describe('internal desktop package profile', () => {
+  it('uses the KST visible identity while preserving update continuity', () => {
+    const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+      description?: string
+      author?: string
+      build?: {
+        appId?: string
+        productName?: string
+        artifactName?: string
+        afterPack?: string
+        win?: { icon?: string; signAndEditExecutable?: boolean }
+        nsis?: Record<string, unknown>
+        publish?: { url?: string }
+      }
+    }
+    const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
+
+    expect(metadata.build?.appId).toBe('com.amazon.toolbox')
+    expect(metadata.description).toBe('课赛通 KST · 跨境电商赛训效率平台')
+    expect(metadata.author).toBe('课赛通 KST 团队')
+    expect(metadata.build?.productName).toBe('课赛通 KST')
+    expect(metadata.build?.artifactName).toBe('KST Setup ${version}.${ext}')
+    expect(metadata.build?.afterPack).toBe('scripts/brand-after-pack.cjs')
+    expect(metadata.build?.win?.icon).toBe('build/icon.ico')
+    expect(metadata.build?.win?.signAndEditExecutable).toBe(false)
+    expect(metadata.build?.nsis).toEqual(expect.objectContaining({
+      shortcutName: '课赛通 KST',
+      installerIcon: 'build/icon.ico',
+      uninstallerIcon: 'build/icon.ico',
+      installerHeaderIcon: 'build/icon.ico',
+    }))
+    expect(metadata.build?.publish?.url).toBe('https://8.130.113.104/updates/')
+    expect(main).toContain('app.setName(APPLICATION_NAME)')
+    expect(main).toContain('app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID)')
+    expect(main).toContain("path.join(process.resourcesPath, 'icon.ico')")
+    expect(main).toContain('icon: windowIconPath')
+    expect(readFileSync(resolve('scripts/brand-after-pack.cjs'), 'utf8')).toContain("'--set-icon'")
+  })
+
   it('ships the explicitly enabled local runner but never bundles the control backend', () => {
     const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
       toolbox?: { distribution?: string; automationRuntime?: boolean }

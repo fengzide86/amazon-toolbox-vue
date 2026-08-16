@@ -226,7 +226,7 @@ def setup_logging(
     # ===== 记录启动信息 =====
     logger = logging.getLogger(__name__)
     logger.info("=" * 60)
-    logger.info("跨境电商赛训效率工具箱 - 后端服务启动")
+    logger.info("课赛通 KST · 跨境电商赛训效率平台 - 后端服务启动")
     logger.info(f"日志级别: {level}")
     logger.info(f"日志目录: {log_dir}")
     logger.info(f"JSON格式: {json_format}")

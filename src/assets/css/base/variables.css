@@ -1,4 +1,4 @@
-/* AmazonToolbox Design System v6 - Mist & Mineral */
+/* KST Design System v6 - Mist & Mineral */
 :root {
   color-scheme: light;
 
@@ -10,6 +10,12 @@
   --color-text: #182033;
   --color-text-secondary: #667085;
   --color-text-tertiary: #98a2b3;
+  --color-brand: #1565ff;
+  --color-brand-hover: #0f56df;
+  --color-brand-soft: #edf4ff;
+  --color-brand-ink: #111111;
+  --color-brand-night: #101828;
+  --color-brand-on-dark: #f8fafc;
   --color-primary: #2d5fca;
   --color-primary-hover: #244fae;
   --color-primary-active: #1e438f;

@@ -14,6 +14,7 @@ describe('packaged local automation runtime', () => {
     expect(metadata.build?.extraResources).toEqual([
       { from: 'resources/templates', to: 'templates', filter: ['**/*.xlsx'] },
       { from: 'resources/rates', to: 'rates', filter: ['**/*.xlsx'] },
+      { from: 'build/icon.ico', to: 'icon.ico' },
     ])
     expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation-runner.cjs')
     expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation/scripts/**')

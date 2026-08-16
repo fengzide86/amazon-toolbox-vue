@@ -39,23 +39,25 @@ describe('UserSidebar', () => {
   })
 
   describe('品牌区渲染', () => {
-    it('应该显示 Zap 图标品牌徽章', async () => {
+    it('应该显示课赛通品牌锁定组合', async () => {
       const wrapper = mount(UserSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-badge').exists()).toBe(true)
-      expect(wrapper.find('.brand-badge svg').exists()).toBe(true)
+      const brand = wrapper.find('[data-testid="kst-brand-lockup"]')
+      expect(brand.exists()).toBe(true)
+      expect(brand.attributes('role')).toBe('img')
+      expect(brand.attributes('aria-label')).toBe('课赛通 KST，个人效率工具箱')
     })
 
-    it('应该显示"自动化工具箱"品牌文字', async () => {
+    it('应该显示 C 端副标题', async () => {
       const wrapper = mount(UserSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-text').text()).toBe('自动化工具箱')
+      expect(wrapper.find('.kst-lockup-subtitle').text()).toBe('个人效率工具箱')
     })
   })
 

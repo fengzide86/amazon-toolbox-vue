@@ -94,6 +94,10 @@ describe('declarative automation workflow runtime', () => {
       expect(html).toContain('--blue:#2d5fca')
       expect(html).toContain('--gold:#a98552')
       expect(html).toContain('background:var(--ink)')
+      expect(html).toContain('aria-label="课赛通 KST"')
+      expect(html).toContain('<strong>课赛通 KST</strong>')
+      expect(html).toContain('viewBox="870 360 210 250"')
+      expect(html).not.toContain('<span class="brand-mark">赛</span>')
       expect(html).not.toContain('Precision mineral theme')
       expect(html).not.toContain('--blue:#405f78')
     } finally {

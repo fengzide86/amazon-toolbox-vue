@@ -2,10 +2,7 @@
   <aside class="studio-user-sidebar" aria-label="用户导航">
     <!-- 品牌区 -->
     <div class="sidebar-brand-zone">
-      <div class="brand-badge">
-        <Zap :size="15" />
-      </div>
-      <span class="brand-text">自动化工具箱</span>
+      <BrandLockup audience="consumer" layout="horizontal" />
     </div>
 
     <!-- 导航菜单 -->
@@ -38,6 +35,7 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import { Zap, ClipboardList, ShieldCheck, Monitor, MessageCircle } from '@lucide/vue'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 
 const route = useRoute()
 
@@ -70,29 +68,8 @@ function isActive(path: string) {
   display: flex;
   align-items: center;
   padding: 0 20px;
-  gap: 11px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
-}
-
-.brand-badge {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: 10px;
-  color: #fff;
-  background: var(--color-primary);
-  box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
-}
-
-.brand-text {
-  color: var(--color-text);
-  font-size: 14px;
-  font-weight: 750;
-  letter-spacing: -.01em;
 }
 
 .sidebar-menu-nav {

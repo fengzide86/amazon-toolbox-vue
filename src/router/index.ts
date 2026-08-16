@@ -315,7 +315,7 @@ router.beforeEach((to, from, next) => {
 
 router.afterEach((to) => {
   if (typeof document === 'undefined') return
-  document.title = `${String(to.meta.title || '工具箱')} · 跨境电商工具箱`
+  document.title = `${String(to.meta.title || '课赛通 KST')} · 课赛通 KST`
   const focusRoute = () => {
     const target = document.querySelector<HTMLElement>('[data-route-focus], main')
     if (!target) return

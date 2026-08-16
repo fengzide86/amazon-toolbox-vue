@@ -32,7 +32,7 @@ class Settings:
     """应用配置"""
     
     # 应用配置
-    APP_NAME: str = "跨境电商赛训效率工具箱"
+    APP_NAME: str = "课赛通 KST · 跨境电商赛训效率平台"
     APP_VERSION: str = _get_version()
     APP_ENV: str = "internal"
     DEBUG: bool = False

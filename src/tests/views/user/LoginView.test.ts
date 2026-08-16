@@ -51,7 +51,15 @@ describe('LoginView', () => {
 
     it('应该显示应用标题', () => {
       const wrapper = mountWithPinia(LoginView)
-      expect(wrapper.find('h1').text()).toBe('跨境电商赛训效率工具箱')
+      expect(wrapper.find('h1').attributes('aria-label')).toBe('课赛通 KST · 跨境电商赛训效率平台')
+      expect(wrapper.find('[data-testid="kst-brand-lockup"]').attributes('aria-hidden')).toBe('true')
+    })
+
+    it('授权卡应该使用装饰性品牌图形', () => {
+      const wrapper = mountWithPinia(LoginView)
+      const mark = wrapper.find('.logo-section [data-testid="kst-brand-mark"]')
+      expect(mark.exists()).toBe(true)
+      expect(mark.attributes('aria-hidden')).toBe('true')
     })
 
     it('左侧大数字指标应该显示完整金色单位', () => {

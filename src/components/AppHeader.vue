@@ -5,6 +5,7 @@
         <button class="hamburger-btn" type="button" aria-label="打开导航菜单" title="打开导航菜单" @click="$emit('toggle-sidebar')">
           <Menu :size="18" />
         </button>
+        <BrandMark class="mobile-brand-mark" :size="28" compact decorative />
         <div class="shell-page-copy" data-testid="shell-page-header">
           <span v-if="currentPageEyebrow" class="shell-page-eyebrow">{{ currentPageEyebrow }}</span>
           <h1>{{ currentPageTitle }}</h1>
@@ -71,6 +72,7 @@ import { Crown, Menu, ShieldCheck } from '@lucide/vue'
 
 import MessageCenter from '@/features/announcements/MessageCenter.vue'
 import UpdateStatusEntry from '@/features/updates/UpdateStatusEntry.vue'
+import BrandMark from '@/components/brand/BrandMark.vue'
 import { useUpdateStore } from '@/features/updates/store'
 import { Auth } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
@@ -282,6 +284,8 @@ onMounted(() => platformStore.loadPlatforms())
   cursor: pointer;
 }
 
+.mobile-brand-mark { display: none; }
+
 .platform-switcher { flex: 0 1 150px; }
 .platform-select { width: 150px; }
 :deep(.platform-select .el-select__wrapper),
@@ -355,6 +359,7 @@ onMounted(() => platformStore.loadPlatforms())
 
 @media (max-width: 1024px) {
   .hamburger-btn { display: grid; }
+  .mobile-brand-mark { display: inline-grid; }
   .header-inner { gap: 16px; padding: 0 18px; }
   .shell-page-copy p { display: none; }
   .shell-page-copy h1 { font-size: 20px; }

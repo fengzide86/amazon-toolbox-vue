@@ -3,8 +3,7 @@
     <section class="admin-login-shell" aria-label="管理员登录">
       <aside class="admin-context" aria-label="管理端说明">
         <div class="context-brand">
-          <div class="context-mark">AMZ</div>
-          <span>Automation Suite</span>
+          <BrandLockup audience="admin" layout="horizontal" variant="inverse" />
         </div>
         <div class="context-copy">
           <p class="context-eyebrow">OPERATIONS CONSOLE</p>
@@ -24,11 +23,7 @@
 
       <div class="login-card">
       <div class="logo-section">
-        <div class="logo-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
-        </div>
+        <BrandMark class="logo-icon" :size="64" decorative />
         <h1>管理员登录</h1>
         <p>使用管理账号和密码进入后台</p>
       </div>
@@ -111,6 +106,8 @@ import { Auth, showToast } from '@/utils'
 import { adminLogin } from '@/utils/api'
 import { useUserStore } from '@/stores/user'
 import { z } from 'zod'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
+import BrandMark from '@/components/brand/BrandMark.vue'
 
 const adminLoginResponseSchema = z.object({
   success: z.boolean(),
@@ -277,18 +274,7 @@ onMounted(focusUsernameInput)
   align-items: center;
 }
 
-.context-brand { gap: 11px; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
-.context-mark {
-  width: 38px;
-  height: 38px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, .25);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, .12);
-  font-size:var(--type-micro);
-  letter-spacing: .06em;
-}
+.context-brand { font-size: 12px; font-weight: 700; letter-spacing: .04em; }
 
 .context-copy { position: relative; z-index: 1; margin-top: auto; }
 .context-eyebrow { margin: 0 0 14px; color: rgba(255,255,255,.64); font-size:var(--type-micro); font-weight: 700; letter-spacing: .18em; }
@@ -333,14 +319,12 @@ onMounted(focusUsernameInput)
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
+  padding: 11px;
+  border: 1px solid rgba(21, 101, 255, .14);
+  background: #fff;
   margin-bottom: 1rem;
-  box-shadow: 0 10px 25px rgba(14,165,233,0.3);
-}
-
-.logo-section .logo-icon svg {
-  width: 32px;
-  height: 32px;
-  color: white;
+  box-shadow: 0 10px 25px rgba(21, 101, 255, .12);
 }
 
 .logo-section h1 {
@@ -585,7 +569,7 @@ onMounted(focusUsernameInput)
   box-shadow: none;
   align-self: center;
 }
-.logo-section .logo-icon { background: var(--color-primary); box-shadow: 0 10px 24px rgba(45, 95, 202, .18); }
+.logo-section .logo-icon { background: #fff; box-shadow: 0 10px 24px rgba(21, 101, 255, .12); }
 .logo-section h1 { color: var(--color-text); letter-spacing: -.025em; }
 .logo-section p { color: var(--color-text-secondary); }
 .input-wrapper input {
@@ -621,7 +605,7 @@ onMounted(focusUsernameInput)
 @media (max-width: 480px) {
   .login-container { padding: 16px; }
   .admin-context { padding: 20px 22px; }
-  .context-brand span { font-size:var(--type-meta); }
+  .context-brand :deep(.kst-lockup-subtitle) { font-size:var(--type-micro); }
   .login-card { padding: 30px 22px; }
 }
 </style>

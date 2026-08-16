@@ -49,24 +49,24 @@ describe('AdminSidebar', () => {
   })
 
   describe('品牌区渲染', () => {
-    it('应该显示"管"品牌徽章', async () => {
+    it('应该显示课赛通管理端品牌锁定组合', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-badge').exists()).toBe(true)
-      expect(wrapper.find('.brand-badge').text()).toBe('管')
+      const brand = wrapper.find('[data-testid="kst-brand-lockup"]')
+      expect(brand.exists()).toBe(true)
+      expect(brand.attributes('aria-label')).toBe('课赛通 KST，运营控制中心')
     })
 
-    it('应该显示"运营控制中心"品牌文字', async () => {
+    it('应该显示运营控制中心副标题', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-text').text()).toContain('运营控制中心')
-      expect(wrapper.find('.brand-text small').text()).toBe('超级管理员')
+      expect(wrapper.find('.kst-lockup-subtitle').text()).toBe('运营控制中心')
     })
   })
 

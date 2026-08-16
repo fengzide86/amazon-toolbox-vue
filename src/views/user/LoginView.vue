@@ -21,13 +21,11 @@
       <div class="brand-content">
         <!-- Logo -->
         <div class="brand-logo">
-          <div class="logo-mark">
-            <Zap :size="24" />
-          </div>
+          <h1 class="brand-heading" aria-label="课赛通 KST · 跨境电商赛训效率平台">
+            <BrandLockup class="login-brand-lockup" audience="login" layout="stacked" decorative />
+          </h1>
         </div>
 
-        <h1 class="brand-title">跨境电商赛训效率工具箱</h1>
-        <p class="brand-subtitle">比赛 · 实训 · 交付</p>
         <div class="brand-divider">
           <span class="divider-line"></span>
           <span class="divider-dot"></span>
@@ -67,9 +65,7 @@
         <div class="card-accent" aria-hidden="true"></div>
 
         <div class="logo-section">
-          <div class="logo-icon">
-            <Zap :size="28" />
-          </div>
+          <BrandMark class="logo-icon" :size="56" decorative />
           <h2>授权码登录</h2>
           <p>请输入授权码激活您的工具箱</p>
         </div>
@@ -151,7 +147,7 @@
 
       <!-- 底部版权 -->
       <div class="login-footer">
-        <p>© 2026 跨境电商赛训效率工具箱 · 专业 · 高效 · 可信赖</p>
+        <p>© 2026 课赛通 KST · 专业 · 高效 · 可信赖</p>
       </div>
     </div>
 
@@ -229,8 +225,10 @@
 </template>
 
 <script setup lang="ts">
-import { Zap, Check, CircleAlert, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
+import { Check, CircleAlert, KeyRound, Monitor, LogIn, Loader, HelpCircle, Phone, FileText, Shield, X, AlertTriangle, Copy } from '@lucide/vue'
 import { useLicenseLogin } from '@/features/auth/useLicenseLogin'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
+import BrandMark from '@/components/brand/BrandMark.vue'
 
 const {
   authCode, authCodeInput, isLoading, loginSucceeded, showError, showHelpModal, showContactModal, copySuccess,
@@ -448,40 +446,10 @@ const {
   margin-bottom: 2rem;
 }
 
-.logo-mark {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
-}
-
-.logo-mark svg {
-  width: 24px;
-  height: 24px;
-  color: white;
-}
-
-/* 标题 */
-.brand-title {
-  font-family: var(--font-family);
-  font-size: 2.25rem;
-  font-weight: 700;
-  color: white;
-  margin-bottom: 0.5rem;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
-}
-
-.brand-subtitle {
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 1.5rem;
-  letter-spacing: 0.15em;
-}
+.brand-heading { margin: 0; }
+.login-brand-lockup { display: flex; }
+.login-brand-lockup :deep(.kst-lockup-logo) { width: min(100%, 270px); max-height: 105px; }
+.login-brand-lockup :deep(.kst-lockup-subtitle) { font-size: 13px; }
 
 /* 分隔线 */
 .brand-divider {
@@ -658,11 +626,7 @@ const {
   box-shadow: 0 4px 16px rgba(14, 165, 233, 0.25);
 }
 
-.logo-icon svg {
-  width: 28px;
-  height: 28px;
-  color: white;
-}
+.logo-icon { padding: 10px; border: 1px solid rgba(21, 101, 255, .14); }
 
 .logo-section h2 {
   font-family: var(--font-family);
@@ -1234,10 +1198,6 @@ const {
     min-height: 320px;
   }
 
-  .brand-title {
-    font-size: 1.75rem;
-  }
-
   .brand-stats {
     gap: 1.5rem;
   }
@@ -1255,14 +1215,6 @@ const {
   .login-brand {
     min-height: 260px;
     padding: 2rem 1.5rem;
-  }
-
-  .brand-title {
-    font-size: 1.5rem;
-  }
-
-  .brand-subtitle {
-    font-size: 0.85rem;
   }
 
   .brand-desc {
@@ -1307,13 +1259,10 @@ const {
 .brand-shapes,
 .scan-line { display: none; }
 .brand-content { max-width: 540px; animation-duration: var(--motion-signature); }
-.logo-mark,
 .login-form-card .logo-icon {
-  background: var(--color-primary);
-  box-shadow: 0 10px 24px rgba(45, 95, 202, .18);
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(21, 101, 255, .12);
 }
-.brand-title { color: var(--color-text); font-size: clamp(32px, 3.2vw, 48px); letter-spacing: -.045em; }
-.brand-subtitle { color: var(--color-premium); font-weight: 700; letter-spacing: .12em; }
 .brand-desc { color: var(--color-text-secondary); }
 .brand-divider .divider-line { background: var(--color-border-strong); }
 .brand-divider .divider-dot { background: var(--color-premium); box-shadow: none; }
@@ -1417,7 +1366,7 @@ const {
   }
   .login-form-section { flex: 1.06; min-width: 0; padding: 32px 24px; }
   .brand-content { max-width: 460px; }
-  .brand-title { font-size: clamp(30px, 3.5vw, 38px); }
+  .login-brand-lockup :deep(.kst-lockup-logo) { width: min(100%, 230px); }
   .brand-desc { margin-bottom: 24px; }
   .brand-stats { gap: 0; padding: 18px 0; margin-bottom: 18px; }
   .stat-item { padding: 0 12px; }
@@ -1444,9 +1393,12 @@ const {
     overflow: visible;
   }
   .brand-content { width: min(100%, 460px); max-width: none; margin: 0 auto; }
-  .brand-logo, .brand-divider, .brand-desc, .brand-stats { display: none; }
-  .brand-title { margin-bottom: 6px; font-size: 28px; text-align: center; }
-  .brand-subtitle { margin-bottom: 14px; font-size: var(--type-micro); text-align: center; }
+  .brand-divider, .brand-desc, .brand-stats { display: none; }
+  .brand-logo { margin-bottom: 14px; }
+  .brand-heading { display: flex; justify-content: center; }
+  .login-brand-lockup { align-items: center; }
+  .login-brand-lockup :deep(.kst-lockup-logo) { width: min(100%, 190px); max-height: 68px; object-position: center; }
+  .login-brand-lockup :deep(.kst-lockup-subtitle) { font-size: var(--type-micro); text-align: center; }
   .feature-tags { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .feature-tag { padding: 6px 4px; font-size:var(--type-meta); background: var(--color-surface); }
   .login-form-section { padding: 16px 0 0; background: transparent; }
@@ -1456,7 +1408,7 @@ const {
 
 @media (max-width: 520px) {
   .login-page { align-content: start; padding: 18px 14px; }
-  .brand-title { font-size: 24px; }
+  .login-brand-lockup :deep(.kst-lockup-logo) { width: min(100%, 168px); }
   .login-form-card { padding: 24px 18px; }
   .footer-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .footer-link { justify-content: center; }

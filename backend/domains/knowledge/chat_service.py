@@ -51,9 +51,12 @@ def _config_list(value: Any) -> list[str]:
         return []
     return [str(item).strip() for item in parsed if str(item).strip()] if isinstance(parsed, list) else []
 
+# 仅兼容系统曾经写入数据库的旧默认值；管理员自定义欢迎语不会被覆盖。
+LEGACY_DEFAULT_WELCOME_MESSAGE = "你好！我是亚马逊工具箱智能客服 🤖\n请问有什么可以帮你的？"
+
 # 默认配置
 DEFAULT_CONFIG = {
-    "welcome_message": "你好！我是亚马逊工具箱智能客服 🤖\n请问有什么可以帮你的？",
+    "welcome_message": "你好！我是课赛通 KST 智能客服 🤖\n请问有什么可以帮你的？",
     "suggested_questions": json.dumps([
         "如何安装工具箱？",
         "授权码怎么使用？",
@@ -85,7 +88,10 @@ async def get_config(db: AsyncSession) -> dict[str, Any]:
     # 合并默认配置
     merged = {}
     for key, default_val in DEFAULT_CONFIG.items():
-        merged[key] = config_dict.get(key, default_val)
+        value = config_dict.get(key, default_val)
+        if key == "welcome_message" and value == LEGACY_DEFAULT_WELCOME_MESSAGE:
+            value = default_val
+        merged[key] = value
 
     return merged
 
@@ -555,7 +561,7 @@ async def _build_ai_messages(
     messages = []
 
     # 系统提示词
-    system_prompt = """你是跨境电商赛训效率工具箱的智能客服助手。
+    system_prompt = """你是课赛通 KST · 跨境电商赛训效率平台的智能客服助手。
 你的职责是帮助用户解决安装、使用、授权等方面的问题。
 
 回答规则：

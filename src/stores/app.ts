@@ -45,8 +45,8 @@ export const useAppStore = defineStore('app', () => {
   // ===== State =====
   
   // 应用信息
-  const appName = ref('跨境电商赛训效率工具箱')
-  const version = ref('1.0.5')
+  const appName = ref('课赛通 KST')
+  const version = ref(import.meta.env.VITE_APP_VERSION || 'unknown')
   
   // 加载状态
   const loading = ref(false)
