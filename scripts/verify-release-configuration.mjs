@@ -61,11 +61,17 @@ if (metadata.scripts['verify:release'].includes('npm run test:mariadb:required')
   throw new Error('verify:release must route MariaDB through release:mariadb-gate')
 }
 
+requireText('.gitattributes', [
+  '*.sh text eol=lf',
+  'ops/** text eol=lf',
+])
 requireText('scripts/toolbox-cli.mjs', [
   "run('npm', ['run', 'verify:release'],",
   "['prepared', 'backend_deployed', 'web_activated', 'desktop_published', 'verified']",
   "'archive'",
   "'--format=tar.gz'",
+  "output('tar', ['-xOf', archive, shellScript])",
+  '提交归档的 Linux 脚本包含 CRLF',
   "gitOutput(['rev-parse', 'origin/main'])",
   "gitOutput(['ls-remote', '--tags', 'origin', 'refs/tags/v*'])",
   "'--hostname', 'github.com'",
