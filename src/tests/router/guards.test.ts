@@ -50,7 +50,7 @@ describe('real route guards', () => {
     expect(router.currentRoute.value.name).toBe('BusinessOverview')
     await router.push('/user/plans')
     expect(router.currentRoute.value.name).toBe('BusinessLicense')
-  }, 30_000)
+  })
 
   it('enforces password reset and back-office role metadata', async () => {
     mockAuth({ authenticated: true, backoffice: true, role: 'support', user: { force_password_reset: true } })
@@ -62,7 +62,7 @@ describe('real route guards', () => {
     await router.push('/admin/settings')
     expect(router.currentRoute.value.name).toBe('AdminDashboard')
     expect(router.currentRoute.value.query.access).toBe('role-required')
-  }, 30_000)
+  })
 
   it('clears corrupt authentication state when a guard throws', async () => {
     vi.spyOn(authService, 'isAuthenticated')
@@ -74,5 +74,5 @@ describe('real route guards', () => {
     expect(router.currentRoute.value.name).toBe('UserLogin')
     expect(clear).toHaveBeenCalledOnce()
     expect(error).toHaveBeenCalledOnce()
-  }, 30_000)
+  })
 })
