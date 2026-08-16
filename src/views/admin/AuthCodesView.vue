@@ -538,7 +538,7 @@ async function handleGenerate() {
   isLoading.value = true
   try {
     const res = generatedAuthCodesSchema.parse(await batchGenerateAuthCodes({
-      plan_id: selectedPlanId.value,
+      plan_id: Number(selectedPlanId.value),
       count: generateCount.value,
       platform_scope: selectedPlatformScope.value,
       scene_type: selectedSceneType.value,

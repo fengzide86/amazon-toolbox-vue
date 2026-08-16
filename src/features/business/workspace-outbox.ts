@@ -1,25 +1,30 @@
+import type { components } from '@/shared/api/openapi.generated'
+
 export type WorkspaceSyncState = 'synced' | 'syncing' | 'offline'
+
+type Schemas = components['schemas']
+type BatchFinishStatus = Schemas['BatchFinish']['status']
 
 interface PendingItemSync {
   batchId: string | number
   itemId: string
-  payload: Record<string, unknown>
+  payload: Schemas['BatchItemUpdate']
 }
 
 interface PendingBatchSync {
   batchId: string | number
-  payload: Record<string, unknown>
+  payload: Schemas['BatchUpdate']
 }
 
 interface PendingFinishSync {
   batchId: string | number
-  status: string
+  status: BatchFinishStatus
 }
 
 interface WorkspaceOutboxOptions {
-  updateItem: (batchId: string | number, itemId: string, payload: Record<string, unknown>) => Promise<unknown>
-  updateBatch: (batchId: string | number, payload: Record<string, unknown>) => Promise<unknown>
-  finishBatch: (batchId: string | number, status: string) => Promise<unknown>
+  updateItem: (batchId: string | number, itemId: string, payload: Schemas['BatchItemUpdate']) => Promise<unknown>
+  updateBatch: (batchId: string | number, payload: Schemas['BatchUpdate']) => Promise<unknown>
+  finishBatch: (batchId: string | number, status: BatchFinishStatus) => Promise<unknown>
   onState: (state: WorkspaceSyncState) => void
   retryDelays?: readonly number[]
 }

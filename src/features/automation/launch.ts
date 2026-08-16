@@ -42,7 +42,7 @@ export async function buildLiveLaunch(
     deviceId: window.electronAPI?.runtime?.deviceId,
     executionMode: 'single',
   })
-  const parsed = toolLaunchResponseSchema.parse(raw.data ?? raw)
+  const parsed = toolLaunchResponseSchema.parse(raw)
   const grant = parsed.launch_data || parsed.grant
   if (!grant?.token || !grant.target_url || !grant.script_key) throw new Error('真实工具启动授权不完整，请刷新工具列表后重试')
   return {

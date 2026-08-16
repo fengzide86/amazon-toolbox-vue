@@ -30,6 +30,6 @@ export default defineConfig({
     command: webServerCommand,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: process.env.PLAYWRIGHT_REUSE_SERVER === '1',
-    timeout: 300_000,
+    timeout: 600_000,
   },
 })

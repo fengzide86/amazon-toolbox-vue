@@ -18,7 +18,11 @@ describe('BusinessWorkspaceOutbox', () => {
       onState: state => states.push(state),
     })
     outbox.queueFinish({ batchId: 1, status: 'completed' })
-    outbox.queueItem({ batchId: 1, itemId: 'item-1', payload: { status: 'completed' } })
+    outbox.queueItem({
+      batchId: 1,
+      itemId: 'item-1',
+      payload: { account_label_masked: '账号 1', status: 'completed' },
+    })
     outbox.queueBatch({ batchId: 1, payload: { completed_count: 1 } })
 
     expect(await outbox.flushWithin(100)).toBe(true)
@@ -40,7 +44,11 @@ describe('BusinessWorkspaceOutbox', () => {
       retryDelays: [60_000],
     })
 
-    outbox.queueItem({ batchId: 1, itemId: 'item-1', payload: { status: 'failed' } })
+    outbox.queueItem({
+      batchId: 1,
+      itemId: 'item-1',
+      payload: { account_label_masked: '账号 1', status: 'failed' },
+    })
     await vi.waitFor(() => expect(states.at(-1)).toBe('offline'))
     expect(outbox.hasPending()).toBe(true)
 

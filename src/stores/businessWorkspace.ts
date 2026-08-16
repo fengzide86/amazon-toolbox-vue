@@ -3,54 +3,27 @@ import { defineStore } from 'pinia'
 import { z } from 'zod'
 
 import {
-  createBusinessBatch,
-  createDemoBatch,
-  createToolLaunchGrant,
-  finishDemoBatch,
-  finishBusinessBatch,
   getBusinessBootstrap,
   getBusinessBatches,
   getDemoBatches,
-  updateDemoBatch,
-  updateDemoBatchItem,
-  updateBusinessBatch,
-  updateBusinessBatchItem,
 } from '@/utils/api'
 import {
-  batchEventSchema,
   businessBatchSnapshotSchema,
   businessBootstrapSchema,
   emptyBatchSnapshot,
-  importPreviewSchema,
-  launchGrantEnvelopeSchema,
-  launchGrantSchema,
-  serverBatchSchema,
   serverBatchHistorySchema,
-  type BatchEvent,
   type BusinessBatchSnapshot,
   type BusinessBootstrap,
   type BusinessTool,
   type ImportPreview,
   type ServerBatchHistory,
 } from '@/features/business/model'
-import { demoBatchListSchema, demoBatchSchema, unwrapApiData, type DemoBatch } from '@/features/demo/model'
-import {
-  DemoConcurrencyController,
-  type DemoCompletion,
-  type DemoProgressUpdate,
-  type DemoSimulatedOutcome,
-} from '@/features/business/demo-concurrency'
-import {
-  createClientBatchId,
-  errorMessage,
-  ipcPayload,
-  importOptions,
-  requireBatchApi,
-  statusText,
-  unwrapData,
-} from '@/features/business/workspace-helpers'
-import { BusinessWorkspaceOutbox } from '@/features/business/workspace-outbox'
-import { demoActivityToken, setDemoActivity } from '@/utils/demoActivity'
+import { demoBatchListSchema, unwrapApiData, type DemoBatch } from '@/features/demo/model'
+import { BusinessDemoCoordinator } from '@/features/business/demo-coordinator'
+import { BusinessLiveCoordinator } from '@/features/business/live-coordinator'
+import { WorkspaceImportCoordinator } from '@/features/business/workspace-import'
+import { createClientBatchId, errorMessage, statusText } from '@/features/business/workspace-helpers'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
 
 const historySchema = z.array(serverBatchHistorySchema)
 
@@ -69,23 +42,6 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const historyLoading = ref(false)
   const historyError = ref<string | null>(null)
 
-  let removeEventListener: (() => void) | null = null
-  let heartbeatTimer: ReturnType<typeof setInterval> | null = null
-  let syncTimer: ReturnType<typeof setTimeout> | null = null
-  let demoBatchEventSeq = 0
-  let demoRunToken = 0
-  let activeDemoToken: string | null = null
-  let demoSummaryQueue: Promise<void> = Promise.resolve()
-  let demoController: DemoConcurrencyController | null = null
-  const provisioning = new Set<string>()
-  const demoItemSequences = new Map<string, number>()
-  const outbox = new BusinessWorkspaceOutbox({
-    updateItem: updateBusinessBatchItem,
-    updateBatch: updateBusinessBatch,
-    finishBatch: finishBusinessBatch,
-    onState: state => { syncState.value = state },
-  })
-
   const entitlements = computed(() => bootstrap.value?.entitlements || {})
   const tools = computed(() => bootstrap.value?.tools || [])
   const items = computed(() => snapshot.value.items)
@@ -98,21 +54,33 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     || item.status === 'running'
     || item.status === 'waiting_user'))
 
+  const imports = new WorkspaceImportCoordinator({
+    getSelectedTool: () => selectedTool.value,
+    getMaxRows: () => entitlements.value.max_batch_rows || 50,
+    getPreview: () => importPreview.value,
+    setPreview: value => { importPreview.value = value },
+    setLoading: value => { loading.value = value },
+    setError: value => { error.value = value },
+  })
+  const demo = new BusinessDemoCoordinator({
+    getSnapshot: () => snapshot.value,
+    setSnapshot: value => applySnapshot(value),
+    setSyncState: value => { syncState.value = value },
+    setError: value => { error.value = value },
+    refreshHistory: () => loadDemoHistory(),
+  })
+  const live = new BusinessLiveCoordinator({
+    getSnapshot: () => snapshot.value,
+    setSnapshot: value => applySnapshot(value),
+    getSelectedTool: () => selectedTool.value,
+    selectItem: itemId => selectItem(itemId),
+    setSyncState: value => { syncState.value = value },
+    setError: value => { error.value = value },
+  })
+
   async function init(): Promise<BusinessBootstrap> {
     if (!bootstrap.value) bootstrap.value = businessBootstrapSchema.parse(await getBusinessBootstrap())
-    const batch = window.electronAPI?.batch
-    if (!removeEventListener && batch) removeEventListener = batch.onEvent(handleBatchEvent)
-    const localSnapshot = await batch?.getSnapshot()
-    const parsedLocalSnapshot = businessBatchSnapshotSchema.safeParse(localSnapshot)
-    if (parsedLocalSnapshot.success && parsedLocalSnapshot.data.recordKind === 'demo') {
-      if (snapshot.value.status === 'idle') await batch?.cancel('interrupted').catch(() => undefined)
-    } else if (localSnapshot) {
-      applySnapshot(localSnapshot)
-    }
-    startHeartbeat()
-    window.addEventListener('online', handleReconnect)
-    window.addEventListener('focus', handleReconnect)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    await live.initialize()
     return bootstrap.value
   }
 
@@ -127,10 +95,10 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
         importPreview.value = null
       }
       return bootstrap.value
-    } catch (refreshError) {
-      error.value = errorMessage(refreshError, '工作台状态刷新失败')
+    } catch (cause) {
+      error.value = errorMessage(cause, '工作台状态刷新失败')
       bootstrapStale.value = bootstrap.value !== null
-      throw refreshError
+      throw cause
     } finally {
       loading.value = false
     }
@@ -171,483 +139,78 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     error.value = null
   }
 
-  async function loadSampleImport(): Promise<ImportPreview> {
-    if (!selectedTool.value) throw new Error('请先选择批量工具')
-    loading.value = true
-    error.value = null
-    try {
-      const payload = await requireBatchApi().loadSampleImport(importOptions(selectedTool.value, entitlements.value.max_batch_rows || 50))
-      importPreview.value = importPreviewSchema.parse(payload)
-      return importPreview.value
-    } catch (importError) {
-      error.value = errorMessage(importError, '内置演示数据载入失败')
-      throw importError
-    } finally {
-      loading.value = false
-    }
+  function loadSampleImport(): Promise<ImportPreview> {
+    return imports.loadSample()
   }
 
-  async function saveSampleTemplate(): Promise<unknown> {
-    return requireBatchApi().saveSampleTemplate()
+  function saveSampleTemplate() {
+    return imports.saveSampleTemplate()
   }
 
-  async function selectImportFile(): Promise<ImportPreview> {
-    if (!selectedTool.value) throw new Error('请先选择批量工具')
-    loading.value = true
-    error.value = null
-    try {
-      const batch = requireBatchApi()
-      const payload = await batch.selectImportFile(importOptions(selectedTool.value, entitlements.value.max_batch_rows || 50))
-      if (!payload) throw new Error('未选择 Excel 文件')
-      importPreview.value = importPreviewSchema.parse(payload)
-      return importPreview.value
-    } catch (importError) {
-      error.value = errorMessage(importError, '文件导入失败')
-      throw importError
-    } finally {
-      loading.value = false
-    }
+  function selectImportFile(): Promise<ImportPreview> {
+    return imports.selectFile()
   }
 
-  async function exportImportErrors(): Promise<unknown> {
-    if (!importPreview.value?.errors.length) return null
-    if (selectedTool.value?.availability === 'demo_only') return null
-    return requireBatchApi().exportImportErrors(ipcPayload(importPreview.value.errors))
+  function exportImportErrors() {
+    return imports.exportErrors()
   }
 
   async function startBatch(): Promise<BusinessBatchSnapshot> {
-    if (!selectedTool.value || !importPreview.value?.validCount) throw new Error('请先导入有效数据')
+    const tool = selectedTool.value
+    const preview = importPreview.value
+    if (!tool || !preview?.validCount) throw new Error('请先导入有效数据')
+    if (tool.availability !== 'demo_only' && !getRuntimeCapabilities().batchLive) {
+      throw new Error('真实批量执行仅支持课赛通 KST 桌面端')
+    }
     const batchId = createClientBatchId()
     loading.value = true
     try {
-      if (selectedTool.value.availability === 'demo_only') {
-        const created = demoBatchSchema.parse(unwrapApiData(await createDemoBatch({
-          client_demo_batch_id: `demo_${batchId}`,
-          tool_id: String(selectedTool.value.id),
-          tool_name: selectedTool.value.name,
-          platform_key: selectedTool.value.platform_key || selectedTool.value.platformKey || 'amazon',
-          scenario_id: selectedTool.value.demo_scenario_id,
-          row_count: importPreview.value.validCount,
-        })))
-        const itemRefs = created.items.length
-          ? created.items.map(item => item.item_ref)
-          : Array.from({ length: created.row_count }, (_, index) => `demo_item_${index + 1}`)
-        const batchApi = requireBatchApi()
-        const localImport = importPreviewSchema.parse(await batchApi.remapImportItems({
-          importId: importPreview.value.importId,
-          itemIds: itemRefs,
-        }))
-        const localSnapshot = businessBatchSnapshotSchema.parse(await batchApi.create(ipcPayload({
-          importId: localImport.importId,
-          batchId: `demo_${batchId}`,
-          serverBatchId: created.id,
-          tool: {
-            ...selectedTool.value,
-            executionMode: 'demo',
-            scriptKey: selectedTool.value.script_key,
-            launchGrant: { scriptKey: selectedTool.value.script_key },
-          },
-          maxOpenSessions: 0,
-          recordKind: 'demo',
-        })))
-        const startedAtMs = Date.now()
-        const concurrentSnapshot = businessBatchSnapshotSchema.parse({
-          ...localSnapshot,
-          status: 'running',
-          activeItemId: null,
-          provisioningItemId: null,
-          maxOpenSessions: 0,
-          counts: {
-            total: localSnapshot.items.length,
-            pending: 0,
-            running: localSnapshot.items.length,
-            waiting: 0,
-            completed: 0,
-            failed: 0,
-          },
-          items: localSnapshot.items.map(item => ({
-            ...item,
-            status: 'running',
-            browserReady: false,
-            progressPercent: 4,
-            stageIndex: 0,
-            startedAtMs,
-            finishedAtMs: undefined,
-            simulatedOutcome: null,
-            message: '演示账号已并发启动',
-          })),
-        })
-        importPreview.value = null
-        applySnapshot(concurrentSnapshot)
-        selectedItemId.value = concurrentSnapshot.items[0]?.itemId || null
-        syncState.value = 'syncing'
-        demoItemSequences.clear()
-        await Promise.all(concurrentSnapshot.items.map(async item => {
-          await updateDemoBatchItem(created.id, item.itemId, {
-            event_seq: 1,
-            status: 'playing',
-            simulated_outcome: null,
-          })
-          demoItemSequences.set(item.itemId, 1)
-        }))
-        demoBatchEventSeq = 1
-        await updateDemoBatch(created.id, {
-          event_seq: demoBatchEventSeq,
-          status: 'running',
-          queued_count: 0,
-          playing_count: concurrentSnapshot.items.length,
-          played_count: 0,
-          skipped_count: 0,
-          error_count: 0,
-        })
-        activeDemoToken = demoActivityToken('batch', created.id)
-        await setDemoActivity(activeDemoToken, true)
-        syncState.value = 'synced'
-        startDemoConcurrency(created.id)
-        return concurrentSnapshot
-      }
-      const serverBatch = serverBatchSchema.parse(unwrapData(await createBusinessBatch({
-        client_batch_id: batchId,
-        tool_id: selectedTool.value.id,
-        tool_name: selectedTool.value.name,
-        total_count: importPreview.value.validCount,
-      })))
-      const localSnapshot = businessBatchSnapshotSchema.parse(await requireBatchApi().create(ipcPayload({
-        importId: importPreview.value.importId,
-        batchId,
-        serverBatchId: serverBatch.id,
-        tool: selectedTool.value,
-        maxOpenSessions: entitlements.value.max_open_sessions || 6,
-        recordKind: 'live',
-      })))
+      const nextSnapshot = tool.availability === 'demo_only'
+        ? await demo.start(tool, preview, batchId)
+        : await live.start(tool, preview, batchId, entitlements.value.max_open_sessions || 6)
       importPreview.value = null
-      applySnapshot(localSnapshot)
-      return localSnapshot
-    } catch (startError) {
-      error.value = errorMessage(startError, '无法开始批次')
-      if (selectedTool.value?.availability === 'demo_only') {
-        demoController?.stop()
-        demoController = null
-        await deactivateDemoActivity()
-      }
-      throw startError
+      return nextSnapshot
+    } catch (cause) {
+      error.value = errorMessage(cause, '无法开始批次')
+      throw cause
     } finally {
       loading.value = false
     }
-  }
-
-  function startDemoConcurrency(batchId: string | number): void {
-    demoRunToken += 1
-    const token = demoRunToken
-    demoSummaryQueue = Promise.resolve()
-    demoController?.stop()
-    demoController = new DemoConcurrencyController({
-      onProgress: applyDemoProgress,
-      onItemComplete: completion => finishDemoConcurrentItem(batchId, token, completion),
-      onComplete: () => completeDemoBatch(batchId, token),
-      onError: failDemoPlayback,
-    })
-    demoController.start(snapshot.value.items.map(item => item.itemId))
-  }
-
-  function applyDemoProgress(updates: DemoProgressUpdate[]): void {
-    if (!isDemoBatch.value || snapshot.value.status !== 'running') return
-    const byId = new Map(updates.map(update => [update.itemId, update]))
-    snapshot.value = businessBatchSnapshotSchema.parse({
-      ...snapshot.value,
-      items: snapshot.value.items.map(item => {
-        const update = byId.get(item.itemId)
-        return update && item.status === 'running' ? { ...item, ...update } : item
-      }),
-    })
-  }
-
-  function demoLocalCounts(nextItems = snapshot.value.items) {
-    return {
-      total: nextItems.length,
-      pending: nextItems.filter(item => item.status === 'pending').length,
-      running: nextItems.filter(item => item.status === 'running').length,
-      waiting: nextItems.filter(item => item.status === 'waiting_user').length,
-      completed: nextItems.filter(item => item.status === 'completed').length,
-      failed: nextItems.filter(item => item.status === 'failed').length,
-    }
-  }
-
-  function demoServerCounts(nextItems = snapshot.value.items) {
-    return {
-      queued_count: nextItems.filter(item => item.status === 'pending').length,
-      playing_count: nextItems.filter(item => item.status === 'running').length,
-      played_count: nextItems.filter(item => item.status === 'completed' || item.status === 'waiting_user').length,
-      skipped_count: nextItems.filter(item => item.status === 'cancelled').length,
-      error_count: nextItems.filter(item => item.status === 'failed').length,
-    }
-  }
-
-  function demoResult(outcome: DemoSimulatedOutcome): { status: string; message: string } {
-    if (outcome === 'attention_example') return { status: 'waiting_user', message: '已展示需要关注的人工操作案例' }
-    if (outcome === 'failure_example') return { status: 'failed', message: '已展示异常结果案例' }
-    return { status: 'completed', message: '已展示完成案例' }
-  }
-
-  async function finishDemoConcurrentItem(
-    batchId: string | number,
-    token: number,
-    completion: DemoCompletion,
-  ): Promise<void> {
-    if (token !== demoRunToken || snapshot.value.status !== 'running') return
-    const serverStatus = completion.outcome === 'failure_example' ? 'error' : 'played'
-    await updateDemoBatchItem(batchId, completion.itemId, {
-      event_seq: 2,
-      status: serverStatus,
-      simulated_outcome: completion.outcome,
-    })
-    if (token !== demoRunToken || snapshot.value.status !== 'running') return
-
-    demoItemSequences.set(completion.itemId, 2)
-    const result = demoResult(completion.outcome)
-    const nextItems = snapshot.value.items.map(item => item.itemId === completion.itemId
-      ? {
-          ...item,
-          ...completion,
-          status: result.status,
-          message: result.message,
-          simulatedOutcome: completion.outcome,
-        }
-      : item)
-    snapshot.value = businessBatchSnapshotSchema.parse({
-      ...snapshot.value,
-      items: nextItems,
-      counts: demoLocalCounts(nextItems),
-    })
-  }
-
-  function queueDemoSummary(
-    batchId: string | number,
-    token: number,
-    nextItems = snapshot.value.items,
-  ): Promise<void> {
-    const counts = demoServerCounts(nextItems)
-    const request = demoSummaryQueue.catch(() => undefined).then(async () => {
-      if (token !== demoRunToken || snapshot.value.status !== 'running') return
-      demoBatchEventSeq += 1
-      await updateDemoBatch(batchId, {
-        event_seq: demoBatchEventSeq,
-        status: 'running',
-        ...counts,
-      })
-    })
-    demoSummaryQueue = request
-    return request
-  }
-
-  async function completeDemoBatch(batchId: string | number, token: number): Promise<void> {
-    if (token !== demoRunToken || snapshot.value.status !== 'running') return
-    try {
-      await queueDemoSummary(batchId, token, snapshot.value.items)
-      if (token !== demoRunToken || snapshot.value.status !== 'running') return
-      demoBatchEventSeq += 1
-      await finishDemoBatch(batchId, { event_seq: demoBatchEventSeq })
-      snapshot.value = businessBatchSnapshotSchema.parse({
-        ...snapshot.value,
-        status: 'completed',
-        activeItemId: null,
-        provisioningItemId: null,
-        counts: demoLocalCounts(),
-      })
-      demoController?.stop()
-      demoController = null
-      await deactivateDemoActivity()
-      syncState.value = 'synced'
-      await loadDemoHistory().catch(() => undefined)
-    } catch (demoError) {
-      failDemoPlayback(demoError)
-    }
-  }
-
-  function failDemoPlayback(demoError: unknown): void {
-    demoRunToken += 1
-    demoController?.stop()
-    demoController = null
-    void deactivateDemoActivity()
-    error.value = errorMessage(demoError, '批量演示同步失败，请重新开始')
-    syncState.value = 'offline'
-    snapshot.value = businessBatchSnapshotSchema.parse({ ...snapshot.value, status: 'error' })
-  }
-
-  async function deactivateDemoActivity(): Promise<void> {
-    const token = activeDemoToken
-    activeDemoToken = null
-    if (token) await setDemoActivity(token, false)
-  }
-
-  async function settleWithin(work: Promise<void>, timeoutMs: number): Promise<boolean> {
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    const completed = work.then(() => true, () => false)
-    const expired = new Promise<boolean>(resolve => {
-      timeout = setTimeout(() => resolve(false), timeoutMs)
-    })
-    const result = await Promise.race([completed, expired])
-    if (timeout) clearTimeout(timeout)
-    return result
   }
 
   async function registerBrowser(itemId: string, webContentsId: number): Promise<void> {
     if (isDemoBatch.value) return
-    await requireBatchApi().registerBrowser(itemId, webContentsId)
-    await startProvisionedItem(itemId)
-  }
-
-  async function startProvisionedItem(itemId: string): Promise<void> {
-    if (provisioning.has(itemId) || snapshot.value.provisioningItemId !== itemId) return
-    provisioning.add(itemId)
-    try {
-      const tool = snapshot.value.tool || selectedTool.value
-      if (!tool) throw new Error('当前批次缺少工具配置')
-      const platformKey = tool.platform_key || tool.platformKey || 'amazon'
-      const envelope = launchGrantEnvelopeSchema.parse(await createToolLaunchGrant(tool.id, {
-        platformKey,
-        deviceId: window.electronAPI?.runtime?.deviceId || localStorage.getItem('toolbox_device_id') || '',
-        executionMode: 'batch',
-        clientBatchId: snapshot.value.batchId,
-        clientItemId: itemId,
-        idempotencyKey: `${snapshot.value.batchId}:${itemId}`,
-      }))
-      const grant = envelope.launch_data || envelope.grant || (envelope.token ? launchGrantSchema.parse(envelope) : null)
-      if (!grant) throw new Error('批量启动授权不完整')
-      await requireBatchApi().start(ipcPayload({
-        itemId,
-        tool: {
-          ...tool,
-          platformKey: grant.platform_key || platformKey,
-          targetUrl: grant.target_url || tool.target_url || tool.targetUrl,
-          executionMode: 'live',
-          launchGrant: {
-            token: grant.token,
-            expiresAt: grant.expires_at || envelope.expires_at,
-            expiresIn: envelope.expires_in,
-            scriptKey: grant.script_key,
-            runnerApiVersion: grant.runner_api_version || 1,
-            toolVersion: grant.tool_version || '1.0.0',
-            toolManifest: grant.tool_manifest,
-            toolSignature: grant.tool_signature,
-            signingKeyId: grant.signing_key_id,
-            signatureRequired: Boolean(grant.signature_required),
-          },
-        },
-      }))
-    } catch (startError) {
-      error.value = errorMessage(startError, '无法启动该账号')
-      const failed = await requireBatchApi().failItem({ itemId, message: error.value }).catch(() => null)
-      if (failed) applySnapshot(failed)
-      throw startError
-    } finally {
-      provisioning.delete(itemId)
-    }
+    await live.registerBrowser(itemId, webContentsId)
   }
 
   function selectItem(itemId: string): void {
     selectedItemId.value = itemId
-    void window.electronAPI?.batch?.selectItem(itemId).catch(() => undefined)
+    live.selectItem(itemId)
   }
 
   async function completeUserAction(itemId: string): Promise<void> {
     if (isDemoBatch.value) return
-    applySnapshot(await requireBatchApi().completeUserAction(itemId))
+    await live.completeUserAction(itemId)
   }
 
   async function restartItem(itemId: string): Promise<void> {
     if (isDemoBatch.value) return
-    applySnapshot(await requireBatchApi().restartItem(itemId))
+    await live.restartItem(itemId)
   }
 
-  async function cancelBatch(status = 'cancelled'): Promise<void> {
-    const serverBatchId = snapshot.value.serverBatchId
-    if (isDemoBatch.value) {
-      demoRunToken += 1
-      demoController?.stop()
-      demoController = null
-      const finishedAtMs = Date.now()
-      const unfinishedItems = snapshot.value.items.filter(item => item.status === 'pending' || item.status === 'running')
-      const nextItems = snapshot.value.items.map(item => unfinishedItems.some(candidate => candidate.itemId === item.itemId)
-        ? { ...item, status: 'cancelled', message: '演示已退出', progressPercent: item.progressPercent || 0, finishedAtMs }
-        : item)
-      snapshot.value = businessBatchSnapshotSchema.parse({
-        ...snapshot.value,
-        status: 'cancelled',
-        activeItemId: null,
-        provisioningItemId: null,
-        items: nextItems,
-        counts: demoLocalCounts(nextItems),
-      })
-
-      const remoteCancellation = (async () => {
-        await demoSummaryQueue.catch(() => undefined)
-        if (serverBatchId === undefined) return
-        await Promise.allSettled(unfinishedItems.map(item => updateDemoBatchItem(serverBatchId, item.itemId, {
-          event_seq: Math.max(2, (demoItemSequences.get(item.itemId) || 0) + 1),
-          status: 'skipped',
-          simulated_outcome: null,
-        })))
-        demoBatchEventSeq += 1
-        await updateDemoBatch(serverBatchId, {
-          event_seq: demoBatchEventSeq,
-          status: 'cancelled',
-          ...demoServerCounts(nextItems),
-        })
-      })()
-      const [persisted] = await Promise.all([
-        settleWithin(remoteCancellation, 2_400),
-        settleWithin(window.electronAPI?.batch?.cancel(status).then(() => undefined) || Promise.resolve(), 1_500),
-      ])
-      await deactivateDemoActivity()
-      syncState.value = persisted ? 'synced' : 'offline'
-      if (!persisted) error.value = '演示已在本地退出，记录将在网络恢复后刷新'
-      else await loadDemoHistory().catch(() => undefined)
-      return
-    }
-    applySnapshot(await requireBatchApi().cancel(status))
-    if (serverBatchId !== undefined) {
-      outbox.queueFinish({ batchId: serverBatchId, status })
-      await flushOutboxWithin(1_500)
-    }
+  async function cancelBatch(status: 'completed' | 'cancelled' | 'interrupted' = 'cancelled'): Promise<void> {
+    if (isDemoBatch.value) await demo.cancel(status)
+    else await live.cancel(status)
   }
 
   async function resetWorkspace(): Promise<void> {
     if (isActive.value) throw new Error('当前批次仍在执行')
-    demoRunToken += 1
-    demoController?.stop()
-    demoController = null
-    await deactivateDemoActivity()
-    await window.electronAPI?.batch?.cancel(snapshot.value.status || 'completed')
+    await demo.reset()
+    await live.cancelLocal(snapshot.value.status || 'completed')
     snapshot.value = emptyBatchSnapshot()
     selectedItemId.value = null
     selectedTool.value = null
     importPreview.value = null
-    provisioning.clear()
-    demoItemSequences.clear()
-  }
-
-  function handleBatchEvent(input: unknown): void {
-    const parsed = batchEventSchema.safeParse(input)
-    if (!parsed.success) return
-    const event: BatchEvent = parsed.data
-    if (event.snapshot?.recordKind === 'demo') return
-    if (event.snapshot) applySnapshot(event.snapshot)
-    if (event.type === 'batch.item_ready' && event.itemId) {
-      selectItem(event.itemId)
-    }
-    if (event.type === 'batch.item_updated' && event.itemId) {
-      void syncItem(event.itemId)
-    }
-    if (event.type === 'batch.finished') {
-      const finalStatus = event.snapshot?.status === 'completed' ? 'completed' : 'cancelled'
-      const serverBatchId = event.snapshot?.serverBatchId
-      if (serverBatchId !== undefined) {
-        outbox.queueFinish({ batchId: serverBatchId, status: finalStatus })
-        void flushOutbox()
-      }
-    }
-    scheduleSummarySync()
   }
 
   function applySnapshot(input: unknown): void {
@@ -662,86 +225,13 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     }
   }
 
-  function syncItem(itemId: string): void {
-    const batchId = snapshot.value.serverBatchId
-    const item = items.value.find(candidate => candidate.itemId === itemId)
-    if (batchId === undefined || !item) return
-    outbox.queueItem({
-      batchId,
-      itemId,
-      payload: {
-        account_label_masked: item.accountLabelMasked,
-        status: item.status,
-        intervention_type: item.interventionType || undefined,
-        customer_message: item.message || undefined,
-      },
-    })
-  }
-
-  function scheduleSummarySync(): void {
-    if (syncTimer) clearTimeout(syncTimer)
-    syncTimer = setTimeout(() => { void syncSummary() }, 250)
-  }
-
-  function syncSummary(): void {
-    const batchId = snapshot.value.serverBatchId
-    if (isDemoBatch.value || batchId === undefined || snapshot.value.status === 'idle') return
-    const counts = snapshot.value.counts
-    outbox.queueBatch({
-      batchId,
-      payload: {
-        status: snapshot.value.status === 'completed' ? 'completed' : 'running',
-        pending_count: counts.pending || 0,
-        running_count: counts.running || 0,
-        waiting_count: counts.waiting || 0,
-        completed_count: counts.completed || 0,
-        failed_count: counts.failed || 0,
-      },
-    })
-  }
-
-  function hasPendingSync(): boolean {
-    return outbox.hasPending()
-  }
-
-  async function flushOutbox(): Promise<void> {
-    return outbox.flush()
-  }
-
-  async function flushOutboxWithin(timeoutMs: number): Promise<boolean> {
-    return outbox.flushWithin(timeoutMs)
-  }
-
-  function handleReconnect(): void {
-    outbox.reconnect()
-  }
-
-  function handleVisibilityChange(): void {
-    if (document.visibilityState === 'visible') handleReconnect()
-  }
-
-  function startHeartbeat(): void {
-    if (heartbeatTimer) return
-    heartbeatTimer = setInterval(() => {
-      if (isActive.value) syncSummary()
-    }, 30000)
+  function flushOutboxWithin(timeoutMs: number): Promise<boolean> {
+    return live.flushWithin(timeoutMs)
   }
 
   function dispose(): void {
-    if (hasPendingSync()) void flushOutboxWithin(1_500)
-    removeEventListener?.()
-    removeEventListener = null
-    if (heartbeatTimer) clearInterval(heartbeatTimer)
-    if (syncTimer) clearTimeout(syncTimer)
-    outbox.dispose()
-    demoController?.stop()
-    demoController = null
-    void deactivateDemoActivity()
-    heartbeatTimer = null
-    syncTimer = null
-    window.removeEventListener('online', handleReconnect)
-    window.removeEventListener('focus', handleReconnect)
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
+    live.dispose()
+    demo.dispose()
   }
 
   return {

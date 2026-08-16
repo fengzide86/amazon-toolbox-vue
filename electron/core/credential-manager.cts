@@ -3,6 +3,7 @@ import path from 'node:path'
 
 import { app, safeStorage, type BrowserWindow, type IpcMain } from 'electron'
 
+import { parseDesktopIpcArgs } from '../../src/shared/ipc/desktop-contract.js'
 import { assertTrustedSender } from '../ipc/sender-guard.js'
 
 interface CredentialManagerOptions {
@@ -20,16 +21,19 @@ export class CredentialManager {
   }
 
   register(): void {
-    this.ipcMain.handle('credential-save-user-code', (event, code: unknown) => {
+    this.ipcMain.handle('credential-save-user-code', (event, ...args: unknown[]) => {
       assertTrustedSender(event, this.getWindow, !app.isPackaged)
+      const [code] = parseDesktopIpcArgs('credential-save-user-code', args)
       return this.save(code)
     })
-    this.ipcMain.handle('credential-load-user-code', event => {
+    this.ipcMain.handle('credential-load-user-code', (event, ...args: unknown[]) => {
       assertTrustedSender(event, this.getWindow, !app.isPackaged)
+      parseDesktopIpcArgs('credential-load-user-code', args)
       return this.load()
     })
-    this.ipcMain.handle('credential-clear-user-code', event => {
+    this.ipcMain.handle('credential-clear-user-code', (event, ...args: unknown[]) => {
       assertTrustedSender(event, this.getWindow, !app.isPackaged)
+      parseDesktopIpcArgs('credential-clear-user-code', args)
       return this.clear()
     })
   }

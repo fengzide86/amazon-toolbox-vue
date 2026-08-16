@@ -266,9 +266,15 @@ export function useAdminSettings() {
       return
     }
     try {
-      await updateProfitPolicy(Object.fromEntries(
-        Object.entries(profitRatios.value).map(([key, value]) => [key, Number((value / 100).toFixed(6))]),
-      ))
+      const normalizedRatios = {
+        tech: Number((profitRatios.value.tech / 100).toFixed(6)),
+        market: Number((profitRatios.value.market / 100).toFixed(6)),
+        product: Number((profitRatios.value.product / 100).toFixed(6)),
+        service: Number((profitRatios.value.service / 100).toFixed(6)),
+        coordination: Number((profitRatios.value.coordination / 100).toFixed(6)),
+        record: Number((profitRatios.value.record / 100).toFixed(6)),
+      }
+      await updateProfitPolicy(normalizedRatios)
       showToast('分润比例已更新', 'success')
       showProfitModal.value = false
     } catch {

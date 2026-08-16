@@ -147,7 +147,7 @@ async function save(status: 'draft' | 'published'): Promise<void> {
   if (!form.title.trim() || !form.content.trim()) { ElMessage.warning('请填写标题和正文'); return }
   if (form.category === 'update' && form.app_version && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(form.app_version)) { ElMessage.warning('应用版本请使用 SemVer，例如 1.8.0'); return }
   saving.value = true
-  const payload = { title: form.title, content: form.content, audience: form.audience, category: form.category, severity: form.severity, presentation: form.presentation, app_version: form.app_version || null, starts_at: form.starts_at, expires_at: form.expires_at, status }
+  const payload = { title: form.title, content: form.content, audience: form.audience, category: form.category, severity: form.severity, presentation: form.presentation, app_version: form.app_version || null, starts_at: form.starts_at?.toISOString() || null, expires_at: form.expires_at?.toISOString() || null, status }
   try { if (form.id) await updateAnnouncement(form.id, payload); else await createAnnouncement(payload); editorOpen.value = false; ElMessage.success(status === 'published' ? '公告已发布' : '草稿已保存'); await load() } finally { saving.value = false }
 }
 async function handleCommand(command: string, rawRow: Record<string, unknown>): Promise<void> {

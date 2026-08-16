@@ -1,3 +1,5 @@
+import type { components } from '@/shared/api/openapi.generated'
+
 export interface PendingOrderDraft {
   plan_id: string | number
   amount: number
@@ -6,9 +8,12 @@ export interface PendingOrderDraft {
 }
 
 /** New orders are always pending; status transitions use dedicated endpoints. */
-export function buildPendingOrderPayload(draft: PendingOrderDraft, platformKey?: string): Record<string, unknown> {
+export function buildPendingOrderPayload(
+  draft: PendingOrderDraft,
+  platformKey?: string,
+): components['schemas']['OrderCreate'] {
   return {
-    plan_id: draft.plan_id,
+    plan_id: Number(draft.plan_id),
     amount: draft.amount,
     channel: draft.channel.trim() || null,
     responsible: draft.responsible.trim() || null,

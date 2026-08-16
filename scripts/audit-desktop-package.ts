@@ -46,9 +46,20 @@ function packagedSource(filename: string): string {
   return extractFile(asarPath, filename).toString('utf8')
 }
 
+const desktopApplicationSource = packagedSource(
+  path.join('dist-electron', 'electron', 'desktop-application.cjs'),
+)
+const mainWindowSource = packagedSource(
+  path.join('dist-electron', 'electron', 'core', 'main-window.cjs'),
+)
+const automationControllerSource = packagedSource(
+  path.join('dist-electron', 'electron', 'automation', 'desktop-automation-controller.cjs'),
+)
 const mainSource = [
   packagedSource(path.join('dist-electron', 'electron', 'main.cjs')),
-  packagedSource(path.join('dist-electron', 'electron', 'desktop-application.cjs')),
+  desktopApplicationSource,
+  mainWindowSource,
+  automationControllerSource,
 ].join('\n')
 const preloadSource = packagedSource(path.join('dist-electron', 'electron', 'preload.cjs'))
 const updateManagerSource = packagedSource(path.join('dist-electron', 'electron', 'core', 'update-manager.cjs'))
@@ -58,12 +69,13 @@ const internalPolicyFailures: string[] = []
 if (!mainSource.includes("packageMetadata.toolbox?.distribution === 'internal'")) {
   internalPolicyFailures.push('internal distribution gate')
 }
-if (!mainSource.includes('webviewTag: AUTOMATION_RUNTIME_ENABLED')
-  || !mainSource.includes('if (!AUTOMATION_RUNTIME_ENABLED')) {
+if (!mainWindowSource.includes('webviewTag: options.automationEnabled')
+  || !desktopApplicationSource.includes('automationEnabled: AUTOMATION_RUNTIME_ENABLED')) {
   internalPolicyFailures.push('webview runtime gate')
 }
 if (mainSource.includes('webviewTag: true')) internalPolicyFailures.push('unconditional webview capability')
-if (!/if\s*\(AUTOMATION_RUNTIME_ENABLED\)\s*registerTrustedOn\('launch-tool'/.test(mainSource)) {
+if (!/if\s*\(!this\.options\.automationEnabled\)\s*return/.test(automationControllerSource)
+  || !automationControllerSource.includes("registerTrustedOn('launch-tool'")) {
   internalPolicyFailures.push('tool launch IPC gate')
 }
 const conditionalBridge = preloadSource.indexOf('...(automationEnabled ?')

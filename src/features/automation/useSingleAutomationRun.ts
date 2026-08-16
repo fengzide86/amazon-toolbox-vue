@@ -10,6 +10,7 @@ import type { RunStatus } from '@/automation'
 import { demoRunSchema, unwrapApiData } from '@/features/demo/model'
 import { demoActivityToken, setDemoActivity } from '@/utils/demoActivity'
 import { refreshLiveLaunch } from '@/features/automation/launch'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
 import type { FreightQuoteResult } from '@/shared/freight/types'
 
 
@@ -62,7 +63,7 @@ const evidenceSummary = computed(() => ({
 const isActiveRun = computed(() => ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
 const isTerminal = computed(() => ['completed', 'failed', 'cancelled'].includes(runStatus.value))
  const isBrowserRetryableError = computed(() => false)
- const isDesktop = computed(() => Boolean(window.electronAPI?.automation))
+ const isDesktop = computed(() => getRuntimeCapabilities().singleLive)
  const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
  const displayUrl = computed(() => isDemo.value
    ? '本地交互沙盒 · 不访问外部平台'

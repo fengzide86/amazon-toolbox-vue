@@ -35,10 +35,12 @@ export default defineConfig({
       'amazon-toolbox/**',
       'backend/**'
     ],
-    // Forks avoid lingering thread workers on Windows. Four workers are slower
-    // than the old eight-worker setting but remain stable during release builds.
+    // Coverage instrumentation is memory-heavy on Windows. Two forks avoid
+    // starving router/freight suites while keeping the release gate deterministic.
     pool: 'forks',
-    maxWorkers: 4,
+    maxWorkers: 2,
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -1,8 +1,15 @@
 import { api, type ApiQueryParams } from './index'
+import type { components } from '@/shared/api/openapi.generated'
 
 type EntityId = string | number
+type Schemas = components['schemas']
+type FeedbackList = NonNullable<Schemas['FeedbackListEnvelope']['data']>
 
-export const getFeedbacks = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/feedback', params)
-export const getMyFeedbacks = (params: ApiQueryParams = {}): Promise<unknown> => api.get('/api/feedback/my', params)
-export const createFeedback = (data: unknown): Promise<unknown> => api.post('/api/feedback', data)
-export const updateFeedback = (id: EntityId, data: unknown): Promise<unknown> => api.put(`/api/feedback/${id}`, data)
+export const getFeedbacks = (params: ApiQueryParams = {}): Promise<FeedbackList> => api.get('/api/feedback', params)
+export const getMyFeedbacks = (params: ApiQueryParams = {}): Promise<FeedbackList> => api.get('/api/feedback/my', params)
+export const createFeedback = (data: Schemas['FeedbackCreate']): Promise<Schemas['FeedbackItemEnvelope']> =>
+  api.post('/api/feedback', data)
+export const updateFeedback = (
+  id: EntityId,
+  data: Schemas['FeedbackUpdate'],
+): Promise<Schemas['FeedbackItemEnvelope']> => api.put(`/api/feedback/${id}`, data)

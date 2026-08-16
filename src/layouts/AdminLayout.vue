@@ -32,7 +32,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { usePlatformStore } from '@/stores/platform'
 import AppHeader from '@/components/AppHeader.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -43,9 +42,9 @@ import { provideShellPageHeader } from '@/features/shell/pageHeaderContext'
 provideShellPageHeader()
 const router = useRouter()
 const route = useRoute()
-const platformStore = usePlatformStore()
 const showMobileSidebar = ref(false)
 const platformKey = ref(0)
+let removeAfterEach: (() => void) | undefined
 
 function skeletonType(value: unknown): 'default' | 'dashboard' | 'table' | 'grid' {
   return value === 'dashboard' || value === 'table' || value === 'grid' ? value : 'default'
@@ -67,11 +66,12 @@ function handlePlatformChange() {
 }
 
 // 路由变化时关闭侧边栏
-router.afterEach(() => {
+removeAfterEach = router.afterEach(() => {
   closeSidebar()
 })
 
 onUnmounted(() => {
+  removeAfterEach?.()
   document.body.style.overflow = ''
 })
 </script>

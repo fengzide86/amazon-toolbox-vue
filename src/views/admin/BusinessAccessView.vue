@@ -252,7 +252,7 @@ async function generateInternalCode() {
   generating.value = true
   try {
     const result = generatedAuthCodesSchema.parse(await batchGenerateAuthCodes({
-      plan_id: activeBusinessPlan.value.id,
+      plan_id: Number(activeBusinessPlan.value.id),
       count: 1,
       duration_days: 30,
       platform_scope: 'amazon',

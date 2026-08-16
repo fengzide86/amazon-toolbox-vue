@@ -12,7 +12,9 @@ EnvironmentFile=/opt/amazon-toolbox/backend/.env
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=UPDATE_RELEASE_DIR=/var/lib/amazon-toolbox/updates
-ExecStart=/opt/amazon-toolbox/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
+Environment=EXPENSE_ATTACHMENT_DIR=/var/lib/amazon-toolbox/expense-attachments
+EnvironmentFile=-/var/lib/amazon-toolbox/release.env
+ExecStart=/opt/amazon-toolbox/current-venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=on-failure
 RestartSec=3s
 TimeoutStartSec=45s
@@ -35,6 +37,8 @@ ReadWritePaths=-/opt/amazon-toolbox/backend/updates
 ReadWritePaths=-/opt/amazon-toolbox/backend/.updates-staging
 ReadWritePaths=-/var/lib/amazon-toolbox/updates
 ReadWritePaths=-/var/lib/amazon-toolbox/.updates-staging
+ReadWritePaths=-/var/lib/amazon-toolbox/expense-attachments
+ReadWritePaths=-/opt/amazon-toolbox/backend/chroma_db
 ReadWritePaths=-/opt/amazon-toolbox/backend/uploads
 ReadWritePaths=-/opt/amazon-toolbox/backend/runtime
 ReadWritePaths=-/opt/amazon-toolbox/backend/logs

@@ -219,6 +219,12 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
     }
 
     if (currentRole === 'business') {
+      const idleBatchSnapshot = {
+        status: 'idle',
+        recordKind: 'live' as const,
+        counts: {},
+        items: [],
+      }
       const importPreview = {
         importId: 'visual-brand-import',
         fileName: '课赛通批量演示.xlsx',
@@ -233,7 +239,7 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
         demoActivity: { setActive: async () => {} },
         batch: {
           onEvent: () => () => {},
-          getSnapshot: async () => ({ status: 'idle', recordKind: 'live', items: [] }),
+          getSnapshot: async () => idleBatchSnapshot,
           storeDemoImport: async () => importPreview,
           loadSampleImport: async () => importPreview,
           saveSampleTemplate: async () => null,
@@ -254,14 +260,14 @@ async function prepareRole(page: Page, role: 'consumer' | 'business' | 'admin', 
               browserReady: false,
             })),
           }),
-          start: async () => null,
-          failItem: async () => null,
-          cancel: async () => ({ status: 'cancelled', items: [] }),
-          selectItem: async () => {},
-          completeUserAction: async () => null,
-          restartItem: async () => null,
-          registerBrowser: async () => null,
-          unregisterBrowser: async () => null,
+          start: async () => ({ runId: 'visual-run' }),
+          failItem: async () => idleBatchSnapshot,
+          cancel: async () => ({ ...idleBatchSnapshot, status: 'cancelled' }),
+          selectItem: async itemId => ({ itemId, snapshot: idleBatchSnapshot }),
+          completeUserAction: async () => idleBatchSnapshot,
+          restartItem: async () => idleBatchSnapshot,
+          registerBrowser: async () => ({ id: 1, url: 'about:blank' }),
+          unregisterBrowser: async () => ({ released: true }),
         },
       }
     }

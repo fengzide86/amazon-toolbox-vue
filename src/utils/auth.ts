@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
+import { getApiBase } from '@/shared/api/base'
 import { clearAllCache } from '@/utils/cache'
 import {
   authRoleSchema,
@@ -143,26 +144,12 @@ class AuthService {
     this.tokenRefreshTimer = null
   }
 
-  private getApiBase(): string {
-    try {
-      const runtimeApiBase = window.electronAPI?.runtime?.controlApiBase
-      if (runtimeApiBase) return runtimeApiBase
-      const controlApiBase = localStorage.getItem('toolbox_control_api_base')
-      if (controlApiBase) return controlApiBase
-      const electronApiBase = localStorage.getItem('toolbox_api_base')
-      if (electronApiBase) return electronApiBase
-    } catch {
-      // 非浏览器测试环境继续使用构建配置或本地默认值。
-    }
-    return import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-  }
-
   async refreshToken(): Promise<void> {
     const auth = this.getAuth()
     if (!auth?.refresh_token) return
 
     try {
-      const response = await fetch(`${this.getApiBase()}/api/auth/refresh`, {
+      const response = await fetch(`${getApiBase()}/api/auth/refresh`, {
         method: 'POST',
         headers: toolboxVersionHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ refresh_token: auth.refresh_token }),

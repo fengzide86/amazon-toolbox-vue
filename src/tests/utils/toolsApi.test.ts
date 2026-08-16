@@ -26,7 +26,7 @@ describe('tools API', () => {
     })
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:8000/api/tools/tool%20listing/launch-grant?platform_key=amazon',
+      `${window.location.origin}/api/tools/tool%20listing/launch-grant?platform_key=amazon`,
       expect.objectContaining({ method: 'POST' }),
     )
     expect(grant.launch_data.token).toBe('grant-token')

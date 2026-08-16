@@ -32,7 +32,7 @@
         type="button"
         :class="['tool-card', `is-${toolState(tool)}`, { 'is-launching': launchingToolId === tool.id, 'is-focused': route.query?.tool === tool.id }]"
         :disabled="launchingToolId !== null || toolState(tool) === 'maintenance'"
-        :aria-label="`${tool.name}，${toolState(tool) === 'available' ? '打开能力说明并开始演示' : toolState(tool) === 'locked' ? '查看可用套餐' : '暂时不可用'}`"
+        :aria-label="`${tool.name}，${liveUnavailable(tool) ? '需要下载桌面端运行' : toolState(tool) === 'available' ? '打开能力说明并开始演示' : toolState(tool) === 'locked' ? '查看可用套餐' : '暂时不可用'}`"
         :data-testid="'tool-card-' + tool.name"
         @click="hasToolDetails(tool) ? openDetails(tool) : handleToolClick(tool)"
       >
@@ -41,7 +41,7 @@
           <span class="tool-icon"><component :is="toolIcon(tool)" :size="21" /></span>
           <span v-if="toolState(tool) === 'locked'" class="state-badge locked"><LockKeyhole :size="12" /> 当前套餐未包含</span>
           <span v-else-if="toolState(tool) === 'maintenance'" class="state-badge maintenance">暂时不可用</span>
-          <span v-else :class="['state-badge', isLiveTool(tool) ? 'live' : 'demo']">{{ isLiveTool(tool) ? (tool.availability === 'live_beta' ? '真实执行 Beta' : '真实执行') : '交互演示' }}</span>
+          <span v-else :class="['state-badge', isLiveTool(tool) ? 'live' : 'demo']">{{ liveUnavailable(tool) ? '桌面端执行' : isLiveTool(tool) ? (tool.availability === 'live_beta' ? '真实执行 Beta' : '真实执行') : '交互演示' }}</span>
         </span>
 
         <span class="tool-copy">
@@ -70,6 +70,9 @@
             查看可用套餐 <ArrowRight :size="16" />
           </template>
           <template v-else-if="toolState(tool) === 'maintenance'">维护中</template>
+          <template v-else-if="liveUnavailable(tool)">
+            下载桌面端 <Download :size="16" />
+          </template>
           <template v-else>
             {{ isLiveTool(tool) ? '开始执行' : '开始交互演示' }} <ArrowRight :size="16" />
           </template>
@@ -105,7 +108,7 @@
           <span class="section-label">什么时候需要你操作</span>
           <ul><li v-for="scenario in normalizedList(detailsTool.intervention_scenarios)" :key="scenario">{{ scenario }}</li></ul>
         </section>
-        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>{{ isLiveTool(detailsTool) ? '工具将在本机浏览器中操作比赛模拟平台，登录数据不上传。' : '这是本地交互沙盒，会真实填写和点击，但不访问外部平台。' }}</span></div>
+        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>{{ liveUnavailable(detailsTool) ? '真实自动化需要桌面端本地 Runner；网页版不会读取或执行外部平台操作。' : isLiveTool(detailsTool) ? '工具将在本机浏览器中操作比赛模拟平台，登录数据不上传。' : '这是本地交互沙盒，会真实填写和点击，但不访问外部平台。' }}</span></div>
       </div>
       <template #footer>
         <button class="drawer-primary" :disabled="Boolean(detailsTool && toolState(detailsTool) === 'maintenance')" @click="launchFromDetails">
@@ -141,6 +144,7 @@ import {
   Boxes,
   CheckCircle2,
   CircleAlert,
+  Download,
   LoaderCircle,
   LockKeyhole,
   Megaphone,
@@ -165,6 +169,8 @@ import {
   type ToolCatalogItem,
 } from '@/features/tools/model'
 import { buildDemoLaunch, buildLiveLaunch, isLiveTool } from '@/features/automation/launch'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
+import { downloadDesktopInstaller } from '@/runtime/desktop-download'
 
 const router = useRouter() || { push: () => {} }
 const route = useRoute() || { query: {} }
@@ -180,6 +186,7 @@ const detailsTool = ref<ToolCatalogItem | null>(null)
 const runDialogVisible = ref(false)
 const pendingTool = ref<ToolCatalogItem | null>(null)
 const runInput = ref<Record<string, string | number | undefined>>({})
+const runtime = getRuntimeCapabilities()
 
 function numberInput(key: string): number | undefined {
   const value = runInput.value[key]
@@ -252,6 +259,10 @@ function hasToolDetails(tool: ToolCatalogItem) {
     || normalizedList(tool?.intervention_scenarios).length
 }
 
+function liveUnavailable(tool: ToolCatalogItem): boolean {
+  return isLiveTool(tool) && !runtime.singleLive
+}
+
 function openDetails(rawTool: unknown) {
   detailsTool.value = toolCatalogItemSchema.parse(rawTool)
   detailsVisible.value = true
@@ -261,14 +272,27 @@ const detailsActionText = computed(() => {
   if (!detailsTool.value) return '关闭'
   if (toolState(detailsTool.value) === 'locked') return '查看可用套餐'
   if (toolState(detailsTool.value) === 'maintenance') return '当前维护中'
+  if (liveUnavailable(detailsTool.value)) return '下载 KST 桌面端'
   return isLiveTool(detailsTool.value) ? '填写参数并执行' : '开始交互演示'
 })
 
-function launchFromDetails() {
+async function launchFromDetails() {
   if (!detailsTool.value || toolState(detailsTool.value) === 'maintenance') return
   const tool = detailsTool.value
   detailsVisible.value = false
+  if (liveUnavailable(tool)) {
+    await downloadKstDesktop()
+    return
+  }
   handleToolClick(tool)
+}
+
+async function downloadKstDesktop(): Promise<void> {
+  try {
+    await downloadDesktopInstaller()
+  } catch (error) {
+    showToast(errorMessage(error, '桌面安装包暂时无法下载'), 'error')
+  }
 }
 
 function toolState(tool: ToolCatalogItem) {
@@ -289,6 +313,10 @@ function handleToolClick(rawTool: unknown) {
     return
   }
   if (state === 'maintenance') return
+  if (liveUnavailable(tool)) {
+    void downloadKstDesktop()
+    return
+  }
   if (isLiveTool(tool) && tool.single_input_schema?.length) {
     pendingTool.value = tool
     runInput.value = Object.fromEntries(tool.single_input_schema.map(field => [field.key, undefined]))
@@ -330,7 +358,7 @@ async function runTool(tool: ToolCatalogItem, input: Record<string, unknown> = {
   launchingToolId.value = tool.id
   try {
     const platformKey = platformStore.currentPlatform
-    if (isLiveTool(tool) && !window.electronAPI?.automation) throw new Error('真实自动化仅支持已启用本地 Runner 的桌面客户端')
+    if (isLiveTool(tool) && !runtime.singleLive) throw new Error('真实自动化仅支持已启用本地 Runner 的桌面客户端')
     const launchTool = isLiveTool(tool)
       ? await buildLiveLaunch(tool, platformKey, input)
       : buildDemoLaunch(tool, platformKey, input)

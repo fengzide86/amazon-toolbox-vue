@@ -45,6 +45,7 @@ function importsOf(file: string): string[] {
     /(?:import|export)\s+(?:[^'"()]+?\s+from\s+)?['"]([^'"]+)['"]/g,
     /import\(\s*['"]([^'"]+)['"]\s*\)/g,
     /require\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /new\s+URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g,
   ]
   for (const pattern of patterns) {
     for (const match of content.matchAll(pattern)) if (match[1]) specifiers.add(match[1])

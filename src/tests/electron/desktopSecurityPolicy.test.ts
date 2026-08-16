@@ -95,7 +95,7 @@ describe('app protocol renderer entrypoint', () => {
     expect(html).toContain('href="/favicon-32x32.png"')
     expect(html).toContain('href="/favicon-16x16.png"')
     expect(html).toContain('rel="apple-touch-icon"')
-    expect(readFileSync(resolve('electron/desktop-application.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
+    expect(readFileSync(resolve('electron/core/main-window.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
     expect(readFileSync(resolve('electron/core/app-protocol.cts'), 'utf8')).toContain("scheme: 'app'")
   })
 })
@@ -116,6 +116,7 @@ describe('internal desktop package profile', () => {
       }
     }
     const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
+    const mainWindow = readFileSync(resolve('electron/core/main-window.cts'), 'utf8')
 
     expect(metadata.build?.appId).toBe('com.amazon.toolbox')
     expect(metadata.description).toBe('课赛通 KST · 跨境电商赛训效率平台')
@@ -134,8 +135,8 @@ describe('internal desktop package profile', () => {
     expect(metadata.build?.publish?.url).toBe('https://8.130.113.104/updates/')
     expect(main).toContain('app.setName(APPLICATION_NAME)')
     expect(main).toContain('app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID)')
-    expect(main).toContain("path.join(process.resourcesPath, 'icon.ico')")
-    expect(main).toContain('icon: windowIconPath')
+    expect(mainWindow).toContain("join(process.resourcesPath, 'icon.ico')")
+    expect(mainWindow).toContain('icon: windowIconPath')
     expect(readFileSync(resolve('scripts/brand-after-pack.cjs'), 'utf8')).toContain("'--set-icon'")
   })
 
@@ -157,9 +158,10 @@ describe('internal desktop package profile', () => {
   })
 
   it('removes tool-launch IPC from the internal renderer bridge', () => {
-    const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
+    const automation = readFileSync(resolve('electron/automation/desktop-automation-controller.cts'), 'utf8')
     const preload = readFileSync(resolve('electron/preload.cts'), 'utf8')
-    expect(main).toContain("if (AUTOMATION_RUNTIME_ENABLED) registerTrustedOn('launch-tool'")
+    expect(automation).toContain('if (!this.options.automationEnabled) return')
+    expect(automation).toContain("this.options.registerTrustedOn('launch-tool'")
     expect(preload.indexOf('launchTool:')).toBeGreaterThan(preload.indexOf('...(automationEnabled'))
     expect(preload.indexOf('launchTool:')).toBeLessThan(preload.indexOf('} : {}),'))
     expect(preload).toContain("'demo-activity:set-active'")

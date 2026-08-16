@@ -22,6 +22,6 @@ export default defineConfig({
     command: webServerCommand,
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: false,
-    timeout: 300000,
+    timeout: 600000,
   },
 })

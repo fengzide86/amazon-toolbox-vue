@@ -69,7 +69,7 @@ export const renewalOccurrenceSchema = z.object({
   id: z.coerce.number().int().positive(),
   renewal_id: z.coerce.number().int().positive(),
   due_on: z.string(),
-  status: z.enum(['paid', 'skipped']),
+  status: z.enum(['paid', 'skipped', 'reversed']),
   expense_id: z.coerce.number().int().positive().nullable().optional(),
   note: nullableText,
   processed_at: nullableText,

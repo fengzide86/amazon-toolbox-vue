@@ -18,7 +18,11 @@ module.exports = async function brandAfterPack(context) {
   const executablePath = path.join(context.appOutDir, executableName)
   const temporaryExecutablePath = path.join(context.appOutDir, `kst-branding-${process.pid}.exe`)
   const iconPath = path.join(projectDir, metadata.build?.win?.icon || 'build/icon.ico')
-  const rceditPath = path.join(projectDir, 'node_modules', 'electron-winstaller', 'vendor', 'rcedit.exe')
+  // electron-winstaller is a declared direct development dependency. Resolve
+  // its package root instead of relying on electron-builder's transitive
+  // node_modules layout, which can change after a clean npm install.
+  const winInstallerPackage = require.resolve('electron-winstaller/package.json', { paths: [projectDir] })
+  const rceditPath = path.join(path.dirname(winInstallerPackage), 'vendor', 'rcedit.exe')
 
   for (const requiredPath of [executablePath, iconPath, rceditPath]) {
     if (!fs.existsSync(requiredPath)) throw new Error(`KST Windows branding input is missing: ${requiredPath}`)

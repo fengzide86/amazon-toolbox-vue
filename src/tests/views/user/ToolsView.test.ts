@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   createToolLaunchGrant: vi.fn(),
   push: vi.fn(),
   showToast: vi.fn(),
+  downloadDesktopInstaller: vi.fn(),
   route: { query: {} },
 }))
 
@@ -22,6 +23,7 @@ vi.mock('@/utils/api', () => ({
 }))
 
 vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
+vi.mock('@/runtime/desktop-download', () => ({ downloadDesktopInstaller: mocks.downloadDesktopInstaller }))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mocks.push }),
@@ -57,6 +59,8 @@ describe('ToolsView 一键工具箱', () => {
     mocks.getTools.mockResolvedValue([])
     mocks.createDemoRun.mockResolvedValue({ id: 'demo-1', tool_id: 'register', status: 'created' })
     mocks.updateDemoRun.mockResolvedValue({ success: true })
+    mocks.downloadDesktopInstaller.mockResolvedValue('https://example.test/updates/KST.exe')
+    Object.defineProperty(window, 'electronAPI', { configurable: true, value: undefined })
     localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y15 体验包', plan_code: 'Y15' }))
   })
 
@@ -129,6 +133,22 @@ describe('ToolsView 一键工具箱', () => {
     await flushPromises()
     expect(wrapper.exists()).toBe(true)
     expect(mocks.getTools).toHaveBeenCalledWith({ platform_key: 'amazon' })
+  })
+
+  it('网页版真实工具只提供桌面端下载，不显示可执行入口', async () => {
+    mocks.getTools.mockResolvedValue([{
+      id: 'live-listing', name: '真实上品', module: 'listing', status: 'online', availability: 'live',
+      supports_live_single: true, available_plans: ['Y15'],
+    }])
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('下载桌面端')
+    expect(wrapper.text()).not.toContain('开始执行')
+    await wrapper.find('[data-testid="tool-card-真实上品"]').trigger('click')
+    await flushPromises()
+    expect(mocks.downloadDesktopInstaller).toHaveBeenCalledOnce()
+    expect(useAppStore().toolVisible).toBe(false)
   })
 
   it('只展示真实能力标签和说明入口，不向普通用户暴露批量能力', async () => {

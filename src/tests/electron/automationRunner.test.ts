@@ -22,11 +22,14 @@ describe('packaged local automation runtime', () => {
 
   it('keeps Runner, batch and webview capabilities behind an explicit package/runtime gate', () => {
     const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
+    const trustedIpc = readFileSync(resolve('electron/ipc/trusted-ipc.cts'), 'utf8')
+    const mainWindow = readFileSync(resolve('electron/core/main-window.cts'), 'utf8')
 
     expect(main).toContain('packageMetadata.toolbox?.automationRuntime === true')
     expect(main).toContain("process.env.TOOLBOX_AUTOMATION_ENABLED === 'true'")
-    expect(main).toContain('if (AUTOMATION_RUNTIME_ENABLED) registerTrustedHandle(channel, handler)')
-    expect(main).toContain('webviewTag: AUTOMATION_RUNTIME_ENABLED')
+    expect(main).toContain('automationEnabled: AUTOMATION_RUNTIME_ENABLED')
+    expect(trustedIpc).toContain('if (options.automationEnabled) handle(channel, handler)')
+    expect(mainWindow).toContain('webviewTag: options.automationEnabled')
   })
 
   it('only exposes the automation bridge when main explicitly enables it', () => {

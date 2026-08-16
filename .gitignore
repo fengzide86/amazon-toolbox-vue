@@ -73,6 +73,10 @@ playwright-report/
 .automation-profiles/
 .automation-artifacts/
 .automation-smoke/
+reports/ui-audit-*/
+.tmp_*/
+.tmp_*.png
+tmp/
 
 # ===== AI 工具配置 =====
 .clinerules/

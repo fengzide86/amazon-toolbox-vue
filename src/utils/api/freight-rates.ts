@@ -1,14 +1,39 @@
 import { api } from './index'
+import type { components } from '@/shared/api/openapi.generated'
 
-function unwrapData(response: unknown): unknown {
-  if (typeof response !== 'object' || response === null || !('data' in response)) return response
-  return (response as { data: unknown }).data
+type Schemas = components['schemas']
+type JsonValue = Schemas['JsonValue']
+type FreightRateRelease = Schemas['FreightRateReleaseResponse']
+type FreightRateReleaseEnvelope = Schemas['FreightRateReleaseEnvelope']
+
+export interface FreightRateDraftPayload {
+  pack: JsonValue
+  source_file_name?: string | null
 }
 
-export const getFreightRateReleases = (): Promise<unknown> => api.get('/api/freight-rate-packs', {}, { cache: false })
-export const createFreightRateDraft = async (data: unknown): Promise<unknown> => unwrapData(await api.post('/api/freight-rate-packs/drafts', data))
-export const publishFreightRatePack = async (packId: string, version: string): Promise<unknown> =>
-  unwrapData(await api.post(`/api/freight-rate-packs/${encodeURIComponent(packId)}/${encodeURIComponent(version)}/publish`, {}))
-export const rollbackFreightRatePack = async (packId: string, targetVersion: string): Promise<unknown> =>
-  unwrapData(await api.post(`/api/freight-rate-packs/${encodeURIComponent(packId)}/rollback`, { target_version: targetVersion }))
-export const getCurrentFreightRatePack = (): Promise<unknown> => api.get('/api/freight-rate-packs/current', {}, { cache: false })
+export const getFreightRateReleases = (): Promise<FreightRateRelease[]> =>
+  api.get('/api/freight-rate-packs', {}, { cache: false })
+
+export const createFreightRateDraft = async (data: FreightRateDraftPayload): Promise<FreightRateRelease> => {
+  const response = await api.post<FreightRateReleaseEnvelope>('/api/freight-rate-packs/drafts', data)
+  return response.data
+}
+
+export const publishFreightRatePack = async (packId: string, version: string): Promise<FreightRateRelease> => {
+  const response = await api.post<FreightRateReleaseEnvelope>(
+    `/api/freight-rate-packs/${encodeURIComponent(packId)}/${encodeURIComponent(version)}/publish`,
+    {},
+  )
+  return response.data
+}
+
+export const rollbackFreightRatePack = async (packId: string, targetVersion: string): Promise<FreightRateRelease> => {
+  const response = await api.post<FreightRateReleaseEnvelope>(
+    `/api/freight-rate-packs/${encodeURIComponent(packId)}/rollback`,
+    { target_version: targetVersion },
+  )
+  return response.data
+}
+
+export const getCurrentFreightRatePack = (): Promise<FreightRateRelease> =>
+  api.get('/api/freight-rate-packs/current', {}, { cache: false })

@@ -1,4 +1,5 @@
 import { parseAuthSession } from '@/features/auth/model'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
 
 const LEGACY_AUTH_KEY = 'toolbox_auth'
 
@@ -13,13 +14,16 @@ function legacyUserCode(): string | null {
 }
 
 export async function saveRememberedUserCode(code: string): Promise<boolean> {
+  if (!getRuntimeCapabilities().credentialStore) return false
   const store = window.electronAPI?.credentialStore
   if (!store) return false
   return Boolean(await store.saveUserCode(code))
 }
 
 export async function loadRememberedUserCode(): Promise<string | null> {
-  const store = window.electronAPI?.credentialStore
+  const store = getRuntimeCapabilities().credentialStore
+    ? window.electronAPI?.credentialStore
+    : undefined
   let code = store ? await store.loadUserCode() : null
 
   if (!code) {
@@ -34,6 +38,7 @@ export async function loadRememberedUserCode(): Promise<string | null> {
 }
 
 export async function clearRememberedUserCode(): Promise<void> {
+  if (!getRuntimeCapabilities().credentialStore) return
   const store = window.electronAPI?.credentialStore
   if (store) await store.clearUserCode()
 }

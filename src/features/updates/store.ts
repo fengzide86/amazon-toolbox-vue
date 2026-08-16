@@ -4,6 +4,7 @@ import { defineStore } from 'pinia'
 import { updateSnapshotSchema, type UpdateSnapshot } from '@/shared/ipc/update-contract'
 import { getVersionReleaseNotes } from './release-api'
 import { useOverlayCoordinatorStore } from '@/features/shell/overlay-store'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
 import { showToast } from '@/utils'
 
 const PROMPT_KEY = 'toolbox_update_prompt_preferences'
@@ -43,7 +44,7 @@ export const useUpdateStore = defineStore('application-updates', () => {
   const loadedReleaseNoteVersions = new Set<string>()
   let removeStateListener: (() => void) | undefined
 
-  const supported = computed(() => Boolean(window.electronAPI?.updates && state.value.supported))
+  const supported = computed(() => getRuntimeCapabilities().desktopUpdates && state.value.supported)
   const drawerOpen = computed(() => overlay.activeDrawer === 'updates')
   const displayPercent = computed(() => Math.round(state.value.percent ?? 0))
   const promptSuppressed = computed(() => {
@@ -87,7 +88,7 @@ export const useUpdateStore = defineStore('application-updates', () => {
   }
 
   async function initialize(): Promise<void> {
-    if (initialized.value || !window.electronAPI?.updates) return
+    if (initialized.value || !getRuntimeCapabilities().desktopUpdates || !window.electronAPI?.updates) return
     initialized.value = true
     removeStateListener = window.electronAPI.updates.onState(applySnapshot)
     applySnapshot(await window.electronAPI.updates.getState())
@@ -108,7 +109,7 @@ export const useUpdateStore = defineStore('application-updates', () => {
   }
 
   async function checkManually(): Promise<void> {
-    if (!window.electronAPI?.updates || !supported.value) {
+    if (!getRuntimeCapabilities().desktopUpdates || !window.electronAPI?.updates || !supported.value) {
       showToast('开发预览无需检查更新', 'info')
       return
     }

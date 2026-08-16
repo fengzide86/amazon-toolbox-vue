@@ -60,6 +60,30 @@ describe('business workspace sync outbox', () => {
     vi.useRealTimers()
   })
 
+  it('keeps the workspace store as a stable public facade', () => {
+    const store = useBusinessWorkspaceStore()
+
+    expect(store).toEqual(expect.objectContaining({
+      bootstrap: null,
+      history: [],
+      demoHistory: [],
+      importPreview: null,
+      selectedTool: null,
+      selectedItemId: null,
+      init: expect.any(Function),
+      loadSampleImport: expect.any(Function),
+      selectImportFile: expect.any(Function),
+      startBatch: expect.any(Function),
+      registerBrowser: expect.any(Function),
+      completeUserAction: expect.any(Function),
+      restartItem: expect.any(Function),
+      cancelBatch: expect.any(Function),
+      resetWorkspace: expect.any(Function),
+      flushOutboxWithin: expect.any(Function),
+      dispose: expect.any(Function),
+    }))
+  })
+
   it('keeps the latest item status and retries after connectivity returns', async () => {
     electronBatch.getSnapshot.mockResolvedValue({
       batchId: 'local-1',
@@ -184,6 +208,37 @@ describe('business workspace sync outbox', () => {
     await vi.advanceTimersByTimeAsync(6_000)
     expect(store.snapshot.status).toBe('completed')
     expect(apiMocks.finishDemoBatch).toHaveBeenCalledOnce()
+    store.dispose()
+  })
+
+  it('runs a browser demo batch without an Electron batch bridge', async () => {
+    Object.defineProperty(window, 'electronAPI', { configurable: true, value: undefined })
+    const tool = {
+      id: 'web-demo-tool', name: '浏览器批量演示', availability: 'demo_only',
+      demo_scenario_id: 'web-demo', script_key: 'demo.web',
+      batch_input_schema: [{ key: 'account_label', label: '客户简称', required: true }],
+    }
+    const itemIds = Array.from({ length: 8 }, (_, index) => `web-item-${index + 1}`)
+    apiMocks.getBusinessBootstrap.mockResolvedValue({ entitlements: { max_batch_rows: 50 }, tools: [tool] })
+    apiMocks.createDemoBatch.mockResolvedValue({ data: {
+      id: 'web-demo-batch', tool_id: tool.id, row_count: itemIds.length,
+      items: itemIds.map(item_ref => ({ item_ref, status: 'queued', event_seq: 0 })),
+    } })
+
+    const store = useBusinessWorkspaceStore()
+    await store.init()
+    store.chooseTool(store.tools[0])
+    await store.loadSampleImport()
+    expect(store.importPreview?.validCount).toBe(8)
+    await store.startBatch()
+
+    expect(store.snapshot.recordKind).toBe('demo')
+    expect(store.items).toHaveLength(8)
+    expect(store.items.every(item => item.status === 'running')).toBe(true)
+    expect(electronBatch.create).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(6_000)
+    expect(store.snapshot.status).toBe('completed')
     store.dispose()
   })
 

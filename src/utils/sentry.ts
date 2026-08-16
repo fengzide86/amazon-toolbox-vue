@@ -23,7 +23,7 @@ export function initSentry(app: App, router: Router): void {
       replaysSessionSampleRate: import.meta.env.PROD ? 0.1 : 0,
       replaysOnErrorSampleRate: 1,
       environment: import.meta.env.MODE || 'development',
-      release: `amazon-toolbox@${import.meta.env.PACKAGE_VERSION || '1.0.0'}`,
+      release: `kst@${import.meta.env.VITE_APP_VERSION || 'unknown'}`,
       ignoreErrors: ['Failed to fetch', 'NetworkError', 'AbortError', 'Script error'],
       beforeSend: event => event,
     })
