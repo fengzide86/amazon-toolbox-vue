@@ -181,6 +181,9 @@ describe('internal desktop package profile', () => {
   it('keeps release venvs executable and restores decompressed database streams', () => {
     const deploy = readFileSync(resolve('ops/deploy/deploy-backend.sh'), 'utf8')
     const restore = readFileSync(resolve('ops/deploy/restore-backup.sh'), 'utf8')
+    const startBat = readFileSync(resolve('backend/start.bat'), 'utf8')
+    const constraints = readFileSync(resolve('backend/constraints-py310.txt'), 'utf8')
+    const workflow = readFileSync(resolve('.github/workflows/test.yml'), 'utf8')
     const reusedVenv = deploy.indexOf('if [[ -e "${VENV_RELEASE_DIR}" ]]; then')
     const reusedPermissions = deploy.indexOf('chmod -R a+rX "${VENV_RELEASE_DIR}"', reusedVenv)
     const reusedServiceUserCheck = deploy.indexOf(
@@ -200,6 +203,27 @@ describe('internal desktop package profile', () => {
     expect(rootOwnership).toBeGreaterThan(0)
     expect(readablePermissions).toBeGreaterThan(rootOwnership)
     expect(serviceUserCheck).toBeGreaterThan(readablePermissions)
+
+    const productionImportProbe = deploy.indexOf('importlib.import_module("main")')
+    const stagingUpdates = deploy.indexOf(
+      'install -d -o root -g toolbox -m 0750 "${STAGING_DIR}/backend/updates"',
+    )
+    expect(stagingUpdates).toBeGreaterThan(deploy.indexOf('tar -xzf "${ARCHIVE_PATH}"'))
+    expect(productionImportProbe).toBeGreaterThan(stagingUpdates)
+    expect(deploy).toContain('os.environ["UPDATE_RELEASE_DIR"] = str(runtime_root / "updates")')
+    expect(deploy).toContain(
+      'os.environ["EXPENSE_ATTACHMENT_DIR"] = str(runtime_root / "expense-attachments")',
+    )
+    expect(productionImportProbe).toBeGreaterThan(serviceUserCheck)
+    expect(productionImportProbe).toBeLessThan(deploy.indexOf('DEPLOY_STARTED=1'))
+    const runtimeDirectory = deploy.indexOf('"${BACKEND_DIR}/runtime"')
+    expect(runtimeDirectory).toBeGreaterThan(deploy.indexOf('chown -R toolbox:toolbox "${BACKEND_DIR}"'))
+    expect(deploy.indexOf('runuser -u toolbox -- test -w "${BACKEND_DIR}/runtime"')).toBeGreaterThan(runtimeDirectory)
+    expect(runtimeDirectory).toBeLessThan(deploy.indexOf('MIGRATION_STARTED=1'))
+    expect(startBat).toContain('"%PYTHON%" -c "import main"')
+    expect(constraints).toContain('async-timeout==5.0.1')
+    expect(constraints).toContain('exceptiongroup==1.3.1')
+    expect(workflow).toContain('scripts/check_python_constraint_closure.py')
 
     const gzipPreflight = restore.indexOf(
       '# Validate the complete compressed stream before changing the live schema.',

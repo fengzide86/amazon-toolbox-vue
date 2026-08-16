@@ -306,6 +306,10 @@ chmod 0640 \
   "${STAGING_DIR}/backend/constraints-py310.txt"
 runuser -u toolbox -- test -r "${STAGING_DIR}/backend/requirements.txt"
 runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"
+# Application construction mounts this legacy static directory and creates it
+# when absent. The Git archive intentionally does not track the empty folder,
+# so provide a readable mount point without making staged source writable.
+install -d -o root -g toolbox -m 0750 "${STAGING_DIR}/backend/updates"
 
 VENV_RELEASE_DIR="${VENV_ROOT}/${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}"
 VENV_METADATA_FILE="${VENV_RELEASE_DIR}/.toolbox-release"
@@ -373,6 +377,34 @@ else
 fi
 VENV_PYTHON="${VENV_RELEASE_DIR}/bin/python"
 test -x "${VENV_PYTHON}"
+
+# A dependency can be importable in the long-lived legacy environment while
+# still being absent from requirements.txt. Import the complete application
+# with only the new production venv before stopping the live service.
+runuser -u toolbox -- "${VENV_PYTHON}" - \
+  "${STAGING_DIR}/backend" "${BACKEND_DIR}/.env" <<'PY'
+import importlib
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from dotenv import dotenv_values
+
+source_dir = Path(sys.argv[1]).resolve(strict=True)
+config = dotenv_values(Path(sys.argv[2]))
+for key, value in config.items():
+    if value is not None:
+        os.environ.setdefault(key, value)
+with tempfile.TemporaryDirectory(prefix="toolbox-runtime-probe-") as runtime_dir:
+    runtime_root = Path(runtime_dir)
+    os.environ["TOOLBOX_RUNTIME_DIR"] = str(runtime_root / "runtime")
+    os.environ["UPDATE_RELEASE_DIR"] = str(runtime_root / "updates")
+    os.environ["EXPENSE_ATTACHMENT_DIR"] = str(runtime_root / "expense-attachments")
+    os.chdir(source_dir)
+    sys.path.insert(0, str(source_dir))
+    importlib.import_module("main")
+PY
 
 mkdir -p "${BACKUP_DIR}/backend"
 rsync -a "${BACKEND_PERSISTENT_EXCLUDES[@]}" \
@@ -483,6 +515,13 @@ rsync -a --delete "${BACKEND_PERSISTENT_EXCLUDES[@]}" \
 cp -a "${STAGING_DIR}/package.json" "${APP_ROOT}/package.json"
 chown -R toolbox:toolbox "${BACKEND_DIR}"
 chmod 600 "${BACKEND_DIR}/.env"
+# systemd ProtectSystem=strict cannot create a missing ReadWritePaths target.
+# Materialize writable application directories before migration and startup.
+install -d -o toolbox -g toolbox -m 0700 \
+  "${BACKEND_DIR}/updates" \
+  "${BACKEND_DIR}/runtime"
+runuser -u toolbox -- test -w "${BACKEND_DIR}/updates"
+runuser -u toolbox -- test -w "${BACKEND_DIR}/runtime"
 
 # Keep public update artifacts outside the private application tree. Nginx can
 # traverse/read only this release directory; the staging area stays private to

@@ -115,13 +115,33 @@ requireText('scripts/verify-release-mariadb-gate.mjs', [
   "'npm run test:mariadb:required'",
 ])
 requireText('backend/Dockerfile', ['constraints-py310.txt', '-c /tmp/requirements/constraints-py310.txt'])
+requireText('backend/requirements.txt', ['httpx==0.27.2'])
+rejectText('backend/requirements-dev.txt', ['httpx=='])
+requireText('backend/constraints-py310.txt', [
+  'async-timeout==5.0.1',
+  'exceptiongroup==1.3.1',
+])
+requireText('backend/start.bat', ['"%PYTHON%" -c "import main"'])
+requireText('scripts/check_python_constraint_closure.py', [
+  'installed distributions missing exact constraints',
+  'BOOTSTRAP_DISTRIBUTIONS',
+])
+requireText('.github/workflows/test.yml', [
+  'Verify production dependency closure in a clean venv',
+  '-r backend/requirements.txt',
+  '-m pip check',
+  'scripts/check_python_constraint_closure.py',
+  "-c 'import aiomysql, alembic, httpx, main, pymysql'",
+])
 requireText('compose.yaml', [
   'EXPENSE_ATTACHMENT_DIR: /var/lib/amazon-toolbox/expense-attachments',
   'toolbox_expense_attachments:/var/lib/amazon-toolbox/expense-attachments',
 ])
 requireText('ops/systemd/toolbox-backend.service', [
   'EnvironmentFile=-/var/lib/amazon-toolbox/release.env',
+  'Environment=TOOLBOX_RUNTIME_DIR=/opt/amazon-toolbox/backend/runtime',
   'ReadWritePaths=-/var/lib/amazon-toolbox/expense-attachments',
+  'ReadWritePaths=-/opt/amazon-toolbox/backend/runtime',
   'ReadWritePaths=-/opt/amazon-toolbox/backend/chroma_db',
   'ExecStart=/opt/amazon-toolbox/current-venv/bin/python',
 ])
@@ -162,10 +182,17 @@ requireText('ops/deploy/deploy-backend.sh', [
   'chmod 0750 "${STAGING_DIR}" "${STAGING_DIR}/backend"',
   'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/requirements.txt"',
   'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"',
+  'install -d -o root -g toolbox -m 0750 "${STAGING_DIR}/backend/updates"',
   'chmod -R a+rX "${VENV_BUILD_DIR}"',
   'runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check',
   'chmod -R a+rX "${VENV_RELEASE_DIR}"',
   'runuser -u toolbox -- "${VENV_RELEASE_DIR}/bin/python" -m pip check',
+  'with tempfile.TemporaryDirectory(prefix="toolbox-runtime-probe-") as runtime_dir:',
+  'os.environ["UPDATE_RELEASE_DIR"] = str(runtime_root / "updates")',
+  'os.environ["EXPENSE_ATTACHMENT_DIR"] = str(runtime_root / "expense-attachments")',
+  'importlib.import_module("main")',
+  '"${BACKEND_DIR}/runtime"',
+  'runuser -u toolbox -- test -w "${BACKEND_DIR}/runtime"',
 ])
 requireText('ops/deploy/restore-backup.sh', [
   'trap restore_failure ERR',
@@ -189,6 +216,7 @@ requireOrder('ops/deploy/deploy-backend.sh', [
   '"${ACTIVE_VENV_PYTHON}" - "${BACKEND_DIR}/.env"',
   'tar -xzf "${ARCHIVE_PATH}" -C "${STAGING_DIR}"',
   'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"',
+  'install -d -o root -g toolbox -m 0750 "${STAGING_DIR}/backend/updates"',
   'VENV_BUILD_MARKER="${VENV_ROOT}/.${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}.building"',
   '# Freeze writes before taking the attachment and database snapshots.',
 ])
@@ -197,6 +225,16 @@ requireOrder('ops/deploy/deploy-backend.sh', [
   'chmod -R a+rX "${VENV_BUILD_DIR}"',
   'runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check',
   'VENV_PYTHON="${VENV_RELEASE_DIR}/bin/python"',
+  'importlib.import_module("main")',
+  'mkdir -p "${BACKUP_DIR}/backend"',
+  'DEPLOY_STARTED=1',
+])
+requireOrder('ops/deploy/deploy-backend.sh', [
+  'chown -R toolbox:toolbox "${BACKEND_DIR}"',
+  '"${BACKEND_DIR}/runtime"',
+  'runuser -u toolbox -- test -w "${BACKEND_DIR}/runtime"',
+  'MIGRATION_STARTED=1',
+  'systemctl start toolbox-backend',
 ])
 requireOrder('ops/deploy/deploy-backend.sh', [
   'MIGRATION_STARTED=1',
