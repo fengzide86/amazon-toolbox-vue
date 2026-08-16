@@ -162,6 +162,10 @@ requireText('ops/deploy/deploy-backend.sh', [
   'chmod 0750 "${STAGING_DIR}" "${STAGING_DIR}/backend"',
   'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/requirements.txt"',
   'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"',
+  'chmod -R a+rX "${VENV_BUILD_DIR}"',
+  'runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check',
+  'chmod -R a+rX "${VENV_RELEASE_DIR}"',
+  'runuser -u toolbox -- "${VENV_RELEASE_DIR}/bin/python" -m pip check',
 ])
 requireText('ops/deploy/restore-backup.sh', [
   'trap restore_failure ERR',
@@ -173,6 +177,8 @@ requireText('ops/deploy/restore-backup.sh', [
   'DROP TABLE IF EXISTS',
   'current-venv.target',
   'mv -Tf',
+  'process = subprocess.Popen(command, stdin=subprocess.PIPE)',
+  'while chunk := source.read(1024 * 1024):',
 ])
 requireCount('ops/deploy/deploy-backend.sh', '"${BACKEND_PERSISTENT_EXCLUDES[@]}"', 3)
 requireCount('ops/deploy/restore-backup.sh', '"${BACKEND_PERSISTENT_EXCLUDES[@]}"', 1)
@@ -187,6 +193,12 @@ requireOrder('ops/deploy/deploy-backend.sh', [
   '# Freeze writes before taking the attachment and database snapshots.',
 ])
 requireOrder('ops/deploy/deploy-backend.sh', [
+  'chown -R root:root "${VENV_BUILD_DIR}"',
+  'chmod -R a+rX "${VENV_BUILD_DIR}"',
+  'runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check',
+  'VENV_PYTHON="${VENV_RELEASE_DIR}/bin/python"',
+])
+requireOrder('ops/deploy/deploy-backend.sh', [
   'MIGRATION_STARTED=1',
   'atomic_switch_current_venv "${VENV_RELEASE_DIR}"',
 ])
@@ -197,12 +209,19 @@ requireOrder('ops/deploy/restore-backup.sh', [
   'trap restore_failure ERR',
 ])
 requireOrder('ops/deploy/restore-backup.sh', [
+  '# Validate the complete compressed stream before changing the live schema.',
+  'with gzip.open(sys.argv[2], "rb") as source:',
+  'objects = subprocess.run(',
   'DROP VIEW IF EXISTS',
   'DROP TABLE IF EXISTS',
-  'with gzip.open(sys.argv[2], "rb") as source:',
+  'process = subprocess.Popen(command, stdin=subprocess.PIPE)',
+  'while chunk := source.read(1024 * 1024):',
 ])
 rejectText('ops/deploy/deploy-backend.sh', ['https://8.130.113.104'])
-rejectText('ops/deploy/restore-backup.sh', ["trap 'systemctl start toolbox-backend || true' EXIT"])
+rejectText('ops/deploy/restore-backup.sh', [
+  "trap 'systemctl start toolbox-backend || true' EXIT",
+  'subprocess.run(command, stdin=source',
+])
 rejectText('ops/systemd/toolbox-backend.service', ['ExecStart=/opt/amazon-toolbox/backend/.venv/bin/python'])
 
 process.stdout.write('release_configuration=verified\n')

@@ -177,4 +177,37 @@ describe('internal desktop package profile', () => {
     expect(deploy).toContain('ops/systemd/toolbox-backend.service')
     expect(readFileSync(resolve('ops/systemd/toolbox-backend.service'), 'utf8')).toContain('--workers 1')
   })
+
+  it('keeps release venvs executable and restores decompressed database streams', () => {
+    const deploy = readFileSync(resolve('ops/deploy/deploy-backend.sh'), 'utf8')
+    const restore = readFileSync(resolve('ops/deploy/restore-backup.sh'), 'utf8')
+    const reusedVenv = deploy.indexOf('if [[ -e "${VENV_RELEASE_DIR}" ]]; then')
+    const reusedPermissions = deploy.indexOf('chmod -R a+rX "${VENV_RELEASE_DIR}"', reusedVenv)
+    const reusedServiceUserCheck = deploy.indexOf(
+      'runuser -u toolbox -- "${VENV_RELEASE_DIR}/bin/python" -m pip check',
+      reusedPermissions,
+    )
+    expect(reusedVenv).toBeGreaterThan(0)
+    expect(reusedPermissions).toBeGreaterThan(reusedVenv)
+    expect(reusedServiceUserCheck).toBeGreaterThan(reusedPermissions)
+
+    const rootOwnership = deploy.indexOf('chown -R root:root "${VENV_BUILD_DIR}"')
+    const readablePermissions = deploy.indexOf('chmod -R a+rX "${VENV_BUILD_DIR}"')
+    const serviceUserCheck = deploy.indexOf(
+      'runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check',
+      readablePermissions,
+    )
+    expect(rootOwnership).toBeGreaterThan(0)
+    expect(readablePermissions).toBeGreaterThan(rootOwnership)
+    expect(serviceUserCheck).toBeGreaterThan(readablePermissions)
+
+    const gzipPreflight = restore.indexOf(
+      '# Validate the complete compressed stream before changing the live schema.',
+    )
+    expect(gzipPreflight).toBeGreaterThan(0)
+    expect(gzipPreflight).toBeLessThan(restore.indexOf('DROP TABLE IF EXISTS'))
+    expect(restore).toContain('process = subprocess.Popen(command, stdin=subprocess.PIPE)')
+    expect(restore).toContain('while chunk := source.read(1024 * 1024):')
+    expect(restore).not.toContain('subprocess.run(command, stdin=source')
+  })
 })

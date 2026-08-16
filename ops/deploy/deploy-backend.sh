@@ -324,6 +324,11 @@ if [[ -e "${VENV_RELEASE_DIR}" || -L "${VENV_RELEASE_DIR}" ]]; then
 fi
 if [[ -e "${VENV_RELEASE_DIR}" ]]; then
   release_venv_is_complete
+  # A previous interrupted release may have completed dependency installation
+  # before permission normalization. Repair that immutable venv in place so a
+  # resume can safely reuse it instead of failing under the toolbox account.
+  chown -R root:root "${VENV_RELEASE_DIR}"
+  chmod -R a+rX "${VENV_RELEASE_DIR}"
   runuser -u toolbox -- "${VENV_RELEASE_DIR}/bin/python" -m pip check
   if [[ -e "${VENV_BUILD_MARKER}" || -L "${VENV_BUILD_MARKER}" ]]; then
     validate_venv_build_marker
@@ -349,8 +354,12 @@ else
     --disable-pip-version-check --no-cache-dir \
     -c "${STAGING_DIR}/backend/constraints-py310.txt" \
     -r "${STAGING_DIR}/backend/requirements.txt"
-  runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check
   chown -R root:root "${VENV_BUILD_DIR}"
+  # umask 077 makes venv subdirectories private while toolbox owns them.
+  # Once ownership moves to root, restore read/traverse access for the
+  # unprivileged service user while keeping the environment non-writable.
+  chmod -R a+rX "${VENV_BUILD_DIR}"
+  runuser -u toolbox -- "${VENV_BUILD_DIR}/bin/python" -m pip check
   VENV_METADATA_TMP="$(mktemp "${VENV_RELEASE_DIR}/.toolbox-release.XXXXXX")"
   printf 'TOOLBOX_VERSION=%s\nTOOLBOX_COMMIT_SHA=%s\nTOOLBOX_RELEASE_ID=%s\n' \
     "${EXPECTED_VERSION}" "${EXPECTED_COMMIT}" "${RELEASE_ID}" \

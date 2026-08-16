@@ -232,6 +232,15 @@ try:
         f"--defaults-extra-file={defaults_path}",
         "--default-character-set=utf8mb4",
     ]
+
+    # Validate the complete compressed stream before changing the live schema.
+    # Passing a gzip.GzipFile directly as subprocess stdin is unsafe because
+    # Popen consumes its underlying file descriptor and therefore sends the
+    # compressed bytes to mysql instead of the decompressed SQL stream.
+    with gzip.open(sys.argv[2], "rb") as source:
+        while source.read(1024 * 1024):
+            pass
+
     objects = subprocess.run(
         mysql
         + [
@@ -270,8 +279,31 @@ try:
     reset_sql.append("SET FOREIGN_KEY_CHECKS=1;")
     command = mysql + [database]
     subprocess.run(command, input="\n".join(reset_sql).encode("utf-8"), check=True)
-    with gzip.open(sys.argv[2], "rb") as source:
-        subprocess.run(command, stdin=source, check=True)
+    process = subprocess.Popen(command, stdin=subprocess.PIPE)
+    assert process.stdin is not None
+    stream_error = None
+    try:
+        try:
+            with gzip.open(sys.argv[2], "rb") as source:
+                while chunk := source.read(1024 * 1024):
+                    process.stdin.write(chunk)
+        except BrokenPipeError as error:
+            stream_error = error
+        finally:
+            try:
+                process.stdin.close()
+            except BrokenPipeError as error:
+                stream_error = stream_error or error
+    except BaseException:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        raise
+    return_code = process.wait()
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, command) from stream_error
+    if stream_error is not None:
+        raise stream_error
 finally:
     if defaults_path:
         Path(defaults_path).unlink(missing_ok=True)
