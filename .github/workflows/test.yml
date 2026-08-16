@@ -60,6 +60,25 @@ jobs:
             backend/requirements.txt
             backend/constraints-py310.txt
       - run: python -m pip install -r backend/requirements-dev.txt
+      - name: Verify production dependency closure in a clean venv
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/toolbox-production-venv"
+          "$RUNNER_TEMP/toolbox-production-venv/bin/python" -m pip install \
+            -c backend/constraints-py310.txt \
+            -r backend/requirements.txt
+          "$RUNNER_TEMP/toolbox-production-venv/bin/python" -m pip check
+          "$RUNNER_TEMP/toolbox-production-venv/bin/python" \
+            scripts/check_python_constraint_closure.py
+          mkdir -p "$RUNNER_TEMP/toolbox-production-runtime"
+          (
+            cd backend
+            APP_ENV=test \
+            DEBUG=true \
+            TOOLBOX_RUNTIME_DIR="$RUNNER_TEMP/toolbox-production-runtime" \
+            "$RUNNER_TEMP/toolbox-production-venv/bin/python" \
+              -c 'import aiomysql, alembic, httpx, main, pymysql'
+          )
       - name: OpenAPI snapshot and generated types
         run: >-
           python scripts/export_openapi.py --output backend/openapi.json --check &&

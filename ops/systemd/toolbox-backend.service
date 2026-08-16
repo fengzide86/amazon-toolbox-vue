@@ -11,6 +11,7 @@ WorkingDirectory=/opt/amazon-toolbox/backend
 EnvironmentFile=/opt/amazon-toolbox/backend/.env
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=TOOLBOX_RUNTIME_DIR=/opt/amazon-toolbox/backend/runtime
 Environment=UPDATE_RELEASE_DIR=/var/lib/amazon-toolbox/updates
 Environment=EXPENSE_ATTACHMENT_DIR=/var/lib/amazon-toolbox/expense-attachments
 EnvironmentFile=-/var/lib/amazon-toolbox/release.env

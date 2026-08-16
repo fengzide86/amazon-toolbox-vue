@@ -44,9 +44,9 @@ if not exist "%TOOLBOX_RUNTIME_DIR%" (
     if errorlevel 1 goto :failed
 )
 
-rem Import every runtime dependency used by the local backend. Checking only the
-rem web framework can leave a partially installed venv that fails after launch.
-"%PYTHON%" -c "import fastapi, uvicorn, multipart, dotenv, yaml, sqlalchemy, pydantic, pydantic_settings, aiosqlite, aiomysql, pymysql, cryptography, redis, bcrypt, jwt, slowapi, alembic, greenlet" >nul 2>&1
+rem Import the complete application so an old or partially installed venv is
+rem repaired whenever a newly required runtime dependency is missing.
+"%PYTHON%" -c "import main" >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Installing backend dependencies...
     "%PYTHON%" -m pip install -r requirements.txt
