@@ -1,0 +1,3 @@
+# Linux deployment artifacts must not inherit Windows CRLF conversions.
+*.sh text eol=lf
+ops/** text eol=lf

@@ -843,6 +843,14 @@ function deploymentArchive(version, commitSha, artifactDir) {
   for (const required of ['backend/main.py', 'backend/constraints-py310.txt', 'ops/deploy/deploy-backend.sh', 'package.json']) {
     if (!listing.split(/\r?\n/).includes(required)) fail(`提交归档缺少必要文件：${required}`)
   }
+  for (const shellScript of [
+    'ops/deploy/deploy-backend.sh',
+    'ops/deploy/deploy-web.sh',
+    'ops/deploy/restore-backup.sh',
+  ]) {
+    const source = output('tar', ['-xOf', archive, shellScript])
+    if (source.includes('\r')) fail(`提交归档的 Linux 脚本包含 CRLF：${shellScript}`)
+  }
   return archive
 }
 
