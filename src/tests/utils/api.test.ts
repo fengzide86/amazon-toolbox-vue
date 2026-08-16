@@ -279,7 +279,7 @@ describe('API Utils', () => {
     })
 
     it('授权码更新和删除应把真实 ID 放进请求路径', async () => {
-      await updateAuthCode(42, { note: 'updated' })
+      await updateAuthCode(42, { status: 'disabled' })
       expect(mockedFetch.mock.calls[0][0]).toContain('/api/auth-codes/42')
 
       vi.clearAllMocks()

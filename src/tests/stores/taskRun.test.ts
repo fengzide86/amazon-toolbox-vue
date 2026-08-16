@@ -93,7 +93,7 @@ describe('taskRun store', () => {
     expect(store.steps[0].status).toBe('active')
   })
 
-  it('internal 模式即使存在 Electron Bridge 也只使用显式 Demo Adapter', () => {
+  it('桌面端 Demo 使用本地 Runner 执行真实交互沙盒', async () => {
     const automation = {
       onEvent: vi.fn(() => vi.fn()),
       start: vi.fn(() => Promise.resolve({ runId: 'local_run_1' })),
@@ -107,10 +107,9 @@ describe('taskRun store', () => {
     window.electronAPI = { automation }
     const store = useTaskRunStore()
 
-    store.start(tool)
+    await store.start(tool)
 
-    expect(automation.start).not.toHaveBeenCalled()
-    expect(store.status).toBe('running')
-    expect(store.runId).toMatch(/^demo_run_local_/)
+    expect(automation.start).toHaveBeenCalledWith(tool)
+    expect(store.status).toBe('preparing')
   })
 })

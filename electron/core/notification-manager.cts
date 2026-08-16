@@ -1,9 +1,9 @@
 import { Notification, type BrowserWindow } from 'electron'
 
-export interface NotificationFocus {
-  mode: 'single' | 'batch'
-  itemId?: string
-}
+import {
+  parseDesktopIpcEvent,
+  type NotificationFocusPayload as NotificationFocus,
+} from '../../src/shared/ipc/desktop-contract.js'
 
 interface ActionNotification {
   title: string
@@ -43,7 +43,8 @@ export class NotificationManager {
       if (activeWindow.isMinimized()) activeWindow.restore()
       activeWindow.show()
       activeWindow.focus()
-      activeWindow.webContents.send('toolbox:notification-focus', input.focus)
+      const focus = parseDesktopIpcEvent('toolbox:notification-focus', input.focus)
+      activeWindow.webContents.send('toolbox:notification-focus', focus)
     })
     notification.show()
   }

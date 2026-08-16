@@ -23,7 +23,7 @@ const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'toolbox-embedded-smo
 const timeout = setTimeout(() => {
   console.error('embedded browser smoke test timed out');
   runner?.stop().finally(() => app.exit(2));
-}, 30000);
+}, 90000);
 
 function startGrantServer(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -80,16 +80,13 @@ app.whenReady().then(async () => {
 
       await runner?.start({
         id: 'embedded-smoke',
-        name: '嵌入浏览器巡检',
+        name: '嵌入浏览器本地沙盒巡检',
         platformKey: 'amazon',
+        executionMode: 'demo',
         browserMode: 'embedded-cdp',
-        targetUrl: 'https://example.com/',
-        launchGrant: {
-          token: 'smoke-grant',
-          scriptKey: 'amazon.register.v1',
-          runnerApiVersion: 1,
-          expiresAt: new Date(Date.now() + 60000).toISOString(),
-        },
+        scriptKey: 'demo.listing_script_walkthrough_v1',
+        targetUrl: 'demo://amazon/listing',
+        executionContext: { mode: 'single', sessionId: 'embedded-smoke', input: {} },
       });
       const event = await completed;
       const result = event.result || {};

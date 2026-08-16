@@ -2,7 +2,8 @@
 AI客服相关数据模型
 包含: KnowledgeBase, ChatSession, ChatMessage, ChatConfig
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, Boolean, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text, func
+
 from models.base import Base
 
 

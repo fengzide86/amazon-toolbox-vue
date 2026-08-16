@@ -1,6 +1,8 @@
 import { api, type ApiQueryParams } from './index'
+import type { components } from '@/shared/api/openapi.generated'
 
 type EntityId = string | number
+type Schemas = components['schemas']
 
 export interface DemoRunCreatePayload {
   client_demo_run_id: string
@@ -24,19 +26,19 @@ export interface DemoRunFinishPayload {
   completed_step_count: number
 }
 
-export const createDemoRun = ({ client_demo_run_id, ...payload }: DemoRunCreatePayload): Promise<unknown> =>
+export const createDemoRun = ({ client_demo_run_id, ...payload }: DemoRunCreatePayload): Promise<Schemas['DemoRunResponse']> =>
   api.post('/api/demo/runs', payload, { headers: { 'Idempotency-Key': client_demo_run_id } })
 
-export const updateDemoRun = (runId: EntityId, payload: DemoRunProgressPayload): Promise<unknown> =>
+export const updateDemoRun = (runId: EntityId, payload: DemoRunProgressPayload): Promise<Schemas['DemoRunResponse']> =>
   api.patch(`/api/demo/runs/${encodeURIComponent(runId)}`, payload)
 
-export const finishDemoRun = (runId: EntityId, payload: DemoRunFinishPayload): Promise<unknown> =>
+export const finishDemoRun = (runId: EntityId, payload: DemoRunFinishPayload): Promise<Schemas['DemoRunResponse']> =>
   api.post(`/api/demo/runs/${encodeURIComponent(runId)}/finish`, payload)
 
-export const cancelDemoRun = (runId: EntityId, eventSeq: number): Promise<unknown> =>
+export const cancelDemoRun = (runId: EntityId, eventSeq: number): Promise<Schemas['DemoRunResponse']> =>
   api.post(`/api/demo/runs/${encodeURIComponent(runId)}/cancel`, { event_seq: eventSeq })
 
-export const getDemoRuns = (params: ApiQueryParams = {}): Promise<unknown> =>
+export const getDemoRuns = (params: ApiQueryParams = {}): Promise<Schemas['DemoRunResponse'][]> =>
   api.get('/api/demo/runs', params, { cache: false })
 
 export interface DemoBatchCreatePayload {
@@ -48,17 +50,17 @@ export interface DemoBatchCreatePayload {
   row_count: number
 }
 
-export const createDemoBatch = ({ client_demo_batch_id, ...payload }: DemoBatchCreatePayload): Promise<unknown> =>
+export const createDemoBatch = ({ client_demo_batch_id, ...payload }: DemoBatchCreatePayload): Promise<Schemas['DemoBatchResponse']> =>
   api.post('/api/demo/batches', payload, { headers: { 'Idempotency-Key': client_demo_batch_id } })
 
-export const updateDemoBatch = (batchId: EntityId, payload: unknown): Promise<unknown> =>
+export const updateDemoBatch = (batchId: EntityId, payload: Schemas['DemoBatchUpdate']): Promise<Schemas['DemoBatchResponse']> =>
   api.patch(`/api/demo/batches/${encodeURIComponent(batchId)}`, payload)
 
-export const updateDemoBatchItem = (batchId: EntityId, itemRef: string, payload: unknown): Promise<unknown> =>
+export const updateDemoBatchItem = (batchId: EntityId, itemRef: string, payload: Schemas['DemoBatchItemUpdate']): Promise<Schemas['DemoBatchItemResponse']> =>
   api.put(`/api/demo/batches/${encodeURIComponent(batchId)}/items/${encodeURIComponent(itemRef)}`, payload)
 
-export const finishDemoBatch = (batchId: EntityId, payload: unknown): Promise<unknown> =>
+export const finishDemoBatch = (batchId: EntityId, payload: Schemas['DemoEvent']): Promise<Schemas['DemoBatchResponse']> =>
   api.post(`/api/demo/batches/${encodeURIComponent(batchId)}/finish`, payload)
 
-export const getDemoBatches = (params: ApiQueryParams = {}): Promise<unknown> =>
+export const getDemoBatches = (params: ApiQueryParams = {}): Promise<Schemas['DemoBatchResponse'][]> =>
   api.get('/api/demo/batches', params, { cache: false })

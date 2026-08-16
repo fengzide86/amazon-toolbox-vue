@@ -2,6 +2,7 @@ from domains.catalog.seed_service import (
     DEFAULT_REGISTER_TOOL,
     default_tool_configs,
     ensure_tool_runtime_fields,
+    restore_missing_default_platforms,
     upgrade_default_tool_configs,
 )
 
@@ -86,3 +87,29 @@ def test_default_tool_configs_include_register_tool():
     assert register_tool["target_url"] == ""
     assert register_tool["availability"] == "demo_only"
     assert register_tool["supports_live_single"] is False
+
+
+def test_restore_missing_aliexpress_defaults_for_legacy_amazon_catalog():
+    tools = [dict(DEFAULT_REGISTER_TOOL)]
+
+    changed = restore_missing_default_platforms(tools)
+
+    assert changed is True
+    aliexpress_tools = [tool for tool in tools if tool["platform_key"] == "aliexpress"]
+    assert {tool["capability_key"] for tool in aliexpress_tools} == {
+        "ali_register",
+        "ali_listing",
+        "ali_ship",
+    }
+
+
+def test_keep_custom_aliexpress_catalog_without_readding_defaults():
+    tools = [
+        dict(DEFAULT_REGISTER_TOOL),
+        {"id": "custom_ali", "platform_key": "aliexpress", "name": "自定义速卖通工具"},
+    ]
+
+    changed = restore_missing_default_platforms(tools)
+
+    assert changed is False
+    assert [tool["id"] for tool in tools if tool["platform_key"] == "aliexpress"] == ["custom_ali"]

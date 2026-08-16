@@ -1,5 +1,5 @@
 """B 端批量自动化的脱敏控制面模型。"""
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, func
 
 from models.base import Base
 

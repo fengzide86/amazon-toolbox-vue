@@ -2,22 +2,26 @@
 分页模块
 提供标准化的分页查询功能
 """
-from typing import TypeVar, Generic, List, Optional, Any, Tuple
+
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any, Generic, TypeVar
+
 from fastapi import Query
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 @dataclass
 class PaginationParams:
     """分页参数"""
+
     page: int = Query(1, ge=1, description="页码（从1开始）")
     page_size: int = Query(20, ge=1, le=100, description="每页数量（1-100）")
-    
+
     @property
     def offset(self) -> int:
         """计算偏移量"""
@@ -27,15 +31,16 @@ class PaginationParams:
 @dataclass
 class PageInfo:
     """分页信息"""
+
     page: int
     page_size: int
     total: int
     total_pages: int
     has_next: bool
     has_prev: bool
-    
+
     @classmethod
-    def create(cls, page: int, page_size: int, total: int) -> 'PageInfo':
+    def create(cls, page: int, page_size: int, total: int) -> "PageInfo":
         """创建分页信息"""
         total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
         return cls(
@@ -46,8 +51,8 @@ class PageInfo:
             has_next=page < total_pages,
             has_prev=page > 1,
         )
-    
-    def to_dict(self) -> dict:
+
+    def to_dict(self) -> dict[str, int | bool]:
         """转换为字典"""
         return {
             "page": self.page,
@@ -62,12 +67,16 @@ class PageInfo:
 @dataclass
 class PaginatedResult(Generic[T]):
     """分页查询结果"""
-    items: List[T]
+
+    items: list[T]
     page_info: PageInfo
-    
-    def to_response(self, serializer=None) -> dict:
+
+    def to_response(
+        self,
+        serializer: Callable[[T], Any] | None = None,
+    ) -> dict[str, Any]:
         """转换为响应格式
-        
+
         Args:
             serializer: 可选的序列化函数，用于转换每个项目
         """
@@ -75,7 +84,7 @@ class PaginatedResult(Generic[T]):
             data = [serializer(item) for item in self.items]
         else:
             data = self.items
-            
+
         return {
             "success": True,
             "message": "ok",
@@ -87,18 +96,14 @@ class PaginatedResult(Generic[T]):
         }
 
 
-async def paginate(
-    query: Select,
-    db: AsyncSession,
-    pagination: PaginationParams
-) -> Tuple[List[Any], int]:
+async def paginate(query: Select, db: AsyncSession, pagination: PaginationParams) -> tuple[list[Any], int]:
     """执行分页查询
-    
+
     Args:
         query: SQLAlchemy 查询对象
         db: 数据库会话
         pagination: 分页参数
-        
+
     Returns:
         (items, total) 元组
     """
@@ -106,27 +111,23 @@ async def paginate(
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
-    
+
     # 执行分页查询
     paginated_query = query.offset(pagination.offset).limit(pagination.page_size)
     result = await db.execute(paginated_query)
     items = list(result.scalars().all())
-    
+
     return items, total
 
 
-async def paginate_with_info(
-    query: Select,
-    db: AsyncSession,
-    pagination: PaginationParams
-) -> PaginatedResult:
+async def paginate_with_info(query: Select, db: AsyncSession, pagination: PaginationParams) -> PaginatedResult:
     """执行分页查询并返回完整分页结果
-    
+
     Args:
         query: SQLAlchemy 查询对象
         db: 数据库会话
         pagination: 分页参数
-        
+
     Returns:
         PaginatedResult 对象
     """
@@ -136,11 +137,10 @@ async def paginate_with_info(
 
 
 def get_pagination_params(
-    page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量")
+    page: int = Query(1, ge=1, description="页码"), page_size: int = Query(20, ge=1, le=100, description="每页数量")
 ) -> PaginationParams:
     """获取分页参数（用于依赖注入）
-    
+
     Usage:
         @router.get("/items")
         async def get_items(pagination: PaginationParams = Depends(get_pagination_params)):
@@ -152,6 +152,7 @@ def get_pagination_params(
 # ===== 常用分页大小预设 =====
 class PageSize:
     """预设分页大小"""
+
     SMALL = 10
     MEDIUM = 20
     LARGE = 50

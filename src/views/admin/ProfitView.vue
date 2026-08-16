@@ -1,109 +1,117 @@
 <template>
-  <div>
-    <h2 class="page-title">分润管理</h2>
-    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载分润数据…" @retry="loadData" />
+  <div class="profit-page">
+    <PageHeader title="分润管理" description="查看当前有效分润总额与各角色的分配构成" />
+    <AsyncStateNotice
+      :state="loadState"
+      :message="loadError"
+      loading-text="正在加载分润数据…"
+      @retry="loadData"
+    />
 
-    <!-- 分润统计卡片 -->
-    <el-row v-if="loadState !== 'loading' && loadState !== 'error'" :gutter="16" style="margin-bottom: 1.5rem; align-items: stretch;">
-      <el-col :xs="12" :sm="8" :md="4" v-for="(item, index) in profitItems" :key="item.key" style="display: flex;">
-        <el-card class="stat-card" style="width: 100%; min-height: 120px;">
-          <div class="stat-icon" :style="{ background: item.bgColor }">
-            <span style="font-size: 1.5rem;">{{ item.icon }}</span>
+    <template v-if="loadState !== 'loading' && loadState !== 'error'">
+      <section class="profit-summary" aria-label="有效分润汇总">
+        <div class="profit-summary__primary">
+          <span>有效分润总额</span>
+          <strong>¥{{ formatMoney(summary.grand_total) }}</strong>
+          <p>仅统计已收款且尚未冲正的订单。</p>
+        </div>
+        <dl class="profit-summary__meta">
+          <div>
+            <dt>统计范围</dt>
+            <dd>{{ platformLabel }}</dd>
           </div>
-          <div class="stat-content">
-            <div class="stat-label">{{ item.label }} ({{ profitRatios[item.key] }}%)</div>
-            <div class="stat-value" :style="{ color: item.color }">
-              ¥{{ summary[item.amountKey]?.toFixed(2) || '0.00' }}
+          <div>
+            <dt>策略版本</dt>
+            <dd>V{{ policyVersion }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <el-card class="distribution-card" shadow="never">
+        <template #header>
+          <div class="distribution-header">
+            <div>
+              <h3>分润构成</h3>
+              <p>金额按订单收款时生效的策略快照计算</p>
             </div>
+            <router-link v-if="canEditPolicy" to="/admin/settings" class="settings-link">编辑比例</router-link>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
+        </template>
 
-    <!-- 分润总计 -->
-    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="total-card">
-      <div class="total-content">
-        <div class="total-label">分润总计</div>
-        <div class="total-value">¥{{ summary.grand_total?.toFixed(2) || '0.00' }}</div>
-      </div>
-      <div v-if="!summary.grand_total" class="total-empty">
-      暂无分润记录，请先创建订单并标记已收款
-      </div>
-    </el-card>
+        <div class="distribution-grid">
+          <article v-for="item in profitItems" :key="item.key" class="distribution-item">
+            <div class="distribution-item__header">
+              <span>{{ item.label }}</span>
+              <span>{{ profitRatios[item.key] }}%</span>
+            </div>
+            <strong>¥{{ formatMoney(summary[item.amountKey]) }}</strong>
+            <div class="ratio-track" aria-hidden="true">
+              <span :style="{ width: `${profitRatios[item.key]}%` }" />
+            </div>
+          </article>
+        </div>
 
-    <!-- 分润比例可视化 -->
-    <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="table-card">
-      <template #header>
-        <div class="card-header">
-          <h3>分润比例配置</h3>
-          <router-link v-if="canEditPolicy" to="/admin/settings" class="settings-link">
-            <el-icon><Setting /></el-icon>
-            去设置
-          </router-link>
+        <div v-if="summary.grand_total === 0" class="profit-empty">
+          暂无有效分润记录。订单标记为已收款后，系统会按当时的策略生成分润。
         </div>
-      </template>
-      <div class="ratio-bars">
-        <div v-for="item in profitItems" :key="item.key" class="ratio-bar-row">
-          <div class="ratio-bar-label">
-            <span class="ratio-bar-icon">{{ item.icon }}</span>
-            <span>{{ item.label }}</span>
-          </div>
-          <div class="ratio-bar-track">
-            <div class="ratio-bar-fill" :style="{ width: profitRatios[item.key] + '%', background: item.barColor }"></div>
-          </div>
-          <div class="ratio-bar-value">{{ profitRatios[item.key] }}%</div>
-        </div>
-      </div>
-    </el-card>
+      </el-card>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { getProfitPolicy, getProfitSummary } from '@/utils/api'
 import { usePlatformStore } from '@/stores/platform'
 import { authService } from '@/utils/auth'
-import { Setting } from '@element-plus/icons-vue'
 import { profitPolicySchema, profitSummarySchema } from '@/features/admin/model'
 import { hasStaffPermission } from '@/features/auth/permissions'
-import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import { failedDataState, type AsyncDataState } from '@/features/async/state'
+import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 type ProfitKey = 'tech' | 'market' | 'product' | 'service' | 'coordination' | 'record'
 type ProfitAmountKey = 'total_tech' | 'total_market' | 'total_product' | 'total_service' | 'total_coordination' | 'total_record'
+
 interface ProfitItem {
   key: ProfitKey
   label: string
-  icon: string
   amountKey: ProfitAmountKey
-  color: string
-  bgColor: string
-  barColor: string
 }
 
 const summary = ref(profitSummarySchema.parse({}))
 const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
 const hasLoaded = ref(false)
+const policyVersion = ref(1)
 const profitRatios = ref<Record<ProfitKey, number>>({
   tech: 30,
   market: 25,
   product: 15,
   service: 15,
   coordination: 10,
-  record: 5
+  record: 5,
 })
 
 const platformStore = usePlatformStore()
 const canEditPolicy = computed(() => hasStaffPermission(authService.getRole(), 'profit.policy.write'))
-const profitItems = computed<ProfitItem[]>(() => [
-  { key: 'tech', label: '技术', icon: '🔧', amountKey: 'total_tech', color: '#6366F1', bgColor: 'rgba(99,102,241,0.1)', barColor: '#6366F1' },
-  { key: 'market', label: '市场', icon: '📢', amountKey: 'total_market', color: '#10B981', bgColor: 'rgba(16,185,129,0.1)', barColor: '#10B981' },
-  { key: 'product', label: '产品', icon: '📦', amountKey: 'total_product', color: '#F59E0B', bgColor: 'rgba(245,158,11,0.1)', barColor: '#F59E0B' },
-  { key: 'service', label: '客服', icon: '🎧', amountKey: 'total_service', color: '#EC4899', bgColor: 'rgba(236,72,153,0.1)', barColor: '#EC4899' },
-  { key: 'coordination', label: '统筹', icon: '📋', amountKey: 'total_coordination', color: '#8B5CF6', bgColor: 'rgba(139,92,246,0.1)', barColor: '#8B5CF6' },
-  { key: 'record', label: '记录', icon: '📝', amountKey: 'total_record', color: '#D97706', bgColor: 'rgba(217,119,6,0.1)', barColor: '#D97706' }
-])
+const platformLabel = computed(() => {
+  if (platformStore.adminPlatform === 'amazon') return '亚马逊'
+  if (platformStore.adminPlatform === 'aliexpress') return '速卖通'
+  return '全部平台'
+})
+const profitItems: ProfitItem[] = [
+  { key: 'tech', label: '技术', amountKey: 'total_tech' },
+  { key: 'market', label: '市场', amountKey: 'total_market' },
+  { key: 'product', label: '产品', amountKey: 'total_product' },
+  { key: 'service', label: '客服', amountKey: 'total_service' },
+  { key: 'coordination', label: '统筹', amountKey: 'total_coordination' },
+  { key: 'record', label: '记录', amountKey: 'total_record' },
+]
+
+function formatMoney(value: number | null | undefined): string {
+  return Number(value || 0).toFixed(2)
+}
 
 async function loadData() {
   loadState.value = hasLoaded.value ? 'data' : 'loading'
@@ -118,6 +126,7 @@ async function loadData() {
     summary.value = profitSummarySchema.parse(summaryRes)
 
     const policy = profitPolicySchema.parse(policyRes)
+    policyVersion.value = policy.version
     const ratioUpdate = Object.fromEntries(
       Object.entries(policy.ratios)
         .filter(([key, value]) => key in profitRatios.value && Number.isFinite(value))
@@ -132,177 +141,85 @@ async function loadData() {
   }
 }
 
-watch(() => platformStore.adminPlatform, () => { loadData() })
-
+watch(() => platformStore.adminPlatform, loadData)
 onMounted(loadData)
 </script>
 
 <style scoped>
-.page-title {
-  font-family: var(--font-family);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 1.5rem;
-}
-
-.stat-card {
-  display: flex;
+.profit-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 20px;
+  padding: 24px 28px;
+  border: 1px solid rgba(45, 95, 202, 0.22);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(45, 95, 202, 0.08), rgba(45, 95, 202, 0.02));
 }
 
-.stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
+.profit-summary__primary { display: grid; gap: 6px; }
+.profit-summary__primary > span { color: var(--color-text-secondary); font-size: 0.85rem; font-weight: 600; }
+.profit-summary__primary strong { color: var(--color-text); font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1.1; letter-spacing: -0.035em; }
+.profit-summary__primary p { margin: 2px 0 0; color: var(--color-text-secondary); font-size: 0.82rem; }
 
-.stat-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.stat-label {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-}
-
-.stat-value {
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.total-card {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-muted));
-  margin-bottom: 1.5rem;
-  text-align: center;
-  color: white;
-}
-
-.total-card :deep(.el-card__body) {
-  background: transparent;
-}
-
-.total-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.total-label {
-  font-size: 0.9rem;
-  opacity: 0.9;
-  font-weight: 500;
-}
-
-.total-value {
-  font-size: 2.5rem;
-  font-weight: 800;
-  font-family: var(--font-family);
-}
-
-.total-empty {
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  opacity: 0.8;
-}
-
-.table-card {
-  margin-bottom: 1.5rem;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.card-header h3 {
-  font-family: var(--font-family);
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text);
+.profit-summary__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(112px, 1fr));
+  gap: 12px;
   margin: 0;
 }
 
-.settings-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--color-primary);
-  text-decoration: none;
-  padding: 0.4rem 0.75rem;
-  border-radius: 8px;
-  background: rgba(79, 70, 229, 0.08);
-  transition: background var(--transition);
+.profit-summary__meta div { padding: 12px 14px; border-left: 1px solid var(--color-border); }
+.profit-summary__meta dt { color: var(--color-text-secondary); font-size: 0.75rem; }
+.profit-summary__meta dd { margin: 5px 0 0; color: var(--color-text); font-size: 0.95rem; font-weight: 700; }
+
+.distribution-card { border-radius: var(--radius-lg); }
+.distribution-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.distribution-header h3 { margin: 0; color: var(--color-text); font-size: 1rem; }
+.distribution-header p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: 0.8rem; }
+.settings-link { color: var(--color-primary); font-size: 0.85rem; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.settings-link:hover { text-decoration: underline; }
+
+.distribution-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
 }
 
-.settings-link:hover {
-  background: rgba(79, 70, 229, 0.15);
+.distribution-item {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
-.ratio-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+.distribution-item__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-text-secondary); font-size: 0.82rem; }
+.distribution-item__header span:first-child { color: var(--color-text); font-weight: 700; }
+.distribution-item strong { overflow-wrap: anywhere; color: var(--color-text); font-size: 1.45rem; line-height: 1.2; letter-spacing: -0.02em; }
+.ratio-track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--color-canvas); }
+.ratio-track span { display: block; height: 100%; border-radius: inherit; background: var(--color-primary); }
+.profit-empty { margin-top: 18px; padding: 14px 16px; border-radius: var(--radius-md); color: var(--color-text-secondary); background: var(--color-surface-soft); font-size: 0.85rem; line-height: 1.6; }
+
+@media (max-width: 720px) {
+  .profit-summary { grid-template-columns: 1fr; gap: 20px; padding: 22px; }
+  .profit-summary__meta { width: 100%; }
+  .profit-summary__meta div:first-child { border-left: 0; padding-left: 0; }
 }
 
-.ratio-bar-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+@media (max-width: 1100px) {
+  .distribution-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-.ratio-bar-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 80px;
-  font-size: 0.85rem;
-  color: var(--color-text);
-  font-weight: 500;
-}
-
-.ratio-bar-icon {
-  font-size: 1rem;
-}
-
-.ratio-bar-track {
-  flex: 1;
-  height: 8px;
-  background: var(--color-canvas);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.ratio-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.5s ease;
-}
-
-.ratio-bar-value {
-  min-width: 40px;
-  text-align: right;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-@media (max-width: 768px) {
-  .total-value {
-    font-size: 2rem;
-  }
+@media (max-width: 520px) {
+  .profit-summary__meta { grid-template-columns: 1fr; }
+  .profit-summary__meta div { border-left: 0; border-top: 1px solid var(--color-border); padding: 10px 0 0; }
+  .distribution-header { align-items: flex-start; }
+  .distribution-grid { grid-template-columns: 1fr; }
 }
 </style>

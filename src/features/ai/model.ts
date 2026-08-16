@@ -62,9 +62,8 @@ export type ChatSessionDetail = z.infer<typeof chatSessionDetailSchema>
 export const aiConfigSchema = z.object({
   welcome_message: z.string().default(''),
   suggested_questions: z.string().default('[]'),
-  transfer_rules: z.string().default('{}'),
-  ai_model: z.string().default('qwen-turbo'),
-  reply_style: z.string().default('concise'),
+  transfer_keywords: z.string().default('[]'),
+  max_unmatched: z.coerce.number().int().min(1).max(10).default(2),
 }).passthrough()
 export type AiConfig = z.infer<typeof aiConfigSchema>
 
@@ -84,12 +83,9 @@ export const aiDebugResultSchema = z.object({
   ai_used: z.boolean(),
   knowledge_refs: z.array(knowledgeReferenceSchema).default([]),
   fallback_reason: nullableText,
+  should_transfer: z.boolean().default(false),
   diagnostics: z.object({
-    retrieval_ms: z.coerce.number().optional(),
-    generation_ms: z.coerce.number().optional(),
     total_ms: z.coerce.number().optional(),
-    provider: nullableText,
-    model: nullableText,
   }).passthrough().default({}),
 }).passthrough()
 export type AiDebugResult = z.infer<typeof aiDebugResultSchema>

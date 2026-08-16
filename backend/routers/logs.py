@@ -5,6 +5,7 @@
 import csv
 import io
 from datetime import datetime
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -16,13 +17,14 @@ from core.logging import get_logger
 from database import get_db
 from models import RunLog
 from schemas import LogCreate, LogResponse
+from schemas.feedback import LogPageResponse
 
 logger = get_logger(__name__)
 
 router = APIRouter()
 
 
-@router.get("")
+@router.get("", response_model=LogPageResponse)
 async def get_logs(
     user_id: int | None = Query(None, description="用户ID"),
     start_date: str | None = Query(None, description="开始日期 (YYYY-MM-DD)"),
@@ -33,8 +35,8 @@ async def get_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
     """获取运行日志列表，支持多条件筛选
     
     Args:
@@ -106,7 +108,12 @@ async def get_logs(
     }
 
 
-@router.get("/export")
+@router.get(
+    "/export",
+    response_model=None,
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/csv": {"schema": {"type": "string", "format": "binary"}}}}},
+)
 async def export_logs(
     user_id: int | None = Query(None, description="用户ID"),
     start_date: str | None = Query(None, description="开始日期 (YYYY-MM-DD)"),
@@ -114,8 +121,8 @@ async def export_logs(
     tool_name: str | None = Query(None, description="工具名称"),
     status: str | None = Query(None, description="状态 (success/failed)"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> StreamingResponse:
     """导出日志为 CSV 文件"""
     query = select(RunLog)
     
@@ -181,12 +188,12 @@ async def export_logs(
     )
 
 
-@router.get("/tools")
+@router.get("/tools", response_model=list[str])
 async def get_log_tools(
     user_id: int | None = Query(None, description="用户ID"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[str]:
     """获取日志中的工具名称列表（用于筛选下拉框）"""
     query = select(RunLog.tool_name).distinct()
 
@@ -206,8 +213,8 @@ async def get_log_tools(
 async def create_log(
     req: LogCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
-):
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> NoReturn:
     """Real execution logs are read-only until a Runner-only API exists."""
     del req, db, current_user
     raise HTTPException(status_code=403, detail="真实执行记录只能由未来 Runner 写入")

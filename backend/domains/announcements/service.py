@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
+from domains.access import resolve_product_access
 from domains.announcements.schemas import AnnouncementCreate, AnnouncementUpdate
 from models import Announcement, AnnouncementReceipt
-from services.entitlement_service import resolve_product_access
 
 CATEGORY_DEFAULTS = {
     "system": ("important", "modal"),
@@ -92,7 +92,7 @@ async def feed(db: AsyncSession, current_user: dict[str, object]) -> list[dict[s
     device_id = current_user.get("device_id")
     if not auth_code_id or not device_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="当前设备身份不完整")
-    access = await resolve_product_access(db, auth_code_id)
+    access = await resolve_product_access(db, cast(int, auth_code_id))
     audience = "business" if access.get("product_type") == "business" else "consumer"
     now = datetime.now()
     result = await db.execute(
@@ -122,7 +122,7 @@ async def release_notes(
     auth_code_id = current_user.get("auth_code_id")
     audiences = ["all"]
     if auth_code_id:
-        access = await resolve_product_access(db, auth_code_id)
+        access = await resolve_product_access(db, cast(int, auth_code_id))
         audiences.append("business" if access.get("product_type") == "business" else "consumer")
     now = datetime.now()
     result = await db.execute(
@@ -205,6 +205,37 @@ async def update(
     await db.commit()
     await db.refresh(announcement)
     return announcement
+
+
+async def delete(
+    db: AsyncSession,
+    announcement_id: int,
+    *,
+    actor: dict[str, Any],
+    request: Request | None = None,
+) -> None:
+    result = await db.execute(select(Announcement).where(Announcement.id == announcement_id))
+    announcement = result.scalar_one_or_none()
+    if not announcement:
+        raise HTTPException(status_code=404, detail="公告不存在")
+    before = serialize(announcement)
+    await db.delete(announcement)
+    await log_admin_action(
+        db,
+        user_id=cast(int | None, actor.get("staff_id")),
+        user_name=cast(str | None, actor.get("username")),
+        action="announcement_delete",
+        target_type="announcement",
+        target_id=announcement.id,
+        detail={
+            "role": actor.get("role"),
+            "before": before,
+            "after": {"deleted": True},
+            "reason": None,
+        },
+        request=request,
+    )
+    await db.commit()
 
 
 async def record_receipt(db: AsyncSession, announcement_id: int, current_user: dict[str, object], action: str) -> dict[str, object]:

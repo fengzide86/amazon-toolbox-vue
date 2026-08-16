@@ -4,6 +4,7 @@ AI 对话服务测试
 import pytest
 
 from domains.knowledge import chat_service as ai_chat_service
+from models import ChatConfig
 
 
 class TestAIChatService:
@@ -17,6 +18,7 @@ class TestAIChatService:
         assert "session_id" in result
         assert result["status"] == "active"
         assert "welcome_message" in result
+        assert "课赛通 KST" in result["welcome_message"]
         assert "suggested_questions" in result
 
     @pytest.mark.asyncio
@@ -92,6 +94,19 @@ class TestAIChatService:
         assert "suggested_questions" in config
         assert config["support_mode"] == "rules"
         assert "transfer_keywords" in config
+
+    @pytest.mark.asyncio
+    async def test_get_config_maps_only_legacy_default_welcome_message(self, db_session):
+        """旧系统默认欢迎语应展示新品牌，但不触碰管理员自定义内容。"""
+        db_session.add(ChatConfig(
+            key="welcome_message",
+            value=ai_chat_service.LEGACY_DEFAULT_WELCOME_MESSAGE,
+        ))
+        await db_session.flush()
+
+        config = await ai_chat_service.get_config(db_session)
+
+        assert config["welcome_message"] == ai_chat_service.DEFAULT_CONFIG["welcome_message"]
 
     @pytest.mark.asyncio
     async def test_update_config(self, db_session):

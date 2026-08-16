@@ -2,8 +2,9 @@
 公告 API 测试
 """
 import pytest
-from models import Announcement, AuthCode, Plan, User
+
 from core.security import create_access_token
+from models import Announcement, AuthCode, Plan, User
 
 
 @pytest.fixture

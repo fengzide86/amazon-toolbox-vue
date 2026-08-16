@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.audit import log_admin_action
 from core.cache import CacheKeys, cache
 from core.exceptions import ConflictException, NotFoundException, ValidationException
+from domains.access import normalize_entitlements, serialize_entitlements
 from models import AuthCode, Order, Plan, PlanStatus
-from services.entitlement_service import normalize_entitlements, serialize_entitlements
 
 
 class PlanService:
@@ -22,7 +22,7 @@ class PlanService:
         {"price", "duration_days", "code_prefix", "product_type", "entitlements"}
     )
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def list_public(self, product_type: str = "consumer") -> dict:

@@ -1,9 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import type { RouteRecordRaw } from 'vue-router'
 import { authService } from '@/utils/auth'
 import { hasBusinessWorkspaceAccess } from '@/features/auth/model'
 import type { BackofficeRole } from '@/features/auth/model'
 
-const routes = [
+const routes: RouteRecordRaw[] = [
   // 用户端路由
   {
     path: '/',
@@ -151,6 +152,12 @@ const routes = [
         meta: { title: '分润管理', skeleton: 'table', roles: ['super_admin', 'operator'] }
       },
       {
+        path: 'expenses',
+        name: 'AdminExpenses',
+        component: () => import('@/views/admin/ExpensesView.vue'),
+        meta: { title: '公账支出', skeleton: 'dashboard', roles: ['super_admin', 'operator'] }
+      },
+      {
         path: 'settings',
         name: 'AdminSettings',
         component: () => import('@/views/admin/SettingsView.vue'),
@@ -191,6 +198,12 @@ const routes = [
         name: 'AdminUpdates',
         component: () => import('@/views/admin/UpdateReleasesView.vue'),
         meta: { title: '应用更新', skeleton: 'table', roles: ['super_admin'] }
+      },
+      {
+        path: 'freight-rates',
+        name: 'AdminFreightRates',
+        component: () => import('@/views/admin/FreightRatesView.vue'),
+        meta: { title: '物流费率中心', skeleton: 'default', roles: ['super_admin'] }
       },
       {
         path: 'staff-accounts',
@@ -302,7 +315,7 @@ router.beforeEach((to, from, next) => {
 
 router.afterEach((to) => {
   if (typeof document === 'undefined') return
-  document.title = `${String(to.meta.title || '工具箱')} · 跨境电商工具箱`
+  document.title = `${String(to.meta.title || '课赛通 KST')} · 课赛通 KST`
   const focusRoute = () => {
     const target = document.querySelector<HTMLElement>('[data-route-focus], main')
     if (!target) return

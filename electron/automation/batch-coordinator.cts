@@ -37,6 +37,8 @@ interface ParsedImport {
   fileName: string;
   rows: ImportedRow[];
   errors: unknown[];
+  worksheetName?: string;
+  templateVersion?: string | null;
 }
 
 interface BatchItem {
@@ -57,6 +59,7 @@ interface ActiveBatch {
   serverBatchId?: string | number;
   tool: UnknownRecord;
   status: string;
+  recordKind: 'demo' | 'live';
   maxOpenSessions: number;
   items: BatchItem[];
 }
@@ -112,10 +115,29 @@ class BatchCoordinator {
       errorCount: parsed.errors.length,
       rows: parsed.rows.map(row => ({ itemId: row.itemId, preview: row.preview, accountLabelMasked: row.accountLabelMasked })),
       errors: parsed.errors,
+      worksheetName: parsed.worksheetName,
+      templateVersion: parsed.templateVersion,
     };
   }
 
-  create({ importId, batchId, serverBatchId, tool, maxOpenSessions = 6 }: { importId: string; batchId: string; serverBatchId?: string | number; tool: UnknownRecord; maxOpenSessions?: number }) {
+  remapImportItems(importId: string, itemIds: string[]) {
+    const importedRows = this.imports.get(importId);
+    if (!importedRows?.length) throw this.error('BATCH_IMPORT_MISSING', '导入数据已经失效，请重新载入');
+    if (itemIds.length !== importedRows.length) throw this.error('BATCH_ITEM_COUNT_MISMATCH', '服务端任务数与本地导入行数不一致');
+    const nextImportId = `${importId}_mapped`;
+    const rows = importedRows.map((row, index) => ({ ...row, itemId: itemIds[index]! }));
+    this.imports.delete(importId);
+    this.imports.set(nextImportId, rows);
+    return {
+      importId: nextImportId,
+      validCount: rows.length,
+      errorCount: 0,
+      rows: rows.map(row => ({ itemId: row.itemId, preview: row.preview, accountLabelMasked: row.accountLabelMasked })),
+      errors: [],
+    };
+  }
+
+  create({ importId, batchId, serverBatchId, tool, maxOpenSessions = 6, recordKind = 'live' }: { importId: string; batchId: string; serverBatchId?: string | number; tool: UnknownRecord; maxOpenSessions?: number; recordKind?: 'demo' | 'live' }) {
     if (this.batch && this.batch.status === 'running') throw this.error('BATCH_ACTIVE', '已有批次正在执行');
     const importedRows = this.imports.get(importId);
     if (!importedRows?.length) throw this.error('BATCH_IMPORT_MISSING', '导入数据已经失效，请重新选择文件');
@@ -125,6 +147,7 @@ class BatchCoordinator {
       serverBatchId,
       tool: { ...tool },
       status: 'running',
+      recordKind,
       maxOpenSessions: Math.min(Math.max(Number(maxOpenSessions) || 6, 2), 10),
       items: importedRows.map(row => ({
         itemId: row.itemId,
@@ -163,7 +186,7 @@ class BatchCoordinator {
     const batch = this.batch;
     if (!batch) throw this.error('BATCH_NOT_FOUND', '批次不存在');
     if (this.activeItemId && this.activeItemId !== itemId) throw this.error('BATCH_RUNNER_BUSY', '另一个账号正在处理');
-    if (!this.hostManager.isReady(itemId)) throw this.error('BROWSER_NOT_REGISTERED', '账号浏览器尚未就绪');
+    if (batch.recordKind !== 'demo' && !this.hostManager.isReady(itemId)) throw this.error('BROWSER_NOT_REGISTERED', '账号浏览器尚未就绪');
     if (TERMINAL.has(item.status)) throw this.error('BATCH_ITEM_TERMINAL', '该账号已经结束');
     this.provisioningItemId = null;
     this.activeItemId = itemId;
@@ -173,7 +196,8 @@ class BatchCoordinator {
     const runTool = {
       ...batch.tool,
       ...tool,
-      browserMode: 'embedded-cdp',
+      browserMode: this.hostManager.isReady(itemId) ? 'embedded-cdp' : 'playwright',
+      executionMode: batch.recordKind,
       executionContext: {
         mode: 'batch',
         batchId: batch.batchId,
@@ -285,6 +309,10 @@ class BatchCoordinator {
     if (this.activeItemId === item.itemId) this.activeItemId = null;
     item.runner?.stop?.().catch(() => {});
     item.runner = null;
+    if (item.browserReady) {
+      this.hostManager.release(item.itemId);
+      item.browserReady = false;
+    }
     this.emit('batch.item_updated', { itemId: item.itemId });
     if (batch.items.every(candidate => TERMINAL.has(candidate.status))) {
       batch.status = 'completed';
@@ -322,7 +350,7 @@ class BatchCoordinator {
     }
     const next = this.batch.items.find(item => item.status === 'pending');
     if (!next) return;
-    if (this.hostManager.size() >= this.batch.maxOpenSessions && !this.hostManager.isReady(next.itemId)) {
+    if (this.batch.recordKind !== 'demo' && this.hostManager.size() >= this.batch.maxOpenSessions && !this.hostManager.isReady(next.itemId)) {
       this.emit('batch.resource_blocked', { message: '浏览器现场已达上限，请先处理一个需要操作的账号' });
       return;
     }
@@ -349,6 +377,7 @@ class BatchCoordinator {
       activeItemId: this.activeItemId,
       provisioningItemId: this.provisioningItemId,
       maxOpenSessions: this.batch.maxOpenSessions,
+      recordKind: this.batch.recordKind,
       counts: {
         total: items.length,
         pending: count('pending'),

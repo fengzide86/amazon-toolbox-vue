@@ -1,8 +1,10 @@
 """
 AI 提供商测试
 """
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+
 from domains.knowledge import provider as ai_provider
 
 

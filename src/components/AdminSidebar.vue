@@ -2,8 +2,7 @@
   <aside class="studio-admin-sidebar" aria-label="管理员导航">
     <!-- 品牌区 -->
     <div class="sidebar-brand-zone">
-      <div class="brand-badge">管</div>
-      <span class="brand-text">运营控制中心<small>{{ roleLabel }}</small></span>
+      <BrandLockup audience="admin" layout="horizontal" />
     </div>
 
     <!-- 导航菜单 -->
@@ -27,6 +26,10 @@
       <router-link v-if="can('profit.read')" to="/admin/profit" class="menu-nav-item" active-class="is-active">
         <Percent :size="14" class="menu-icon" />
         <span class="menu-label">分润管理</span>
+      </router-link>
+      <router-link v-if="can('expenses.read')" to="/admin/expenses" class="menu-nav-item" active-class="is-active">
+        <WalletCards :size="14" class="menu-icon" />
+        <span class="menu-label">公账支出</span>
       </router-link>
       <router-link to="/admin/users" class="menu-nav-item" active-class="is-active">
         <Users :size="14" class="menu-icon" />
@@ -52,6 +55,10 @@
         <PackageCheck :size="14" class="menu-icon" />
         <span class="menu-label">应用更新</span>
       </router-link>
+      <router-link v-if="can('settings.manage')" to="/admin/freight-rates" class="menu-nav-item" active-class="is-active">
+        <Truck :size="14" class="menu-icon" />
+        <span class="menu-label">物流费率中心</span>
+      </router-link>
       <router-link v-if="can('settings.manage')" to="/admin/settings" class="menu-nav-item" active-class="is-active">
         <Settings :size="14" class="menu-icon" />
         <span class="menu-label">系统设置</span>
@@ -68,14 +75,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { authService } from '@/utils/auth'
-import { hasStaffPermission, staffRoleLabel, type StaffPermission } from '@/features/auth/permissions'
+import { hasStaffPermission, type StaffPermission } from '@/features/auth/permissions'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 import {
   LayoutDashboard, Key, BriefcaseBusiness, Receipt, Percent, Users, Wrench,
-  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser
+  BookOpen, MessageSquare, Megaphone, PackageCheck, Settings, ShieldUser, Truck, WalletCards
 } from '@lucide/vue'
 
 const role = computed(() => authService.getRole())
-const roleLabel = computed(() => staffRoleLabel(role.value))
 const can = (permission: StaffPermission): boolean => hasStaffPermission(role.value, permission)
 </script>
 
@@ -98,30 +105,13 @@ const can = (permission: StaffPermission): boolean => hasStaffPermission(role.va
 }
 
 .sidebar-brand-zone {
-  height: var(--header-height);
+  height: var(--shell-header-height, 88px);
   display: flex;
   align-items: center;
   padding: 0 20px;
-  gap: 11px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
-
-.brand-badge {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  background: var(--color-primary);
-  color: white;
-  font-size:var(--type-meta);
-  font-weight: 700;
-  border-radius: 9px;
-  box-shadow: 0 6px 14px rgba(45, 95, 202, .18);
-}
-
-.brand-text { display:grid; gap:1px; color: var(--color-text); font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
-.brand-text small { color: var(--color-text-tertiary); font-size: var(--type-micro); font-weight: 700; letter-spacing: .08em; }
 
 .sidebar-menu-nav {
   flex-grow: 1;
@@ -159,6 +149,7 @@ const can = (permission: StaffPermission): boolean => hasStaffPermission(role.va
 .menu-nav-item:hover .menu-label { color: var(--color-text); }
 
 .menu-nav-item.is-active { background: var(--color-primary-soft); }
+.menu-nav-item.is-active { box-shadow: inset 0 0 0 1px rgba(45, 95, 202, .045); }
 
 .menu-nav-item.is-active .menu-icon,
 .menu-nav-item.is-active .menu-label { color: var(--color-primary); font-weight: 700; }

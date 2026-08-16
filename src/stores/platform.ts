@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
+import { getApiBase } from '@/shared/api/base'
 
 export interface PlatformInfo {
   key: string
@@ -13,19 +14,6 @@ export interface PlatformInfo {
 interface PlatformResponse {
   success?: boolean
   data?: PlatformInfo[]
-}
-
-// 动态获取 API 地址（不依赖静态导入，确保 Electron 注入的 localStorage 生效）
-function getApiBase() {
-  try {
-    const electronApiBase = localStorage.getItem('toolbox_api_base')
-    if (electronApiBase) return electronApiBase
-  } catch {
-    // 存储不可用时继续读取构建期配置。
-  }
-  const viteApiBase = import.meta.env?.VITE_API_BASE
-  if (viteApiBase) return viteApiBase
-  return 'http://localhost:8000' // 打包应用使用内嵌本地后端
 }
 
 export const usePlatformStore = defineStore('platform', () => {

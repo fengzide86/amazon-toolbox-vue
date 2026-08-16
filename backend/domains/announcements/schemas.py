@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from core.response import APIResponse
+
 Audience = Literal["all", "consumer", "business"]
 Category = Literal["system", "update", "activity", "maintenance"]
 Severity = Literal["info", "important", "critical"]
@@ -56,3 +58,48 @@ class AnnouncementUpdate(AnnouncementWriteBase):
 
 class ReceiptAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class AnnouncementResponse(BaseModel):
+    """Read-only announcement contract shared by admin and user feeds."""
+
+    id: int
+    title: str
+    content: str
+    type: str | None = None
+    audience: str
+    category: str | None = None
+    severity: str
+    presentation: str
+    app_version: str | None = None
+    status: str
+    priority: int
+    starts_at: str | None = None
+    expires_at: str | None = None
+    published_at: str | None = None
+    revision: int
+    created_at: str | None = None
+    updated_at: str | None = None
+    is_read: bool = False
+    is_dismissed: bool = False
+
+
+class LegacyAnnouncementResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    type: str | None = None
+    created_at: str | None = None
+
+
+class AnnouncementReceiptResponse(BaseModel):
+    announcement_id: int
+    revision: int
+    action: str
+
+
+AnnouncementListResponse = APIResponse[list[AnnouncementResponse]]
+AnnouncementEnvelope = APIResponse[AnnouncementResponse]
+LegacyAnnouncementListResponse = APIResponse[list[LegacyAnnouncementResponse]]
+AnnouncementReceiptEnvelope = APIResponse[AnnouncementReceiptResponse]
+AnnouncementDeleteResponse = APIResponse[None]

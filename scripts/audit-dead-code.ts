@@ -4,7 +4,10 @@ import { execFileSync } from 'node:child_process'
 
 const root = process.cwd()
 const codeExtensions = ['.ts', '.cts', '.vue']
-const tracked = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' })
+// Include non-ignored, untracked sources so the gate is reliable before a
+// developer stages a new module. `git ls-files` alone made freshly extracted
+// entry modules look invisible and reported their dependencies as orphans.
+const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
   .split(/\r?\n/)
   .filter(Boolean)
   .map(file => file.replaceAll('\\', '/'))
@@ -22,7 +25,7 @@ function sourceCandidate(candidate: string): string | null {
   const extension = path.posix.extname(normalized)
   if (extension === '.js') candidates.push(normalized.slice(0, -3) + '.ts')
   if (extension === '.cjs') candidates.push(normalized.slice(0, -4) + '.cts')
-  if (!extension) {
+  if (!codeExtensions.includes(extension) && extension !== '.js' && extension !== '.cjs') {
     for (const suffix of codeExtensions) candidates.push(normalized + suffix)
     for (const suffix of codeExtensions) candidates.push(path.posix.join(normalized, `index${suffix}`))
   }
@@ -42,6 +45,7 @@ function importsOf(file: string): string[] {
     /(?:import|export)\s+(?:[^'"()]+?\s+from\s+)?['"]([^'"]+)['"]/g,
     /import\(\s*['"]([^'"]+)['"]\s*\)/g,
     /require\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /new\s+URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g,
   ]
   for (const pattern of patterns) {
     for (const match of content.matchAll(pattern)) if (match[1]) specifiers.add(match[1])

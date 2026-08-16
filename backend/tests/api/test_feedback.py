@@ -5,7 +5,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Feedback, User, Plan
+from models import Feedback, Plan, User
 from tests.conftest import get_data
 
 
@@ -68,7 +68,7 @@ class TestCreateFeedback:
 
     async def test_create_feedback_basic(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
         """创建基本工单"""
-        from models import User, Plan
+        from models import Plan, User
         plan = Plan(name="测试", price=99, duration_days=30, status="active")
         db_session.add(plan)
         await db_session.flush()

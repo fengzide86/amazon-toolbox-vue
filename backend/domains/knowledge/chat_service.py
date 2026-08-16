@@ -51,9 +51,27 @@ def _config_list(value: Any) -> list[str]:
         return []
     return [str(item).strip() for item in parsed if str(item).strip()] if isinstance(parsed, list) else []
 
+
+def _config_storage_value(value: Any) -> str:
+    """Store structured operator input in the same JSON format used by existing clients."""
+    if isinstance(value, (list, dict)):
+        return json.dumps(value, ensure_ascii=False)
+    return value if isinstance(value, str) else str(value)
+
+
+async def _commit_or_rollback(db: AsyncSession) -> None:
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+# 仅兼容系统曾经写入数据库的旧默认值；管理员自定义欢迎语不会被覆盖。
+LEGACY_DEFAULT_WELCOME_MESSAGE = "你好！我是亚马逊工具箱智能客服 🤖\n请问有什么可以帮你的？"
+
 # 默认配置
 DEFAULT_CONFIG = {
-    "welcome_message": "你好！我是亚马逊工具箱智能客服 🤖\n请问有什么可以帮你的？",
+    "welcome_message": "你好！我是课赛通 KST 智能客服 🤖\n请问有什么可以帮你的？",
     "suggested_questions": json.dumps([
         "如何安装工具箱？",
         "授权码怎么使用？",
@@ -85,7 +103,10 @@ async def get_config(db: AsyncSession) -> dict[str, Any]:
     # 合并默认配置
     merged = {}
     for key, default_val in DEFAULT_CONFIG.items():
-        merged[key] = config_dict.get(key, default_val)
+        value = config_dict.get(key, default_val)
+        if key == "welcome_message" and value == LEGACY_DEFAULT_WELCOME_MESSAGE:
+            value = default_val
+        merged[key] = value
 
     return merged
 
@@ -98,21 +119,24 @@ async def update_config(
 ) -> dict[str, Any]:
     """更新AI客服配置"""
     before = await get_config(db)
-    for key, value in updates.items():
-        if key not in DEFAULT_CONFIG:
-            continue
+    normalized_updates = {
+        key: _config_storage_value(value)
+        for key, value in updates.items()
+        if key in DEFAULT_CONFIG
+    }
+    for key, value in normalized_updates.items():
         result = await db.execute(
             select(ChatConfig).where(ChatConfig.key == key)
         )
         existing = result.scalar_one_or_none()
         if existing:
-            existing.value = str(value) if not isinstance(value, str) else value
+            existing.value = value
         else:
-            db.add(ChatConfig(key=key, value=str(value) if not isinstance(value, str) else value))
+            db.add(ChatConfig(key=key, value=value))
 
     after = {
         **before,
-        **{key: value for key, value in updates.items() if key in DEFAULT_CONFIG},
+        **normalized_updates,
     }
     if actor:
         await log_admin_action(
@@ -130,38 +154,44 @@ async def update_config(
             },
             request=request,
         )
-    await db.commit()
+    await _commit_or_rollback(db)
     return await get_config(db)
 
 
-async def create_session(db: AsyncSession, user_id: int | None = None) -> dict[str, Any]:
+async def create_session(
+    db: AsyncSession,
+    user_id: int | None = None,
+    platform_key: str | None = None,
+    capability_key: str | None = None,
+) -> dict[str, Any]:
     """创建新会话"""
     session_id = str(uuid.uuid4())[:12]
+    config = await get_config(db)
+    welcome_message = config.get("welcome_message") or DEFAULT_CONFIG["welcome_message"]
 
     session = ChatSession(
         user_id=user_id,
         session_id=session_id,
         status="active",
+        platform_key=platform_key,
+        capability_key=capability_key,
     )
     db.add(session)
-    await db.commit()
-    await db.refresh(session)
 
     # 添加欢迎消息
-    config = await get_config(db)
     welcome = ChatMessage(
         session_id=session_id,
         role="system",
-        content=config.get("welcome_message", DEFAULT_CONFIG["welcome_message"]),
+        content=welcome_message,
     )
     db.add(welcome)
-    await db.commit()
+    await _commit_or_rollback(db)
 
     return {
         "session_id": session_id,
         "status": "active",
-        "welcome_message": config.get("welcome_message", DEFAULT_CONFIG["welcome_message"]),
-        "suggested_questions": json.loads(config.get("suggested_questions", DEFAULT_CONFIG["suggested_questions"])),
+        "welcome_message": welcome_message,
+        "suggested_questions": _config_list(config.get("suggested_questions")),
     }
 
 
@@ -282,6 +312,9 @@ async def send_message(
     capability_key: str | None = None,
 ) -> dict[str, Any]:
     """Persist one local rule/FAQ answer."""
+    result = await answer_question(
+        db, user_message, platform_key, capability_key, session_id=session_id
+    )
     user_msg = ChatMessage(
         session_id=session_id,
         role="user",
@@ -289,17 +322,6 @@ async def send_message(
     )
     db.add(user_msg)
 
-    # 更新会话消息数
-    await db.execute(
-        sql_update(ChatSession)
-        .where(ChatSession.session_id == session_id)
-        .values(message_count=ChatSession.message_count + 1)
-    )
-    await db.commit()
-
-    result = await answer_question(
-        db, user_message, platform_key, capability_key, session_id=session_id
-    )
     knowledge_ids = [str(r["id"]) for r in result["knowledge_refs"] if r.get("id")]
     ai_msg = ChatMessage(
         session_id=session_id,
@@ -311,9 +333,9 @@ async def send_message(
     await db.execute(
         sql_update(ChatSession)
         .where(ChatSession.session_id == session_id)
-        .values(message_count=ChatSession.message_count + 1)
+        .values(message_count=ChatSession.message_count + 2)
     )
-    await db.commit()
+    await _commit_or_rollback(db)
 
     return {**result, "session_id": session_id}
 
@@ -351,7 +373,7 @@ async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int |
     if satisfaction is not None:
         session.satisfaction = satisfaction
 
-    await db.commit()
+    await _commit_or_rollback(db)
     return True
 
 
@@ -393,7 +415,7 @@ async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | No
     session.transferred_to_human = True
     session.resolved_at = datetime.now()
 
-    await db.commit()
+    await _commit_or_rollback(db)
     return feedback.id
 
 
@@ -407,7 +429,7 @@ async def rate_session(db: AsyncSession, session_id: str, satisfaction: int) -> 
         return False
 
     session.satisfaction = satisfaction
-    await db.commit()
+    await _commit_or_rollback(db)
     return True
 
 
@@ -555,7 +577,7 @@ async def _build_ai_messages(
     messages = []
 
     # 系统提示词
-    system_prompt = """你是跨境电商赛训效率工具箱的智能客服助手。
+    system_prompt = """你是课赛通 KST · 跨境电商赛训效率平台的智能客服助手。
 你的职责是帮助用户解决安装、使用、授权等方面的问题。
 
 回答规则：

@@ -44,8 +44,8 @@ describe('DevicesView', () => {
       })
       await flushPromises()
 
-      expect(wrapper.find('.page-title').exists()).toBe(true)
-      expect(wrapper.find('.page-title').text()).toBe('设备授权')
+      expect(wrapper.find('.page-header-v6 h2').exists()).toBe(true)
+      expect(wrapper.find('.page-header-v6 h2').text()).toBe('设备授权')
     })
 
     it('应该显示设备数量提示', async () => {
@@ -67,7 +67,8 @@ describe('DevicesView', () => {
           id: 1,
           device_name: '我的电脑',
           device_id: 'device_001',
-          created_at: '2024-01-01T00:00:00Z'
+          created_at: '2024-01-01T00:00:00Z',
+          is_current: true,
         }
       ])
 
@@ -87,7 +88,8 @@ describe('DevicesView', () => {
           id: 1,
           device_name: '我的电脑',
           device_id: 'device_001',
-          created_at: '2024-01-15T10:30:00Z'
+          created_at: '2024-01-15T10:30:00Z',
+          is_current: true,
         }
       ])
 
@@ -106,7 +108,8 @@ describe('DevicesView', () => {
           id: 1,
           device_name: '我的电脑',
           device_id: 'device_001',
-          created_at: '2024-01-01T00:00:00Z'
+          created_at: '2024-01-01T00:00:00Z',
+          is_current: true,
         }
       ])
 
@@ -127,7 +130,8 @@ describe('DevicesView', () => {
           id: 1,
           device_name: '我的电脑',
           device_id: 'device_001',
-          created_at: '2024-01-01T00:00:00Z'
+          created_at: '2024-01-01T00:00:00Z',
+          is_current: true,
         }
       ])
 
@@ -148,13 +152,15 @@ describe('DevicesView', () => {
           id: 1,
           device_name: '电脑1',
           device_id: 'device_001',
-          created_at: '2024-01-01T00:00:00Z'
+          created_at: '2024-01-01T00:00:00Z',
+          is_current: true,
         },
         {
           id: 2,
           device_name: '电脑2',
           device_id: 'device_002',
-          created_at: '2024-01-02T00:00:00Z'
+          created_at: '2024-01-02T00:00:00Z',
+          is_current: false,
         }
       ])
 
@@ -192,13 +198,15 @@ describe('DevicesView', () => {
           id: 1,
           device_name: '电脑1',
           device_id: 'device_001',
-          created_at: '2024-01-01T00:00:00Z'
+          created_at: '2024-01-01T00:00:00Z',
+          is_current: true,
         },
         {
           id: 2,
           device_name: '电脑2',
           device_id: 'device_002',
-          created_at: '2024-01-02T00:00:00Z'
+          created_at: '2024-01-02T00:00:00Z',
+          is_current: false,
         }
       ])
 

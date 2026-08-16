@@ -1,0 +1,197 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import process from 'node:process'
+
+const root = process.cwd()
+const read = filename => fs.readFileSync(path.join(root, filename), 'utf8')
+const requireText = (filename, patterns) => {
+  const source = read(filename)
+  const missing = patterns.filter(pattern => !source.includes(pattern))
+  if (missing.length) throw new Error(`${filename} is missing release invariants: ${missing.join(', ')}`)
+}
+const requireCount = (filename, pattern, minimum) => {
+  const source = read(filename)
+  const count = source.split(pattern).length - 1
+  if (count < minimum) throw new Error(`${filename} must contain ${pattern} at least ${minimum} times (found ${count})`)
+}
+const rejectText = (filename, patterns) => {
+  const source = read(filename)
+  const forbidden = patterns.filter(pattern => source.includes(pattern))
+  if (forbidden.length) throw new Error(`${filename} contains forbidden release patterns: ${forbidden.join(', ')}`)
+}
+const requireOrder = (filename, patterns) => {
+  const source = read(filename)
+  let cursor = -1
+  for (const pattern of patterns) {
+    const next = source.indexOf(pattern, cursor + 1)
+    if (next < 0) throw new Error(`${filename} is missing ordered release invariant: ${pattern}`)
+    cursor = next
+  }
+}
+const expectedPersistentExcludes = [
+  '--exclude=/.env',
+  '--exclude=/updates/',
+  '--exclude=/.updates-staging/',
+  '--exclude=/chroma_db/',
+  '--exclude=/runtime/',
+  '--exclude=/uploads/',
+  '--exclude=/logs/',
+  '--exclude=/.venv/',
+  '--exclude=__pycache__/',
+]
+const requirePersistentExcludes = filename => {
+  const source = read(filename)
+  const block = /BACKEND_PERSISTENT_EXCLUDES=\(\s*([\s\S]*?)\s*\)/.exec(source)?.[1]
+  if (!block) throw new Error(`${filename} must define BACKEND_PERSISTENT_EXCLUDES`)
+  const actual = [...block.matchAll(/^\s*'([^']+)'\s*$/gm)].map(match => match[1])
+  if (JSON.stringify(actual) !== JSON.stringify(expectedPersistentExcludes)) {
+    throw new Error(`${filename} has an unsafe persistent rsync exclude set: ${actual.join(', ')}`)
+  }
+}
+
+const metadata = JSON.parse(read('package.json'))
+if (!metadata.scripts?.['verify:release']) throw new Error('package.json must expose verify:release')
+if (metadata.scripts?.['release:mariadb-gate'] !== 'node scripts/verify-release-mariadb-gate.mjs') {
+  throw new Error('package.json must expose the guarded release:mariadb-gate')
+}
+if (!metadata.scripts['verify:release'].includes('npm run release:mariadb-gate')) {
+  throw new Error('verify:release must include release:mariadb-gate')
+}
+if (metadata.scripts['verify:release'].includes('npm run test:mariadb:required')) {
+  throw new Error('verify:release must route MariaDB through release:mariadb-gate')
+}
+
+requireText('scripts/toolbox-cli.mjs', [
+  "run('npm', ['run', 'verify:release'],",
+  "['prepared', 'backend_deployed', 'web_activated', 'desktop_published', 'verified']",
+  "'archive'",
+  "'--format=tar.gz'",
+  "gitOutput(['rev-parse', 'origin/main'])",
+  "gitOutput(['ls-remote', '--tags', 'origin', 'refs/tags/v*'])",
+  "'--hostname', 'github.com'",
+  'check.head_sha !== commitSha',
+  "path.join(directory, 'production-release.lock')",
+  "process.env.ProgramData || 'C:\\\\ProgramData'",
+  'acquireProductionReleaseLock(',
+  'acquireRemoteReleaseLease(state, connection)',
+  'assertRemoteReleaseLease(state, connection)',
+  'releaseRemoteReleaseLease(state, connection)',
+  "const REMOTE_PRODUCTION_LEASE = '/var/lib/amazon-toolbox/release-control/production.lease'",
+  'const REMOTE_PRODUCTION_LEASE_GUARD = `${REMOTE_PRODUCTION_LEASE}.guard`',
+  'remoteLeaseGuardedCommand(state, deployCommand)',
+  'remoteLeaseGuardedCommand(state, publishCommand)',
+  'current_session=',
+  'flock -x 9',
+  'verifyResumeCheckpoints(state)',
+  "gitOutput(['show-ref', '--verify', '--hash', `refs/tags/${tag}`])",
+  'lockedPreflight = await productionPreflight(',
+  'artifactsPrepared: false',
+  'controlUrl: preflight.controlUrl',
+  'leaseToken: crypto.randomUUID()',
+  '/current-venv/bin/python',
+  'TOOLBOX_CI_ATTESTED_SHA',
+  "ciAttestedSha !== state.commitSha",
+  "parsed.protocol !== 'https:'",
+  '生产发布禁止 --skip-verify 和 --skip-build',
+])
+requireCount('scripts/toolbox-cli.mjs', 'shellQuote(state.releaseId), shellQuote(state.controlUrl)', 2)
+requireCount('scripts/toolbox-cli.mjs', 'remoteLeaseGuardedCommand(state, deployCommand)', 2)
+rejectText('scripts/toolbox-cli.mjs', ['.venv/bin/python scripts/publish_update.py'])
+requireText('scripts/verify-release-mariadb-gate.mjs', [
+  "const headSha = commandOutput('git', ['rev-parse', 'HEAD'])",
+  "attestedSha === headSha",
+  "commandOutput('gh', [",
+  "'--hostname', 'github.com'",
+  'MariaDB migrations and concurrency',
+  "required.conclusion === 'success'",
+  'required.head_sha === commitSha',
+  "delete environment.TOOLBOX_CI_ATTESTED_SHA",
+  "'npm run test:mariadb:required'",
+])
+requireText('backend/Dockerfile', ['constraints-py310.txt', '-c /tmp/requirements/constraints-py310.txt'])
+requireText('compose.yaml', [
+  'EXPENSE_ATTACHMENT_DIR: /var/lib/amazon-toolbox/expense-attachments',
+  'toolbox_expense_attachments:/var/lib/amazon-toolbox/expense-attachments',
+])
+requireText('ops/systemd/toolbox-backend.service', [
+  'EnvironmentFile=-/var/lib/amazon-toolbox/release.env',
+  'ReadWritePaths=-/var/lib/amazon-toolbox/expense-attachments',
+  'ReadWritePaths=-/opt/amazon-toolbox/backend/chroma_db',
+  'ExecStart=/opt/amazon-toolbox/current-venv/bin/python',
+])
+requireText('ops/nginx/amazon-toolbox.conf', [
+  'location /api/',
+  'root /var/lib/amazon-toolbox/web/current;',
+  'root /var/lib/amazon-toolbox/web;',
+  'location = /web-version.json',
+  'location /updates/',
+])
+requireText('ops/deploy/deploy-web.sh', [
+  'mv -Tf',
+  'web-version.json',
+  'previous_web_release',
+  'ASSETS_DIR',
+  'Hashed Web asset collision',
+  'CONTROL_PLANE_URL="${5:?control plane URL is required}"',
+  'FIRST_HASHED_ASSET_URL',
+  'PUBLIC_WEB_OK',
+  'Public Web activation verification failed',
+])
+requireText('ops/deploy/deploy-backend.sh', [
+  'BACKUP_COMPLETE=1',
+  'MIGRATION_STARTED=1',
+  'restore-backup.sh',
+  'CONTROL_PLANE_URL="${5:?control-plane URL is required}"',
+  'VENV_RELEASE_DIR="${VENV_ROOT}/${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}"',
+  'VENV_BUILD_MARKER="${VENV_ROOT}/.${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}.building"',
+  'VENV_MARKER_TMP="$(mktemp "${VENV_ROOT}/.toolbox-building.XXXXXX")"',
+  'mv -Tf "${VENV_METADATA_TMP}" "${VENV_METADATA_FILE}"',
+  'atomic_switch_current_venv "${VENV_RELEASE_DIR}"',
+  'current-venv.target',
+  'mv -Tf',
+  '"${ACTIVE_VENV_PYTHON}" - "${BACKEND_DIR}/.env"',
+  'database backup schema must be application-owned',
+  '"${CONTROL_PLANE_URL}/api/health/live"',
+])
+requireText('ops/deploy/restore-backup.sh', [
+  'trap restore_failure ERR',
+  'Restore failed; toolbox-backend remains stopped.',
+  '"${RESTORE_VENV_PYTHON}" - "${BACKEND_DIR}/.env"',
+  "ExecStart=/opt/amazon-toolbox/backend/.venv/bin/python",
+  'database restore schema must be application-owned',
+  'DROP VIEW IF EXISTS',
+  'DROP TABLE IF EXISTS',
+  'current-venv.target',
+  'mv -Tf',
+])
+requireCount('ops/deploy/deploy-backend.sh', '"${BACKEND_PERSISTENT_EXCLUDES[@]}"', 3)
+requireCount('ops/deploy/restore-backup.sh', '"${BACKEND_PERSISTENT_EXCLUDES[@]}"', 1)
+requirePersistentExcludes('ops/deploy/deploy-backend.sh')
+requirePersistentExcludes('ops/deploy/restore-backup.sh')
+requireOrder('ops/deploy/deploy-backend.sh', [
+  'require_commands \\',
+  '"${ACTIVE_VENV_PYTHON}" - "${BACKEND_DIR}/.env"',
+  'tar -xzf "${ARCHIVE_PATH}" -C "${STAGING_DIR}"',
+  'VENV_BUILD_MARKER="${VENV_ROOT}/.${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}.building"',
+  '# Freeze writes before taking the attachment and database snapshots.',
+])
+requireOrder('ops/deploy/deploy-backend.sh', [
+  'MIGRATION_STARTED=1',
+  'atomic_switch_current_venv "${VENV_RELEASE_DIR}"',
+])
+requireOrder('ops/deploy/restore-backup.sh', [
+  'require_commands chmod',
+  '"${RESTORE_VENV_PYTHON}" - "${BACKUP_DIR}/backend.env"',
+  'RESTORE_IN_PROGRESS=1',
+  'trap restore_failure ERR',
+])
+requireOrder('ops/deploy/restore-backup.sh', [
+  'DROP VIEW IF EXISTS',
+  'DROP TABLE IF EXISTS',
+  'with gzip.open(sys.argv[2], "rb") as source:',
+])
+rejectText('ops/deploy/deploy-backend.sh', ['https://8.130.113.104'])
+rejectText('ops/deploy/restore-backup.sh', ["trap 'systemctl start toolbox-backend || true' EXIT"])
+rejectText('ops/systemd/toolbox-backend.service', ['ExecStart=/opt/amazon-toolbox/backend/.venv/bin/python'])
+
+process.stdout.write('release_configuration=verified\n')

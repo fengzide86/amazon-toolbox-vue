@@ -1,12 +1,15 @@
 """Database engine, sessions, schema gate and health checks."""
 from __future__ import annotations
 
+import hashlib
+import re
 import time
 from collections.abc import AsyncGenerator
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import text
+from sqlalchemy import event, text
+from sqlalchemy.engine import Connection, ExecutionContext
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from core.config import settings
@@ -16,7 +19,7 @@ from models.base import Base
 logger = get_logger(__name__)
 
 DATABASE_URL = settings.get_database_url()
-SCHEMA_REVISION = "20260718_audit_target_id_string"
+SCHEMA_REVISION = "20260816_data_integrity"
 
 logger.info("数据库类型: %s", settings.DB_TYPE)
 logger.info("数据库连接: %s", DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL)
@@ -45,15 +48,58 @@ async_session_maker = async_sessionmaker(
 SLOW_QUERY_THRESHOLD = 1.0
 
 
+def sql_fingerprint(statement: str) -> tuple[str, str]:
+    """Return a stable operation/fingerprint without logging SQL values."""
+    normalized = re.sub(r"\s+", " ", statement).strip()
+    operation = normalized.partition(" ")[0].upper() if normalized else "UNKNOWN"
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+    return operation, digest
+
+
+@event.listens_for(engine.sync_engine, "before_cursor_execute")
+def _record_query_start(
+    _connection: Connection,
+    _cursor: Any,
+    _statement: str,
+    _parameters: Any,
+    context: ExecutionContext,
+    _executemany: bool,
+) -> None:
+    context._kst_query_started_at = time.perf_counter()  # type: ignore[attr-defined]
+
+
+@event.listens_for(engine.sync_engine, "after_cursor_execute")
+def _record_query_finish(
+    _connection: Connection,
+    _cursor: Any,
+    statement: str,
+    _parameters: Any,
+    context: ExecutionContext,
+    executemany: bool,
+) -> None:
+    started_at = getattr(context, "_kst_query_started_at", None)
+    if started_at is None:
+        return
+    elapsed = time.perf_counter() - float(started_at)
+    if elapsed < SLOW_QUERY_THRESHOLD:
+        return
+    operation, fingerprint = sql_fingerprint(statement)
+    logger.with_data(
+        "慢 SQL",
+        {
+            "sql_operation": operation,
+            "sql_fingerprint": fingerprint,
+            "sql_duration_ms": round(elapsed * 1000, 2),
+            "executemany": executemany,
+        },
+    )
+
+
 async def get_db() -> AsyncGenerator[AsyncSession]:
     """Yield one transactional request session."""
     async with async_session_maker() as session:
         try:
-            started = time.time()
             yield session
-            elapsed = time.time() - started
-            if elapsed > SLOW_QUERY_THRESHOLD:
-                logger.warning("慢查询检测: 会话耗时 %.2fs", elapsed)
         except HTTPException:
             await session.rollback()
             raise

@@ -1,9 +1,10 @@
 <template>
   <div class="records-page">
-    <header class="records-header">
-      <div><span class="records-eyebrow">活动记录</span><h2>工具记录</h2><p>演示记录与真实执行记录完全分开，不会混合统计。</p></div>
-      <router-link class="support-link" to="/user/ai-chat"><MessageCircle :size="16" />联系帮助</router-link>
-    </header>
+    <PageHeader eyebrow="活动记录" title="工具记录" description="演示记录与真实执行记录完全分开，不会混合统计。">
+      <template #actions>
+        <router-link class="support-link" to="/user/ai-chat"><MessageCircle :size="16" />联系帮助</router-link>
+      </template>
+    </PageHeader>
 
     <div class="record-tabs" role="tablist" aria-label="记录类型">
       <button type="button" role="tab" :aria-selected="activeTab === 'demo'" :class="{ active: activeTab === 'demo' }" @click="activeTab = 'demo'">演示记录</button>
@@ -57,6 +58,7 @@ import { usePlatformStore } from '@/stores/platform'
 import { demoRunListSchema } from '@/features/demo/model'
 import { executionRecordListSchema } from '@/features/user/model'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 type RecordKind = 'demo' | 'live'
 interface RecordRow {

@@ -50,10 +50,11 @@ export default {
           /--.*/,
         ],
       },
-      // 保留关键 CSS
+      // 保留关键 CSS。全局设计令牌可能只在懒加载组件的独立 CSS
+      // chunk 中使用，不能按入口样式表的使用情况删除。
       fontFace: true,
       keyframes: true,
-      variables: true,
+      variables: false,
     }),
   ].filter(Boolean),
 }

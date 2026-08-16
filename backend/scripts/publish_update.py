@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
+import hashlib
 import json
 from pathlib import Path
 
@@ -111,6 +113,49 @@ async def publish(
     return published
 
 
+def _artifact_fingerprint(path: Path) -> dict[str, object]:
+    digest = hashlib.sha512()
+    size = 0
+    with path.resolve(strict=True).open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            size += len(chunk)
+            digest.update(chunk)
+    return {"name": path.name, "size": size, "sha512": base64.b64encode(digest.digest()).decode("ascii")}
+
+
+async def publish_idempotent(
+    version: str,
+    artifact_paths: list[Path],
+    *,
+    username: str | None,
+) -> dict[str, object]:
+    """Publish, or safely resume an identical version left in staging."""
+    service = UpdateReleaseService(get_update_releases_dir())
+    staged = next(
+        (
+            release
+            for release in service.list_releases()
+            if release.get("version") == version and release.get("status") == "staged"
+        ),
+        None,
+    )
+    if staged is None:
+        return await publish(version, artifact_paths, username=username)
+
+    expected = sorted(
+        (
+            {"name": item.get("name"), "size": item.get("size"), "sha512": item.get("sha512")}
+            for item in (staged.get("files") or [])
+            if isinstance(item, dict)
+        ),
+        key=lambda item: str(item["name"]),
+    )
+    actual = sorted((_artifact_fingerprint(path) for path in artifact_paths), key=lambda item: str(item["name"]))
+    if actual != expected:
+        raise RuntimeError(f"Staged v{version} exists with different artifacts; refusing automatic resume")
+    return await resume_staged(version, username=username)
+
+
 async def resume_staged(version: str, *, username: str | None) -> dict[str, object]:
     """Finish a release whose files were staged before an audit write failed."""
     staff = await _active_super_admin(username)
@@ -169,7 +214,7 @@ if __name__ == "__main__":
         try:
             if args.resume_staged:
                 return await resume_staged(args.version, username=args.staff_username)
-            return await publish(args.version, args.artifacts, username=args.staff_username)
+            return await publish_idempotent(args.version, args.artifacts, username=args.staff_username)
         finally:
             await engine.dispose()
 

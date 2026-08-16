@@ -1,23 +1,23 @@
 """
 系统设置/公告相关 Schema
 """
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class SettingUpdate(BaseModel):
     key: str
     value: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class SettingResponse(BaseModel):
     id: int
     key: str
-    value: Optional[str] = None
-    description: Optional[str] = None
-    created_at: Optional[datetime] = None
+    value: str | None = None
+    description: str | None = None
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,19 +25,19 @@ class SettingResponse(BaseModel):
 class AnnouncementCreate(BaseModel):
     title: str
     content: str
-    type: Optional[str] = "info"
-    status: Optional[str] = "draft"
-    priority: Optional[int] = 0
-    expires_at: Optional[datetime] = None
+    type: str | None = "info"
+    status: str | None = "draft"
+    priority: int | None = 0
+    expires_at: datetime | None = None
 
 
 class AnnouncementUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    type: Optional[str] = None
-    status: Optional[str] = None
-    priority: Optional[int] = None
-    expires_at: Optional[datetime] = None
+    title: str | None = None
+    content: str | None = None
+    type: str | None = None
+    status: str | None = None
+    priority: int | None = None
+    expires_at: datetime | None = None
 
 
 class AnnouncementOut(BaseModel):
@@ -47,7 +47,11 @@ class AnnouncementOut(BaseModel):
     type: str
     status: str
     priority: int
-    expires_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
+    expires_at: datetime | None = None
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SettingUpdateResponse(BaseModel):
+    success: bool

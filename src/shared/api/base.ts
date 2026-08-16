@@ -13,7 +13,10 @@ export function getApiBase(): string {
   } catch {
     // Storage may be unavailable in isolated tests.
   }
-  return (import.meta.env.VITE_CONTROL_API_BASE
-    || import.meta.env.VITE_API_BASE
-    || 'http://localhost:8000').replace(/\/+$/, '')
+  const buildTimeBase = import.meta.env.VITE_CONTROL_API_BASE || import.meta.env.VITE_API_BASE
+  if (buildTimeBase) return buildTimeBase.replace(/\/+$/, '')
+  if (typeof window !== 'undefined' && /^https?:$/.test(window.location.protocol)) {
+    return window.location.origin.replace(/\/+$/, '')
+  }
+  return ''
 }

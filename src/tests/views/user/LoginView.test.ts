@@ -51,7 +51,21 @@ describe('LoginView', () => {
 
     it('应该显示应用标题', () => {
       const wrapper = mountWithPinia(LoginView)
-      expect(wrapper.find('h1').text()).toBe('跨境电商赛训效率工具箱')
+      expect(wrapper.find('h1').attributes('aria-label')).toBe('课赛通 KST · 跨境电商赛训效率平台')
+      expect(wrapper.find('[data-testid="kst-brand-lockup"]').attributes('aria-hidden')).toBe('true')
+    })
+
+    it('授权卡应该使用装饰性品牌图形', () => {
+      const wrapper = mountWithPinia(LoginView)
+      const mark = wrapper.find('.logo-section [data-testid="kst-brand-mark"]')
+      expect(mark.exists()).toBe(true)
+      expect(mark.attributes('aria-hidden')).toBe('true')
+    })
+
+    it('左侧大数字指标应该显示完整金色单位', () => {
+      const wrapper = mountWithPinia(LoginView)
+      const units = wrapper.findAll('.stat-unit').map(item => item.text())
+      expect(units).toEqual(['%', '×', 'h'])
     })
 
     it('应该显示授权码提示', () => {
@@ -162,7 +176,13 @@ describe('LoginView', () => {
       expect(sessionStorage.getItem('toolbox_role')).toBe('user')
       expect(sessionStorage.getItem('toolbox_token')).toBe('jwt-token')
       expect(wrapper.find('.success-message').exists()).toBe(false)
+      expect(wrapper.find('.btn-login').text()).toContain('验证通过')
+      await vi.advanceTimersByTimeAsync(160)
+      await flushPromises()
       expect(routeTrackListener).toHaveBeenCalledOnce()
+      expect(routeTrackListener.mock.calls[0]?.[0]).toMatchObject({ detail: { duration: 780 } })
+      await vi.advanceTimersByTimeAsync(270)
+      await flushPromises()
       expect(mockPush).toHaveBeenCalledWith('/user/tools')
       expect(mockShowToast).not.toHaveBeenCalledWith(expect.stringContaining('正在跳转'), 'success')
     })

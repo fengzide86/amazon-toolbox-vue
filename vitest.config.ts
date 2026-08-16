@@ -11,7 +11,13 @@ import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue({
+    template: {
+      compilerOptions: {
+        isCustomElement: tag => tag === 'webview',
+      },
+    },
+  })],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
@@ -29,15 +35,23 @@ export default defineConfig({
       'amazon-toolbox/**',
       'backend/**'
     ],
-    // Forks avoid the lingering thread workers seen on Windows; eight workers
-    // keep the full 44-file suite bounded on the 16-core development machine.
+    // Coverage instrumentation is memory-heavy on Windows. Two forks avoid
+    // starving router/freight suites while keeping the release gate deterministic.
     pool: 'forks',
-    maxWorkers: 8,
+    maxWorkers: 2,
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,vue}'],
-      exclude: ['src/tests/**', 'src/main.ts']
+      exclude: ['src/tests/**', 'src/main.ts'],
+      thresholds: {
+        statements: 45,
+        branches: 35,
+        functions: 35,
+        lines: 45,
+      },
     }
   }
 })

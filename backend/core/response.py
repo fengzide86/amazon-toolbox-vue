@@ -2,19 +2,44 @@
 统一响应格式模块
 提供标准化的 API 响应结构
 """
-from typing import Any
+from typing import Annotated, Any, Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
+
+ResponseDataT = TypeVar("ResponseDataT")
+
+# Explicit compatibility contract for legacy routes whose response body can be
+# a mapping, list, scalar, or ORM object.  FastAPI's normal no-model path uses
+# `jsonable_encoder`; the serializer keeps that exact runtime behaviour while
+# still making the route contract deliberate and discoverable.
+CompatibleResponse = Annotated[
+    Any,
+    PlainSerializer(jsonable_encoder, return_type=Any),
+]
 
 
-class APIResponse(BaseModel):
+class APIResponse(BaseModel, Generic[ResponseDataT]):
     """统一 API 响应格式"""
+
+    model_config = ConfigDict(from_attributes=True)
+
     success: bool = Field(default=True, description="是否成功")
     message: str = Field(default="ok", description="响应消息")
-    data: Any | None = Field(default=None, description="响应数据")
+    data: ResponseDataT | None = Field(default=None, description="响应数据")
     total: int | None = Field(default=None, description="总数（分页用）")
     page: int | None = Field(default=None, description="当前页码")
     page_size: int | None = Field(default=None, description="每页数量")
+    total_pages: int | None = Field(default=None, description="总页数")
+
+
+class PaginatedResponse(APIResponse[list[ResponseDataT]], Generic[ResponseDataT]):
+    """带分页元数据的统一响应格式。"""
+
+    total: int = Field(description="总数")
+    page: int = Field(description="当前页码")
+    page_size: int = Field(description="每页数量")
+    total_pages: int = Field(description="总页数")
 
 
 class ErrorResponse(BaseModel):

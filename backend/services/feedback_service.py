@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 class FeedbackService:
     """工单反馈服务"""
     
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
     
     async def get_feedback_list(

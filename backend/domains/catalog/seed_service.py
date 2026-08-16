@@ -22,6 +22,62 @@ logger = get_logger(__name__)
 CENT = Decimal("0.01")
 INTERNAL_ORDER_PREFIX = "INT-SEED-"
 
+DEFAULT_SINGLE_INPUT_SCHEMAS: dict[str, list[dict[str, Any]]] = {
+    "register": [
+        {"key": "shop_name", "label": "店铺名称", "type": "text", "required": True},
+        {"key": "contact_name", "label": "联系人", "type": "text", "required": True},
+        {"key": "contact_phone", "label": "联系电话", "type": "text", "required": True},
+    ],
+    "logistics_standard": [
+        {"key": "template_name", "label": "模板名称", "type": "text", "required": True},
+        {"key": "country", "label": "配送国家", "type": "select", "required": True, "options": ["美国", "加拿大", "英国", "德国"]},
+        {"key": "shipping_price", "label": "固定运费", "type": "number", "required": True},
+    ],
+    "logistics_cost": [
+        {"key": "country", "label": "配送国家", "type": "select", "required": True, "options": ["美国", "加拿大", "英国", "德国"]},
+        {"key": "weight_kg", "label": "重量（kg）", "type": "number", "required": True},
+        {"key": "declared_value", "label": "申报金额", "type": "number", "required": True},
+    ],
+    "listing_script": [
+        {"key": "sku", "label": "SKU", "type": "text", "required": True},
+        {"key": "title", "label": "商品标题", "type": "text", "required": True},
+        {"key": "price", "label": "售价", "type": "number", "required": True},
+        {"key": "quantity", "label": "库存数量", "type": "number", "required": True},
+        {"key": "weight_kg", "label": "重量（kg）", "type": "number", "required": True},
+        {"key": "length_cm", "label": "长度（cm）", "type": "number", "required": True},
+        {"key": "width_cm", "label": "宽度（cm）", "type": "number", "required": True},
+        {"key": "height_cm", "label": "高度（cm）", "type": "number", "required": True},
+    ],
+    "ship_script": [
+        {"key": "order_id", "label": "订单号", "type": "text", "required": True},
+        {"key": "carrier", "label": "物流承运商", "type": "select", "required": True, "options": ["UPS", "USPS", "DHL", "FedEx"]},
+        {"key": "tracking_number", "label": "物流单号", "type": "text", "required": True},
+    ],
+    "fba_agl": [
+        {"key": "sku", "label": "SKU", "type": "text", "required": True},
+        {"key": "quantity", "label": "发货数量", "type": "number", "required": True},
+        {"key": "warehouse", "label": "目标仓库", "type": "select", "required": True, "options": ["ONT8", "LAX9", "FTW1", "ABE8"]},
+        {"key": "carton_count", "label": "箱数", "type": "number", "required": True},
+        {"key": "length_cm", "label": "长度（cm）", "type": "number", "required": True},
+        {"key": "width_cm", "label": "宽度（cm）", "type": "number", "required": True},
+        {"key": "height_cm", "label": "高度（cm）", "type": "number", "required": True},
+        {"key": "weight_kg", "label": "重量（kg）", "type": "number", "required": True},
+    ],
+    "replenishment": [
+        {"key": "sku", "label": "SKU", "type": "text", "required": True},
+        {"key": "order_demand", "label": "订单需求", "type": "number", "required": True},
+        {"key": "current_stock", "label": "当前库存", "type": "number", "required": True},
+        {"key": "safety_percent", "label": "安全库存比例（%）", "type": "number", "required": True},
+        {"key": "suggested_quantity", "label": "建议补货数量", "type": "number", "required": False},
+    ],
+    "ad_script": [
+        {"key": "campaign_name", "label": "广告活动名称", "type": "text", "required": True},
+        {"key": "daily_budget", "label": "每日预算", "type": "number", "required": True},
+        {"key": "default_bid", "label": "默认竞价", "type": "number", "required": True},
+        {"key": "sku", "label": "商品 SKU", "type": "text", "required": True},
+    ],
+}
+
 DEFAULT_REGISTER_TOOL = {
     "id": "tool_reg_newbie",
     "name": "新手快速注册工具",
@@ -51,6 +107,7 @@ DEFAULT_REGISTER_TOOL = {
     "supports_batch": False,
     "business_description": "",
     "batch_input_schema": [],
+    "single_input_schema": DEFAULT_SINGLE_INPUT_SCHEMAS["register"],
 }
 
 
@@ -123,6 +180,19 @@ def default_tool_configs() -> list[dict[str, Any]]:
             "sort_order": 6
         },
         {
+            "id": "tool_replenishment",
+            "name": "智能补货建议",
+            "module": "库存脚本",
+            "category": "automation",
+            "platform_key": "amazon",
+            "capability_key": "replenishment",
+            "release_status": "available",
+            "status": "online",
+            "description": "按订单需求、当前库存与安全库存比例生成补货建议",
+            "available_plans": ["Y199", "Y999"],
+            "sort_order": 7
+        },
+        {
             "id": "tool_fba_agl",
             "name": "自动发FBA/AGL脚本",
             "module": "发货脚本",
@@ -133,7 +203,7 @@ def default_tool_configs() -> list[dict[str, Any]]:
             "status": "online",
             "description": "FBA/AGL发货自动化，支持多仓库分配",
             "available_plans": ["Y999"],
-            "sort_order": 7
+            "sort_order": 8
         },
         {
             "id": "tool_ali_reg",
@@ -146,7 +216,7 @@ def default_tool_configs() -> list[dict[str, Any]]:
             "status": "online",
             "description": "速卖通店铺快速注册和资质提交",
             "available_plans": ["Y49", "Y199", "Y999"],
-            "sort_order": 8
+            "sort_order": 9
         },
         {
             "id": "tool_ali_listing",
@@ -159,7 +229,7 @@ def default_tool_configs() -> list[dict[str, Any]]:
             "status": "online",
             "description": "批量上传速卖通产品，支持多语言优化",
             "available_plans": ["Y199", "Y999"],
-            "sort_order": 9
+            "sort_order": 10
         },
         {
             "id": "tool_ali_ship",
@@ -172,10 +242,10 @@ def default_tool_configs() -> list[dict[str, Any]]:
             "status": "online",
             "description": "速卖通订单自动发货和物流同步",
             "available_plans": ["Y199", "Y999"],
-            "sort_order": 10
+            "sort_order": 11
         },
     ]
-    batch_capabilities = {"ad_script", "ship_script", "listing_script", "fba_agl", "ali_listing", "ali_ship"}
+    batch_capabilities = {"ad_script", "ship_script", "listing_script", "replenishment", "fba_agl", "ali_listing", "ali_ship"}
     for tool in tools:
         capability_key = str(tool.get("capability_key") or tool.get("id") or "demo")
         supports_batch = capability_key in batch_capabilities
@@ -190,6 +260,7 @@ def default_tool_configs() -> list[dict[str, Any]]:
             "script_key": f"demo.{capability_key}_walkthrough_v1",
             "target_url": "",
             "requires_signature": False,
+            "single_input_schema": DEFAULT_SINGLE_INPUT_SCHEMAS.get(capability_key, []),
         })
     return normalize_tool_configs(tools)
 
@@ -200,27 +271,56 @@ def default_tool_configs_by_name() -> dict[str, dict[str, Any]]:
     return mapping
 
 
+def restore_missing_default_platforms(tools: list[dict[str, Any]]) -> bool:
+    """Restore a wholly missing default platform without replacing custom tools."""
+    if not tools or any(tool.get("platform_key") == "aliexpress" for tool in tools):
+        return False
+    aliexpress_defaults = [
+        dict(tool) for tool in default_tool_configs()
+        if tool.get("platform_key") == "aliexpress"
+    ]
+    tools.extend(aliexpress_defaults)
+    return bool(aliexpress_defaults)
+
+
+def restore_new_default_tools(tools: list[dict[str, Any]]) -> bool:
+    """Add newly introduced tools without replacing or mutating existing custom tools."""
+    if not tools:
+        return False
+    existing_ids = {str(tool.get("id")) for tool in tools}
+    additions = [
+        dict(tool) for tool in default_tool_configs()
+        if tool.get("id") == "tool_replenishment" and str(tool.get("id")) not in existing_ids
+    ]
+    tools.extend(additions)
+    return bool(additions)
+
+
 def ensure_tool_runtime_fields(tools: list[dict[str, Any]]) -> bool:
-    """把旧工具配置收口到明确 Demo Adapter，返回是否发生修改。"""
+    """补齐工具运行字段，但不覆盖管理员已显式发布的 Live 配置。"""
     changed = False
     for tool in tools:
         capability_key = tool.get("capability_key") or tool.get("id") or "unknown"
         scenario_id = tool.get("demo_scenario_id") or f"{capability_key}_walkthrough_v1"
-        defaults = {
-            "availability": "demo_only",
+        availability = str(tool.get("availability") or "demo_only")
+        if availability not in {"demo_only", "live_beta", "live"}:
+            availability = "demo_only"
+        is_live = availability in {"live_beta", "live"}
+        defaults: dict[str, Any] = {
+            "availability": availability,
             "demo_scenario_id": scenario_id,
             "supports_demo_single": True,
             "supports_demo_batch": bool(tool.get("supports_demo_batch", tool.get("supports_batch", False))),
-            "supports_live_single": False,
-            "supports_live_batch": False,
-            "script_key": f"demo.{scenario_id}",
-            "target_url": "",
-            "requires_signature": False,
+            "supports_live_single": bool(tool.get("supports_live_single", is_live)),
+            "supports_live_batch": bool(tool.get("supports_live_batch", is_live and tool.get("supports_batch", False))),
+            "script_key": tool.get("script_key") or (f"amazon.{capability_key}.v1" if is_live else f"demo.{scenario_id}"),
+            "target_url": tool.get("target_url") or "",
+            "requires_signature": bool(tool.get("requires_signature", is_live)),
             "tool_version": "1.0.0",
             "runner_api_version": 1,
         }
         for key, value in defaults.items():
-            if tool.get(key) != value:
+            if key not in tool or tool.get(key) is None:
                 tool[key] = value
                 changed = True
     return changed
@@ -515,6 +615,12 @@ async def seed_initial_data() -> None:
                     changed = True
                     logger.info("现有工具配置为空，已恢复默认工具配置")
                 changed = upgrade_default_tool_configs(tools) or changed
+                if restore_missing_default_platforms(tools):
+                    changed = True
+                    logger.info("旧工具配置缺少速卖通平台，已恢复默认速卖通演示工具")
+                if restore_new_default_tools(tools):
+                    changed = True
+                    logger.info("旧工具配置已补充新增的智能补货工具")
                 changed = ensure_tool_runtime_fields(tools) or changed
                 if changed:
                     existing.value = json.dumps(tools, ensure_ascii=False)

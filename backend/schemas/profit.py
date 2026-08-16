@@ -1,9 +1,10 @@
 """Profit ledger and policy schemas."""
 
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from core.response import APIResponse
 
 PROFIT_KEYS = ("tech", "market", "product", "service", "coordination", "record")
 
@@ -43,16 +44,49 @@ class ProfitRecordResponse(BaseModel):
     status: str
     policy_version: int
     ratios_snapshot: str
-    order_amount_snapshot: Decimal
-    tech_share: Decimal = Decimal("0")
-    market_share: Decimal = Decimal("0")
-    product_share: Decimal = Decimal("0")
-    service_share: Decimal = Decimal("0")
-    coordination_share: Decimal = Decimal("0")
-    record_share: Decimal = Decimal("0")
-    reversed_at: datetime | None = None
+    order_amount_snapshot: float
+    tech_share: float = 0
+    market_share: float = 0
+    product_share: float = 0
+    service_share: float = 0
+    coordination_share: float = 0
+    record_share: float = 0
+    reversed_at: str | None = None
     reversal_reason: str | None = None
     created_by_staff_id: int | None = None
-    created_at: datetime | None = None
+    created_at: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProfitRecordPageResponse(APIResponse[list[ProfitRecordResponse]]):
+    total: int
+    page: int
+    page_size: int
+
+
+class ProfitBreakdownResponse(BaseModel):
+    tech: float
+    market: float
+    product: float
+    service: float
+    coordination: float
+    record: float
+    grand_total: float
+
+
+class ProfitSummaryResponse(BaseModel):
+    active: ProfitBreakdownResponse
+    reversed: ProfitBreakdownResponse
+    total_tech: float
+    total_market: float
+    total_product: float
+    total_service: float
+    total_coordination: float
+    total_record: float
+    grand_total: float
+    reversed_total: float
+    gross_total: float
+
+
+ProfitPolicyEnvelope = APIResponse[ProfitPolicyResponse]

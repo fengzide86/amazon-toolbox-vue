@@ -1,19 +1,19 @@
 """
 pytest 测试配置和公共 fixtures
 """
-import sys
 import os
+import sys
 
 # 确保 backend 目录在 Python 路径中
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import asyncio
+from collections.abc import AsyncGenerator
+
 import pytest
 import pytest_asyncio
-import asyncio
-from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 # 设置测试环境变量
 os.environ["APP_ENV"] = "test"
@@ -27,13 +27,12 @@ def _noop_limit(*args, **kwargs):
     return decorator
 
 # 补丁 Limiter.limit 方法
-import slowapi
+import slowapi  # noqa: E402 - test environment must be configured before app imports
+
 slowapi.Limiter.limit = _noop_limit
 
-from database import Base, get_db
-from core.config import settings
-from main import app
-
+from database import Base, get_db  # noqa: E402
+from main import app  # noqa: E402
 
 # 测试数据库 URL (使用 SQLite 内存数据库)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -102,9 +101,10 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture(scope="function")
 async def admin_token(client: AsyncClient, db_session: AsyncSession) -> str:
     """获取超级管理员 Token"""
-    from models import StaffRole, StaffStatus, StaffUser
-    from core.security import hash_password
     from sqlalchemy import select
+
+    from core.security import hash_password
+    from models import StaffRole, StaffStatus, StaffUser
     
     result = await db_session.execute(select(StaffUser).where(StaffUser.username == "admin"))
     staff = result.scalars().first()

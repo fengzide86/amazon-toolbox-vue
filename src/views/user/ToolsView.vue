@@ -1,16 +1,17 @@
 <template>
-  <div class="toolbox-page">
-    <header class="toolbox-header">
-      <div>
-        <span class="toolbox-eyebrow">流程演示工具箱</span>
-        <h2>选择一个工具体验演示</h2>
-        <p>当前工具仅展示模拟流程，不会登录、读取或修改真实店铺数据。</p>
-      </div>
-      <router-link class="plan-chip" to="/user/plans">
-        <ShieldCheck :size="15" />
-        {{ currentPlanName }}
-      </router-link>
-    </header>
+  <div class="toolbox-page" data-testid="tools-page">
+    <PageHeader
+      eyebrow="流程演示工具"
+      title="选择一个工具开始处理"
+      description="当前工具仅展示模拟流程，不会登录、读取或修改真实店铺数据。"
+    >
+      <template #actions>
+        <router-link class="plan-chip" to="/user/plans">
+          <ShieldCheck :size="15" />
+          {{ currentPlanName }}
+        </router-link>
+      </template>
+    </PageHeader>
     <AsyncStateNotice v-if="staleError" state="stale" :message="staleError" @retry="loadData" />
 
     <div v-if="loading" class="tool-grid" aria-label="工具加载中">
@@ -31,7 +32,7 @@
         type="button"
         :class="['tool-card', `is-${toolState(tool)}`, { 'is-launching': launchingToolId === tool.id, 'is-focused': route.query?.tool === tool.id }]"
         :disabled="launchingToolId !== null || toolState(tool) === 'maintenance'"
-        :aria-label="`${tool.name}，${toolState(tool) === 'available' ? '打开能力说明并开始演示' : toolState(tool) === 'locked' ? '查看可用套餐' : '暂时不可用'}`"
+        :aria-label="`${tool.name}，${liveUnavailable(tool) ? '需要下载桌面端运行' : toolState(tool) === 'available' ? '打开能力说明并开始演示' : toolState(tool) === 'locked' ? '查看可用套餐' : '暂时不可用'}`"
         :data-testid="'tool-card-' + tool.name"
         @click="hasToolDetails(tool) ? openDetails(tool) : handleToolClick(tool)"
       >
@@ -40,7 +41,7 @@
           <span class="tool-icon"><component :is="toolIcon(tool)" :size="21" /></span>
           <span v-if="toolState(tool) === 'locked'" class="state-badge locked"><LockKeyhole :size="12" /> 当前套餐未包含</span>
           <span v-else-if="toolState(tool) === 'maintenance'" class="state-badge maintenance">暂时不可用</span>
-          <span v-else class="state-badge demo">演示模式</span>
+          <span v-else :class="['state-badge', isLiveTool(tool) ? 'live' : 'demo']">{{ liveUnavailable(tool) ? '桌面端执行' : isLiveTool(tool) ? (tool.availability === 'live_beta' ? '真实执行 Beta' : '真实执行') : '交互演示' }}</span>
         </span>
 
         <span class="tool-copy">
@@ -48,6 +49,11 @@
           <span>{{ tool.description || defaultDescription(tool) }}</span>
           <span v-if="toolCapabilities(tool).length" class="capability-tags" aria-label="工具能力">
             <span v-for="tag in toolCapabilities(tool)" :key="tag">{{ tag }}</span>
+          </span>
+          <span class="tool-operational-meta">
+            <span><small>目标平台</small><b>{{ toolPlatformLabel(tool) }}</b></span>
+            <span><small>输入字段</small><b>{{ toolInputCount(tool) }} 项</b></span>
+            <span><small>执行产出</small><b>结果核验＋截图</b></span>
           </span>
         </span>
 
@@ -64,8 +70,11 @@
             查看可用套餐 <ArrowRight :size="16" />
           </template>
           <template v-else-if="toolState(tool) === 'maintenance'">维护中</template>
+          <template v-else-if="liveUnavailable(tool)">
+            下载桌面端 <Download :size="16" />
+          </template>
           <template v-else>
-            开始演示 <ArrowRight :size="16" />
+            {{ isLiveTool(tool) ? '开始执行' : '开始交互演示' }} <ArrowRight :size="16" />
           </template>
           </span>
         </span>
@@ -99,7 +108,7 @@
           <span class="section-label">什么时候需要你操作</span>
           <ul><li v-for="scenario in normalizedList(detailsTool.intervention_scenarios)" :key="scenario">{{ scenario }}</li></ul>
         </section>
-        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>这是模拟演示，不会访问或修改真实平台数据。</span></div>
+        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>{{ liveUnavailable(detailsTool) ? '真实自动化需要桌面端本地 Runner；网页版不会读取或执行外部平台操作。' : isLiveTool(detailsTool) ? '工具将在本机浏览器中操作比赛模拟平台，登录数据不上传。' : '这是本地交互沙盒，会真实填写和点击，但不访问外部平台。' }}</span></div>
       </div>
       <template #footer>
         <button class="drawer-primary" :disabled="Boolean(detailsTool && toolState(detailsTool) === 'maintenance')" @click="launchFromDetails">
@@ -107,12 +116,27 @@
         </button>
       </template>
     </el-drawer>
+
+    <el-dialog v-model="runDialogVisible" width="min(560px, 94vw)" :close-on-click-modal="!launchingToolId" destroy-on-close>
+      <template #header>
+        <div class="run-dialog-heading"><small>LIVE AUTOMATION</small><h3>{{ pendingTool?.name }}</h3><p>参数只会发送给本机执行器。</p></div>
+      </template>
+      <el-form v-if="pendingTool" label-position="top" class="run-form">
+        <el-form-item v-for="field in pendingTool.single_input_schema || []" :key="field.key" :label="field.label" :required="field.required">
+          <el-input-number v-if="field.type === 'number'" :model-value="numberInput(field.key)" :controls="false" @update:model-value="value => setNumberInput(field.key, value)" />
+          <el-select v-else-if="field.type === 'select'" v-model="runInput[field.key]" placeholder="请选择"><el-option v-for="option in field.options || []" :key="option" :label="option" :value="option" /></el-select>
+          <el-input v-else v-model="runInput[field.key]" :placeholder="field.type === 'file' ? '输入本机文件完整路径' : `请输入${field.label}`" />
+        </el-form-item>
+      </el-form>
+      <template #footer><div class="run-dialog-actions"><el-button :disabled="Boolean(launchingToolId)" @click="runDialogVisible=false">取消</el-button><el-button type="primary" :loading="Boolean(launchingToolId)" @click="confirmRun">启动自动处理</el-button></div></template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowRight,
@@ -120,6 +144,7 @@ import {
   Boxes,
   CheckCircle2,
   CircleAlert,
+  Download,
   LoaderCircle,
   LockKeyhole,
   Megaphone,
@@ -132,7 +157,7 @@ import {
   Wrench,
   Zap,
 } from '@lucide/vue'
-import { createDemoRun, getTools, updateDemoRun } from '@/utils/api'
+import { getTools } from '@/utils/api'
 import { showToast } from '@/utils'
 import { useAppStore } from '@/stores/app'
 import { usePlatformStore } from '@/stores/platform'
@@ -143,7 +168,9 @@ import {
   toolCatalogSchema,
   type ToolCatalogItem,
 } from '@/features/tools/model'
-import { demoRunSchema, unwrapApiData } from '@/features/demo/model'
+import { buildDemoLaunch, buildLiveLaunch, isLiveTool } from '@/features/automation/launch'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
+import { downloadDesktopInstaller } from '@/runtime/desktop-download'
 
 const router = useRouter() || { push: () => {} }
 const route = useRoute() || { query: {} }
@@ -156,6 +183,19 @@ const staleError = ref('')
 const launchingToolId = ref<string | number | null>(null)
 const detailsVisible = ref(false)
 const detailsTool = ref<ToolCatalogItem | null>(null)
+const runDialogVisible = ref(false)
+const pendingTool = ref<ToolCatalogItem | null>(null)
+const runInput = ref<Record<string, string | number | undefined>>({})
+const runtime = getRuntimeCapabilities()
+
+function numberInput(key: string): number | undefined {
+  const value = runInput.value[key]
+  return typeof value === 'number' ? value : undefined
+}
+
+function setNumberInput(key: string, value: number | null | undefined): void {
+  runInput.value[key] = value ?? undefined
+}
 
 const userInfo = computed(() => {
   try {
@@ -204,10 +244,23 @@ function toolCapabilities(tool: ToolCatalogItem) {
   return normalizedList(tool?.capability_tags).slice(0, 3)
 }
 
+function toolPlatformLabel(tool: ToolCatalogItem): string {
+  const key = String(tool.platform_key || platformStore.currentPlatform || 'amazon').toLowerCase()
+  return key === 'aliexpress' ? '速卖通' : '亚马逊'
+}
+
+function toolInputCount(tool: ToolCatalogItem): number {
+  return Array.isArray(tool.single_input_schema) ? tool.single_input_schema.length : 0
+}
+
 function hasToolDetails(tool: ToolCatalogItem) {
   return toolCapabilities(tool).length
     || normalizedList(tool?.preparation_notes).length
     || normalizedList(tool?.intervention_scenarios).length
+}
+
+function liveUnavailable(tool: ToolCatalogItem): boolean {
+  return isLiveTool(tool) && !runtime.singleLive
 }
 
 function openDetails(rawTool: unknown) {
@@ -219,14 +272,27 @@ const detailsActionText = computed(() => {
   if (!detailsTool.value) return '关闭'
   if (toolState(detailsTool.value) === 'locked') return '查看可用套餐'
   if (toolState(detailsTool.value) === 'maintenance') return '当前维护中'
-  return '开始演示'
+  if (liveUnavailable(detailsTool.value)) return '下载 KST 桌面端'
+  return isLiveTool(detailsTool.value) ? '填写参数并执行' : '开始交互演示'
 })
 
-function launchFromDetails() {
+async function launchFromDetails() {
   if (!detailsTool.value || toolState(detailsTool.value) === 'maintenance') return
   const tool = detailsTool.value
   detailsVisible.value = false
+  if (liveUnavailable(tool)) {
+    await downloadKstDesktop()
+    return
+  }
   handleToolClick(tool)
+}
+
+async function downloadKstDesktop(): Promise<void> {
+  try {
+    await downloadDesktopInstaller()
+  } catch (error) {
+    showToast(errorMessage(error, '桌面安装包暂时无法下载'), 'error')
+  }
 }
 
 function toolState(tool: ToolCatalogItem) {
@@ -247,7 +313,17 @@ function handleToolClick(rawTool: unknown) {
     return
   }
   if (state === 'maintenance') return
-  runTool(tool)
+  if (liveUnavailable(tool)) {
+    void downloadKstDesktop()
+    return
+  }
+  if (isLiveTool(tool) && tool.single_input_schema?.length) {
+    pendingTool.value = tool
+    runInput.value = Object.fromEntries(tool.single_input_schema.map(field => [field.key, undefined]))
+    runDialogVisible.value = true
+    return
+  }
+  void runTool(tool)
 }
 
 async function loadData() {
@@ -256,12 +332,9 @@ async function loadData() {
   loadError.value = ''
   staleError.value = ''
   try {
-    tools.value = toolCatalogSchema.parse(await getTools({ platform_key: platformStore.currentPlatform })).map(tool => ({
-      ...tool,
-      availability: 'demo_only' as const,
-      supports_demo_single: true,
-      supports_live_single: false,
-    }))
+    tools.value = toolCatalogSchema
+      .parse(await getTools({ platform_key: platformStore.currentPlatform }))
+      .filter(tool => tool.supports_demo_single || tool.supports_live_single)
   } catch (error) {
     const message = errorMessage(error, '请检查网络连接后重试。')
     if (hadData) staleError.value = message
@@ -271,50 +344,30 @@ async function loadData() {
   }
 }
 
-async function runTool(tool: ToolCatalogItem) {
+async function confirmRun() {
+  const tool = pendingTool.value
+  if (!tool) return
+  const missing = (tool.single_input_schema || []).find(field => field.required && (runInput.value[field.key] === undefined || runInput.value[field.key] === ''))
+  if (missing) { showToast(`请填写${missing.label}`, 'warning'); return }
+  await runTool(tool, { ...runInput.value })
+  if (appStore.toolVisible) runDialogVisible.value = false
+}
+
+async function runTool(tool: ToolCatalogItem, input: Record<string, unknown> = {}) {
   if (launchingToolId.value !== null) return
   launchingToolId.value = tool.id
   try {
     const platformKey = platformStore.currentPlatform
-    const clientDemoRunId = `demo_run_${Date.now()}_${cryptoRandom()}`
-    const demoRun = demoRunSchema.parse(unwrapApiData(await createDemoRun({
-      client_demo_run_id: clientDemoRunId,
-      tool_id: String(tool.id),
-      tool_name: tool.name,
-      platform_key: platformKey,
-      scenario_id: tool.demo_scenario_id,
-      total_step_count: 6,
-    })))
-    await updateDemoRun(String(demoRun.id), {
-      event_seq: 1,
-      status: 'running',
-      current_step_id: 'prepare',
-      completed_step_count: 0,
-    })
-    appStore.openTool({
-      id: tool.id,
-      name: tool.name,
-      module: tool.module,
-      category: tool.category,
-      platformKey,
-      capabilityKey: tool.capability_key,
-      targetUrl: `demo://${platformKey}/${encodeURIComponent(String(tool.id))}`,
-      executionMode: 'demo',
-      scenarioId: tool.demo_scenario_id,
-      demoRunId: String(demoRun.id),
-    })
+    if (isLiveTool(tool) && !runtime.singleLive) throw new Error('真实自动化仅支持已启用本地 Runner 的桌面客户端')
+    const launchTool = isLiveTool(tool)
+      ? await buildLiveLaunch(tool, platformKey, input)
+      : buildDemoLaunch(tool, platformKey, input)
+    appStore.openTool(launchTool)
   } catch (error) {
-    showToast(errorMessage(error, '暂时无法启动演示，请重试'), 'error')
+    showToast(errorMessage(error, '工具启动失败，请稍后重试'), 'error')
   } finally {
     launchingToolId.value = null
   }
-}
-
-function cryptoRandom(): string {
-  if (globalThis.crypto?.getRandomValues) {
-    return Array.from(globalThis.crypto.getRandomValues(new Uint32Array(2)), value => value.toString(16)).join('')
-  }
-  return Math.random().toString(16).slice(2)
 }
 
 watch(() => platformStore.currentPlatform, () => {
@@ -466,6 +519,13 @@ onMounted(loadData)
   background: var(--color-primary-soft);
 }
 
+.state-badge.live { color: var(--color-success); background: var(--color-success-soft); }
+.run-dialog-heading small { color: var(--color-success); font-size: var(--type-micro); font-weight: 800; letter-spacing: .12em; }
+.run-dialog-heading h3 { margin: 5px 0 0; color: var(--color-text); }
+.run-dialog-heading p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: var(--type-meta); }
+.run-form :deep(.el-input-number), .run-form :deep(.el-select) { width: 100%; }
+.run-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
 .tool-copy {
   display: block;
   flex: 1;
@@ -508,6 +568,7 @@ onMounted(loadData)
   font-weight: 650;
   line-height: 1.45;
 }
+.tool-operational-meta{display:grid!important;grid-template-columns:.8fr .7fr 1.35fr;gap:6px;margin-top:14px;padding-top:12px;border-top:1px solid var(--color-border)}.tool-operational-meta>span{display:grid!important;gap:3px}.tool-operational-meta small{color:var(--color-text-tertiary);font-size:10px}.tool-operational-meta b{overflow:hidden;color:var(--color-text);font-size:var(--type-micro);font-weight:700;text-overflow:ellipsis;white-space:nowrap}
 
 .tool-action {
   display: flex;

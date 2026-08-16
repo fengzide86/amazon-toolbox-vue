@@ -89,7 +89,7 @@ class DemoBatch(Base):
             "status IN ('created','running','completed','cancelled','error')",
             name="ck_demo_batches_status",
         ),
-        CheckConstraint("row_count > 0", name="ck_demo_batches_row_count"),
+        CheckConstraint("row_count > 0 AND row_count <= 50", name="ck_demo_batches_row_count"),
         UniqueConstraint("user_id", "idempotency_key", name="ux_demo_batch_owner_idempotency"),
         Index("ix_demo_batches_owner_created", "user_id", "created_at"),
         Index("ix_demo_batches_owner_status", "user_id", "status"),

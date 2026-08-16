@@ -8,6 +8,7 @@ const EVENTS = Object.freeze({
   BROWSER_NAVIGATED: 'browser.navigated',
   STEP_STARTED: 'step.started',
   STEP_COMPLETED: 'step.completed',
+  STEP_RETRYING: 'step.retrying',
   RUN_PAUSED: 'run.paused',
   RUN_RESUMED: 'run.resumed',
   USER_ACTION_REQUIRED: 'user.action_required',
@@ -38,20 +39,32 @@ interface AutomationTool extends Record<string, unknown> {
   executionContext?: ExecutionContext
 }
 
-function createSteps(tool: AutomationTool = {}) {
+interface ScriptStep extends Record<string, unknown> {
+  id?: string
+  title?: string
+  detail?: string
+  action?: string
+}
+
+interface AutomationScript extends Record<string, unknown> {
+  steps?: ScriptStep[]
+}
+
+function createSteps(tool: AutomationTool = {}, script: AutomationScript = {}) {
   const platformName = tool.platformKey === 'aliexpress' ? '速卖通' : '亚马逊';
-  const scriptKey = tool.launchGrant?.scriptKey || '';
-  const isRegisterFlow = scriptKey.includes('register');
+  const workflowSteps = Array.isArray(script.steps)
+    ? script.steps.flatMap((step, index) => step.id ? [{
+      id: step.id,
+      title: step.title || `执行步骤 ${index + 1}`,
+      detail: step.detail || '按照已发布的工具适配器处理当前页面。',
+      action: step.action || step.title || '正在处理页面',
+    }] : [])
+    : [];
   return [
     { id: 'prepare', title: '初始化本地运行环境', detail: '校验启动授权并准备独立浏览器 Profile。', action: '正在检查授权和浏览器环境' },
     { id: 'open', title: `打开${platformName}页面`, detail: '使用可见浏览器进入工具目标页面。', action: `正在访问 ${tool.targetUrl || '目标页面'}` },
-    { id: 'inspect', title: '检查页面状态', detail: '确认页面已正常加载并准备执行任务。', action: '正在检查页面状态' },
-    {
-      id: 'execute',
-      title: isRegisterFlow ? '执行注册流程' : '运行工具脚本',
-      detail: '按照预设流程处理当前任务。',
-      action: isRegisterFlow ? '正在处理注册信息' : '正在执行本地工具脚本',
-    },
+    { id: 'inspect', title: '扫描并检查页面', detail: '采集脱敏页面结构指纹，检查登录、验证码和页面变化。', action: '正在扫描页面状态' },
+    ...workflowSteps,
     { id: 'verify', title: '检查执行结果', detail: '核对页面状态并生成运行结果。', action: '正在校验执行结果' },
     { id: 'summary', title: '整理任务结果', detail: '汇总本次本地 Runner 执行结果。', action: '正在生成结果摘要' },
   ];

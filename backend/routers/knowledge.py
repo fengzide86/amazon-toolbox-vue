@@ -2,63 +2,42 @@
 知识库管理路由模块
 提供规则式知识库 CRUD 与批量导入 API
 """
+from typing import Any, NoReturn, cast
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin
 from database import get_db
 from domains.knowledge import service as knowledge_service
+from schemas.ai_chat import (
+    FeatureDisabledResponse,
+    KnowledgeBatchImportItem,
+    KnowledgeBatchImportResponse,
+    KnowledgeCategoryResponse,
+    KnowledgeCreateRequest,
+    KnowledgeDeleteResponse,
+    KnowledgeListResponse,
+    KnowledgeResponse,
+    KnowledgeStatsResponse,
+    KnowledgeUpdateRequest,
+    RetrievalTestRequest,
+)
 
 router = APIRouter()
 
 
-# ===== 请求体模型 =====
-
-class KnowledgeCreate(BaseModel):
-    category: str
-    title: str
-    content: str
-    keywords: list[str] | None = None
-    priority: str | None = "medium"
-    platform_key: str | None = None
-    capability_key: str | None = None
-
-
-class KnowledgeUpdate(BaseModel):
-    category: str | None = None
-    title: str | None = None
-    content: str | None = None
-    keywords: list[str] | None = None
-    priority: str | None = None
-    status: str | None = None
-    platform_key: str | None = None
-    capability_key: str | None = None
-
-
-class BatchImportItem(BaseModel):
-    category: str
-    title: str
-    content: str
-    keywords: list[str] | None = None
-    priority: str | None = "medium"
-
-
-class RetrievalTestRequest(BaseModel):
-    query: str = Field(min_length=1, max_length=2000)
-    platform_key: str | None = None
-    capability_key: str | None = None
-    top_k: int = Field(default=5, ge=1, le=20)
-    min_score: float = Field(default=0.3, ge=-1, le=1)
-
-
 # ===== 路由 =====
 
-@router.post("/retrieval-test")
+@router.post(
+    "/retrieval-test",
+    response_model=FeatureDisabledResponse,
+    responses={409: {"model": FeatureDisabledResponse}},
+)
 async def retrieval_test(
     req: RetrievalTestRequest,
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> NoReturn:
     """Vector retrieval is not part of the internal rules build."""
     del req, _admin
     raise HTTPException(
@@ -66,7 +45,7 @@ async def retrieval_test(
         detail={"code": "FEATURE_DISABLED", "message": "当前为规则式客服模式"},
     )
 
-@router.get("")
+@router.get("", response_model=KnowledgeListResponse)
 async def get_knowledge_list(
     category: str | None = Query(None, description="分类过滤"),
     status: str | None = Query(None, description="状态过滤"),
@@ -76,8 +55,8 @@ async def get_knowledge_list(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
     """获取知识库列表（分页）"""
     return await knowledge_service.get_list(
         db, category=category, status=status, keyword=keyword,
@@ -86,30 +65,30 @@ async def get_knowledge_list(
     )
 
 
-@router.get("/categories")
+@router.get("/categories", response_model=list[KnowledgeCategoryResponse])
 async def get_categories(
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> list[dict[str, Any]]:
     """获取分类列表及数量"""
     return await knowledge_service.get_categories(db)
 
 
-@router.get("/stats")
+@router.get("/stats", response_model=KnowledgeStatsResponse)
 async def get_stats(
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
     """获取知识库统计"""
     return await knowledge_service.get_stats(db)
 
 
-@router.get("/{knowledge_id:int}")
+@router.get("/{knowledge_id:int}", response_model=KnowledgeResponse)
 async def get_knowledge(
     knowledge_id: int,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
     """获取知识条目详情"""
     item = await knowledge_service.get_by_id(db, knowledge_id)
     if not item:
@@ -117,13 +96,13 @@ async def get_knowledge(
     return item
 
 
-@router.post("")
+@router.post("", response_model=KnowledgeResponse)
 async def create_knowledge(
-    req: KnowledgeCreate,
+    req: KnowledgeCreateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
     """新建知识条目"""
     result = await knowledge_service.create(
         db,
@@ -131,7 +110,7 @@ async def create_knowledge(
         title=req.title,
         content=req.content,
         keywords=req.keywords,
-        priority=req.priority,
+        priority=cast(str, req.priority),
         platform_key=req.platform_key,
         capability_key=req.capability_key,
         actor=_admin,
@@ -141,14 +120,14 @@ async def create_knowledge(
     return result
 
 
-@router.put("/{knowledge_id:int}")
+@router.put("/{knowledge_id:int}", response_model=KnowledgeResponse)
 async def update_knowledge(
     knowledge_id: int,
-    req: KnowledgeUpdate,
+    req: KnowledgeUpdateRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
     """更新知识条目"""
     item = await knowledge_service.update(
         db, knowledge_id,
@@ -169,13 +148,13 @@ async def update_knowledge(
     return item
 
 
-@router.delete("/{knowledge_id:int}")
+@router.delete("/{knowledge_id:int}", response_model=KnowledgeDeleteResponse)
 async def delete_knowledge(
     knowledge_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, str]:
     """删除知识条目"""
     success = await knowledge_service.delete(
         db,
@@ -189,23 +168,27 @@ async def delete_knowledge(
     return {"message": "删除成功"}
 
 
-@router.post("/batch-import")
+@router.post("/batch-import", response_model=KnowledgeBatchImportResponse)
 async def batch_import(
-    items: list[BatchImportItem],
+    items: list[KnowledgeBatchImportItem],
     request: Request,
     db: AsyncSession = Depends(get_db),
-    actor: dict = Depends(get_current_admin),
-):
+    actor: dict[str, Any] = Depends(get_current_admin),
+) -> dict[str, Any]:
     """批量导入知识条目"""
     data = [item.model_dump() for item in items]
     return await knowledge_service.batch_import(db, data, actor=actor, request=request)
 
 
-@router.post("/sync-vector")
+@router.post(
+    "/sync-vector",
+    response_model=FeatureDisabledResponse,
+    responses={409: {"model": FeatureDisabledResponse}},
+)
 async def sync_to_vector(
     db: AsyncSession = Depends(get_db),
-    _admin: dict = Depends(get_current_admin),
-):
+    _admin: dict[str, Any] = Depends(get_current_admin),
+) -> NoReturn:
     """Vector synchronization is disabled in rules mode."""
     del db, _admin
     raise HTTPException(

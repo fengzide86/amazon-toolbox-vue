@@ -13,6 +13,12 @@ export interface AutomationAdapter {
   dispose(): void
 }
 
+function cloneForIpc<T>(value: T): T {
+  const serialized = JSON.stringify(value)
+  if (!serialized) throw new Error('自动化启动参数无法序列化')
+  return JSON.parse(serialized) as T
+}
+
 export class ElectronAutomationAdapter implements AutomationAdapter {
   constructor(private readonly api: AutomationBridge) {}
 
@@ -21,7 +27,9 @@ export class ElectronAutomationAdapter implements AutomationAdapter {
   }
 
   start(tool: AutomationTool): Promise<unknown> {
-    return this.api.start(tool)
+    // Pinia stores expose nested Vue proxies. Electron's structured-clone
+    // boundary rejects those proxies, even though their data is JSON-safe.
+    return this.api.start(cloneForIpc(tool))
   }
 
   pause(): Promise<unknown> {
@@ -40,5 +48,5 @@ export class ElectronAutomationAdapter implements AutomationAdapter {
     return this.api.cancel()
   }
 
-  dispose(): void {}
+  dispose(): void { void this.api.cancel() }
 }

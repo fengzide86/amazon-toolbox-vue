@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h2 class="page-title">系统设置</h2>
+    <PageHeader eyebrow="SYSTEM CONFIGURATION" title="系统设置" description="维护客服联系方式、套餐规则与后台运行配置。" />
 
     <el-card class="settings-card" shadow="never">
       <template #header><div class="card-header"><span>基本设置</span></div></template>
@@ -223,6 +223,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAdminSettings } from '@/features/admin/useAdminSettings'
+import PageHeader from '@/components/PageHeader.vue'
 
 const router = useRouter()
 const {

@@ -2,8 +2,9 @@
 授权相关数据模型
 包含: AuthCode, Device, AuthSeat, LaunchToken
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Index, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
+
 from models.base import Base
 
 
@@ -65,7 +66,7 @@ class Device(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     __table_args__ = (
-        Index('ix_devices_auth_code_device', 'auth_code_id', 'device_id'),
+        UniqueConstraint('auth_code_id', 'device_id', name='ux_devices_auth_code_device'),
     )
 
 
@@ -83,6 +84,7 @@ class AuthSeat(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
+        UniqueConstraint('auth_code_id', 'device_id', name='ux_auth_seats_auth_code_device'),
         Index('ix_auth_seats_code_status', 'auth_code_id', 'status'),
         Index('ix_auth_seats_user_device', 'user_id', 'device_id'),
     )

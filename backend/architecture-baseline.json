@@ -1,0 +1,7 @@
+{
+  "cross_domain_imports": [],
+  "domain_router_imports": [],
+  "router_transaction_calls": [],
+  "routes_missing_response_model": [],
+  "untyped_functions": []
+}

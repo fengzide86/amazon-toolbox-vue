@@ -15,6 +15,8 @@ set "APP_ENV=development"
 set "TOOL_EXECUTION_MODE=demo"
 set "AI_SUPPORT_MODE=rules"
 set "BUNDLED_BACKEND_ENABLED=false"
+if not defined PYTHONUTF8 set "PYTHONUTF8=1"
+if not defined PYTHONIOENCODING set "PYTHONIOENCODING=utf-8"
 
 echo ============================================
 echo   Amazon Toolbox - Local Backend
@@ -42,10 +44,21 @@ if not exist "%TOOLBOX_RUNTIME_DIR%" (
     if errorlevel 1 goto :failed
 )
 
-"%PYTHON%" -c "import fastapi, uvicorn, sqlalchemy, aiosqlite" >nul 2>&1
+rem Import every runtime dependency used by the local backend. Checking only the
+rem web framework can leave a partially installed venv that fails after launch.
+"%PYTHON%" -c "import fastapi, uvicorn, multipart, dotenv, yaml, sqlalchemy, pydantic, pydantic_settings, aiosqlite, aiomysql, pymysql, cryptography, redis, bcrypt, jwt, slowapi, alembic, greenlet" >nul 2>&1
 if errorlevel 1 (
     echo [INFO] Installing backend dependencies...
-    "%PIP%" install -r requirements.txt
+    "%PYTHON%" -m pip install -r requirements.txt
+    if errorlevel 1 goto :failed
+)
+
+"%PYTHON%" -m pip check >nul 2>&1
+if errorlevel 1 (
+    echo [INFO] Repairing inconsistent backend dependencies...
+    "%PYTHON%" -m pip install -r requirements.txt
+    if errorlevel 1 goto :failed
+    "%PYTHON%" -m pip check >nul 2>&1
     if errorlevel 1 goto :failed
 )
 

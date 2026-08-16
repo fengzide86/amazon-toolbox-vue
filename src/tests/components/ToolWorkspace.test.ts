@@ -6,11 +6,16 @@ import { useAppStore } from '@/stores/app'
 import { useTaskRunStore } from '@/stores/taskRun'
 import { AUTOMATION_EVENT } from '@/automation'
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), createLog: vi.fn(), confirmAction: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
+  createLog: vi.fn(),
+  createDemoRun: vi.fn(),
+  confirmAction: vi.fn(),
+}))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/utils/api', () => ({
   createLog: mocks.createLog,
-  createDemoRun: vi.fn(),
+  createDemoRun: mocks.createDemoRun,
   updateDemoRun: vi.fn().mockResolvedValue({}),
   finishDemoRun: vi.fn().mockResolvedValue({}),
   cancelDemoRun: vi.fn().mockResolvedValue({}),
@@ -24,6 +29,7 @@ describe('ToolWorkspace 极简运行工作台', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
+    mocks.createDemoRun.mockResolvedValue({ id: 'remote-demo-1', tool_id: 'demo' })
     pinia = createPinia()
     setActivePinia(pinia)
     useAppStore().openTool({
@@ -62,6 +68,17 @@ describe('ToolWorkspace 极简运行工作台', () => {
     wrapper.unmount()
   })
 
+  it('后台记录接口失败时仍正常启动本地演示', async () => {
+    mocks.createDemoRun.mockRejectedValueOnce(new Error('network unavailable'))
+    const wrapper = mountWorkspace()
+    await flushPromises()
+
+    expect(useTaskRunStore().status).toBe('running')
+    expect(useTaskRunStore().steps).toHaveLength(6)
+    expect(wrapper.find('[data-testid="tool-workspace"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('需要人工操作时只给一个明确的继续按钮', async () => {
     const wrapper = mountWorkspace()
     await flushPromises()
@@ -95,6 +112,7 @@ describe('ToolWorkspace 极简运行工作台', () => {
     expect(useTaskRunStore().status).toBe('cancelled')
     expect(wrapper.find('.result-card.cancelled').text()).toContain('已退出演示')
     expect(wrapper.find('.result-card.cancelled').text()).toContain('重新演示')
+    expect(wrapper.find('.workspace-topbar').text()).not.toContain('返回工具箱')
     wrapper.unmount()
   })
 

@@ -1,16 +1,16 @@
 import { fork, type ChildProcess } from 'node:child_process'
+import {
+  hostResponseSchema,
+  runnerCommandNameSchema,
+  runnerCommandSchema,
+  runnerProtocolError,
+  runnerToHostMessageSchema,
+  type HostRequest,
+  type RunnerCommandName,
+  type RunnerEvent,
+} from '../../src/shared/ipc/automation-contract.js'
 
 type UnknownRecord = Record<string, unknown>
-type RunnerEvent = UnknownRecord & { type?: string }
-type HostRequest = { type: 'host-request'; id: string; action: string; payload?: UnknownRecord }
-type RunnerResponse = {
-  type: 'response'
-  id: string
-  ok: boolean
-  data?: unknown
-  error?: { code?: string; message?: string }
-}
-type RunnerMessage = { type: 'event'; event: RunnerEvent } | HostRequest | RunnerResponse
 type ForkRunner = typeof fork
 
 interface PendingCommand {
@@ -47,7 +47,7 @@ export class RunnerClient {
   private readonly pending = new Map<string, PendingCommand>()
   private sequence = 0
 
-  constructor({ scriptPath, env = {}, onEvent = () => undefined, onHostRequest = null, forkFn = fork, timeoutMs = 15000 }: RunnerClientOptions) {
+  constructor({ scriptPath, env = {}, onEvent = () => undefined, onHostRequest = null, forkFn = fork, timeoutMs = 45000 }: RunnerClientOptions) {
     this.scriptPath = scriptPath
     this.env = env
     this.onEvent = onEvent
@@ -73,8 +73,20 @@ export class RunnerClient {
   }
 
   private handleMessage(rawMessage: unknown): void {
-    if (!rawMessage || typeof rawMessage !== 'object' || !('type' in rawMessage)) return
-    const message = rawMessage as RunnerMessage
+    const parsed = runnerToHostMessageSchema.safeParse(rawMessage)
+    if (!parsed.success) {
+      const id = rawMessage && typeof rawMessage === 'object' && 'id' in rawMessage && typeof rawMessage.id === 'string'
+        ? rawMessage.id
+        : null
+      const pending = id ? this.pending.get(id) : undefined
+      if (pending) {
+        clearTimeout(pending.timer)
+        this.pending.delete(id as string)
+        pending.reject(runnerProtocolError())
+      }
+      return
+    }
+    const message = parsed.data
     if (message.type === 'event') {
       this.onEvent(message.event)
       return
@@ -97,10 +109,10 @@ export class RunnerClient {
     if (!child?.connected) return
     try {
       if (!this.onHostRequest) throw Object.assign(new Error('Browser host is unavailable'), { code: 'BROWSER_HOST_UNAVAILABLE' })
-      const data = await this.onHostRequest(message.action, message.payload || {})
-      child.send?.({ type: 'host-response', id: message.id, ok: true, data })
+      const data = await this.onHostRequest(message.action, message.payload)
+      child.send?.(hostResponseSchema.parse({ type: 'host-response', id: message.id, ok: true, data }))
     } catch (error) {
-      child.send?.({ type: 'host-response', id: message.id, ok: false, error: errorDetails(error) })
+      child.send?.(hostResponseSchema.parse({ type: 'host-response', id: message.id, ok: false, error: errorDetails(error) }))
     }
   }
 
@@ -114,7 +126,9 @@ export class RunnerClient {
     this.child = null
   }
 
-  command(command: string, payload: UnknownRecord = {}): Promise<unknown> {
+  command(command: RunnerCommandName, payload: UnknownRecord = {}): Promise<unknown> {
+    const commandResult = runnerCommandNameSchema.safeParse(command)
+    if (!commandResult.success) return Promise.reject(runnerProtocolError('Unknown runner command'))
     this.ensureStarted()
     this.sequence += 1
     const id = `cmd_${Date.now()}_${this.sequence}`
@@ -124,7 +138,7 @@ export class RunnerClient {
         reject(new Error(`Runner command timed out: ${command}`))
       }, this.timeoutMs)
       this.pending.set(id, { resolve, reject, timer })
-      this.child?.send?.({ type: 'command', id, command, payload })
+      this.child?.send?.(runnerCommandSchema.parse({ type: 'command', id, command, payload }))
     })
   }
 

@@ -1,73 +1,91 @@
 """
 授权码相关 Schema
 """
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, Dict, Optional, List
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DeviceResponse(BaseModel):
     id: int
     device_id: str
-    device_name: Optional[str] = None
-    created_at: Optional[datetime] = None
+    device_name: str | None = None
+    created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class AuthCodeGenerate(BaseModel):
-    plan_id: Optional[int] = None
+    plan_id: int | None = None
     count: int = 1
-    duration_days: Optional[int] = None
-    max_devices: Optional[int] = None
-    platform_scope: Optional[str] = "amazon"
-    scene_type: Optional[str] = "competition"
-    seat_limit: Optional[int] = None
+    duration_days: int | None = None
+    max_devices: int | None = None
+    platform_scope: str | None = "amazon"
+    scene_type: str | None = "competition"
+    seat_limit: int | None = None
 
 
 class AuthCodeUpdate(BaseModel):
-    status: Optional[str] = None
-    expires_at: Optional[str] = None
-    device_id: Optional[str] = None
-    device_name: Optional[str] = None
-    max_devices: Optional[int] = None
+    status: str | None = None
+    expires_at: str | None = None
+    device_id: str | None = None
+    device_name: str | None = None
+    max_devices: int | None = None
 
 
 class AuthCodeResponse(BaseModel):
     id: int
     code: str
-    plan_id: Optional[int] = None
-    user_id: Optional[int] = None
-    device_id: Optional[str] = None
-    device_name: Optional[str] = None
-    max_devices: Optional[int] = None
+    plan_id: int | None = None
+    user_id: int | None = None
+    device_id: str | None = None
+    device_name: str | None = None
+    max_devices: int | None = None
     status: str
-    expires_at: Optional[datetime] = None
-    created_at: Optional[datetime] = None
-    devices: List[DeviceResponse] = []
+    expires_at: datetime | None = None
+    created_at: datetime | None = None
+    devices: list[DeviceResponse] = []
     # 1.5 新增字段
-    platform_scope: Optional[List[str]] = None
-    scene_type: Optional[str] = None
-    seat_limit: Optional[int] = None
-    seat_used: Optional[int] = None
-    device_used: Optional[int] = None
-    plan_name: Optional[str] = None
+    platform_scope: list[str] | None = None
+    scene_type: str | None = None
+    seat_limit: int | None = None
+    seat_used: int | None = None
+    device_used: int | None = None
+    plan_name: str | None = None
     product_type: str = "consumer"
-    entitlements: Dict[str, Any] = Field(default_factory=dict)
+    entitlements: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AuthCodePageResponse(BaseModel):
+    data: list[AuthCodeResponse]
+    page: int
+    page_size: int
+    total: int
+
+
+class AuthCodeBatchGenerateResponse(BaseModel):
+    success: bool
+    codes: list[str]
+    count: int
+
+
+class AuthCodeDeleteResponse(BaseModel):
+    success: bool
 
 
 # ===== AuthSeat (席位) =====
 class AuthSeatResponse(BaseModel):
     id: int
     auth_code_id: int
-    user_id: Optional[int] = None
-    device_id: Optional[str] = None
-    device_name: Optional[str] = None
-    seat_no: Optional[int] = None
+    user_id: int | None = None
+    device_id: str | None = None
+    device_name: str | None = None
+    seat_no: int | None = None
     status: str
-    activated_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    activated_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from core.response import APIResponse
+
 StaffRoleValue = Literal["super_admin", "operator", "support"]
 StaffStatusValue = Literal["active", "disabled"]
 
@@ -71,3 +73,41 @@ class StaffAccountResponse(BaseModel):
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class StaffContextResponse(BaseModel):
+    staff_id: int
+    user_id: int
+    username: str
+    name: str
+    display_name: str
+    role: StaffRoleValue
+    status: StaffStatusValue
+    token_version: int
+    force_password_reset: bool
+    auth_code_id: None = None
+    device_id: None = None
+
+
+class StaffSessionResponse(StaffContextResponse):
+    token: str
+
+
+class StaffSessionEnvelope(APIResponse[StaffSessionResponse]):
+    pass
+
+
+class StaffMeEnvelope(APIResponse[StaffContextResponse]):
+    pass
+
+
+class StaffAccountEnvelope(APIResponse[StaffAccountResponse]):
+    pass
+
+
+class StaffAccountListEnvelope(APIResponse[list[StaffAccountResponse]]):
+    pass
+
+
+class StaffOperationEnvelope(APIResponse[None]):
+    pass

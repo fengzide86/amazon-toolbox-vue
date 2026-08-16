@@ -1,18 +1,12 @@
-import { api, API_BASE, type ApiQueryParams } from './index'
-import { authService } from '../auth'
-import { toolboxVersionHeaders } from '@/shared/api/client-metadata'
+import { api, type ApiQueryParams } from './index'
+import type { components } from '@/shared/api/openapi.generated'
+import { downloadApiFile } from './download'
 
 type EntityId = string | number
+type Schemas = components['schemas']
+type LogResponse = Schemas['LogResponse']
 
-function queryString(params: ApiQueryParams): string {
-  return new URLSearchParams(
-    Object.entries(params)
-      .filter((entry): entry is [string, string | number | boolean] => entry[1] !== null && entry[1] !== undefined)
-      .map(([key, value]) => [key, String(value)]),
-  ).toString()
-}
-
-export const getLogs = (userIdOrParams: number | ApiQueryParams = {}): Promise<unknown> =>
+export const getLogs = (userIdOrParams: number | ApiQueryParams = {}): Promise<LogResponse[]> =>
   api.get('/api/logs', {
     page: 1,
     page_size: 100,
@@ -20,13 +14,10 @@ export const getLogs = (userIdOrParams: number | ApiQueryParams = {}): Promise<u
   })
 
 export async function exportLogs(params: ApiQueryParams = {}): Promise<Blob> {
-  const query = queryString(params)
-  const token = authService.getAuth()?.token || localStorage.getItem('toolbox_token')
-  const headers = toolboxVersionHeaders(token ? { Authorization: `Bearer ${token}` } : {})
-  const response = await fetch(`${API_BASE}/api/logs/export${query ? `?${query}` : ''}`, { headers })
-  return response.blob()
+  return downloadApiFile('/api/logs/export', params)
 }
 
-export const getLogTools = (userId: EntityId | null = null): Promise<unknown> =>
+export const getLogTools = (userId: EntityId | null = null): Promise<string[]> =>
   api.get('/api/logs/tools', userId !== null ? { user_id: userId } : {})
-export const createLog = (data: unknown): Promise<unknown> => api.post('/api/logs', data)
+export const createLog = (data: Schemas['LogCreate']): Promise<LogResponse> =>
+  api.post('/api/logs', data)

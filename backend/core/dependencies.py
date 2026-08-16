@@ -119,6 +119,7 @@ async def get_current_admin(
         "/api/settings",
         "/api/updates",
         "/api/tool-releases",
+        "/api/freight-rate-packs",
         "/api/audit",
         "/api/audit-logs",
     )

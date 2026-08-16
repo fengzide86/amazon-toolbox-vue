@@ -1,5 +1,4 @@
 import { expect, test, type Page, type Request as PlaywrightRequest, type Route } from '@playwright/test'
-import ExcelJS from 'exceljs'
 
 type StaffRole = 'super_admin' | 'operator' | 'support'
 type SessionRole = StaffRole | 'user'
@@ -21,12 +20,14 @@ const actionCenter = {
     pending_tickets: 0,
     waiting_interventions: 0,
     stale_batches: 0,
+    expense_renewals_due: 0,
   },
   expiring_authorizations: [],
   device_anomalies: [],
   pending_tickets: [],
   waiting_interventions: [],
   stale_batches: [],
+  expense_renewals: [],
 }
 
 function json(route: Route, response: MockResponse): Promise<void> {
@@ -115,6 +116,63 @@ async function installApi(page: Page, responder?: ApiResponder): Promise<void> {
   })
 }
 
+async function installBatchDesktopBridge(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const maskedRows = [
+      { itemId: 'local-alpha', preview: { account_label: 'se***@example.com' } },
+      { itemId: 'local-beta', preview: { account_label: 'se***@example.com' } },
+    ]
+    let remappedRows = maskedRows
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        batch: {
+          onEvent: () => () => undefined,
+          getSnapshot: async () => null,
+          selectImportFile: async () => ({
+            importId: 'desktop-import-1',
+            fileName: 'internal-demo.xlsx',
+            validCount: 2,
+            errorCount: 0,
+            worksheetName: 'demo',
+            rows: maskedRows,
+            errors: [],
+          }),
+          remapImportItems: async (payload: { itemIds?: string[] }) => {
+            remappedRows = (payload.itemIds || []).map((itemId, index) => ({
+              itemId,
+              preview: maskedRows[index]?.preview || { account_label: '' },
+            }))
+            return {
+              importId: 'desktop-import-1-remapped',
+              fileName: 'internal-demo.xlsx',
+              validCount: remappedRows.length,
+              errorCount: 0,
+              worksheetName: 'demo',
+              rows: remappedRows,
+              errors: [],
+            }
+          },
+          create: async (payload: Record<string, unknown>) => ({
+            batchId: payload.batchId,
+            serverBatchId: payload.serverBatchId,
+            tool: payload.tool,
+            status: 'running',
+            recordKind: payload.recordKind,
+            counts: { total: remappedRows.length, pending: remappedRows.length, running: 0, waiting: 0, completed: 0, failed: 0 },
+            items: remappedRows.map(row => ({
+              itemId: row.itemId,
+              accountLabelMasked: String(row.preview.account_label || ''),
+              status: 'pending',
+              browserReady: false,
+            })),
+          }),
+        },
+      },
+    })
+  })
+}
+
 function parseJsonBody(request: PlaywrightRequest): Record<string, unknown> {
   const raw = request.postData()
   if (!raw) return {}
@@ -123,7 +181,7 @@ function parseJsonBody(request: PlaywrightRequest): Record<string, unknown> {
   return parsed as Record<string, unknown>
 }
 
-test('C 端单工具只进入 Demo，并且不会写真实执行接口或显示真实成功结论', async ({ page }) => {
+test('C 端单工具即使记录接口失败也进入 Demo，并且不会写真实执行接口或显示真实成功结论', async ({ page }) => {
   await installSession(page, 'user')
   const requestedPaths: string[] = []
   await installApi(page, (request, path) => {
@@ -143,48 +201,19 @@ test('C 端单工具只进入 Demo，并且不会写真实执行接口或显示�
       }])
     }
     if (path === '/api/demo/runs' && request.method() === 'POST') {
-      return wrapped({
-        id: 'demo-run-1',
-        record_kind: 'demo',
-        execution_scope: 'single',
-        tool_id: 'demo-register',
-        tool_name_snapshot: '注册流程演示',
-        platform_key: 'amazon',
-        scenario_id: 'register-example',
-        status: 'created',
-        completed_step_count: 0,
-        total_step_count: 6,
-        created_at: now,
-      })
-    }
-    if (path === '/api/demo/runs/demo-run-1/finish') {
-      return wrapped({
-        id: 'demo-run-1',
-        record_kind: 'demo',
-        execution_scope: 'single',
-        tool_id: 'demo-register',
-        tool_name_snapshot: '注册流程演示',
-        platform_key: 'amazon',
-        scenario_id: 'register-example',
-        status: 'completed',
-        completed_step_count: 6,
-        total_step_count: 6,
-        simulated_outcome: 'completed_example',
-        created_at: now,
-        finished_at: now,
-      })
+      return { status: 503, body: { detail: 'demo telemetry unavailable' } }
     }
     return undefined
   })
 
   await page.goto('/#/user/tools')
-  await expect(page.getByRole('heading', { name: '选择一个工具体验演示' })).toBeVisible()
+  await expect(page.getByTestId('tools-page')).toBeVisible()
   await page.getByTestId('tool-card-注册流程演示').click()
 
   const workspace = page.getByTestId('tool-workspace')
   await expect(workspace).toBeVisible()
-  await expect(workspace.getByText('演示模式：不会登录、读取或修改真实店铺数据。')).toBeVisible()
-  await expect(workspace.getByText('演示结果不代表真实任务结果')).toBeVisible()
+  await expect(workspace.getByTestId('execution-scope-note')).toContainText('数据只存在本地沙盒')
+  await expect(workspace.getByTestId('result-boundary')).toHaveText('结果只代表本地沙盒操作成功')
   await expect(workspace.locator('webview')).toHaveCount(0)
   await expect(workspace.getByText('成功率')).toHaveCount(0)
   await expect(workspace.getByText(/预计.*时间/)).toHaveCount(0)
@@ -194,7 +223,73 @@ test('C 端单工具只进入 Demo，并且不会写真实执行接口或显示�
   expect(requestedPaths.some(path => path.startsWith('/api/business/batches'))).toBe(false)
 })
 
-test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号与 Cookie 不离开浏览器', async ({ page }) => {
+test('消息中心抽屉位于页面根层，不会被工具卡片覆盖', async ({ page }) => {
+  await installSession(page, 'user')
+  await installApi(page, (_request, path) => {
+    if (path === '/api/tools') {
+      return wrapped([
+        {
+          id: 'demo-register',
+          name: '注册流程演示',
+          description: '展示模拟注册流程',
+          category: 'automation',
+          platform_key: 'amazon',
+          release_status: 'available',
+          supports_demo_single: true,
+        },
+        {
+          id: 'demo-listing',
+          name: '上品流程演示',
+          description: '展示模拟上品流程',
+          category: 'automation',
+          platform_key: 'amazon',
+          release_status: 'available',
+          supports_demo_single: true,
+        },
+      ])
+    }
+    if (path === '/api/announcements/feed') {
+      return wrapped([{
+        id: 1,
+        title: '1.7.9 更新说明',
+        content: '消息中心层级修复验收',
+        type: 'update',
+        audience: 'all',
+        category: 'update',
+        severity: 'info',
+        presentation: 'banner',
+        app_version: '1.7.9',
+        priority: 10,
+        published_at: now,
+        revision: 1,
+        created_at: now,
+        is_read: false,
+        is_dismissed: false,
+      }])
+    }
+    return undefined
+  })
+
+  await page.setViewportSize({ width: 1365, height: 900 })
+  await page.goto('/#/user/tools')
+  await page.getByRole('button', { name: /消息中心/ }).click()
+
+  const layer = page.locator('body > .drawer-layer')
+  const drawer = layer.locator('.message-drawer')
+  await expect(drawer).toBeVisible()
+  await expect(drawer.getByText('1.7.9 更新说明')).toBeVisible()
+  expect(await drawer.evaluate(element => getComputedStyle(element).position)).toBe('absolute')
+  expect(await layer.evaluate(element => Number.parseInt(getComputedStyle(element).zIndex, 10))).toBeGreaterThan(1000)
+
+  const box = await drawer.boundingBox()
+  expect(box).not.toBeNull()
+  const topElementIsDrawer = await page.evaluate(({ x, y }) => {
+    return Boolean(document.elementFromPoint(x, y)?.closest('.message-drawer'))
+  }, { x: Math.round((box?.x || 0) + 30), y: Math.round((box?.y || 0) + 360) })
+  expect(topElementIsDrawer).toBe(true)
+})
+
+test('B 端接收桌面端脱敏预览，只发送行数和工具元数据，原文账号与 Cookie 不离开渲染进程', async ({ page }) => {
   await installSession(page, 'user', {
     product_type: 'business',
     business_workspace_enabled: true,
@@ -205,6 +300,7 @@ test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号�
       max_open_sessions: 4,
     },
   })
+  await installBatchDesktopBridge(page)
 
   const demoBatchRequests: PlaywrightRequest[] = []
   const itemRefs = ['item_ref_alpha', 'item_ref_beta']
@@ -271,24 +367,10 @@ test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号�
   })
 
   await page.goto('/#/business/workspace')
-  await expect(page.getByRole('heading', { name: '体验批量流程演示' })).toBeVisible()
+  await expect(page.getByTestId('business-workspace-page')).toBeVisible()
   await page.getByRole('button', { name: /批量注册流程演示/ }).click()
 
-  const workbook = new ExcelJS.Workbook()
-  const sheet = workbook.addWorksheet('demo')
-  sheet.addRow(['account_label', 'password', 'cookie'])
-  sheet.addRow(['secret.account@example.com', 'PASSWORD_SHOULD_NEVER_LEAVE', 'COOKIE_SHOULD_NEVER_LEAVE'])
-  sheet.addRow(['second.internal@example.com', 'SECOND_PASSWORD_PRIVATE', 'SECOND_COOKIE_PRIVATE'])
-  const xlsx = Buffer.from(await workbook.xlsx.writeBuffer())
-
-  const fileChooserPromise = page.waitForEvent('filechooser')
-  await page.getByRole('button', { name: /选择 .xlsx 演示表格/ }).click()
-  const fileChooser = await fileChooserPromise
-  await fileChooser.setFiles({
-    name: 'internal-demo.xlsx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    buffer: xlsx,
-  })
+  await page.getByTestId('business-file-upload').click()
 
   await expect(page.getByText('se***@example.com').first()).toBeVisible()
   await expect(page.getByText('secret.account@example.com')).toHaveCount(0)
@@ -318,7 +400,7 @@ test('B 端本地解析 xlsx，只发送行数和工具元数据，原文账号�
     'SECOND_COOKIE_PRIVATE',
   ]) expect(serializedRequests).not.toContain(secret)
   expect(demoBatchRequests.some(request => new URL(request.url()).pathname.startsWith('/api/business/batches'))).toBe(false)
-  await expect(page.getByText('不访问真实平台')).toBeVisible()
+  await expect(page.getByText(/演示工具运行本地沙盒/)).toBeVisible()
 })
 
 const roleExpectations: Array<{
@@ -329,19 +411,19 @@ const roleExpectations: Array<{
 }> = [
   {
     role: 'super_admin',
-    visible: ['分润管理', '应用更新', '系统设置', '后台账号管理'],
+    visible: ['分润管理', '公账支出', '应用更新', '系统设置', '后台账号管理'],
     hidden: [],
   },
   {
     role: 'operator',
-    visible: ['订单与套餐', '分润管理', '客服规则管理'],
+    visible: ['订单与套餐', '分润管理', '公账支出', '客服规则管理'],
     hidden: ['应用更新', '系统设置', '后台账号管理'],
     forbiddenPath: '/admin/settings',
   },
   {
     role: 'support',
     visible: ['订单与套餐', '工单管理', '客服规则管理', '公告管理'],
-    hidden: ['专业工作台', '分润管理', '应用更新', '系统设置', '后台账号管理'],
+    hidden: ['专业工作台', '分润管理', '公账支出', '应用更新', '系统设置', '后台账号管理'],
     forbiddenPath: '/admin/profit',
   },
 ]
@@ -368,6 +450,120 @@ for (const expectation of roleExpectations) {
     }
   })
 }
+
+test('公账支出完成记账、创建续费并确认生成实际流水', async ({ page }) => {
+  await installSession(page, 'super_admin')
+  const categories = [
+    { id: 1, code: 'development', name: '开发', status: 'active', sort_order: 10, is_system: true },
+    { id: 2, code: 'tool_membership', name: '工具会员', status: 'active', sort_order: 30, is_system: true },
+  ]
+  const expenses: Array<Record<string, unknown>> = []
+  const renewals: Array<Record<string, unknown>> = []
+  const expenseFrom = (body: Record<string, unknown>, id: number, renewal?: Record<string, unknown>) => ({
+    id,
+    amount: String(Number(body.amount).toFixed(2)),
+    currency: 'CNY',
+    expense_date: body.expense_date,
+    title: body.title,
+    category_id: body.category_id,
+    category_name: categories.find(item => item.id === Number(body.category_id))?.name || '其他',
+    payee: body.payee || null,
+    note: body.note || null,
+    status: 'active',
+    renewal_id: renewal?.id || null,
+    renewal_name: renewal?.name || null,
+    renewal_due_on: renewal?.next_due_on || null,
+    created_by_name: '超级管理员',
+    created_at: now,
+    updated_at: now,
+    attachments: [],
+  })
+
+  await installApi(page, (request, path) => {
+    const method = request.method()
+    if (path === '/api/expenses/categories' && method === 'GET') return wrapped(categories)
+    if (path === '/api/expenses/summary' && method === 'GET') {
+      const total = expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0)
+      return wrapped({
+        month: '2026-07', total: total.toFixed(2), previous_total: '0.00', change_percent: total ? '100.00' : '0.00',
+        count: expenses.length, upcoming_renewals: renewals.length, overdue_renewals: 0,
+        trend: [{ month: '2026-07', total: total.toFixed(2) }],
+        categories: total ? [{ category_id: 1, category_name: '开发', total: total.toFixed(2), percentage: '100.00' }] : [],
+      })
+    }
+    if (path === '/api/expenses' && method === 'GET') return { body: { success: true, data: expenses, total: expenses.length, page: 1, page_size: 20, total_pages: expenses.length ? 1 : 0 } }
+    if (path === '/api/expenses' && method === 'POST') {
+      const created = expenseFrom(parseJsonBody(request), expenses.length + 1)
+      expenses.unshift(created)
+      return { status: 201, body: { success: true, data: created } }
+    }
+    if (path === '/api/expenses/renewals' && method === 'GET') return { body: { success: true, data: renewals, total: renewals.length, page: 1, page_size: 20, total_pages: renewals.length ? 1 : 0 } }
+    if (path === '/api/expenses/renewals' && method === 'POST') {
+      const body = parseJsonBody(request)
+      const created = {
+        id: renewals.length + 1,
+        ...body,
+        default_amount: String(Number(body.default_amount).toFixed(2)),
+        category_name: categories.find(item => item.id === Number(body.category_id))?.name || '工具会员',
+        status: 'active',
+        due_state: 'upcoming',
+        occurrences: [],
+      }
+      renewals.unshift(created)
+      return { status: 201, body: { success: true, data: created } }
+    }
+    const confirmMatch = path.match(/^\/api\/expenses\/renewals\/(\d+)\/confirm$/)
+    if (confirmMatch && method === 'POST') {
+      const renewal = renewals.find(item => Number(item.id) === Number(confirmMatch[1]))!
+      const body = parseJsonBody(request)
+      const expense = expenseFrom({
+        amount: body.amount || renewal.default_amount,
+        expense_date: body.expense_date,
+        title: renewal.name,
+        category_id: renewal.category_id,
+        payee: renewal.vendor,
+        note: body.note,
+      }, expenses.length + 1, renewal)
+      expenses.unshift(expense)
+      renewal.next_due_on = '2026-08-31'
+      renewal.due_state = 'scheduled'
+      renewal.occurrences = [{ id: 1, renewal_id: renewal.id, due_on: body.due_on, status: 'paid', expense_id: expense.id }]
+      return wrapped({ renewal, expense })
+    }
+    const renewalDetail = path.match(/^\/api\/expenses\/renewals\/(\d+)$/)
+    if (renewalDetail && method === 'GET') return wrapped(renewals.find(item => Number(item.id) === Number(renewalDetail[1])))
+    return undefined
+  })
+
+  await page.goto('/#/admin/expenses')
+  await expect(page.getByRole('heading', { name: '公账支出' })).toBeVisible()
+  await page.getByRole('button', { name: '记一笔支出' }).click()
+  let drawer = page.locator('.el-drawer').last()
+  await drawer.locator('.el-input-number input').fill('320.50')
+  await drawer.getByPlaceholder('例如：7 月阿里云服务器').fill('测试云服务器')
+  await drawer.getByRole('button', { name: '确认入账' }).click()
+  await expect(page.getByText('测试云服务器')).toBeVisible()
+  await expect(page.getByText('¥320.50', { exact: true }).first()).toBeVisible()
+
+  await page.getByRole('tab', { name: /续费项目/ }).click()
+  await page.getByRole('button', { name: '新建续费项目' }).click()
+  drawer = page.locator('.el-drawer').last()
+  await drawer.getByPlaceholder('例如：Figma Professional').fill('设计工具会员')
+  await drawer.locator('.el-input-number input').first().fill('99.00')
+  await drawer.getByRole('button', { name: '创建项目' }).click()
+  await expect(page.getByText('设计工具会员', { exact: true }).first()).toBeVisible()
+
+  await page.getByRole('button', { name: '确认续费' }).first().click()
+  drawer = page.locator('.el-drawer').last()
+  await drawer.locator('.el-input-number input').fill('118.00')
+  await drawer.getByRole('button', { name: '确认续费并入账' }).click()
+  await expect(page.getByText('¥438.50', { exact: true }).first()).toBeVisible()
+
+  await page.getByRole('tab', { name: /支出流水/ }).click()
+  await expect(page.getByText('设计工具会员', { exact: true }).first()).toBeVisible()
+  expect(expenses).toHaveLength(2)
+  expect(renewals[0]?.next_due_on).toBe('2026-08-31')
+})
 
 test('订单人工确认收款走独立动作接口，随后可见分润，退款保留终态', async ({ page }) => {
   await installSession(page, 'super_admin')
@@ -442,6 +638,22 @@ test('订单人工确认收款走独立动作接口，随后可见分润，退�
 
   await page.goto('/#/admin/profit')
   await expect(page.getByText('¥100.00', { exact: true })).toBeVisible()
+  await expect(page.locator('.profit-summary')).toBeVisible()
+  await expect(page.locator('.distribution-item')).toHaveCount(6)
+  await expect(page.locator('.stat-icon')).toHaveCount(0)
+  for (const width of [1365, 1024, 768, 520]) {
+    await page.setViewportSize({ width, height: 800 })
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(overflow).toBeLessThanOrEqual(1)
+    const rowCounts = await page.locator('.distribution-item').evaluateAll((items) => {
+      const tops = items.map(item => Math.round(item.getBoundingClientRect().top))
+      return [...new Set(tops)].map(top => tops.filter(value => value === top).length)
+    })
+    if (width === 1365) expect(rowCounts).toEqual([3, 3])
+    else if (width === 520) expect(rowCounts).toEqual([1, 1, 1, 1, 1, 1])
+    else expect(rowCounts).toEqual([2, 2, 2])
+  }
+  await page.setViewportSize({ width: 1365, height: 800 })
 
   await page.goto('/#/admin/orders')
   await page.getByRole('button', { name: '退款' }).click()
@@ -452,6 +664,65 @@ test('订单人工确认收款走独立动作接口，随后可见分润，退�
   await expect.poll(() => actionCalls.map(call => call.path)).toContain('/api/orders/1/refund')
   expect(JSON.parse(actionCalls.at(-1)?.body || '{}')).toEqual({ reason: '内部验收退款' })
   await expect(page.getByRole('row', { name: /INTERNAL-ORDER-001.*已退款/ })).toBeVisible()
+})
+
+test('知识库和客服按区域降级，分页元数据与规则预览保持可用', async ({ page }) => {
+  await installSession(page, 'super_admin')
+  await installApi(page, (request, path) => {
+    if (path === '/api/knowledge') {
+      const item = {
+        id: 801,
+        category: '授权说明',
+        title: '如何更换授权设备',
+        content: '先解绑旧设备，再登录新设备。',
+        keywords: ['换设备'],
+        priority: 'high',
+        status: 'active',
+        view_count: 3,
+      }
+      return { body: { data: [item], items: [item], total: 21, page: 1, page_size: 20 } }
+    }
+    if (path === '/api/knowledge/categories') return { body: { success: true, data: { unexpected: true } } }
+    if (path === '/api/knowledge/stats') return wrapped({ total: 21, active: 20, categories: 4 })
+    if (path === '/api/ai-chat/admin/config') {
+      return { body: {
+        welcome_message: '欢迎咨询工具规则',
+        suggested_questions: '["如何换设备"]',
+        transfer_keywords: '["退款","投诉"]',
+        max_unmatched: '3',
+      } }
+    }
+    if (path === '/api/ai-chat/admin/sessions') return { body: { success: true, data: { unexpected: true } } }
+    if (path === '/api/ai-chat/admin/stats') {
+      return { body: { total_sessions: 4, today_sessions: 1, resolve_rate: 50, transfer_rate: 25 } }
+    }
+    if (path === '/api/ai-chat/admin/debug' && request.method() === 'POST') {
+      return { body: {
+        reply: '请先解绑旧设备，再登录新设备。',
+        answer_mode: 'faq',
+        ai_used: false,
+        knowledge_refs: [],
+        fallback_reason: null,
+        should_transfer: false,
+        diagnostics: { total_ms: 2 },
+      } }
+    }
+    return undefined
+  })
+
+  await page.goto('/#/admin/knowledge')
+  await expect(page.getByText('如何更换授权设备')).toBeVisible()
+  await expect(page.getByText('共 21 条')).toBeVisible()
+  await expect(page.getByText('知识库统计暂时无法加载')).toBeVisible()
+
+  await page.goto('/#/admin/ai-chat')
+  await expect(page.locator('.panel-left textarea').first()).toHaveValue('欢迎咨询工具规则')
+  await expect(page.locator('.stat-value-mini').first()).toHaveText('4')
+  await expect(page.getByText('分页响应缺少数据列表')).toBeVisible()
+  await page.getByPlaceholder('输入测试问题...').fill('如何换设备')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await expect(page.getByText('请先解绑旧设备，再登录新设备。')).toBeVisible()
+  await expect(page.getByText('转人工建议：否')).toBeVisible()
 })
 
 test('规则客服覆盖 FAQ、fallback，并通过转人工接口创建工单', async ({ page }) => {

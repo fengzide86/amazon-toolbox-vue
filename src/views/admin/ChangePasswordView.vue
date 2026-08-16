@@ -1,6 +1,7 @@
 <template>
   <main class="password-page">
     <section class="password-card">
+      <BrandLockup class="password-brand" audience="admin" layout="horizontal" />
       <span class="eyebrow">BACKOFFICE SECURITY</span>
       <h1>{{ forced ? '首次登录请修改密码' : '修改后台密码' }}</h1>
       <p>{{ forced ? '当前临时密码仅用于首次登录。设置新密码后才能进入运营控制中心。' : '修改后其他设备上的旧登录凭证会立即失效。' }}</p>
@@ -29,6 +30,7 @@ import { staffAuthResponseSchema } from '@/features/auth/staffModel'
 import { authService } from '@/utils/auth'
 import { useUserStore } from '@/stores/user'
 import { Auth, showToast } from '@/utils'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -74,5 +76,5 @@ async function logout() {
 </script>
 
 <style scoped>
-.password-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--color-canvas)}.password-card{width:min(460px,100%);padding:34px;border:1px solid var(--color-border);border-radius:20px;background:var(--color-surface);box-shadow:var(--shadow-overlay)}.eyebrow{color:var(--color-primary);font-size:var(--type-micro);font-weight:800;letter-spacing:.12em}.password-card h1{margin:10px 0 8px;font-size:26px;letter-spacing:-.035em}.password-card>p{margin:0 0 22px;color:var(--color-text-secondary);line-height:1.65}.password-card form{display:grid;gap:9px}.password-card label{margin-top:7px;color:var(--color-text);font-size:var(--type-control);font-weight:700}.password-card small{color:var(--color-text-tertiary)}.password-card form button{min-height:44px;margin-top:14px;border:0;border-radius:10px;color:#fff;background:var(--color-primary);font-weight:800;cursor:pointer}.password-card form button:disabled{opacity:.55;cursor:not-allowed}.error{margin-bottom:14px;padding:10px;border-radius:8px;color:var(--color-danger);background:var(--color-danger-soft);font-size:var(--type-control)}.back,.logout{margin-top:15px;padding:0;border:0;color:var(--color-primary);background:transparent;cursor:pointer}.logout{float:right;color:var(--color-text-secondary)}
+.password-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--color-canvas)}.password-card{width:min(460px,100%);padding:34px;border:1px solid var(--color-border);border-radius:20px;background:var(--color-surface);box-shadow:var(--shadow-overlay)}.password-brand{display:flex;margin-bottom:26px;padding-bottom:20px;border-bottom:1px solid var(--color-border)}.eyebrow{color:var(--color-primary);font-size:var(--type-micro);font-weight:800;letter-spacing:.12em}.password-card h1{margin:10px 0 8px;font-size:26px;letter-spacing:-.035em}.password-card>p{margin:0 0 22px;color:var(--color-text-secondary);line-height:1.65}.password-card form{display:grid;gap:9px}.password-card label{margin-top:7px;color:var(--color-text);font-size:var(--type-control);font-weight:700}.password-card small{color:var(--color-text-tertiary)}.password-card form button{min-height:44px;margin-top:14px;border:0;border-radius:10px;color:#fff;background:var(--color-primary);font-weight:800;cursor:pointer}.password-card form button:disabled{opacity:.55;cursor:not-allowed}.error{margin-bottom:14px;padding:10px;border-radius:8px;color:var(--color-danger);background:var(--color-danger-soft);font-size:var(--type-control)}.back,.logout{margin-top:15px;padding:0;border:0;color:var(--color-primary);background:transparent;cursor:pointer}.logout{float:right;color:var(--color-text-secondary)}
 </style>

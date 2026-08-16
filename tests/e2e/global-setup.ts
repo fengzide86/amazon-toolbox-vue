@@ -11,7 +11,8 @@ export default async function globalSetup(): Promise<void> {
   // Ensure directory exists
   mkdirSync(join(__dirname, '..', '..', 'test-results'), { recursive: true })
 
-  const browser = await chromium.launch()
+  const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim() || undefined
+  const browser = await chromium.launch(executablePath ? { executablePath } : undefined)
   const context = await browser.newContext()
   const page = await context.newPage()
 

@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -31,7 +32,9 @@ from routers import (
     demo,
     devices,
     executions,
+    expenses,
     feedback,
+    freight_rate_packs,
     knowledge,
     logs,
     orders,
@@ -70,6 +73,7 @@ def _register_routers(app: FastAPI) -> None:
         (users.router, "/api/users", ["用户管理"]),
         (logs.router, "/api/logs", ["运行日志"]),
         (feedback.router, "/api/feedback", ["工单反馈"]),
+        (freight_rate_packs.router, "/api/freight-rate-packs", ["物流费率版本"]),
         (profit.router, "/api/profit", ["分润管理"]),
         (settings_router.router, "/api/settings", ["系统设置"]),
         (tools.router, "/api/tools", ["工具配置"]),
@@ -77,6 +81,7 @@ def _register_routers(app: FastAPI) -> None:
         (devices.router, "/api/devices", ["设备管理"]),
         (demo.router, "/api/demo", ["演示流程"]),
         (executions.router, "/api/executions", ["真实执行记录"]),
+        (expenses.router, "/api/expenses", ["公账支出"]),
         (knowledge.router, "/api/knowledge", ["知识库管理"]),
         (ai_chat.router, "/api/ai-chat", ["AI客服"]),
         (announcements.router, "/api/announcements", ["公告管理"]),
@@ -111,6 +116,8 @@ def create_app() -> FastAPI:
         health: dict[str, Any] = {
             "status": "ok" if database["status"] == "ok" else "degraded",
             "version": settings.APP_VERSION,
+            "commit_sha": settings.COMMIT_SHA,
+            "release_id": settings.RELEASE_ID,
             "checks": {"database": database},
         }
         if cache.redis:
@@ -120,6 +127,12 @@ def create_app() -> FastAPI:
             except Exception as error:
                 health["checks"]["redis"] = {"status": "error", "error": str(error)}
                 health["status"] = "degraded"
+        elif settings.REDIS_URL:
+            health["checks"]["redis"] = {
+                "status": "error",
+                "error": cache.redis_error or "Redis 已配置但连接不可用",
+            }
+            health["status"] = "degraded"
         else:
             health["checks"]["redis"] = {"status": "not_configured"}
         health["checks"]["pool"] = (await get_db_stats()).get("pool", {})
@@ -130,13 +143,25 @@ def create_app() -> FastAPI:
     @limiter.limit("60/minute")
     async def health_live(request: Request) -> dict[str, Any]:
         del request
-        return {"status": "ok", "version": settings.APP_VERSION}
+        return {
+            "status": "ok",
+            "version": settings.APP_VERSION,
+            "commit_sha": settings.COMMIT_SHA,
+            "release_id": settings.RELEASE_ID,
+        }
 
-    @app.get("/api/health/ready")
+    @app.get(
+        "/api/health/ready",
+        response_model=dict[str, Any],
+        responses={503: {"description": "数据库不可用，服务尚未就绪"}},
+    )
     @limiter.limit("30/minute")
-    async def health_ready(request: Request) -> dict[str, Any]:
+    async def health_ready(request: Request) -> Any:
         del request
-        return await readiness_snapshot()
+        snapshot = await readiness_snapshot()
+        if snapshot["checks"]["database"]["status"] == "error":
+            return JSONResponse(status_code=503, content=snapshot)
+        return snapshot
 
     @app.get("/api/health")
     @limiter.limit("30/minute")
@@ -149,7 +174,12 @@ def create_app() -> FastAPI:
     async def system_info(request: Request) -> dict[str, Any]:
         del request
         return {
-            "app": {"name": settings.APP_NAME, "version": settings.APP_VERSION},
+            "app": {
+                "name": settings.APP_NAME,
+                "version": settings.APP_VERSION,
+                "commit_sha": settings.COMMIT_SHA,
+                "release_id": settings.RELEASE_ID,
+            },
             "runtime": {"python": platform.python_version(), "platform": platform.platform()},
             "database": {"type": settings.DB_TYPE},
             "cache": {"enabled": cache.redis is not None, "type": "redis" if cache.redis else "memory"},

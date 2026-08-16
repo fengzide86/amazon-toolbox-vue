@@ -28,7 +28,7 @@ describe('AppHeader', () => {
       global: {
         plugins: [router],
         stubs: {
-          'router-link': true,
+          'router-link': { template: '<a><slot /></a>' },
           'el-select': true,
           'el-option': true,
           'el-dropdown': true,
@@ -38,6 +38,10 @@ describe('AppHeader', () => {
       }
     })
     expect(wrapper.exists()).toBe(true)
+    expect(wrapper.find('.shell-page-copy').exists()).toBe(true)
+    expect(wrapper.find('#shell-page-actions').exists()).toBe(true)
+    expect(wrapper.find('.mobile-brand-mark').exists()).toBe(true)
+    expect(wrapper.find('.mobile-brand-mark').attributes('aria-hidden')).toBe('true')
   })
 
   it('应该导出为 Vue 组件', () => {
@@ -53,7 +57,7 @@ describe('AppHeader', () => {
       global: {
         plugins: [router],
         stubs: {
-          'router-link': true,
+          'router-link': { template: '<a><slot /></a>' },
           'el-select': true,
           'el-option': true,
           'el-dropdown': true,
@@ -63,6 +67,8 @@ describe('AppHeader', () => {
       }
     })
     expect(wrapper.props('isAdmin')).toBe(true)
+    expect(wrapper.find('.shell-page-copy').exists()).toBe(true)
+    expect(wrapper.find('.mobile-brand-mark').exists()).toBe(true)
   })
 
   it('退出登录后应保留本机设备身份', async () => {
@@ -74,7 +80,7 @@ describe('AppHeader', () => {
       global: {
         plugins: [router],
         stubs: {
-          'router-link': true,
+          'router-link': { template: '<a><slot /></a>' },
           'el-select': true,
           'el-option': true,
           'el-dropdown': {

@@ -1,7 +1,11 @@
 import { api } from './index'
+import type { components } from '@/shared/api/openapi.generated'
 
 type ToolId = string | number
 type QueryValue = string | number | boolean | null | undefined
+type Schemas = components['schemas']
+type JsonValue = Schemas['JsonValue']
+type ConfigJsonValue = Schemas['ConfigJsonValue']
 
 export interface ToolLaunchGrantOptions {
   platformKey?: string
@@ -12,14 +16,14 @@ export interface ToolLaunchGrantOptions {
   idempotencyKey?: string
 }
 
-export interface ToolLaunchGrantResult extends Record<string, unknown> {
-  launch_data?: { token?: string; script_key?: string; [key: string]: unknown }
-}
+export type ToolLaunchGrantResult = Schemas['LaunchGrantDataResponse']
 
-export const getTools = (params: Record<string, QueryValue> = {}): Promise<unknown> => api.get('/api/tools', params)
-export const getToolCategories = (): Promise<unknown> => api.get('/api/tools/categories')
-export const updateTools = (tools: unknown): Promise<unknown> => api.put('/api/tools', tools)
-export const updateToolCategories = (categories: unknown): Promise<unknown> => api.put('/api/tools/categories', categories)
+export const getTools = (params: Record<string, QueryValue> = {}): Promise<ConfigJsonValue[]> => api.get('/api/tools', params)
+export const getToolCategories = (): Promise<ConfigJsonValue[]> => api.get('/api/tools/categories')
+export const updateTools = (tools: Array<Record<string, JsonValue>>): Promise<Schemas['ToolConfigUpdateResponse']> =>
+  api.put('/api/tools', tools)
+export const updateToolCategories = (categories: JsonValue[]): Promise<Schemas['ConfigUpdateResponse']> =>
+  api.put('/api/tools/categories', categories)
 
 export async function createToolLaunchGrant(
   toolId: ToolId,
@@ -42,19 +46,18 @@ export async function createToolLaunchGrant(
   if (clientItemId) params.set('client_item_id', clientItemId)
   if (idempotencyKey) params.set('idempotency_key', idempotencyKey)
 
-  const response = await api.post(`/api/tools/${encodeURIComponent(toolId)}/launch-grant?${params}`, payload)
-  if (typeof response !== 'object' || response === null) throw new Error('工具启动响应格式无效')
-  const record = response as Record<string, unknown>
-  if (record.success === false) {
-    const error = new Error(typeof record.message === 'string' ? record.message : '工具启动失败') as Error & {
-      code?: unknown
-      data?: unknown
+  const response = await api.post<Schemas['LaunchGrantSuccessResponse'] | Schemas['ToolOperationErrorResponse']>(
+    `/api/tools/${encodeURIComponent(toolId)}/launch-grant?${params}`,
+    payload,
+  )
+  if (response.success === false) {
+    const error = new Error(response.message || '工具启动失败') as Error & {
+      code?: number
+      data?: JsonValue
     }
-    error.code = record.error_code
-    error.data = record.detail
+    error.code = response.error_code
+    error.data = response.detail
     throw error
   }
-  const result = record.data ?? response
-  if (typeof result !== 'object' || result === null) throw new Error('工具启动数据格式无效')
-  return result as ToolLaunchGrantResult
+  return response.data
 }

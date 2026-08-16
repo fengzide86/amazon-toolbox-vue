@@ -8,8 +8,10 @@ const mocks = vi.hoisted(() => ({
   getTools: vi.fn(),
   createDemoRun: vi.fn(),
   updateDemoRun: vi.fn(),
+  createToolLaunchGrant: vi.fn(),
   push: vi.fn(),
   showToast: vi.fn(),
+  downloadDesktopInstaller: vi.fn(),
   route: { query: {} },
 }))
 
@@ -17,9 +19,11 @@ vi.mock('@/utils/api', () => ({
   getTools: mocks.getTools,
   createDemoRun: mocks.createDemoRun,
   updateDemoRun: mocks.updateDemoRun,
+  createToolLaunchGrant: mocks.createToolLaunchGrant,
 }))
 
 vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
+vi.mock('@/runtime/desktop-download', () => ({ downloadDesktopInstaller: mocks.downloadDesktopInstaller }))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mocks.push }),
@@ -35,6 +39,14 @@ function mountView() {
       stubs: {
         RouterLink: { props: ['to'], template: '<a><slot /></a>' },
         ElDrawer: { template: '<aside><slot name="header" /><slot /><slot name="footer" /></aside>' },
+        ElDialog: { template: '<section><slot name="header" /><slot /><slot name="footer" /></section>' },
+        ElForm: { template: '<form><slot /></form>' },
+        ElFormItem: { template: '<label><slot /></label>' },
+        ElInput: true,
+        ElInputNumber: true,
+        ElSelect: { template: '<select><slot /></select>' },
+        ElOption: true,
+        ElButton: { template: '<button><slot /></button>' },
       },
     },
   })
@@ -47,6 +59,8 @@ describe('ToolsView 一键工具箱', () => {
     mocks.getTools.mockResolvedValue([])
     mocks.createDemoRun.mockResolvedValue({ id: 'demo-1', tool_id: 'register', status: 'created' })
     mocks.updateDemoRun.mockResolvedValue({ success: true })
+    mocks.downloadDesktopInstaller.mockResolvedValue('https://example.test/updates/KST.exe')
+    Object.defineProperty(window, 'electronAPI', { configurable: true, value: undefined })
     localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y15 体验包', plan_code: 'Y15' }))
   })
 
@@ -54,7 +68,7 @@ describe('ToolsView 一键工具箱', () => {
     const wrapper = mountView()
     await flushPromises()
 
-    expect(wrapper.find('.toolbox-header h2').text()).toBe('选择一个工具体验演示')
+    expect(wrapper.get('.page-header-v6 h2').text()).toBe('选择一个工具开始处理')
     expect(wrapper.find('.search-box').exists()).toBe(false)
     expect(wrapper.find('.category-tabs').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('成功率')
@@ -95,7 +109,7 @@ describe('ToolsView 一键工具箱', () => {
     expect(mocks.createDemoRun).not.toHaveBeenCalled()
   })
 
-  it('点击可用工具只创建一次演示记录并进入工作区', async () => {
+  it('点击可用工具立即进入本地演示，不被远端记录接口阻塞', async () => {
     mocks.getTools.mockResolvedValue([
       { id: 'register', name: '注册工具', module: 'register', status: 'online', available_plans: ['Y15'] },
     ])
@@ -106,11 +120,12 @@ describe('ToolsView 一键工具箱', () => {
     await Promise.all([card.trigger('click'), card.trigger('click')])
     await flushPromises()
 
-    expect(mocks.createDemoRun).toHaveBeenCalledTimes(1)
-    expect(mocks.updateDemoRun).toHaveBeenCalledTimes(1)
+    expect(mocks.createDemoRun).not.toHaveBeenCalled()
+    expect(mocks.updateDemoRun).not.toHaveBeenCalled()
     expect(useAppStore().toolVisible).toBe(true)
     expect(useAppStore().currentTool.name).toBe('注册工具')
     expect(useAppStore().currentTool.executionMode).toBe('demo')
+    expect(useAppStore().currentTool.demoRunId).toMatch(/^demo_run_local_/)
   })
 
   it('按当前平台向后端请求工具', async () => {
@@ -118,6 +133,22 @@ describe('ToolsView 一键工具箱', () => {
     await flushPromises()
     expect(wrapper.exists()).toBe(true)
     expect(mocks.getTools).toHaveBeenCalledWith({ platform_key: 'amazon' })
+  })
+
+  it('网页版真实工具只提供桌面端下载，不显示可执行入口', async () => {
+    mocks.getTools.mockResolvedValue([{
+      id: 'live-listing', name: '真实上品', module: 'listing', status: 'online', availability: 'live',
+      supports_live_single: true, available_plans: ['Y15'],
+    }])
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('下载桌面端')
+    expect(wrapper.text()).not.toContain('开始执行')
+    await wrapper.find('[data-testid="tool-card-真实上品"]').trigger('click')
+    await flushPromises()
+    expect(mocks.downloadDesktopInstaller).toHaveBeenCalledOnce()
+    expect(useAppStore().toolVisible).toBe(false)
   })
 
   it('只展示真实能力标签和说明入口，不向普通用户暴露批量能力', async () => {

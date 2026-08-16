@@ -2,7 +2,8 @@
 系统相关数据模型
 包含: Setting, Announcement, AuditLog
 """
-from sqlalchemy import Column, Integer, String, DateTime, Text, Index, ForeignKey, UniqueConstraint, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+
 from models.base import Base
 
 

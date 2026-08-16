@@ -1,9 +1,10 @@
 <template>
   <div class="plans-page">
-    <header class="plans-header">
-      <div><span class="plans-eyebrow">授权方案</span><h2>套餐与授权</h2><p>先确认需要使用的工具，再选择包含对应能力的套餐。</p></div>
-      <div class="current-plan"><ShieldCheck :size="16" /><span>当前套餐</span><strong>{{ currentPlanName }}</strong></div>
-    </header>
+    <PageHeader eyebrow="授权方案" title="套餐与授权" description="先确认需要使用的工具，再选择包含对应能力的套餐。">
+      <template #actions>
+        <div class="current-plan"><ShieldCheck :size="16" /><span>当前套餐</span><strong>{{ currentPlanName }}</strong></div>
+      </template>
+    </PageHeader>
 
     <div v-if="route.query?.tool" class="upgrade-notice">
       <LockKeyhole :size="17" />当前套餐暂未包含你选择的工具，可查看下面的可用套餐。
@@ -41,6 +42,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Check, LockKeyhole, ShieldCheck } from '@lucide/vue'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 import { getPlans } from '@/utils/api'
 import { showToast } from '@/utils'

@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Device, AuthCode, AuthSeat, User, Plan
+from models import AuthCode, AuthSeat, Device, Plan, User
 from tests.conftest import get_data
 
 
@@ -22,6 +22,7 @@ async def seed_devices(db_session: AsyncSession, device_count: int = 2):
     user = User(device_id="dev1", device_name="PC1", auth_code_id=auth_code.id)
     db_session.add(user)
     await db_session.flush()
+    auth_code.user_id = user.id
 
     devices = []
     for i in range(device_count):
@@ -78,6 +79,8 @@ class TestUnbindDevice:
         )
         db_session.add(seat)
         await db_session.commit()
+        rebound_device_id = devices[0].device_id
+        rebound_device_name = devices[0].device_name
 
         resp = await client.post(
             f"/api/devices/unbind?device_id={devices[0].id}&reason=内部解绑测试",
@@ -90,6 +93,29 @@ class TestUnbindDevice:
             await db_session.execute(select(AuthSeat).where(AuthSeat.id == seat.id))
         ).scalars().one()
         assert released_seat.status == "inactive"
+
+        relogin = await client.post(
+            "/api/auth/verify",
+            json={
+                "code": auth_code.code,
+                "device_id": rebound_device_id,
+                "device_name": rebound_device_name,
+            },
+        )
+        assert relogin.status_code == 200
+        assert relogin.json()["success"] is True
+
+        await db_session.refresh(released_seat)
+        assert released_seat.status == "active"
+        rebound_devices = (
+            await db_session.execute(
+                select(Device).where(
+                    Device.auth_code_id == auth_code.id,
+                    Device.device_id == rebound_device_id,
+                )
+            )
+        ).scalars().all()
+        assert len(rebound_devices) == 1
 
     async def test_unbind_device_requires_admin(self, client: AsyncClient, db_session: AsyncSession):
         _, _, devices = await seed_devices(db_session)

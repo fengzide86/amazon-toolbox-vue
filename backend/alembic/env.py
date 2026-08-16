@@ -2,11 +2,13 @@
 Alembic 环境配置
 用于数据库迁移管理
 """
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
-import sys
 import os
+import sys
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # 添加 backend 目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,10 +16,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # 导入数据库配置和模型
 from core.config import settings
 from database import Base
-from models import (
-    Setting, Plan, AuthCode, Device, Order,
-    User, RunLog, Feedback, ProfitRecord
-)
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

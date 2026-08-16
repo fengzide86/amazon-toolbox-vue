@@ -1,10 +1,6 @@
 <template>
   <div class="devices-page">
-    <header class="devices-header">
-      <span>本机授权</span>
-      <h2 class="page-title">设备授权</h2>
-      <p>查看当前电脑是否已获得使用权限，必要时可管理其他已绑定设备。</p>
-    </header>
+    <PageHeader eyebrow="本机授权" title="设备授权" description="查看当前电脑是否已获得使用权限，必要时可管理其他已绑定设备。" />
 
     <div v-if="!loading && !loadError" class="device-info-banner">
       <CircleCheck v-if="currentDeviceBound" :size="21" />
@@ -65,6 +61,7 @@ import { getDeviceId, showToast } from '@/utils'
 import { AlertTriangle, CircleCheck, LoaderCircle, Monitor } from '@lucide/vue'
 import { confirmAction } from '@/shared/ui/confirm'
 import { deviceListSchema, readStoredLicense, type DeviceSummary } from '@/features/user/model'
+import PageHeader from '@/components/PageHeader.vue'
 
 const devices = ref<DeviceSummary[]>([])
 const maxDevices = ref(1)

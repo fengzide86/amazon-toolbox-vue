@@ -1,9 +1,10 @@
 <template>
   <div class="ai-chat-container">
-    <div class="chat-header">
-      <div><span>执行支持</span><h2>工具帮助</h2><p>遇到授权、设备或自动操作问题，直接描述你看到的情况。</p></div>
-      <button v-if="sessionId" class="btn btn-secondary" @click="showHistory = true">历史记录</button>
-    </div>
+    <PageHeader eyebrow="执行支持" title="工具帮助" description="遇到授权、设备或自动操作问题，直接描述你看到的情况。">
+      <template #actions>
+        <button v-if="sessionId" class="btn btn-secondary" @click="showHistory = true">历史记录</button>
+      </template>
+    </PageHeader>
 
     <div ref="messagesContainer" class="chat-messages" role="log" aria-live="polite" :aria-busy="isLoading">
       <div v-if="!sessionId" class="welcome-message">
@@ -105,6 +106,7 @@
 
 <script setup lang="ts">
 import { useCustomerSupportChat } from '@/features/ai/useCustomerSupportChat'
+import PageHeader from '@/components/PageHeader.vue'
 
 const {
   sessionId, messages, inputMessage, isLoading, showActions, showRating, rating,

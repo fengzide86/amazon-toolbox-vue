@@ -170,6 +170,166 @@ async def test_batch_payload_rejects_source_rows_and_writes_no_real_batch(client
 
 
 @pytest.mark.asyncio
+async def test_demo_batch_rejects_more_than_fifty_rows(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+
+    response = await client.post(
+        "/api/demo/batches",
+        json={
+            "tool_id": "tool_demo_batch",
+            "tool_name": "demo",
+            "platform_key": "amazon",
+            "scenario_id": "demo",
+            "row_count": 51,
+        },
+    )
+
+    assert response.status_code == 422
+    assert (await db_session.execute(select(func.count(DemoBatch.id)))).scalar() == 0
+
+
+@pytest.mark.asyncio
+async def test_demo_batch_supports_concurrent_items_and_recounts_before_finish(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+    created = await client.post(
+        "/api/demo/batches",
+        json={
+            "tool_id": "tool_demo_batch",
+            "tool_name": "demo",
+            "platform_key": "amazon",
+            "scenario_id": "demo",
+            "row_count": 3,
+        },
+    )
+    assert created.status_code == 201
+    batch = created.json()
+    batch_id = batch["id"]
+    item_refs = [item["item_ref"] for item in batch["items"]]
+
+    for index, item_ref in enumerate(item_refs, start=1):
+        response = await client.put(
+            f"/api/demo/batches/{batch_id}/items/{item_ref}",
+            json={"event_seq": 1, "status": "playing", "simulated_outcome": None},
+        )
+        assert response.status_code == 200
+        detail = await client.get(f"/api/demo/batches/{batch_id}")
+        assert detail.json()["playing_count"] == index
+        assert detail.json()["queued_count"] == len(item_refs) - index
+
+    running = await client.patch(
+        f"/api/demo/batches/{batch_id}",
+        json={
+            "event_seq": 1,
+            "status": "running",
+            "queued_count": 0,
+            "playing_count": 3,
+            "played_count": 0,
+            "skipped_count": 0,
+            "error_count": 0,
+        },
+    )
+    assert running.status_code == 200
+    assert running.json()["playing_count"] == 3
+
+    terminal_updates = [
+        (item_refs[0], "played", "completed_example"),
+        (item_refs[1], "played", "attention_example"),
+        (item_refs[2], "error", "failure_example"),
+    ]
+    for item_ref, item_status, outcome in terminal_updates:
+        response = await client.put(
+            f"/api/demo/batches/{batch_id}/items/{item_ref}",
+            json={"event_seq": 2, "status": item_status, "simulated_outcome": outcome},
+        )
+        assert response.status_code == 200
+
+    finished = await client.post(
+        f"/api/demo/batches/{batch_id}/finish",
+        json={"event_seq": 2},
+    )
+    assert finished.status_code == 200
+    assert {
+        key: finished.json()[key]
+        for key in (
+            "status",
+            "queued_count",
+            "playing_count",
+            "played_count",
+            "skipped_count",
+            "error_count",
+        )
+    } == {
+        "status": "completed",
+        "queued_count": 0,
+        "playing_count": 0,
+        "played_count": 2,
+        "skipped_count": 0,
+        "error_count": 1,
+    }
+
+
+@pytest.mark.asyncio
+async def test_cancelling_demo_batch_terminalizes_unfinished_items(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+    batch = (
+        await client.post(
+            "/api/demo/batches",
+            json={
+                "tool_id": "tool_demo_batch",
+                "tool_name": "demo",
+                "platform_key": "amazon",
+                "scenario_id": "demo",
+                "row_count": 2,
+            },
+        )
+    ).json()
+    batch_id = batch["id"]
+    for item in batch["items"]:
+        assert (
+            await client.put(
+                f"/api/demo/batches/{batch_id}/items/{item['item_ref']}",
+                json={"event_seq": 1, "status": "playing", "simulated_outcome": None},
+            )
+        ).status_code == 200
+
+    assert (
+        await client.patch(
+            f"/api/demo/batches/{batch_id}",
+            json={
+                "event_seq": 1,
+                "status": "running",
+                "queued_count": 0,
+                "playing_count": 2,
+                "played_count": 0,
+                "skipped_count": 0,
+                "error_count": 0,
+            },
+        )
+    ).status_code == 200
+    cancelled = await client.patch(
+        f"/api/demo/batches/{batch_id}",
+        json={
+            "event_seq": 2,
+            "status": "cancelled",
+            "queued_count": 0,
+            "playing_count": 2,
+            "played_count": 0,
+            "skipped_count": 0,
+            "error_count": 0,
+        },
+    )
+    assert cancelled.status_code == 200
+    body = cancelled.json()
+    assert body["status"] == "cancelled"
+    assert body["playing_count"] == 0
+    assert body["skipped_count"] == 2
+    assert all(item["status"] == "skipped" for item in body["items"])
+
+
+@pytest.mark.asyncio
 async def test_verified_execution_endpoint_hides_legacy_records(client, db_session):
     await _install_demo_tool(db_session)
     app.dependency_overrides[get_current_user] = _as_user()

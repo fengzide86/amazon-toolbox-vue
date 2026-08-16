@@ -39,6 +39,8 @@ describe('desktop renderer trust policy', () => {
   it('keeps webviews on credential-free HTTPS and known partitions', () => {
     expect(isAllowedWebviewUrl('https://sellercentral.amazon.com/home')).toBe(true)
     expect(isAllowedWebviewUrl('http://sellercentral.amazon.com/home')).toBe(false)
+    expect(isAllowedWebviewUrl('http://127.0.0.1:49152/automation-sandbox')).toBe(true)
+    expect(isAllowedWebviewUrl('http://localhost:49152/automation-sandbox')).toBe(true)
     expect(isAllowedWebviewUrl('https://user:pass@example.com/')).toBe(false)
     expect(isAllowedWebviewPartition('persist:tool-workspace')).toBe(true)
     expect(isAllowedWebviewPartition('batch-demo_account-1')).toBe(true)
@@ -89,29 +91,77 @@ describe('app protocol renderer entrypoint', () => {
     expect(scriptPolicy).not.toContain("'unsafe-eval'")
     expect(html).not.toMatch(/<script\b(?![^>]*\bsrc\s*=)[^>]*>/i)
     expect(html).toContain('startup-loading')
-    expect(readFileSync(resolve('electron/main.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
+    expect(html).toContain('<meta name="theme-color" content="#101828">')
+    expect(html).toContain('href="/favicon-32x32.png"')
+    expect(html).toContain('href="/favicon-16x16.png"')
+    expect(html).toContain('rel="apple-touch-icon"')
+    expect(readFileSync(resolve('electron/core/main-window.cts'), 'utf8')).toContain("window.loadURL('app://toolbox/index.html')")
     expect(readFileSync(resolve('electron/core/app-protocol.cts'), 'utf8')).toContain("scheme: 'app'")
   })
 })
 
 describe('internal desktop package profile', () => {
-  it('cannot ship the runner or bundled backend in the formal installer', () => {
+  it('uses the KST visible identity while preserving update continuity', () => {
     const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
-      toolbox?: { distribution?: string }
+      description?: string
+      author?: string
+      build?: {
+        appId?: string
+        productName?: string
+        artifactName?: string
+        afterPack?: string
+        win?: { icon?: string; signAndEditExecutable?: boolean }
+        nsis?: Record<string, unknown>
+        publish?: { url?: string }
+      }
+    }
+    const main = readFileSync(resolve('electron/desktop-application.cts'), 'utf8')
+    const mainWindow = readFileSync(resolve('electron/core/main-window.cts'), 'utf8')
+
+    expect(metadata.build?.appId).toBe('com.amazon.toolbox')
+    expect(metadata.description).toBe('课赛通 KST · 跨境电商赛训效率平台')
+    expect(metadata.author).toBe('课赛通 KST 团队')
+    expect(metadata.build?.productName).toBe('课赛通 KST')
+    expect(metadata.build?.artifactName).toBe('KST Setup ${version}.${ext}')
+    expect(metadata.build?.afterPack).toBe('scripts/brand-after-pack.cjs')
+    expect(metadata.build?.win?.icon).toBe('build/icon.ico')
+    expect(metadata.build?.win?.signAndEditExecutable).toBe(false)
+    expect(metadata.build?.nsis).toEqual(expect.objectContaining({
+      shortcutName: '课赛通 KST',
+      installerIcon: 'build/icon.ico',
+      uninstallerIcon: 'build/icon.ico',
+      installerHeaderIcon: 'build/icon.ico',
+    }))
+    expect(metadata.build?.publish?.url).toBe('https://8.130.113.104/updates/')
+    expect(main).toContain('app.setName(APPLICATION_NAME)')
+    expect(main).toContain('app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID)')
+    expect(mainWindow).toContain("join(process.resourcesPath, 'icon.ico')")
+    expect(mainWindow).toContain('icon: windowIconPath')
+    expect(readFileSync(resolve('scripts/brand-after-pack.cjs'), 'utf8')).toContain("'--set-icon'")
+  })
+
+  it('ships the explicitly enabled local runner but never bundles the control backend', () => {
+    const metadata = JSON.parse(readFileSync(resolve('package.json'), 'utf8')) as {
+      toolbox?: { distribution?: string; automationRuntime?: boolean }
       scripts?: Record<string, string>
       build?: { extraResources?: unknown[]; files?: string[] }
     }
     expect(metadata.toolbox?.distribution).toBe('internal')
-    expect(metadata.build?.extraResources).toEqual([])
+    expect(metadata.toolbox?.automationRuntime).toBe(true)
+    expect(metadata.build?.extraResources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: 'resources/templates', to: 'templates' }),
+      expect.objectContaining({ from: 'resources/rates', to: 'rates' }),
+    ]))
     expect(metadata.scripts?.['electron:release']).not.toContain('backend:build')
-    expect(metadata.build?.files).toContain('!dist-electron/electron/automation-runner.cjs')
-    expect(metadata.build?.files).toContain('!dist-electron/electron/automation/scripts/**')
+    expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation-runner.cjs')
+    expect(metadata.build?.files).not.toContain('!dist-electron/electron/automation/scripts/**')
   })
 
   it('removes tool-launch IPC from the internal renderer bridge', () => {
-    const main = readFileSync(resolve('electron/main.cts'), 'utf8')
+    const automation = readFileSync(resolve('electron/automation/desktop-automation-controller.cts'), 'utf8')
     const preload = readFileSync(resolve('electron/preload.cts'), 'utf8')
-    expect(main).toContain("if (AUTOMATION_RUNTIME_ENABLED) registerTrustedOn('launch-tool'")
+    expect(automation).toContain('if (!this.options.automationEnabled) return')
+    expect(automation).toContain("this.options.registerTrustedOn('launch-tool'")
     expect(preload.indexOf('launchTool:')).toBeGreaterThan(preload.indexOf('...(automationEnabled'))
     expect(preload.indexOf('launchTool:')).toBeLessThan(preload.indexOf('} : {}),'))
     expect(preload).toContain("'demo-activity:set-active'")

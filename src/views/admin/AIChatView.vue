@@ -1,22 +1,21 @@
 <template>
   <div class="ai-chat-admin">
-    <div class="page-header">
-      <div>
-        <h2 class="page-title">客服规则管理</h2>
-        <p class="page-description">配置欢迎语、推荐问题与转人工规则，并预览固定知识规则的应答效果。</p>
-      </div>
-    </div>
-    <AsyncStateNotice :state="loadState" :message="loadError" loading-text="正在加载客服规则…" @retry="loadAll" />
+    <PageHeader title="客服规则管理" description="配置欢迎语、推荐问题与转人工规则，并预览固定知识规则的应答效果。">
+      <template #actions>
+        <el-button @click="loadAll">刷新</el-button>
+      </template>
+    </PageHeader>
 
     <!-- Master-Detail 双栏布局 -->
-    <div v-if="loadState !== 'loading' && loadState !== 'error'" class="master-detail-container">
+    <div class="master-detail-container">
       <!-- 左侧面板：配置 + 数据看板 + 对话记录 -->
       <div class="panel-left">
         <!-- 策略配置 -->
         <div class="panel-section">
-          <h3 class="section-title">⚙️ 策略配置</h3>
-          
-          <div class="config-section">
+          <h3 class="section-title">策略配置</h3>
+          <AsyncStateNotice :state="configState" :message="configError" loading-text="正在加载规则配置…" @retry="loadConfig" />
+
+          <div v-if="configState !== 'loading' && configState !== 'error'" class="config-section">
             <label>欢迎语</label>
             <el-input
               v-model="config.welcome_message"
@@ -26,7 +25,7 @@
             />
           </div>
 
-          <div class="config-section">
+          <div v-if="configState !== 'loading' && configState !== 'error'" class="config-section">
             <label>推荐问题</label>
             <div v-for="(q, i) in suggestedQuestions" :key="i" class="suggested-item">
               <el-input v-model="suggestedQuestions[i]" size="small" :placeholder="`推荐问题 ${i + 1}`" />
@@ -45,39 +44,41 @@
             </el-button>
           </div>
 
-          <div class="config-row single-column">
-            <div class="config-section">
-              <label>回复风格</label>
-              <el-select v-model="config.reply_style" style="width: 100%;">
-                <el-option label="简洁" value="concise" />
-                <el-option label="详细" value="detailed" />
-                <el-option label="友好" value="friendly" />
-              </el-select>
+          <div v-if="configState !== 'loading' && configState !== 'error'" class="config-section">
+            <label>直接转人工关键词</label>
+            <p class="field-help">用户问题包含任一关键词时，规则会建议转人工。</p>
+            <div v-for="(keyword, i) in transferKeywords" :key="i" class="suggested-item">
+              <el-input v-model="transferKeywords[i]" size="small" :placeholder="`关键词 ${i + 1}`" />
+              <el-button type="danger" size="small" circle aria-label="删除关键词" @click="transferKeywords.splice(i, 1)">×</el-button>
+            </div>
+            <el-button v-if="transferKeywords.length < 10" size="small" @click="transferKeywords.push('')">+ 添加关键词</el-button>
+          </div>
+
+          <div v-if="configState !== 'loading' && configState !== 'error'" class="config-section">
+            <label>连续未命中转人工</label>
+            <div class="threshold-control">
+              <el-input-number v-model="config.max_unmatched" :min="1" :max="10" controls-position="right" />
+              <span>次后建议转人工</span>
             </div>
           </div>
 
-          <div class="config-section">
-            <label>转人工规则</label>
-            <el-checkbox v-model="transferRules.refund_direct_transfer" class="checkbox-item">
-              退款问题直接转人工
-            </el-checkbox>
-            <el-checkbox v-model="transferRules.complaint_direct_transfer" class="checkbox-item">
-              投诉/情绪直接转人工
-            </el-checkbox>
-            <el-checkbox v-model="transferRules.auto_transfer_after_retries" class="checkbox-item">
-              3次未解决自动转人工
-            </el-checkbox>
-          </div>
-
-          <el-button type="primary" size="small" @click="saveConfig" :loading="saving" style="width: 100%;">
+          <el-button
+            v-if="configState !== 'loading' && configState !== 'error'"
+            type="primary"
+            size="small"
+            :loading="saving"
+            style="width: 100%;"
+            @click="saveConfig"
+          >
             {{ saving ? '保存中...' : '保存配置' }}
           </el-button>
         </div>
 
         <!-- 数据看板 -->
         <div class="panel-section">
-          <h3 class="section-title">📊 数据看板</h3>
-          <div class="stats-grid-mini">
+          <h3 class="section-title">数据概览</h3>
+          <AsyncStateNotice :state="statsState" :message="statsError" loading-text="正在加载客服统计…" @retry="loadStats" />
+          <div v-if="statsState !== 'loading' && statsState !== 'error'" class="stats-grid-mini">
             <div class="stat-mini">
               <div class="stat-value-mini">{{ stats.total_sessions || 0 }}</div>
               <div class="stat-label-mini">总对话</div>
@@ -99,8 +100,9 @@
 
         <!-- 最近对话 -->
         <div class="panel-section">
-          <h3 class="section-title">📋 最近对话</h3>
-          <div class="sessions-list-mini">
+          <h3 class="section-title">最近对话</h3>
+          <AsyncStateNotice :state="sessionsState" :message="sessionsError" loading-text="正在加载最近对话…" @retry="loadSessions" />
+          <div v-if="sessionsState !== 'loading' && sessionsState !== 'error'" class="sessions-list-mini">
             <div
               v-for="session in sessions.slice(0, 5)"
               :key="session.session_id"
@@ -123,13 +125,13 @@
       <!-- 右侧面板：规则应答预览 -->
       <div class="panel-right">
         <div class="panel-section chat-sandbox">
-          <h3 class="section-title">💬 规则应答预览</h3>
+          <h3 class="section-title">规则应答预览</h3>
           
           <!-- 聊天消息区 -->
           <div class="chat-messages-sandbox">
             <div v-for="(msg, idx) in sandboxMessages" :key="idx" :class="['message-sandbox', msg.role]">
               <div class="message-avatar-sandbox">
-                {{ msg.role === 'user' ? '👤' : '规' }}
+                {{ msg.role === 'user' ? '用' : '规' }}
               </div>
                 <div class="message-content-sandbox">
                   <div class="message-text-sandbox">{{ msg.content }}</div>
@@ -150,6 +152,7 @@
             <div><strong>匹配路径：</strong>{{ lastDebug.answer_mode || '固定规则' }}</div>
             <div><strong>处理耗时：</strong>{{ lastDebug.diagnostics?.total_ms || 0 }} ms</div>
             <div v-if="lastDebug.fallback_reason"><strong>未命中原因：</strong>{{ lastDebug.fallback_reason }}</div>
+            <div><strong>转人工建议：</strong>{{ lastDebug.should_transfer ? '是' : '否' }}</div>
           </div>
 
           <!-- 输入区 -->
@@ -177,11 +180,13 @@
 <script setup lang="ts">
 import { useOperatorSupportConsole } from '@/features/ai/useOperatorSupportConsole'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const {
-  config, suggestedQuestions, transferRules, saving, sessions, currentSession, stats,
+  config, suggestedQuestions, transferKeywords, saving, sessions, currentSession, stats,
   testMessage, sandboxMessages, sendingTest, lastDebug, debugPlatform,
-  loadState, loadError, loadAll,
+  configState, configError, sessionsState, sessionsError, statsState, statsError,
+  loadAll, loadConfig, loadSessions, loadStats,
   getStatusTagType, getStatusText, formatTime, saveConfig, viewSession, sendTest,
 } = useOperatorSupportConsole()
 </script>
@@ -192,44 +197,29 @@ const {
   max-width: 100% !important;
 }
 
-.config-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.config-row.single-column { grid-template-columns: 1fr; }
 .debug-panel { margin: 12px 0; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 12px; line-height: 1.8; background: var(--color-surface-soft); }
 .debug-refs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 
-.page-header {
-  margin-bottom: 1.5rem;
-}
-
-.page-title {
-  font-family: var(--font-family);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0;
-}
-.page-description { margin: 6px 0 0; color: var(--color-text-secondary); font-size: var(--type-control); }
-
 /* ===== Master-Detail 双栏布局 ===== */
 .master-detail-container {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(300px, 35%) minmax(0, 1fr);
   gap: 20px;
   width: 100%;
-  height: calc(100vh - 120px);
+  align-items: start;
 }
 
 .panel-left {
-  flex: 0 0 35%;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow-y: auto;
+  min-width: 0;
 }
 
 .panel-right {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .panel-section {
@@ -253,6 +243,8 @@ const {
   margin-bottom: 1rem;
 }
 
+.panel-section :deep(.async-notice) { margin-bottom: 1rem; }
+
 .config-section label {
   display: block;
   font-size: 0.8rem;
@@ -270,10 +262,9 @@ const {
   align-items: center;
 }
 
-.checkbox-item {
-  display: flex;
-  margin-bottom: 0.5rem;
-}
+.field-help { margin: -0.15rem 0 0.65rem; color: var(--color-text-secondary); font-size: 0.78rem; line-height: 1.5; }
+.threshold-control { display: flex; align-items: center; gap: 10px; color: var(--color-text-secondary); font-size: 0.85rem; }
+.threshold-control :deep(.el-input-number) { width: 112px; }
 
 /* ===== 左侧面板：数据看板 ===== */
 .stats-grid-mini {
@@ -347,7 +338,8 @@ const {
 .chat-sandbox {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 640px;
+  height: calc(100vh - 190px);
 }
 
 .chat-messages-sandbox {
@@ -438,16 +430,13 @@ const {
 /* ===== 响应式 ===== */
 @media (max-width: 1024px) {
   .master-detail-container {
-    flex-direction: column;
-    height: auto;
+    grid-template-columns: 1fr;
   }
-  
-  .panel-left {
-    flex: none;
-  }
-  
+
   .panel-right {
     min-height: 500px;
   }
+
+  .chat-sandbox { height: auto; }
 }
 </style>

@@ -15,18 +15,38 @@ export interface ActiveTool extends UnknownRecord {
   module?: string
   category?: string
   platformKey?: string
+  capabilityKey?: string
   targetUrl?: string
   executionMode?: 'demo' | 'live'
   scenarioId?: string
   demoRunId?: string
+  launchGrant?: {
+    token?: string
+    scriptKey?: string
+    runnerApiVersion?: number
+    expiresAt?: string
+    expiresIn?: number
+    toolVersion?: string
+    toolManifest?: unknown
+    toolSignature?: string
+    signingKeyId?: string
+    signatureRequired?: boolean
+  }
+  executionContext?: {
+    mode?: 'single' | 'batch'
+    sessionId?: string
+    batchId?: string
+    itemId?: string
+    input?: UnknownRecord
+  }
 }
 
 export const useAppStore = defineStore('app', () => {
   // ===== State =====
   
   // 应用信息
-  const appName = ref('跨境电商赛训效率工具箱')
-  const version = ref('1.0.5')
+  const appName = ref('课赛通 KST')
+  const version = ref(import.meta.env.VITE_APP_VERSION || 'unknown')
   
   // 加载状态
   const loading = ref(false)

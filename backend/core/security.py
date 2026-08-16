@@ -27,7 +27,7 @@ def configure_cors(app: FastAPI) -> None:
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Toolbox-Version"],
+        allow_headers=["Content-Type", "Authorization", "X-Toolbox-Version", "Idempotency-Key"],
         max_age=600,  # 预检请求缓存10分钟
     )
 

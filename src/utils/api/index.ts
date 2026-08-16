@@ -23,6 +23,8 @@ export type ApiQueryParams = Record<string, ApiQueryValue>
 export type ApiErrorKind = 'network' | 'timeout' | 'http' | 'business' | 'validation' | 'parse' | 'cancelled'
 export type ApiRetryPolicy = 'none' | 'safe-read' | 'background'
 type ApiBody = unknown
+type JsonPrimitive = string | number | boolean | null
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body' | 'headers'> {
   body?: ApiBody
@@ -34,6 +36,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body' | 'headers'>
 
 export interface ApiGetOptions extends Pick<ApiRequestOptions, 'signal' | 'timeoutMs' | 'retry' | 'trackConnection'> {
   cache?: boolean
+  responseMode?: 'data' | 'raw'
 }
 
 export class ApiError extends Error {
@@ -67,7 +70,7 @@ export class ApiError extends Error {
 }
 
 export const API_BASE = getApiBase()
-const pendingRequests = new Map<string, Promise<unknown>>()
+const pendingRequests = new Map<string, Promise<JsonValue>>()
 const activeControllers = new Set<AbortController>()
 const delay = (milliseconds: number): Promise<void> => new Promise(resolve => setTimeout(resolve, milliseconds))
 
@@ -197,7 +200,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('toolbox:auth-cleared', cancelPendingApiRequests)
 }
 
-export async function request<T = unknown>(url: string, options: ApiRequestOptions = {}): Promise<T> {
+export async function request<T = JsonValue>(url: string, options: ApiRequestOptions = {}): Promise<T> {
   const method = (options.method || 'GET').toUpperCase()
   const isIdempotent = method === 'GET' || method === 'HEAD'
   const token = getAuthToken()
@@ -209,7 +212,7 @@ export async function request<T = unknown>(url: string, options: ApiRequestOptio
   if (existing) return existing as Promise<T>
 
   const config = createRequestInit(options, token)
-  const fetchPromise = (async (): Promise<unknown> => {
+  const fetchPromise = (async (): Promise<JsonValue> => {
     let lastError = new ApiError('请求失败', { kind: 'network', retryable: true })
     const attempts = maxAttempts(retryPolicy)
     for (let attempt = 0; attempt < attempts; attempt += 1) {
@@ -235,7 +238,7 @@ export async function request<T = unknown>(url: string, options: ApiRequestOptio
         if (trackConnection) recordConnectionSuccess()
         const requestId = response.headers?.get?.('X-Request-ID') || null
 
-        let data: unknown
+        let data: JsonValue
         try {
           data = await response.json()
         } catch {
@@ -311,7 +314,7 @@ function invalidationPrefix(url: string): string {
 }
 
 export const api = {
-  async get<T = unknown>(url: string, params: ApiQueryParams = {}, options: ApiGetOptions = {}): Promise<T> {
+  async get<T = JsonValue>(url: string, params: ApiQueryParams = {}, options: ApiGetOptions = {}): Promise<T> {
     const entries = Object.entries(params)
       .filter((entry): entry is [string, Exclude<ApiQueryValue, null | undefined>] => entry[1] !== null && entry[1] !== undefined)
       .map(([key, value]) => [key, String(value)] as [string, string])
@@ -326,35 +329,37 @@ export const api = {
     }
 
     if (options.cache !== false && shouldCache(url)) {
-      const cacheKey = generateCacheKey(`${cacheIdentityScope()}:${fullUrl}`)
+      const cacheKey = generateCacheKey(`${cacheIdentityScope()}:${options.responseMode ?? 'data'}:${fullUrl}`)
       const cached = getCache<T>(cacheKey)
       if (cached !== null) return cached
-      const result = unwrapData(await request(fullUrl, requestOptions)) as T
+      const raw = await request(fullUrl, requestOptions)
+      const result = (options.responseMode === 'raw' ? raw : unwrapData(raw)) as T
       setCache(cacheKey, result, CACHE_TTL)
       return result
     }
-    return unwrapData(await request(fullUrl, requestOptions)) as T
+    const raw = await request(fullUrl, requestOptions)
+    return (options.responseMode === 'raw' ? raw : unwrapData(raw)) as T
   },
 
-  async post<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+  async post<T = JsonValue>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
     const result = await request<T>(url, { ...options, method: 'POST', body: data })
     clearApiCache(invalidationPrefix(url))
     return result
   },
 
-  async put<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+  async put<T = JsonValue>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
     const result = await request<T>(url, { ...options, method: 'PUT', body: data })
     clearApiCache(invalidationPrefix(url))
     return result
   },
 
-  async patch<T = unknown>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+  async patch<T = JsonValue>(url: string, data: ApiBody = {}, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
     const result = await request(url, { ...options, method: 'PATCH', body: data })
     clearApiCache(invalidationPrefix(url))
     return unwrapData(result) as T
   },
 
-  async delete<T = unknown>(url: string, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
+  async delete<T = JsonValue>(url: string, options: Omit<ApiRequestOptions, 'method' | 'body'> = {}): Promise<T> {
     const result = await request<T>(url, { ...options, method: 'DELETE' })
     clearApiCache(invalidationPrefix(url))
     return result
@@ -372,6 +377,7 @@ export { createChatSession, getChatSession, sendChatMessage, resolveChatSession,
 export { getAnnouncements, getAnnouncementFeed, markAnnouncementRead, dismissAnnouncement, createAnnouncement, updateAnnouncement, deleteAnnouncement } from './announcements'
 export { getTools, getToolCategories, updateTools, updateToolCategories, createToolLaunchGrant } from './tools'
 export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRelease } from './tool-releases'
+export { getFreightRateReleases, createFreightRateDraft, publishFreightRatePack, rollbackFreightRatePack, getCurrentFreightRatePack } from './freight-rates'
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback'
 export { getLogs, exportLogs, getLogTools, createLog } from './logs'
 export { createDemoRun, updateDemoRun, finishDemoRun, cancelDemoRun, getDemoRuns, createDemoBatch, updateDemoBatch, updateDemoBatchItem, finishDemoBatch, getDemoBatches } from './demo'
@@ -379,4 +385,11 @@ export { getExecutions, getExecution } from './executions'
 export { getStaffAccounts, createStaffAccount, updateStaffAccount, resetStaffPassword, changeStaffPassword, logoutStaff } from './staff'
 export { getDashboard, getDashboardCharts, getProfit, getProfitSummary, getProfitPolicy, updateProfitPolicy } from './dashboard'
 export { getBusinessBootstrap, getBusinessTools, getBusinessBatches, getBusinessBatch, createBusinessBatch, updateBusinessBatch, updateBusinessBatchItem, finishBusinessBatch, getAdminActionCenter, getAdminBusinessBatch } from './business'
-export { getSettings, updateSetting } from './settings'
+export { getSettings, getPublicSettings, updateSetting } from './settings'
+export {
+  getExpenseSummary, getExpenseCategories, createExpenseCategory, updateExpenseCategory,
+  getExpenses, getExpense, createExpense, updateExpense, voidExpense, exportExpenses,
+  uploadExpenseAttachment, downloadExpenseAttachment, deleteExpenseAttachment,
+  getExpenseRenewals, getExpenseRenewal, createExpenseRenewal, updateExpenseRenewal,
+  confirmExpenseRenewal, skipExpenseRenewal, pauseExpenseRenewal, resumeExpenseRenewal, endExpenseRenewal,
+} from './expenses'

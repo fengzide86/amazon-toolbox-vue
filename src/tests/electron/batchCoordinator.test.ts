@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 const require = createRequire(import.meta.url)
 const { BatchCoordinator } = require('../../../dist-electron/electron/automation/batch-coordinator.cjs')
 
-function createHarness() {
+function createHarness(recordKind = 'live') {
   const ready = new Set()
   const runners = []
   const hostManager = {
@@ -35,11 +35,37 @@ function createHarness() {
       { itemId: 'two', input: { account_label: '客户二' }, preview: { account_label: '客***二' }, accountLabelMasked: '客***二' },
     ],
   })
-  coordinator.create({ importId: 'import-1', batchId: 'batch-1', serverBatchId: 1, tool: { id: 'register' } })
+  coordinator.create({ importId: 'import-1', batchId: 'batch-1', serverBatchId: 1, tool: { id: 'register' }, recordKind })
   return { coordinator, runners }
 }
 
 describe('BatchCoordinator', () => {
+  it('服务端任务编号重映射后保留本地 Excel 输入', () => {
+    const ready = new Set()
+    const coordinator = new BatchCoordinator({
+      hostManager: { register: vi.fn(), release: vi.fn(), releaseAll: vi.fn(), isReady: itemId => ready.has(itemId), size: () => 0, request: vi.fn() },
+    })
+    coordinator.storeImport({ importId: 'source', fileName: 'sample.xlsx', errors: [], rows: [
+      { itemId: 'local-1', input: { account_label: '客户一', sku: 'SKU-001' }, preview: { account_label: '客户一' }, accountLabelMasked: '客户一' },
+    ] })
+    const remapped = coordinator.remapImportItems('source', ['server-item-1'])
+    coordinator.create({ importId: remapped.importId, batchId: 'batch-remap', tool: { id: 'listing' }, recordKind: 'demo' })
+    expect(coordinator.batch.items[0]).toMatchObject({ itemId: 'server-item-1', input: { account_label: '客户一', sku: 'SKU-001' } })
+  })
+
+  it('Demo 批次不需要 webview 就能使用独立 Playwright 沙盒', async () => {
+    const { coordinator, runners } = createHarness('demo')
+
+    await coordinator.startItem('one', { scriptKey: 'demo.register_walkthrough_v1' })
+
+    expect(runners[0].start).toHaveBeenCalledWith(expect.objectContaining({
+      browserMode: 'playwright',
+      executionMode: 'demo',
+      executionContext: expect.objectContaining({ itemId: 'one' }),
+    }))
+    expect(coordinator.snapshot()).toMatchObject({ recordKind: 'demo', activeItemId: 'one' })
+  })
+
   it('一个账号等待用户操作时保留现场并继续下一行，活动 Runner 始终只有一个', async () => {
     const { coordinator, runners } = createHarness()
     expect(coordinator.snapshot().provisioningItemId).toBe('one')

@@ -1,3 +1,28 @@
+import type { AutomationTool } from '../../automation/events.js'
+import type {
+  BatchEvent,
+  BusinessBatchSnapshot,
+  ImportPreview,
+} from '../../features/business/model.js'
+import type {
+  FreightQuoteResult,
+} from '../freight/types.js'
+import type {
+  ParsedFreightWorkbook,
+} from '../freight/workbook-parser.js'
+import type {
+  BatchCreateRequest,
+  BatchFailItemRequest,
+  BatchImportError,
+  BatchImportOptions,
+  BatchRemapImportRequest,
+  BatchStartRequest,
+  BatchStoreDemoImportRequest,
+  FreightQuoteIpcPayload,
+  FreightWorkbookIpcOptions,
+  NotificationFocusPayload,
+} from './desktop-contract.js'
+import type { RunnerEvent } from './automation-contract.js'
 import type { UpdateDeferPhase, UpdateSnapshot } from './update-contract.js'
 
 export interface UpdateBridge {
@@ -14,36 +39,66 @@ export interface DemoActivityBridge {
   setActive(token: string, active: boolean): Promise<void>
 }
 
-export interface BatchSnapshot {
-  status?: 'running' | 'completed' | 'cancelled' | 'interrupted' | string
+export interface AutomationStartResult {
+  runId: string
+}
+
+export interface AutomationStatusResult {
+  status: string
+}
+
+export interface BrowserRegistrationResult {
+  id: number
+  url: string
+}
+
+export interface BrowserReleaseResult {
+  released: boolean
+}
+
+export interface BatchSelectionResult {
+  itemId: string
+  snapshot: BusinessBatchSnapshot
+}
+
+export interface SavedFileResult {
+  filePath: string
+}
+
+export interface ExportedImportErrorsResult extends SavedFileResult {
+  count: number
 }
 
 export interface BatchBridge {
-  selectImportFile(options: unknown): Promise<unknown>
-  parseImportFile(options: unknown): Promise<unknown>
-  exportImportErrors(errors: unknown): Promise<unknown>
-  create(payload: unknown): Promise<unknown>
-  start(payload: unknown): Promise<unknown>
-  failItem(payload: unknown): Promise<unknown>
-  selectItem(itemId: string): Promise<unknown>
-  completeUserAction(itemId: string): Promise<unknown>
-  restartItem(itemId: string): Promise<unknown>
-  cancel(status?: string): Promise<unknown>
-  getSnapshot(): Promise<BatchSnapshot | null>
-  registerBrowser(itemId: string, webContentsId: number): Promise<unknown>
-  unregisterBrowser(itemId: string): Promise<unknown>
-  onEvent(callback: (event: unknown) => void): () => void
+  storeDemoImport(payload: BatchStoreDemoImportRequest): Promise<ImportPreview>
+  loadSampleImport(options: BatchImportOptions): Promise<ImportPreview>
+  saveSampleTemplate(): Promise<SavedFileResult | null>
+  remapImportItems(payload: BatchRemapImportRequest): Promise<ImportPreview>
+  selectImportFile(options: BatchImportOptions): Promise<ImportPreview | null>
+  parseImportFile(options: BatchImportOptions): Promise<ImportPreview>
+  exportImportErrors(errors: BatchImportError[]): Promise<ExportedImportErrorsResult | null>
+  create(payload: BatchCreateRequest): Promise<BusinessBatchSnapshot>
+  start(payload: BatchStartRequest): Promise<AutomationStartResult>
+  failItem(payload: BatchFailItemRequest): Promise<BusinessBatchSnapshot>
+  selectItem(itemId: string): Promise<BatchSelectionResult>
+  completeUserAction(itemId: string): Promise<BusinessBatchSnapshot>
+  restartItem(itemId: string): Promise<BusinessBatchSnapshot>
+  cancel(status?: string): Promise<BusinessBatchSnapshot>
+  getSnapshot(): Promise<BusinessBatchSnapshot | null>
+  registerBrowser(itemId: string, webContentsId: number): Promise<BrowserRegistrationResult>
+  unregisterBrowser(itemId: string): Promise<BrowserReleaseResult>
+  onEvent(callback: (event: BatchEvent) => void): () => void
 }
 
 export interface AutomationBridge {
-  start(tool: unknown): Promise<unknown>
-  pause(): Promise<unknown>
-  resume(): Promise<unknown>
-  completeUserAction(): Promise<unknown>
-  cancel(): Promise<unknown>
-  registerBrowser(webContentsId: number): Promise<unknown>
-  unregisterBrowser(): Promise<unknown>
-  onEvent(callback: (event: unknown) => void): () => void
+  start(tool: AutomationTool): Promise<AutomationStartResult>
+  pause(): Promise<AutomationStatusResult>
+  resume(): Promise<AutomationStatusResult>
+  completeUserAction(): Promise<AutomationStatusResult>
+  cancel(): Promise<AutomationStatusResult>
+  registerBrowser(webContentsId: number): Promise<BrowserRegistrationResult>
+  unregisterBrowser(): Promise<BrowserReleaseResult>
+  onEvent(callback: (event: RunnerEvent) => void): () => void
 }
 
 export interface CredentialStoreBridge {
@@ -52,13 +107,20 @@ export interface CredentialStoreBridge {
   clearUserCode(): Promise<boolean>
 }
 
-export interface NotificationFocusPayload {
-  mode?: 'single' | 'batch'
-  itemId?: string
+export interface FreightBridge {
+  getDefaultPack(): Promise<ParsedFreightWorkbook>
+  parseWorkbook(options: FreightWorkbookIpcOptions): Promise<ParsedFreightWorkbook | null>
+  reparseWorkbook(options: FreightWorkbookIpcOptions): Promise<ParsedFreightWorkbook>
+  quote(payload: FreightQuoteIpcPayload): Promise<FreightQuoteResult>
 }
 
 export interface NotificationBridge {
   onFocus(callback: (payload: NotificationFocusPayload) => void): () => void
+}
+
+export interface OpenExternalResult {
+  success: boolean
+  message?: string
 }
 
 export interface ToolboxElectronApi {
@@ -69,5 +131,9 @@ export interface ToolboxElectronApi {
   automation?: AutomationBridge
   credentialStore?: CredentialStoreBridge
   notifications?: NotificationBridge
-  [key: string]: unknown
+  freight?: FreightBridge
+  launchTool?(data: Record<string, unknown>): void
+  onLaunchToolError?(callback: (payload: { message: string }) => void): () => void
+  onLaunchToolSuccess?(callback: (payload: { toolName: string; platformKey?: string }) => void): () => void
+  openExternal?(url: string): Promise<OpenExternalResult>
 }

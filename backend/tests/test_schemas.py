@@ -152,9 +152,10 @@ class TestPlanResponse:
             name="月度套餐",
             price=99.00,
             duration_days=30,
+            duration_label="30 天",
             features='["功能1"]',
             status="active",
-            created_at=datetime.now()
+            created_at=datetime.now().isoformat(),
         )
         assert response.id == 1
         assert response.name == "月度套餐"
@@ -166,7 +167,8 @@ class TestPlanResponse:
             name="基础套餐",
             price=49.00,
             duration_days=7,
-            status="active"
+            duration_label="7 天",
+            status="active",
         )
         assert response.features is None
         assert response.created_at is None

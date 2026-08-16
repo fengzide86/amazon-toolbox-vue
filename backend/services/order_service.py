@@ -19,7 +19,7 @@ CENT = Decimal("0.01")
 
 
 class OrderService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
     async def list_orders(

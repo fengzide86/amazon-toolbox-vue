@@ -32,18 +32,19 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { usePlatformStore } from '@/stores/platform'
 import AppHeader from '@/components/AppHeader.vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 import AppNoticeQueue from '@/features/shell/AppNoticeQueue.vue'
+import { provideShellPageHeader } from '@/features/shell/pageHeaderContext'
 
+provideShellPageHeader()
 const router = useRouter()
 const route = useRoute()
-const platformStore = usePlatformStore()
 const showMobileSidebar = ref(false)
 const platformKey = ref(0)
+let removeAfterEach: (() => void) | undefined
 
 function skeletonType(value: unknown): 'default' | 'dashboard' | 'table' | 'grid' {
   return value === 'dashboard' || value === 'table' || value === 'grid' ? value : 'default'
@@ -65,17 +66,19 @@ function handlePlatformChange() {
 }
 
 // 路由变化时关闭侧边栏
-router.afterEach(() => {
+removeAfterEach = router.afterEach(() => {
   closeSidebar()
 })
 
 onUnmounted(() => {
+  removeAfterEach?.()
   document.body.style.overflow = ''
 })
 </script>
 
 <style scoped>
 .app-layout {
+  --shell-header-height: 88px;
   min-height: 100vh;
   background: var(--color-canvas);
   display: flex;
@@ -84,14 +87,16 @@ onUnmounted(() => {
 
 /* Header 左侧留空，为固定侧边栏让位 */
 .app-layout :deep(.studio-header) {
+  width: calc(100% - var(--sidebar-width, 200px));
   margin-left: var(--sidebar-width, 200px);
+  box-sizing: border-box;
 }
 
 /* 主布局 - 侧边栏全高，内容区独立 */
 .layout {
   flex: 1;
   display: flex;
-  min-height: calc(100vh - var(--header-height, 56px));
+  min-height: calc(100vh - var(--shell-header-height));
   width: 100%;
   max-width: none;
   margin: 0;
@@ -101,9 +106,10 @@ onUnmounted(() => {
 
 /* 主内容区左侧留空，为固定侧边栏让位 */
 .content {
-  flex: 1;
+  width: calc(100% - var(--sidebar-width, 200px));
+  flex: 0 0 auto;
   min-width: 0;
-  padding: 32px clamp(24px, 3vw, 42px) 48px;
+  padding: 24px clamp(24px, 3vw, 42px) 48px;
   overflow-y: auto;
   overflow-x: hidden;
   margin-left: var(--sidebar-width, 200px);
@@ -111,9 +117,16 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
+.content:focus,
+.admin-content :deep([data-route-focus]:focus) {
+  outline: none;
+}
+
 /* 移动端：取消 margin-left，侧边栏变为抽屉式 */
 @media (max-width: 1024px) {
+  .app-layout { --shell-header-height: 72px; }
   .app-layout :deep(.studio-header) {
+    width: 100%;
     margin-left: 0;
   }
   .content {
@@ -217,5 +230,9 @@ onUnmounted(() => {
 @media (max-width: 560px) {
   .admin-content :deep(.stats-row) { grid-template-columns: 1fr; }
   .admin-content :deep(.page-header) { flex-direction: column; }
+}
+
+@media (max-width: 767px) {
+  .app-layout { --shell-header-height: 64px; }
 }
 </style>

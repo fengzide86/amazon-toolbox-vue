@@ -2,11 +2,11 @@
 用户服务模块
 包含用户 CRUD、统计、分页查询等业务逻辑
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import Request
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 class UserService:
     """用户服务"""
     
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession) -> None:
         self.db = db
     
     async def get_users_list(
@@ -145,26 +145,33 @@ class UserService:
     
     async def get_user_stats(self) -> dict[str, Any]:
         """获取用户统计"""
-        # 总用户数
-        total_result = await self.db.execute(select(func.count(User.id)))
-        total_users = total_result.scalar() or 0
-        
-        # 活跃用户数（有活跃授权码）
-        active_result = await self.db.execute(
-            select(func.count(User.id)).where(
-                User.auth_code_id.in_(
-                    select(AuthCode.id).where(AuthCode.status == "active")
+        today_start = datetime.combine(datetime.now().date(), datetime.min.time())
+        tomorrow_start = today_start + timedelta(days=1)
+        active_code_ids = select(AuthCode.id).where(AuthCode.status == "active")
+        total_users, active_users, today_new = (
+            await self.db.execute(
+                select(
+                    func.count(User.id),
+                    func.coalesce(
+                        func.sum(case((User.auth_code_id.in_(active_code_ids), 1), else_=0)),
+                        0,
+                    ),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    (User.created_at >= today_start)
+                                    & (User.created_at < tomorrow_start),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
                 )
             )
-        )
-        active_users = active_result.scalar() or 0
-        
-        # 今日新增
-        today = datetime.now().date()
-        today_result = await self.db.execute(
-            select(func.count(User.id)).where(func.date(User.created_at) == today)
-        )
-        today_new = today_result.scalar() or 0
+        ).one()
         
         return success_response(data={
             "total_users": total_users,

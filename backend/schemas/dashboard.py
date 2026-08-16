@@ -1,8 +1,8 @@
 """
 看板相关 Schema
 """
+
 from pydantic import BaseModel
-from typing import List
 
 
 class DashboardData(BaseModel):
@@ -12,4 +12,4 @@ class DashboardData(BaseModel):
     total_users: int
     today_runs: int
     pending_tickets: int
-    recent_logs: List[dict]
+    recent_logs: list[dict]

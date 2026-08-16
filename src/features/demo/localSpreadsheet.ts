@@ -4,6 +4,7 @@ import { importPreviewSchema, type ImportPreview } from '@/features/business/mod
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const FORMULA_PREFIX = /^[=+\-@]/
+const ALLOWED_EXTENSIONS = new Set(['.xlsx', '.csv'])
 
 interface DemoInputField {
   key: string
@@ -56,6 +57,47 @@ function normalizeFields(inputSchema: Array<Record<string, unknown>> = []): Demo
     fields.unshift({ key: 'account_label', label: '客户简称', required: true })
   }
   return fields
+}
+
+function extensionOf(fileName: string): string {
+  const match = fileName.toLowerCase().match(/\.[^.]+$/)
+  return match?.[0] || ''
+}
+
+/** Parse RFC-4180 style CSV without executing spreadsheet formulas. */
+export function parseCsvRows(source: string): string[][] {
+  const rows: string[][] = []
+  let row: string[] = []
+  let value = ''
+  let quoted = false
+  const text = source.replace(/^\uFEFF/, '')
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]
+    if (quoted) {
+      if (character === '"' && text[index + 1] === '"') {
+        value += '"'
+        index += 1
+      } else if (character === '"') quoted = false
+      else value += character
+      continue
+    }
+    if (character === '"') quoted = true
+    else if (character === ',') {
+      row.push(value)
+      value = ''
+    } else if (character === '\n') {
+      row.push(value.replace(/\r$/, ''))
+      rows.push(row)
+      row = []
+      value = ''
+    } else value += character
+  }
+  if (quoted) throw new Error('CSV 文件包含未闭合的引号')
+  if (value || row.length) {
+    row.push(value.replace(/\r$/, ''))
+    rows.push(row)
+  }
+  return rows
 }
 
 export function parseDemoWorksheet(
@@ -126,14 +168,34 @@ export async function parseLocalDemoSpreadsheet(
   maxRows = 50,
 ): Promise<ImportPreview> {
   if (file.size > MAX_FILE_SIZE) throw new Error('导入文件不能超过 10MB')
-  if (!file.name.toLowerCase().endsWith('.xlsx')) throw new Error('演示导入仅支持 .xlsx 文件')
+  const extension = extensionOf(file.name)
+  if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error('演示导入仅支持 .xlsx 或 .csv 文件')
+  const buffer = await file.arrayBuffer()
+  return parseDemoSpreadsheetBuffer(buffer, file.name, inputSchema, maxRows)
+}
+
+export async function parseDemoSpreadsheetBuffer(
+  buffer: ArrayBuffer,
+  fileName: string,
+  inputSchema: Array<Record<string, unknown>> = [],
+  maxRows = 50,
+): Promise<ImportPreview> {
+  if (buffer.byteLength > MAX_FILE_SIZE) throw new Error('导入文件不能超过 10MB')
+  const extension = extensionOf(fileName)
+  if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error('演示导入仅支持 .xlsx 或 .csv 文件')
   const module = await import('exceljs')
   const ExcelJS = module.default
   const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(await file.arrayBuffer())
+  if (extension === '.csv') {
+    const worksheet = workbook.addWorksheet('CSV')
+    worksheet.addRows(parseCsvRows(new TextDecoder('utf-8').decode(buffer)))
+  } else {
+    await workbook.xlsx.load(buffer)
+  }
   const worksheet = workbook.worksheets.find(sheet => sheet.state === 'visible') || workbook.worksheets[0]
   if (!worksheet) throw new Error('导入文件没有可读取的工作表')
-  return parseDemoWorksheet(worksheet, file.name, inputSchema, maxRows)
+  const preview = parseDemoWorksheet(worksheet, fileName, inputSchema, maxRows)
+  return importPreviewSchema.parse({ ...preview, worksheetName: worksheet.name })
 }
 
 export function chooseLocalDemoSpreadsheet(): Promise<File | null> {
@@ -141,7 +203,7 @@ export function chooseLocalDemoSpreadsheet(): Promise<File | null> {
   return new Promise(resolve => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    input.accept = '.xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv'
     input.hidden = true
     const finish = (file: File | null) => {
       input.remove()
@@ -152,4 +214,59 @@ export function chooseLocalDemoSpreadsheet(): Promise<File | null> {
     document.body.appendChild(input)
     input.click()
   })
+}
+
+export function createLocalDemoSample(
+  inputSchema: Array<Record<string, unknown>> = [],
+  maxRows = 50,
+  count = 8,
+): ImportPreview {
+  const fields = normalizeFields(inputSchema)
+  const size = Math.max(1, Math.min(count, maxRows, 50))
+  const rows = Array.from({ length: size }, (_, index) => ({
+    itemId: localId('demo_item'),
+    preview: Object.fromEntries(fields.map(field => [field.key, field.key === 'account_label' ? `演示账号 ${String(index + 1).padStart(2, '0')}` : '已校验'])),
+  }))
+  return importPreviewSchema.parse({
+    importId: localId('demo_import'),
+    fileName: 'KST 批量演示样例',
+    validCount: rows.length,
+    errorCount: 0,
+    rows,
+    errors: [],
+  })
+}
+
+function csvCell(value: unknown): string {
+  const text = String(value ?? '').replace(/^([=+\-@])/, "'$1")
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function downloadCsv(fileName: string, rows: unknown[][]): void {
+  if (typeof document === 'undefined') return
+  const content = `\uFEFF${rows.map(row => row.map(csvCell).join(',')).join('\r\n')}`
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  anchor.hidden = true
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+export function downloadLocalDemoTemplate(inputSchema: Array<Record<string, unknown>> = []): string {
+  const fields = normalizeFields(inputSchema)
+  const headers = fields.map(field => field.label)
+  const example = fields.map(field => field.key === 'account_label' ? '示例账号 01' : '请填写')
+  const fileName = 'KST-批量导入模板.csv'
+  downloadCsv(fileName, [headers, example])
+  return fileName
+}
+
+export function downloadLocalImportErrors(errors: Array<{ rowNumber?: number; message: string }>): string {
+  const fileName = 'KST-导入问题清单.csv'
+  downloadCsv(fileName, [['行号', '问题'], ...errors.map(error => [error.rowNumber || '', error.message])])
+  return fileName
 }

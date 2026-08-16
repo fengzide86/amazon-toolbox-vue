@@ -111,6 +111,31 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
     if normalized["supports_batch"] and not any(item["key"] == "account_label" for item in batch_schema):
         batch_schema.insert(0, {"key": "account_label", "label": "客户简称", "type": "text", "required": True, "sensitive": False})
     normalized["batch_input_schema"] = batch_schema
+    single_schema: list[dict[str, object]] = []
+    for field in _items(normalized.get("single_input_schema")):
+        if not isinstance(field, dict):
+            continue
+        key = slugify(str(field.get("key") or ""))
+        if not key or key in SENSITIVE_BATCH_KEYS:
+            continue
+        field_type = str(field.get("type") or "text")
+        if field_type not in {"text", "number", "file", "select"}:
+            field_type = "text"
+        entry: dict[str, object] = {
+            "key": key,
+            "label": str(field.get("label") or key).strip()[:80],
+            "type": field_type,
+            "required": bool(field.get("required", True)),
+            "sensitive": bool(field.get("sensitive")),
+        }
+        if field_type == "select":
+            entry["options"] = [
+                str(item).strip()[:100]
+                for item in _items(field.get("options"))
+                if str(item).strip()
+            ][:100]
+        single_schema.append(entry)
+    normalized["single_input_schema"] = single_schema
     normalized["requires_signature"] = False if availability == "demo_only" else bool(normalized.get("requires_signature", False))
     if isinstance(normalized["available_plans"], str):
         normalized["available_plans"] = [item.strip() for item in normalized["available_plans"].split(",") if item.strip()]

@@ -3,9 +3,10 @@
 """
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import AuthCode, Plan
+from models import AuthCode, AuthSeat, Device, Plan
 from tests.conftest import get_data
 
 
@@ -130,3 +131,66 @@ async def test_admin_auth_code_list_exposes_business_product_context(
     assert business_code["product_type"] == "business"
     assert business_code["plan_name"] == "B端内部验证版"
     assert business_code["entitlements"]["batch_execution"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_auth_code_returns_normalized_platform_scope(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+):
+    plan = Plan(name="双平台套餐", price=199, duration_days=30, status="active")
+    db_session.add(plan)
+    await db_session.flush()
+    code = AuthCode(
+        code="DUAL-PLATFORM-UPDATE",
+        plan_id=plan.id,
+        platform_scope="amazon,aliexpress",
+        status="active",
+    )
+    db_session.add(code)
+    await db_session.commit()
+
+    response = await client.put(
+        f"/api/auth-codes/{code.id}",
+        json={"status": "frozen"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "frozen"
+    assert payload["platform_scope"] == ["amazon", "aliexpress"]
+
+
+@pytest.mark.asyncio
+async def test_delete_used_auth_code_revokes_access_and_hides_it_from_default_list(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers: dict,
+):
+    plan = Plan(name="已使用套餐", price=49, duration_days=7, status="active")
+    db_session.add(plan)
+    await db_session.flush()
+    code = AuthCode(code="USED-CODE-DELETE", plan_id=plan.id, status="active")
+    db_session.add(code)
+    await db_session.flush()
+    db_session.add_all([
+        Device(auth_code_id=code.id, device_id="device-used", device_name="已绑定设备"),
+        AuthSeat(auth_code_id=code.id, device_id="device-used", status="active"),
+    ])
+    await db_session.commit()
+
+    response = await client.delete(f"/api/auth-codes/{code.id}", headers=auth_headers)
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    await db_session.refresh(code)
+    assert code.status == "deleted"
+    seat = (
+        await db_session.execute(select(AuthSeat).where(AuthSeat.auth_code_id == code.id))
+    ).scalar_one()
+    assert seat.status == "inactive"
+
+    list_response = await client.get("/api/auth-codes", headers=auth_headers)
+    assert all(item["id"] != code.id for item in get_data(list_response))

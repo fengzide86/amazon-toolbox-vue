@@ -2,30 +2,33 @@
   <main class="terms-container">
     <div class="terms-card">
       <div class="terms-header">
+        <BrandLockup class="terms-brand" audience="login" layout="horizontal" />
         <h1>服务条款</h1>
-        <p class="terms-date">最后更新：2026年6月4日</p>
+        <p class="terms-date">最后更新：2026年7月19日</p>
       </div>
 
       <div class="terms-content">
         <section>
           <h2>1. 服务说明</h2>
-          <p>跨境电商赛训效率工具箱（以下简称"本工具"）是由开发团队提供的一款面向跨境电商卖家的效率工具软件。本工具提供包括物流模板管理、自动上广告、自动发货、自动上品、自动发FBA/AGL等功能模块。</p>
+          <p>课赛通 KST（以下简称“本工具”）是一款面向赛训、实训和内部验证场景的桌面演示工具，提供授权管理、流程演示、本地表格解析、执行记录和工具帮助等功能。</p>
+          <p>当前工具流程属于演示模式，不会登录、读取或修改真实店铺数据，演示结果也不代表第三方平台的真实处理结果。</p>
         </section>
 
         <section>
           <h2>2. 授权码使用</h2>
-          <p>2.1 本工具采用授权码机制进行激活和使用。每个授权码只能绑定一台Windows设备。</p>
-          <p>2.2 授权码的有效期以购买时选择的套餐为准，到期后需续费才能继续使用。</p>
+          <p>2.1 本工具采用授权码机制进行激活和使用，可绑定的 Windows 设备数量以当前套餐和授权页面显示的额度为准。</p>
+          <p>2.2 授权码的有效期以人工确认的套餐记录为准，到期后需续期才能继续使用。</p>
           <p>2.3 严禁将授权码转让、共享或出售给第三方使用。</p>
-          <p>2.4 如需更换绑定设备，请联系客服处理。</p>
+          <p>2.4 如需更换绑定设备，可先在设备授权页面解绑；无法自助处理时请联系客服。</p>
         </section>
 
         <section>
-          <h2>3. 套餐与退款</h2>
-          <p>3.1 本工具提供多种套餐供用户选择，具体套餐内容和价格以购买页面展示为准。</p>
-          <p>3.2 购买后24小时内，如未激活使用授权码，可申请全额退款。</p>
-          <p>3.3 已激活使用的授权码不支持退款。</p>
-          <p>3.4 退款请联系客服微信处理。</p>
+          <h2>3. 套餐、人工收款与退款</h2>
+          <p>3.1 本工具提供多种套餐，具体内容、价格和设备额度以套餐页面展示及人工确认记录为准。</p>
+          <p>3.2 本工具不内置在线支付系统，收款渠道、金额和订单状态由工作人员人工登记。</p>
+          <p>3.3 人工确认收款后 24 小时内，如授权码尚未激活使用，可申请全额退款。</p>
+          <p>3.4 已激活使用的授权码不支持退款。</p>
+          <p>3.5 退款申请由客服人工核对订单记录后处理。</p>
         </section>
 
         <section>
@@ -39,23 +42,24 @@
         <section>
           <h2>5. 隐私保护</h2>
           <p>5.1 本工具会收集用户的设备信息（设备ID、设备名称）用于授权码绑定。</p>
-          <p>5.2 本工具会记录用户运行工具时的日志数据（工具名称、运行状态、运行时间）。</p>
-          <p>5.3 我们不会将用户信息泄露给第三方，除非法律要求。</p>
+          <p>5.2 本工具会记录必要的演示元数据（工具名称、运行状态、运行时间）用于展示执行记录和定位问题。</p>
+          <p>5.3 专业工作台中的客户密码、Cookie 和 Excel 原文仅在本机处理，不上传到服务端。</p>
+          <p>5.4 我们不会将用户信息泄露给第三方，法律法规另有要求的除外。</p>
         </section>
 
         <section>
           <h2>6. 免责声明</h2>
           <p>6.1 本工具按"现状"提供，不保证所有功能在所有环境下均能正常运行。</p>
           <p>6.2 因网络问题、系统兼容性问题或第三方平台政策变更导致的功能异常，开发团队不承担责任。</p>
-          <p>6.3 用户使用本工具产生的任何业务决策和结果，由用户自行负责。</p>
+          <p>6.3 演示状态和演示结果仅用于展示流程，不应作为真实平台处理结果或业务决策依据。</p>
         </section>
 
         <section>
           <h2>7. 联系方式</h2>
           <p>如有疑问或需要帮助，请通过以下方式联系我们：</p>
           <ul>
-            <li>客服微信：AmazonToolbox_Support</li>
-            <li>工作时间为每周一至周日 9:00-22:00</li>
+            <li>客服微信：{{ wechatId }}</li>
+            <li>服务时间和处理进度以客服当日回复为准</li>
           </ul>
         </section>
       </div>
@@ -68,6 +72,22 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { publicSettingsSchema } from '@/features/auth/model'
+import { getPublicSettings } from '@/utils/api'
+import BrandLockup from '@/components/brand/BrandLockup.vue'
+
+const wechatId = ref('请在登录页查看最新联系方式')
+
+onMounted(async () => {
+  try {
+    const settings = publicSettingsSchema.parse(await getPublicSettings())
+    const configured = settings.find(item => item.key === 'wechat_id')?.value?.trim()
+    if (configured) wechatId.value = configured
+  } catch {
+    // 联系方式读取失败时保留安全提示，不展示可能已经失效的硬编码账号。
+  }
+})
 </script>
 
 <style scoped>
@@ -94,6 +114,7 @@
   padding-bottom: 1.5rem;
   border-bottom: 1px solid var(--color-border);
 }
+.terms-brand { margin-bottom: 24px; }
 .terms-header h1 {
   font-family: var(--font-family);
   font-size: 1.875rem;

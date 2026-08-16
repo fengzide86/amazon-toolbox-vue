@@ -14,5 +14,5 @@
     "outDir": "dist-electron",
     "types": ["node", "electron"]
   },
-  "include": ["electron/**/*.ts", "electron/**/*.cts", "src/shared/ipc/**/*.ts"]
+  "include": ["electron/**/*.ts", "electron/**/*.cts", "src/shared/ipc/**/*.ts", "src/shared/freight/**/*.ts"]
 }

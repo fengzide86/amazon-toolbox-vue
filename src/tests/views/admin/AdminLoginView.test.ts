@@ -49,6 +49,14 @@ describe('AdminLoginView', () => {
       expect(wrapper.find('h1').text()).toBe('管理员登录')
     })
 
+    it('应该显示课赛通管理端品牌且移除临时 AMZ 标志', () => {
+      const wrapper = mountWithPinia(AdminLoginView)
+      const brand = wrapper.find('.context-brand [data-testid="kst-brand-lockup"]')
+      expect(brand.attributes('aria-label')).toBe('课赛通 KST，运营控制中心')
+      expect(wrapper.find('.context-mark').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Automation Suite')
+    })
+
     it('应该显示副标题提示', () => {
       const wrapper = mountWithPinia(AdminLoginView)
       expect(wrapper.text()).toContain('使用管理账号和密码进入后台')

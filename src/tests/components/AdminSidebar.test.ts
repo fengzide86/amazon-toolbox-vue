@@ -18,12 +18,14 @@ const mockRouter = createRouter({
     { path: '/admin/business-access', name: 'AdminBusinessAccess', component: { template: '<div />' } },
     { path: '/admin/orders', name: 'AdminOrders', component: { template: '<div />' } },
     { path: '/admin/profit', name: 'AdminProfit', component: { template: '<div />' } },
+    { path: '/admin/expenses', name: 'AdminExpenses', component: { template: '<div />' } },
     { path: '/admin/users', name: 'AdminUsers', component: { template: '<div />' } },
     { path: '/admin/feedback', name: 'AdminFeedback', component: { template: '<div />' } },
     { path: '/admin/knowledge', name: 'AdminKnowledge', component: { template: '<div />' } },
     { path: '/admin/ai-chat', name: 'AdminAIChat', component: { template: '<div />' } },
     { path: '/admin/announcements', name: 'AdminAnnouncements', component: { template: '<div />' } },
     { path: '/admin/updates', name: 'AdminUpdates', component: { template: '<div />' } },
+    { path: '/admin/freight-rates', name: 'AdminFreightRates', component: { template: '<div />' } },
     { path: '/admin/settings', name: 'AdminSettings', component: { template: '<div />' } },
     { path: '/admin/staff-accounts', name: 'AdminStaffAccounts', component: { template: '<div />' } },
     { path: '/admin/login', name: 'AdminLogin', component: { template: '<div />' } },
@@ -47,24 +49,24 @@ describe('AdminSidebar', () => {
   })
 
   describe('品牌区渲染', () => {
-    it('应该显示"管"品牌徽章', async () => {
+    it('应该显示课赛通管理端品牌锁定组合', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-badge').exists()).toBe(true)
-      expect(wrapper.find('.brand-badge').text()).toBe('管')
+      const brand = wrapper.find('[data-testid="kst-brand-lockup"]')
+      expect(brand.exists()).toBe(true)
+      expect(brand.attributes('aria-label')).toBe('课赛通 KST，运营控制中心')
     })
 
-    it('应该显示"运营控制中心"品牌文字', async () => {
+    it('应该显示运营控制中心副标题', async () => {
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
       })
       await flushPromises()
 
-      expect(wrapper.find('.brand-text').text()).toContain('运营控制中心')
-      expect(wrapper.find('.brand-text small').text()).toBe('超级管理员')
+      expect(wrapper.find('.kst-lockup-subtitle').text()).toBe('运营控制中心')
     })
   })
 
@@ -76,7 +78,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      expect(menuItems.length).toBe(13)
+      expect(menuItems.length).toBe(15)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -90,12 +92,14 @@ describe('AdminSidebar', () => {
       expect(labels).toContain('授权码管理')
       expect(labels).toContain('订单与套餐')
       expect(labels).toContain('分润管理')
+      expect(labels).toContain('公账支出')
       expect(labels).toContain('用户管理')
       expect(labels).toContain('工单管理')
       expect(labels).toContain('知识库管理')
       expect(labels).toContain('客服规则管理')
       expect(labels).toContain('公告管理')
       expect(labels).toContain('应用更新')
+      expect(labels).toContain('物流费率中心')
       expect(labels).toContain('系统设置')
       expect(labels).toContain('后台账号管理')
       expect(labels).not.toContain('退出登录')
@@ -111,6 +115,7 @@ describe('AdminSidebar', () => {
       const labels = wrapper.findAll('.menu-label').map(el => el.text())
       expect(labels).not.toContain('专业工作台')
       expect(labels).not.toContain('分润管理')
+      expect(labels).not.toContain('公账支出')
       expect(labels).not.toContain('应用更新')
       expect(labels).not.toContain('系统设置')
       expect(labels).not.toContain('后台账号管理')

@@ -22,11 +22,21 @@ const forbidden = entries.filter(entry => {
   if (/\.(?:ts|cts|map)$/i.test(normalized)) return true
   if (/(?:^|\/)(?:tests?|docs)(?:\/|$)/i.test(normalized)) return true
   if (/(?:^|\/)smoke(?:\/|$)/i.test(normalized)) return true
-  if (/(?:^|\/)automation-runner\.cjs$/i.test(normalized)) return true
-  if (normalized.includes('/dist-electron/electron/automation/scripts/')) return true
-  if (/(?:^|\/)scripts(?:\/|$)/i.test(normalized)) return true
+  if (/^\/?scripts(?:\/|$)/i.test(normalized)) return true
   return /(?:admin_)?token\.txt$/i.test(normalized)
 })
+
+const requiredAutomationEntries = [
+  '/dist-electron/electron/automation-runner.cjs',
+  '/dist-electron/electron/automation/adapter-loader.cjs',
+  '/dist-electron/electron/automation/scripts/registry.cjs',
+]
+const missingAutomationEntries = requiredAutomationEntries.filter(required => (
+  !entries.some(entry => entry.replaceAll('\\', '/').endsWith(required))
+))
+if (missingAutomationEntries.length) {
+  throw new Error(`Missing packaged automation runtime:\n${missingAutomationEntries.join('\n')}`)
+}
 
 if (forbidden.length) {
   throw new Error(`Forbidden package entries:\n${forbidden.slice(0, 30).join('\n')}`)
@@ -36,7 +46,21 @@ function packagedSource(filename: string): string {
   return extractFile(asarPath, filename).toString('utf8')
 }
 
-const mainSource = packagedSource(path.join('dist-electron', 'electron', 'main.cjs'))
+const desktopApplicationSource = packagedSource(
+  path.join('dist-electron', 'electron', 'desktop-application.cjs'),
+)
+const mainWindowSource = packagedSource(
+  path.join('dist-electron', 'electron', 'core', 'main-window.cjs'),
+)
+const automationControllerSource = packagedSource(
+  path.join('dist-electron', 'electron', 'automation', 'desktop-automation-controller.cjs'),
+)
+const mainSource = [
+  packagedSource(path.join('dist-electron', 'electron', 'main.cjs')),
+  desktopApplicationSource,
+  mainWindowSource,
+  automationControllerSource,
+].join('\n')
 const preloadSource = packagedSource(path.join('dist-electron', 'electron', 'preload.cjs'))
 const updateManagerSource = packagedSource(path.join('dist-electron', 'electron', 'core', 'update-manager.cjs'))
 const indexSource = packagedSource(path.join('dist', 'index.html'))
@@ -45,12 +69,13 @@ const internalPolicyFailures: string[] = []
 if (!mainSource.includes("packageMetadata.toolbox?.distribution === 'internal'")) {
   internalPolicyFailures.push('internal distribution gate')
 }
-if (!mainSource.includes('webviewTag: AUTOMATION_RUNTIME_ENABLED')
-  || !mainSource.includes('if (!AUTOMATION_RUNTIME_ENABLED')) {
+if (!mainWindowSource.includes('webviewTag: options.automationEnabled')
+  || !desktopApplicationSource.includes('automationEnabled: AUTOMATION_RUNTIME_ENABLED')) {
   internalPolicyFailures.push('webview runtime gate')
 }
 if (mainSource.includes('webviewTag: true')) internalPolicyFailures.push('unconditional webview capability')
-if (!/if\s*\(AUTOMATION_RUNTIME_ENABLED\)\s*registerTrustedOn\('launch-tool'/.test(mainSource)) {
+if (!/if\s*\(!this\.options\.automationEnabled\)\s*return/.test(automationControllerSource)
+  || !automationControllerSource.includes("registerTrustedOn('launch-tool'")) {
   internalPolicyFailures.push('tool launch IPC gate')
 }
 const conditionalBridge = preloadSource.indexOf('...(automationEnabled ?')

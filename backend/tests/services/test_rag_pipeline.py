@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -6,7 +7,7 @@ from sqlalchemy import func, select
 from core.security import create_access_token
 from domains.knowledge import chat_service as ai_chat_service
 from domains.knowledge import faq_service
-from models import ChatSession, Feedback, KnowledgeBase, User
+from models import ChatMessage, ChatSession, Feedback, KnowledgeBase, User
 
 
 @pytest.mark.asyncio
@@ -55,15 +56,29 @@ async def test_faq_platform_isolation(db_session):
 
 @pytest.mark.asyncio
 async def test_admin_debug_does_not_create_session(client, db_session, admin_token):
-    before = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
+    db_session.add(KnowledgeBase(
+        category="使用教程", title="规则预览测试", content="这是固定规则答案。",
+        keywords='["规则预览"]', status="active", platform_key="amazon",
+    ))
+    await db_session.commit()
+    before_sessions = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
+    before_messages = (await db_session.execute(select(func.count(ChatMessage.id)))).scalar() or 0
     response = await client.post(
-        "/api/ai-chat/admin/debug", json={"message": "测试"},
+        "/api/ai-chat/admin/debug",
+        json={"message": "规则预览", "platform_key": "amazon"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
-    after = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
-    assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "FEATURE_DISABLED"
-    assert before == after
+    after_sessions = (await db_session.execute(select(func.count(ChatSession.id)))).scalar() or 0
+    after_messages = (await db_session.execute(select(func.count(ChatMessage.id)))).scalar() or 0
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reply"] == "这是固定规则答案。"
+    assert payload["answer_mode"] == "faq"
+    assert payload["ai_used"] is False
+    assert payload["knowledge_refs"][0]["title"] == "规则预览测试"
+    assert set(payload["diagnostics"]) == {"total_ms"}
+    assert before_sessions == after_sessions
+    assert before_messages == after_messages
 
 
 @pytest.mark.asyncio
@@ -82,6 +97,82 @@ async def test_user_cannot_read_another_users_session(client, db_session):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_session_api_persists_context_in_service_transaction(client, db_session):
+    user = User(name="scoped-session-owner", auth_code_id=31)
+    db_session.add(user)
+    await db_session.commit()
+    await db_session.refresh(user)
+    token = create_access_token({"user_id": user.id, "role": "user", "auth_code_id": 31})
+
+    response = await client.post(
+        "/api/ai-chat/session",
+        json={"platform_key": "amazon", "capability_key": "shipping"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert set(payload) == {"session_id", "status", "welcome_message", "suggested_questions"}
+    session = (
+        await db_session.execute(
+            select(ChatSession).where(ChatSession.session_id == payload["session_id"])
+        )
+    ).scalar_one()
+    assert session.platform_key == "amazon"
+    assert session.capability_key == "shipping"
+    messages = (
+        await db_session.execute(
+            select(ChatMessage).where(ChatMessage.session_id == payload["session_id"])
+        )
+    ).scalars().all()
+    assert [(message.role, message.content) for message in messages] == [
+        ("system", payload["welcome_message"])
+    ]
+
+
+@pytest.mark.asyncio
+async def test_chat_config_service_serializes_structured_values(db_session):
+    result = await ai_chat_service.update_config(
+        db_session,
+        {
+            "suggested_questions": ["怎么安装？"],
+            "transfer_keywords": ["人工"],
+            "transfer_rules": {"complaint_direct_transfer": True},
+        },
+    )
+
+    assert json.loads(result["suggested_questions"]) == ["怎么安装？"]
+    assert json.loads(result["transfer_keywords"]) == ["人工"]
+    assert json.loads(result["transfer_rules"]) == {"complaint_direct_transfer": True}
+
+
+@pytest.mark.asyncio
+async def test_send_message_persists_pair_and_updates_count_once(db_session):
+    session = await ai_chat_service.create_session(db_session, user_id=None)
+
+    await ai_chat_service.send_message(
+        db_session,
+        session["session_id"],
+        "一个没有规则匹配的问题",
+    )
+
+    record = (
+        await db_session.execute(
+            select(ChatSession).where(ChatSession.session_id == session["session_id"])
+        )
+    ).scalar_one()
+    messages = (
+        await db_session.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session["session_id"])
+            .order_by(ChatMessage.id)
+        )
+    ).scalars().all()
+    assert record.message_count == 2
+    assert [message.role for message in messages] == ["system", "user", "ai"]
 
 
 @pytest.mark.asyncio
