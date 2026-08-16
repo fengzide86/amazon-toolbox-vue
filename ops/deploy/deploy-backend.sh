@@ -292,6 +292,21 @@ test -f "${STAGING_DIR}/backend/requirements.txt"
 test -f "${STAGING_DIR}/backend/constraints-py310.txt"
 test -f "${STAGING_DIR}/backend/alembic.ini"
 
+# mktemp creates the staging root as root-only under umask 077. The release
+# venv is deliberately built as the unprivileged toolbox account, so expose
+# only the two dependency manifests and their parent traversal path to that
+# account before invoking pip.
+chown root:toolbox "${STAGING_DIR}" "${STAGING_DIR}/backend"
+chmod 0750 "${STAGING_DIR}" "${STAGING_DIR}/backend"
+chown root:toolbox \
+  "${STAGING_DIR}/backend/requirements.txt" \
+  "${STAGING_DIR}/backend/constraints-py310.txt"
+chmod 0640 \
+  "${STAGING_DIR}/backend/requirements.txt" \
+  "${STAGING_DIR}/backend/constraints-py310.txt"
+runuser -u toolbox -- test -r "${STAGING_DIR}/backend/requirements.txt"
+runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"
+
 VENV_RELEASE_DIR="${VENV_ROOT}/${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}"
 VENV_METADATA_FILE="${VENV_RELEASE_DIR}/.toolbox-release"
 VENV_BUILD_MARKER="${VENV_ROOT}/.${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}.building"

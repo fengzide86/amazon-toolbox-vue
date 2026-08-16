@@ -158,6 +158,10 @@ requireText('ops/deploy/deploy-backend.sh', [
   '"${ACTIVE_VENV_PYTHON}" - "${BACKEND_DIR}/.env"',
   'database backup schema must be application-owned',
   '"${CONTROL_PLANE_URL}/api/health/live"',
+  'chown root:toolbox "${STAGING_DIR}" "${STAGING_DIR}/backend"',
+  'chmod 0750 "${STAGING_DIR}" "${STAGING_DIR}/backend"',
+  'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/requirements.txt"',
+  'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"',
 ])
 requireText('ops/deploy/restore-backup.sh', [
   'trap restore_failure ERR',
@@ -178,6 +182,7 @@ requireOrder('ops/deploy/deploy-backend.sh', [
   'require_commands \\',
   '"${ACTIVE_VENV_PYTHON}" - "${BACKEND_DIR}/.env"',
   'tar -xzf "${ARCHIVE_PATH}" -C "${STAGING_DIR}"',
+  'runuser -u toolbox -- test -r "${STAGING_DIR}/backend/constraints-py310.txt"',
   'VENV_BUILD_MARKER="${VENV_ROOT}/.${EXPECTED_VERSION}-${RELEASE_ID}-${EXPECTED_COMMIT:0:12}.building"',
   '# Freeze writes before taking the attachment and database snapshots.',
 ])
