@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
 import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
@@ -29,7 +30,7 @@ def test_staff_commerce_migration_upgrades_legacy_sqlite(tmp_path, monkeypatch):
         sa.Column("status", sa.String(20), nullable=False),
         sa.Column("product_type", sa.String(20), nullable=False, server_default="consumer"),
     )
-    orders = sa.Table(
+    _orders = sa.Table(
         "orders",
         metadata,
         sa.Column("id", sa.Integer, primary_key=True),
@@ -43,7 +44,7 @@ def test_staff_commerce_migration_upgrades_legacy_sqlite(tmp_path, monkeypatch):
         sa.Column("paid_at", sa.DateTime),
         sa.Column("updated_at", sa.DateTime),
     )
-    profits = sa.Table(
+    _profits = sa.Table(
         "profit_records",
         metadata,
         sa.Column("id", sa.Integer, primary_key=True),
@@ -75,23 +76,6 @@ def test_staff_commerce_migration_upgrades_legacy_sqlite(tmp_path, monkeypatch):
                 "UPDATE plans SET price = 0, duration_days = 0, "
                 "product_type = 'legacy' WHERE id = 1"
             )
-        )
-        connection.execute(
-            orders.insert(),
-            {"id": 1, "order_no": "LEGACY-ORDER", "plan_id": 2, "amount": 199, "status": "paid"},
-        )
-        connection.execute(
-            profits.insert(),
-            {
-                "id": 1,
-                "order_id": 1,
-                "tech_share": 59.7,
-                "market_share": 49.75,
-                "product_share": 29.85,
-                "service_share": 29.85,
-                "coordination_share": 19.9,
-                "record_share": 9.95,
-            },
         )
 
     migration_path = Path(__file__).parents[1] / "alembic" / "versions" / "20260718_staff_commerce.py"
@@ -175,3 +159,47 @@ def test_staff_commerce_migration_upgrades_legacy_sqlite(tmp_path, monkeypatch):
         assert connection.execute(
             sa.text("SELECT COUNT(*) FROM profit_records")
         ).scalar_one() == 0
+
+
+def test_staff_commerce_migration_has_no_destructive_commerce_delete():
+    migration_path = Path(__file__).parents[1] / "alembic" / "versions" / "20260718_staff_commerce.py"
+    source = migration_path.read_text(encoding="utf-8")
+
+    assert "DELETE FROM orders" not in source
+    assert "DELETE FROM profit_records" not in source
+    assert "禁止自动删除" in source
+
+
+@pytest.mark.parametrize("case", ["legacy_order", "null_profit", "duplicate_profit"])
+def test_staff_commerce_migration_stops_and_preserves_legacy_commerce(case, tmp_path, monkeypatch):
+    engine = sa.create_engine(f"sqlite:///{tmp_path / f'{case}.db'}")
+    metadata = sa.MetaData()
+    orders = sa.Table("orders", metadata, sa.Column("id", sa.Integer, primary_key=True))
+    profits = sa.Table(
+        "profit_records",
+        metadata,
+        sa.Column("id", sa.Integer, primary_key=True),
+        sa.Column("order_id", sa.Integer),
+    )
+    metadata.create_all(engine)
+    with engine.begin() as connection:
+        if case == "legacy_order":
+            connection.execute(orders.insert(), {"id": 7})
+        elif case == "null_profit":
+            connection.execute(profits.insert(), {"id": 8, "order_id": None})
+        else:
+            connection.execute(profits.insert(), [{"id": 9, "order_id": 3}, {"id": 10, "order_id": 3}])
+
+    migration_path = Path(__file__).parents[1] / "alembic" / "versions" / "20260718_staff_commerce.py"
+    spec = importlib.util.spec_from_file_location(f"staff_commerce_{case}", migration_path)
+    assert spec and spec.loader
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    with engine.begin() as connection:
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        with pytest.raises(RuntimeError, match="迁移已停止|preserve data"):
+            migration.upgrade()
+
+    with engine.connect() as connection:
+        assert connection.execute(sa.text("SELECT COUNT(*) FROM orders")).scalar_one() == (1 if case == "legacy_order" else 0)
+        assert connection.execute(sa.text("SELECT COUNT(*) FROM profit_records")).scalar_one() == (1 if case == "null_profit" else 2 if case == "duplicate_profit" else 0)

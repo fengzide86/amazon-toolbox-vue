@@ -1,4 +1,6 @@
 """Configuration schema tests that do not depend on a developer's local .env values."""
+import pytest
+
 from core.config import Settings, settings
 
 
@@ -38,3 +40,28 @@ def test_environment_override_is_parsed(monkeypatch) -> None:
     assert configured.DEBUG is True
     assert configured.APP_ENV == "test"
     assert configured.BUNDLED_BACKEND_ENABLED is True
+
+
+def test_internal_environment_rejects_implicit_sqlite(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENV", "internal")
+    monkeypatch.delenv("DB_TYPE", raising=False)
+
+    with pytest.raises(ValueError, match="DB_TYPE=mysql"):
+        Settings()
+
+
+@pytest.mark.parametrize("environment", ["test", "development"])
+def test_non_production_environment_allows_sqlite(monkeypatch, environment: str) -> None:
+    monkeypatch.setenv("APP_ENV", environment)
+    monkeypatch.setenv("DB_TYPE", "sqlite")
+    assert Settings().DB_TYPE == "sqlite"
+
+
+def test_production_rejects_sqlite_and_unknown_database(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("DB_TYPE", "sqlite")
+    with pytest.raises(ValueError):
+        Settings()
+    monkeypatch.setenv("DB_TYPE", "oracle")
+    with pytest.raises(ValueError):
+        Settings()

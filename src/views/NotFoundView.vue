@@ -17,7 +17,7 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
 const homePath = computed(() => {
   if (authService.isBackoffice()) return '/admin/dashboard'
   if (hasBusinessWorkspaceAccess(authService.getUser())) return '/business/overview'
-  return authService.isAuthenticated() ? '/user/tools' : '/user/login'
+  return authService.isAuthenticated() ? '/user/tools' : '/'
 })
 </script>
 

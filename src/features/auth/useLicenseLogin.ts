@@ -8,9 +8,9 @@ import { saveRememberedUserCode } from '@/utils/credentialStore'
 import { licenseLoginResponseSchema, publicSettingsSchema } from './model'
 
 const stats = [
-  { value: '90', unit: '%', desc: '操作提效 · 一键完成物料/发货' },
-  { value: '10', unit: '×', desc: '上品速度 · 批量处理告别手动' },
-  { value: '24', unit: 'h', desc: 'AI 客服 · 问题秒级响应' },
+  { value: 'C', unit: '端', desc: '个人工具箱 · 面向参赛学生' },
+  { value: 'B', unit: '端', desc: '批量工作台 · 面向代打团队' },
+  { value: '50', unit: '项', desc: '批量演示上限 · 非真实账号并发' },
 ]
 
 const featureTags = ['自动上品', '物流模板', '自动发货', 'FBA / AGL', '广告脚本', '批量操作']

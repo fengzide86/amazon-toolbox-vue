@@ -3,7 +3,7 @@
     <PageHeader
       eyebrow="流程演示工具"
       title="选择一个工具开始处理"
-      description="当前工具仅展示模拟流程，不会登录、读取或修改真实店铺数据。"
+      description="按工具状态选择交互演示或真实执行；真实自动化仅在课赛通 KST 桌面端运行。"
     >
       <template #actions>
         <router-link class="plan-chip" to="/user/plans">

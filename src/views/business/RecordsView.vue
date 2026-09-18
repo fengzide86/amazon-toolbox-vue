@@ -43,17 +43,21 @@ interface BatchRow { id: string | number; toolName: string; startedAt?: string |
 const activeTab = ref<RecordTab>('demo')
 const loadError = ref('')
 const loadState = ref<AsyncDataState>('loading')
+let loadSequence = 0
 const rows = computed<BatchRow[]>(() => activeTab.value === 'demo'
   ? store.demoHistory.map(batch => ({ id: batch.id, toolName: batch.tool_name_snapshot, startedAt: batch.started_at || batch.created_at, total: batch.row_count, processed: batch.played_count + batch.skipped_count, attention: batch.error_count, status: batch.status }))
   : store.history.map(batch => ({ id: batch.id, toolName: batch.tool_name, startedAt: batch.started_at, total: batch.total_count, processed: batch.completed_count + batch.failed_count, attention: batch.waiting_count, status: batch.status })))
 const load = async () => {
+  const requestSequence = ++loadSequence
   loadState.value = rows.value.length ? 'data' : 'loading'
   loadError.value = ''
   try {
     if (activeTab.value === 'demo') await store.loadDemoHistory()
     else await store.loadHistory()
+    if (requestSequence !== loadSequence) return
     loadState.value = settledDataState(rows.value.length)
   } catch (error) {
+    if (requestSequence !== loadSequence) return
     loadError.value = error instanceof Error && error.message ? error.message : '请检查网络连接后重试。'
     loadState.value = failedDataState(rows.value.length > 0)
   }

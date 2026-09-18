@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "description": "课赛通 KST · 跨境电商赛训效率平台",
   "author": "课赛通 KST 团队",
   "private": true,
@@ -50,7 +50,8 @@
     "test:amazon-navigation": "npm run electron:compile && electron dist-electron/electron/smoke/amazon-navigation-smoke.cjs",
     "test:app-protocol": "npm run electron:compile && electron dist-electron/electron/smoke/app-protocol-smoke.cjs",
     "test:automation-smoke": "npm run electron:compile && node scripts/automation-smoke.mjs",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
+    "source:check": "node scripts/check-source-artifacts.mjs",
+    "typecheck": "npm run source:check && vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p tsconfig.electron.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.e2e.json",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.ts\" \"electron/**/*.{ts,cts}\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.config.ts\"",
     "openapi:generate": "node scripts/run-python.mjs -- scripts/export_openapi.py --output backend/openapi.json && node scripts/run-python.mjs -- scripts/generate_openapi_types.py",
     "openapi:check": "node scripts/run-python.mjs -- scripts/export_openapi.py --output backend/openapi.json --check && node scripts/run-python.mjs -- scripts/check_openapi_compat.py && node scripts/run-python.mjs -- scripts/generate_openapi_types.py --check",

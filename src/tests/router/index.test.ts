@@ -1,127 +1,47 @@
-/**
- * 路由配置单元测试
- * 测试路由定义和结构（不测试 vue-router 内部逻辑）
- */
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-// 直接测试路由配置对象
-describe('Router Configuration', () => {
-  // 导入路由配置（不使用 mock）
-  const getRoutes = async () => {
-    // 由于 vue-router 在测试环境中不可用，我们直接测试路由定义
-    return [
-      { path: '/user/login', name: 'UserLogin' },
-      { path: '/admin/login', name: 'AdminLogin' },
-      { 
-        path: '/user',
-        children: [
-      { path: 'dashboard', name: 'UserDashboard', meta: { title: '工具箱' } },
-      { path: 'tools', name: 'UserTools', meta: { title: '工具箱' } },
-      { path: 'logs', name: 'UserLogs', meta: { title: '使用记录' } },
-          { path: 'faq', name: 'UserFaq', meta: { title: '常见问题' } },
-      { path: 'plans', name: 'UserPlans', meta: { title: '套餐与授权' } },
-          { path: 'devices', name: 'UserDevices', meta: { title: '设备管理' } },
-          { path: 'ai-chat', name: 'UserAIChat', meta: { title: 'AI 客服' } }
-        ]
-      },
-      {
-        path: '/admin',
-        children: [
-          { path: 'dashboard', name: 'AdminDashboard', meta: { title: '数据总览看板' } },
-          { path: 'authcodes', name: 'AdminAuthCodes', meta: { title: '授权码管理' } },
-          { path: 'orders', name: 'AdminOrders', meta: { title: '订单与套餐权限' } },
-          { path: 'profit', name: 'AdminProfit', meta: { title: '分润管理' } },
-          { path: 'settings', name: 'AdminSettings', meta: { title: '系统设置' } },
-          { path: 'users', name: 'AdminUsers', meta: { title: '用户管理' } },
-          { path: 'feedback', name: 'AdminFeedback', meta: { title: '工单管理' } },
-          { path: 'knowledge', name: 'AdminKnowledge', meta: { title: '知识库管理' } },
-          { path: 'ai-chat', name: 'AdminAIChat', meta: { title: 'AI 客服管理' } },
-          { path: 'announcements', name: 'AdminAnnouncements', meta: { title: '公告管理' } }
-        ]
-      }
-    ]
-  }
+import router from '@/router'
 
-  describe('路由定义', () => {
-    it('应该定义用户登录路由', async () => {
-      const routes = await getRoutes()
-      const loginRoute = routes.find(r => r.path === '/user/login')
-      expect(loginRoute).toBeDefined()
-      expect(loginRoute.name).toBe('UserLogin')
-    })
+describe('Router configuration', () => {
+  const routes = () => router.getRoutes()
 
-    it('应该定义管理员登录路由', async () => {
-      const routes = await getRoutes()
-      const adminLoginRoute = routes.find(r => r.path === '/admin/login')
-      expect(adminLoginRoute).toBeDefined()
-      expect(adminLoginRoute.name).toBe('AdminLogin')
-    })
+  it('uses the real route table and includes all three product surfaces', () => {
+    const names = new Set(routes().map(route => String(route.name)))
 
-    it('应该定义用户端布局路由', async () => {
-      const routes = await getRoutes()
-      const userLayout = routes.find(r => r.path === '/user')
-      expect(userLayout).toBeDefined()
-      expect(userLayout.children).toBeDefined()
-      expect(userLayout.children.length).toBeGreaterThan(0)
-    })
-
-    it('应该定义管理后台布局路由', async () => {
-      const routes = await getRoutes()
-      const adminLayout = routes.find(r => r.path === '/admin')
-      expect(adminLayout).toBeDefined()
-      expect(adminLayout.children).toBeDefined()
-      expect(adminLayout.children.length).toBeGreaterThan(0)
-    })
-
-    it('用户端应该包含所有必要的子路由', async () => {
-      const routes = await getRoutes()
-      const userLayout = routes.find(r => r.path === '/user')
-      const childPaths = userLayout.children.map(c => c.path)
-      
-      expect(childPaths).toContain('dashboard')
-      expect(childPaths).toContain('tools')
-      expect(childPaths).toContain('logs')
-      expect(childPaths).toContain('faq')
-      expect(childPaths).toContain('plans')
-      expect(childPaths).toContain('devices')
-      expect(childPaths).toContain('ai-chat')
-    })
-
-    it('管理后台应该包含所有必要的子路由', async () => {
-      const routes = await getRoutes()
-      const adminLayout = routes.find(r => r.path === '/admin')
-      const childPaths = adminLayout.children.map(c => c.path)
-      
-      expect(childPaths).toContain('dashboard')
-      expect(childPaths).toContain('authcodes')
-      expect(childPaths).toContain('orders')
-      expect(childPaths).toContain('profit')
-      expect(childPaths).toContain('settings')
-      expect(childPaths).toContain('users')
-      expect(childPaths).toContain('feedback')
-      expect(childPaths).toContain('knowledge')
-      expect(childPaths).toContain('ai-chat')
-      expect(childPaths).toContain('announcements')
-    })
+    expect([...names]).toEqual(expect.arrayContaining([
+      'Landing',
+      'UserLogin',
+      'UserTools',
+      'UserLogs',
+      'BusinessOverview',
+      'BusinessWorkspace',
+      'BusinessRecords',
+      'AdminDashboard',
+      'AdminExpenses',
+      'AdminUpdates',
+      'AdminStaffAccounts',
+      'NotFound',
+    ]))
   })
 
-  describe('路由 meta 信息', () => {
-    it('所有用户端子路由应该包含 title 元信息', async () => {
-      const routes = await getRoutes()
-      const userLayout = routes.find(r => r.path === '/user')
-      userLayout.children.forEach(child => {
-        expect(child.meta).toBeDefined()
-        expect(child.meta.title).toBeDefined()
-      })
-    })
+  it('gives every navigable child route a title and lazy component', () => {
+    const children = routes().filter(route => route.name && route.name !== 'NotFound')
 
-    it('所有管理后台子路由应该包含 title 元信息', async () => {
-      const routes = await getRoutes()
-      const adminLayout = routes.find(r => r.path === '/admin')
-      adminLayout.children.forEach(child => {
-        expect(child.meta).toBeDefined()
-        expect(child.meta.title).toBeDefined()
-      })
-    })
+    for (const route of children) {
+      expect(route.meta?.title || route.redirect, String(route.name)).toBeTruthy()
+      if (!route.redirect) {
+        expect(route.components, String(route.name)).toBeTruthy()
+      }
+    }
+  })
+
+  it('keeps product and role restrictions on protected surfaces', () => {
+    const business = routes().find(route => route.name === 'BusinessWorkspace')
+    const expenses = routes().find(route => route.name === 'AdminExpenses')
+    const settings = routes().find(route => route.name === 'AdminSettings')
+
+    expect(business?.meta).toMatchObject({ productType: 'business', entitlement: 'batch_execution' })
+    expect(expenses?.meta?.roles).toEqual(['super_admin', 'operator'])
+    expect(settings?.meta?.roles).toEqual(['super_admin'])
   })
 })

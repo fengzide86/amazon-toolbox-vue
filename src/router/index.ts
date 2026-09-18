@@ -3,12 +3,15 @@ import type { RouteRecordRaw } from 'vue-router'
 import { authService } from '@/utils/auth'
 import { hasBusinessWorkspaceAccess } from '@/features/auth/model'
 import type { BackofficeRole } from '@/features/auth/model'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
 
 const routes: RouteRecordRaw[] = [
   // 用户端路由
   {
     path: '/',
-    redirect: '/user/login'
+    name: 'Landing',
+    component: () => import('@/views/LandingView.vue'),
+    meta: { title: '跨境电商赛训效率平台', public: true }
   },
   {
     path: '/user/login',
@@ -226,6 +229,7 @@ const router = createRouter({
   routes,
   scrollBehavior(to, from, savedPosition) {
     if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, top: 88 }
     return { top: 0 }
   }
 })
@@ -238,9 +242,15 @@ router.beforeEach((to, from, next) => {
     const role = authService.getRole()
     const user = authService.getUser() || {}
     const hasBusinessAccess = hasBusinessWorkspaceAccess(user)
+    // The website markets the product; the installed app still opens its
+    // existing login/workspace flow, including remembered-license recovery.
+    if (to.name === 'Landing' && getRuntimeCapabilities().isDesktop) {
+      next({ name: 'UserLogin' })
+      return
+    }
     
     // 登录页不需要验证
-    if (to.name === 'UserTerms' || to.name === 'NotFound') {
+    if (to.meta.public || to.name === 'UserTerms' || to.name === 'NotFound') {
       next()
       return
     }

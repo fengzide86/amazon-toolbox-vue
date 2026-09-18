@@ -95,7 +95,14 @@ def _deduplicate_plan_names(bind) -> None:
 
 
 def _deduplicate_profit_records(bind) -> None:
-    bind.execute(sa.text("DELETE FROM profit_records WHERE order_id IS NULL"))
+    null_count = bind.execute(
+        sa.text("SELECT COUNT(*) FROM profit_records WHERE order_id IS NULL")
+    ).scalar()
+    if null_count:
+        raise RuntimeError(
+            "profit_records contains rows without order_id; migration stopped to preserve data. "
+            "Repair these rows explicitly before retrying."
+        )
     duplicate_orders = bind.execute(
         sa.text(
             "SELECT order_id FROM profit_records "
@@ -114,9 +121,9 @@ def _deduplicate_profit_records(bind) -> None:
             ).fetchall()
         ]
         for record_id in record_ids[1:]:
-            bind.execute(
-                sa.text("DELETE FROM profit_records WHERE id = :record_id"),
-                {"record_id": record_id},
+            raise RuntimeError(
+                "profit_records contains duplicate order_id values; migration stopped to preserve data. "
+                "Resolve duplicates explicitly before retrying."
             )
 
 
@@ -199,14 +206,21 @@ def upgrade() -> None:
     if "settings" in inspector.get_table_names():
         _migrate_legacy_admin(bind)
 
-    # The deployment runbook exports the legacy commerce tables before this
-    # revision.  The old order/profit shape does not satisfy the new state
-    # machine and immutable-ledger invariants, so clear children before parents
-    # and let the internal seed rebuild only valid simulation data.
-    if "profit_records" in tables:
-        bind.execute(sa.text("DELETE FROM profit_records"))
-    if "orders" in tables:
-        bind.execute(sa.text("DELETE FROM orders"))
+    # Never delete commerce history from a schema migration. If legacy rows
+    # exist, stop and require an explicit, backed-up conversion plan instead
+    # of silently destroying orders and profit records.
+    legacy_counts: dict[str, int] = {}
+    for table in ("orders", "profit_records"):
+        if table in tables:
+            legacy_counts[table] = int(
+                bind.execute(sa.text(f"SELECT COUNT(*) FROM `{table}`")).scalar() or 0
+            )
+    populated_legacy_tables = {table: count for table, count in legacy_counts.items() if count}
+    if populated_legacy_tables:
+        raise RuntimeError(
+            "迁移已停止：检测到旧订单/分润历史，禁止自动删除。"
+            f" 请先完成受控转换并确认备份：{populated_legacy_tables}"
+        )
 
     if "plans" in inspector.get_table_names():
         bind.execute(sa.text("UPDATE plans SET status = 'archived' WHERE status = 'deleted'"))

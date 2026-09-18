@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
@@ -27,6 +27,33 @@ INTERVENTION_MESSAGES = {
     "page_confirmation": "需要确认页面提示",
     "other": "需要人工完成页面操作",
 }
+
+async def _recount_batch_items(db: AsyncSession, batch_id: int) -> int:
+    """Rebuild the parent counters from the item rows.
+
+    The client can report a heartbeat, but it must not be the source of truth
+    for a completed batch. Cancelled items are counted as failed because the
+    public batch contract has no separate cancelled counter.
+    """
+    # Production sessions disable autoflush. Include this request's item
+    # insert/update before deriving counters, not just the previously saved rows.
+    await db.flush()
+    result = await db.execute(
+        select(AutomationBatchItem.status, func.count(AutomationBatchItem.id))
+        .where(AutomationBatchItem.batch_id == batch_id)
+        .group_by(AutomationBatchItem.status)
+    )
+    counts = {str(status): int(total) for status, total in result.all()}
+    batch = await db.get(AutomationBatch, batch_id, with_for_update=True)
+    if batch is None:
+        return 0
+    item_total = sum(counts.values())
+    batch.pending_count = counts.get("pending", 0) + max((batch.total_count or 0) - item_total, 0)
+    batch.running_count = counts.get("running", 0)
+    batch.waiting_count = counts.get("waiting_user", 0)
+    batch.completed_count = counts.get("completed", 0)
+    batch.failed_count = counts.get("failed", 0) + counts.get("cancelled", 0)
+    return sum(counts.values())
 
 
 def serialize_item(item: AutomationBatchItem) -> dict[str, Any]:
@@ -213,11 +240,24 @@ async def update_batch(
         request.completed_count,
         request.failed_count,
     ]
+    # The existing Runner summary omits cancelled items (there is no
+    # cancelled_count in this API). Keep accepting that partial heartbeat;
+    # persisted item rows below remain authoritative for final counts.
     if sum(counts) > batch.total_count:
         raise HTTPException(status_code=422, detail="批次状态数量超过总数")
-    for field in ("pending_count", "running_count", "waiting_count", "completed_count", "failed_count"):
-        setattr(batch, field, getattr(request, field))
+    item_count = await _recount_batch_items(db, batch.id)
+    if item_count:
+        # Item updates are authoritative whenever item rows exist.
+        if item_count > batch.total_count:
+            raise HTTPException(status_code=409, detail="批次项目数量超过批次总数")
+    else:
+        for field in ("pending_count", "running_count", "waiting_count", "completed_count", "failed_count"):
+            setattr(batch, field, getattr(request, field))
     if request.status:
+        if request.status == "completed":
+            unfinished = batch.pending_count + batch.running_count + batch.waiting_count
+            if item_count != batch.total_count or unfinished:
+                raise HTTPException(status_code=409, detail="仍有未完成的批次项目，暂不能标记完成")
         batch.status = request.status
     batch.last_heartbeat_at = datetime.now()
     if batch.status in {"completed", "cancelled", "interrupted"} and not batch.finished_at:
@@ -236,17 +276,25 @@ async def upsert_batch_item(
 ) -> dict[str, Any]:
     require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context, lock=True)
+    normalized_client_item_id = client_item_id.strip()
+    if not normalized_client_item_id or len(normalized_client_item_id) > 100:
+        raise HTTPException(status_code=422, detail="批次项目标识长度必须为 1-100 个字符")
     result = await db.execute(
         select(AutomationBatchItem).where(
             AutomationBatchItem.batch_id == batch.id,
-            AutomationBatchItem.client_item_id == client_item_id,
+            AutomationBatchItem.client_item_id == normalized_client_item_id,
         )
     )
     item = result.scalar_one_or_none()
     if not item:
+        existing_count = await db.scalar(
+            select(func.count(AutomationBatchItem.id)).where(AutomationBatchItem.batch_id == batch.id)
+        )
+        if int(existing_count or 0) >= batch.total_count:
+            raise HTTPException(status_code=409, detail="批次项目数量超过批次总数")
         item = AutomationBatchItem(
             batch_id=batch.id,
-            client_item_id=client_item_id[:100],
+            client_item_id=normalized_client_item_id,
             account_label_masked=_mask_label(request.account_label_masked),
         )
         db.add(item)
@@ -263,6 +311,7 @@ async def upsert_batch_item(
     if request.status in {"completed", "failed", "cancelled"}:
         item.completed_at = datetime.now()
     batch.last_heartbeat_at = datetime.now()
+    await _recount_batch_items(db, batch.id)
     await db.commit()
     await db.refresh(item)
     return serialize_item(item)
@@ -276,6 +325,11 @@ async def finish_batch(
 ) -> dict[str, Any]:
     require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context, lock=True)
+    item_count = await _recount_batch_items(db, batch.id)
+    if request.status == "completed":
+        unfinished = batch.pending_count + batch.running_count + batch.waiting_count
+        if item_count != batch.total_count or unfinished:
+            raise HTTPException(status_code=409, detail="仍有未完成的批次项目，暂不能标记完成")
     batch.status = request.status
     batch.finished_at = datetime.now()
     batch.last_heartbeat_at = datetime.now()

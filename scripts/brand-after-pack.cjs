@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const os = require('node:os')
 const { execFileSync } = require('node:child_process')
 
 function authorName(author) {
@@ -16,7 +17,6 @@ module.exports = async function brandAfterPack(context) {
   const productName = metadata.build?.productName || '课赛通 KST'
   const executableName = `${productName}.exe`
   const executablePath = path.join(context.appOutDir, executableName)
-  const temporaryExecutablePath = path.join(context.appOutDir, `kst-branding-${process.pid}.exe`)
   const iconPath = path.join(projectDir, metadata.build?.win?.icon || 'build/icon.ico')
   // electron-winstaller is a declared direct development dependency. Resolve
   // its package root instead of relying on electron-builder's transitive
@@ -28,14 +28,17 @@ module.exports = async function brandAfterPack(context) {
     if (!fs.existsSync(requiredPath)) throw new Error(`KST Windows branding input is missing: ${requiredPath}`)
   }
 
-  // The bundled rcedit cannot open an executable whose filesystem path
-  // contains CJK characters. Rename only while editing, then restore the
-  // final user-facing filename before electron-builder continues.
-  fs.renameSync(executablePath, temporaryExecutablePath)
+  // Both rcedit inputs need ASCII-safe paths. The build wrapper redirects
+  // TEMP/TMP to D:; the source project may still have a Chinese directory name.
+  const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'kst-branding-'))
+  const temporaryExecutablePath = path.join(temporaryDirectory, 'app.exe')
+  const temporaryIconPath = path.join(temporaryDirectory, 'icon.ico')
   try {
+    fs.copyFileSync(executablePath, temporaryExecutablePath)
+    fs.copyFileSync(iconPath, temporaryIconPath)
     execFileSync(rceditPath, [
       temporaryExecutablePath,
-      '--set-icon', iconPath,
+      '--set-icon', temporaryIconPath,
       '--set-file-version', metadata.version,
       '--set-product-version', metadata.version,
       '--set-version-string', 'ProductName', productName,
@@ -44,9 +47,10 @@ module.exports = async function brandAfterPack(context) {
       '--set-version-string', 'OriginalFilename', executableName,
       '--set-version-string', 'InternalName', productName,
     ], { stdio: 'inherit', windowsHide: true })
+    // Never replace the packaged executable with a partially edited file when
+    // rcedit fails. Only a successful resource edit is copied back.
+    fs.copyFileSync(temporaryExecutablePath, executablePath)
   } finally {
-    if (fs.existsSync(temporaryExecutablePath)) {
-      fs.renameSync(temporaryExecutablePath, executablePath)
-    }
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true })
   }
 }

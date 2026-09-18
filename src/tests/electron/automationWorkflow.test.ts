@@ -149,9 +149,18 @@ describe('declarative automation workflow runtime', () => {
   })
 
   it('runs a complete product-listing workflow through the child-process protocol', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolbox-workflow-'))
+    temporaryPaths.push(root)
     const runnerPath = resolve('dist-electron/electron/automation-runner.cjs')
     const child = fork(runnerPath, [], {
-      env: { ...process.env, TOOLBOX_RUNNER_MOCK: 'true', TOOLBOX_MIN_ACTION_INTERVAL_MS: '250', ELECTRON_RUN_AS_NODE: '1' },
+      env: {
+        ...process.env,
+        TOOLBOX_RUNNER_MOCK: 'true',
+        TOOLBOX_MIN_ACTION_INTERVAL_MS: '250',
+        ELECTRON_RUN_AS_NODE: '1',
+        TOOLBOX_PROFILE_ROOT: join(root, 'profiles'),
+        TOOLBOX_ARTIFACT_ROOT: join(root, 'artifacts'),
+      },
       stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
     })
     const eventTypes: string[] = []

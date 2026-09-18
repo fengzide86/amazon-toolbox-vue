@@ -4,6 +4,7 @@ import { getDeviceId, getDeviceName } from './index'
 import { loadRememberedUserCode, clearRememberedUserCode } from './credentialStore'
 import { useUserStore } from '@/stores/user'
 import { authenticatedUserSchema } from '@/features/auth/model'
+import { getRuntimeCapabilities } from '@/runtime/capabilities'
 
 const verifyResponseSchema = z.object({
   success: z.boolean(),
@@ -15,7 +16,15 @@ export function isBackofficeEntry(hash = window.location.hash): boolean {
   return /^#\/admin(?:\/|$)/.test(hash)
 }
 
+function isPublicLandingEntry(hash = window.location.hash): boolean {
+  // Empty URLs and section links both belong to the public website home.
+  return hash === '' || /^#\/?(?:[?#].*)?$/.test(hash)
+}
+
 export async function initializeRememberedLogin(): Promise<boolean> {
+  // The public landing page should paint immediately and must not trigger a
+  // remembered-license verification request before the visitor chooses to log in.
+  if (!getRuntimeCapabilities().isDesktop && isPublicLandingEntry()) return false
   // 管理员直达预览不能被已记住的 C 端授权码抢占；凭据本身继续保留。
   if (isBackofficeEntry()) return false
   if (sessionStorage.getItem('toolbox_token')) return true
