@@ -5,12 +5,12 @@
         <span class="professional-badge">{{ store.isDemoBatch ? '交互演示' : '自动执行' }}</span>
         <div>
           <strong>{{ store.snapshot.tool?.name }}</strong>
-          <small>{{ totalCount }} 个账号正在统一调度</small>
+          <small>{{ totalCount }} 个账号 · {{ store.isDemoBatch ? '并发演示' : '依次执行' }}</small>
         </div>
       </div>
-      <div class="batch-progress" aria-label="批次总体进度">
-        <div><span>总体进度</span><strong>{{ batchProgress }}%</strong></div>
-        <div class="progress-track"><i :style="{ width: `${batchProgress}%` }"></i></div>
+      <div class="batch-progress" aria-label="已结束账号数">
+        <div><span>已结束账号</span><strong>{{ processedCount }} / {{ totalCount }}</strong></div>
+        <div class="progress-track" aria-hidden="true"><i :style="{ width: `${batchProgress}%` }"></i></div>
       </div>
       <div class="header-actions">
         <span :class="['sync-state', `is-${store.syncState}`]">{{ syncText }}</span>
@@ -23,17 +23,17 @@
 
     <div class="metric-strip" aria-label="批次状态汇总">
       <article><span>账号总数</span><strong>{{ totalCount }}</strong><small>本批次</small></article>
-      <article class="is-running"><span>运行中</span><strong>{{ runningCount }}</strong><small>并发推进</small></article>
-      <article class="is-success"><span>已完成</span><strong>{{ completedCount }}</strong><small>通过演示</small></article>
-      <article class="is-attention"><span>需关注</span><strong>{{ waitingCount }}</strong><small>案例提示</small></article>
-      <article class="is-danger"><span>异常</span><strong>{{ failedCount }}</strong><small>结果案例</small></article>
+      <article class="is-running"><span>运行中</span><strong>{{ runningCount }}</strong><small>{{ store.isDemoBatch ? '并发演示' : '依次处理' }}</small></article>
+      <article class="is-success"><span>已完成</span><strong>{{ completedCount }}</strong><small>{{ store.isDemoBatch ? '完成案例' : '执行已完成' }}</small></article>
+      <article class="is-attention"><span>需关注</span><strong>{{ waitingCount }}</strong><small>{{ store.isDemoBatch ? '人工操作案例' : '等待你操作' }}</small></article>
+      <article class="is-danger"><span>异常</span><strong>{{ failedCount }}</strong><small>{{ store.isDemoBatch ? '异常结果案例' : '可查看并重试' }}</small></article>
     </div>
 
     <section class="execution-surface">
       <header class="execution-toolbar">
         <div>
           <strong>账号执行总览</strong>
-          <span>全部账号同步推进，点击任意一行查看详细过程</span>
+          <span>{{ store.isDemoBatch ? '账号并发演示，点击查看案例过程' : '账号依次处理；需人工操作时保留现场，点击账号继续' }}</span>
         </div>
         <div class="toolbar-controls">
           <label class="search-control">
@@ -46,6 +46,7 @@
               :key="option.value"
               type="button"
               :class="{ active: activeFilter === option.value }"
+              :aria-pressed="activeFilter === option.value"
               @click="activeFilter = option.value"
             >{{ option.label }}<span>{{ option.count }}</span></button>
           </div>
@@ -55,7 +56,7 @@
       <div class="table-scroll">
         <table v-if="filteredItems.length" class="execution-table">
           <thead>
-            <tr><th>账号</th><th>状态</th><th>当前阶段</th><th>进度</th><th>耗时</th><th>结果</th><th aria-label="查看详情"></th></tr>
+            <tr><th>账号</th><th>状态</th><th>当前阶段</th><th>{{ store.isDemoBatch ? '演示进度' : '处理情况' }}</th><th>耗时</th><th>结果</th><th aria-label="查看详情"></th></tr>
           </thead>
           <tbody>
             <tr
@@ -67,15 +68,18 @@
               @keydown.enter.prevent="openDetails(item.itemId)"
               @keydown.space.prevent="openDetails(item.itemId)"
             >
-              <td><div class="account-cell"><span class="account-icon"><UserRound :size="16" /></span><div><strong>{{ item.accountLabelMasked || '演示账号' }}</strong><small>{{ item.itemId.slice(-10) }}</small></div></div></td>
+              <td><div class="account-cell"><span class="account-icon"><UserRound :size="16" /></span><div><strong>{{ item.accountLabelMasked || (store.isDemoBatch ? '演示账号' : '未命名账号') }}</strong></div></div></td>
               <td><span :class="['status-pill', `is-${item.status}`]"><component :is="statusIcon(item.status)" :size="14" :class="{ spin: item.status === 'running' }" />{{ displayStatus(item) }}</span></td>
               <td>
                 <div class="stage-cell">
                   <strong>{{ stageLabel(item) }}</strong>
-                  <div class="stage-track" aria-hidden="true"><i v-for="index in 4" :key="index" :class="stageClass(item, index - 1)"></i></div>
+                  <div v-if="store.isDemoBatch" class="stage-track" aria-hidden="true"><i v-for="index in 4" :key="index" :class="stagePresentation(item, index - 1)"></i></div>
                 </div>
               </td>
-              <td><div class="row-progress"><span><i :style="{ width: `${progressFor(item)}%` }"></i></span><strong>{{ progressFor(item) }}%</strong></div></td>
+              <td>
+                <div v-if="store.isDemoBatch && demoProgress(item) !== null" class="row-progress"><span aria-hidden="true"><i :style="{ width: `${demoProgress(item)}%` }"></i></span><strong>{{ demoProgress(item) }}%</strong></div>
+                <span v-else class="progress-description">{{ progressDescription(item) }}</span>
+              </td>
               <td class="duration-cell">{{ durationFor(item) }}</td>
               <td><span class="result-text">{{ resultText(item) }}</span></td>
               <td><ChevronRight :size="15" /></td>
@@ -101,8 +105,8 @@
             </div>
             <div class="detail-stage">
               <div><span>业务阶段</span><strong>{{ stageLabel(store.selectedItem) }}</strong></div>
-              <div class="stage-track"><i v-for="index in 4" :key="index" :class="stageClass(store.selectedItem, index - 1)"></i></div>
-              <small>准备 · 执行 · 核验 · 完成</small>
+              <div v-if="store.isDemoBatch" class="stage-track" aria-hidden="true"><i v-for="index in 4" :key="index" :class="stagePresentation(store.selectedItem, index - 1)"></i></div>
+              <small>{{ store.isDemoBatch ? '仅展示案例过程，不代表真实执行结果' : '按实际执行状态更新；人工操作后仍需继续执行' }}</small>
             </div>
             <div class="browser-shell">
               <div class="browser-toolbar"><span class="traffic"><i></i><i></i><i></i></span><LockKeyhole :size="13" /><span>{{ displayUrl }}</span></div>
@@ -111,7 +115,7 @@
                   <Layers3 :size="34" />
                   <strong>{{ store.selectedItem.accountLabelMasked }}</strong>
                   <span>{{ resultText(store.selectedItem) }}</span>
-                  <div class="preview-progress"><i :style="{ width: `${progressFor(store.selectedItem)}%` }"></i></div>
+                  <div v-if="demoProgress(store.selectedItem) !== null" class="preview-progress" aria-hidden="true"><i :style="{ width: `${demoProgress(store.selectedItem)}%` }"></i></div>
                 </div>
                 <template v-else>
                   <webview
@@ -158,6 +162,7 @@ import {
 } from '@lucide/vue'
 
 import type { BatchItem } from '@/features/business/model'
+import { demoProgress, endedAccountCount, executionStage, stagePresentation } from '@/features/business/run-presentation'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { showToast } from '@/utils'
 
@@ -176,13 +181,13 @@ const runningCount = computed(() => store.snapshot.counts.running || 0)
 const completedCount = computed(() => store.snapshot.counts.completed || 0)
 const waitingCount = computed(() => store.snapshot.counts.waiting || 0)
 const failedCount = computed(() => store.snapshot.counts.failed || 0)
-const processedCount = computed(() => completedCount.value + waitingCount.value + failedCount.value)
+const processedCount = computed(() => endedAccountCount(store.items, store.isDemoBatch))
 const batchProgress = computed(() => totalCount.value ? Math.round((processedCount.value / totalCount.value) * 100) : 0)
-const syncText = computed(() => ({ synced: '状态已同步', syncing: '正在同步', offline: '本地已退出' })[store.syncState])
+const syncText = computed(() => ({ synced: '状态已同步', syncing: '正在同步', offline: '同步待重试' })[store.syncState])
 const displayUrl = computed(() => store.isDemoBatch ? '本地并发演示' : (store.snapshot.tool?.target_url || store.snapshot.tool?.targetUrl || '比赛模拟平台'))
 const filterOptions = computed(() => [
   { value: 'all' as const, label: '全部', count: store.items.length },
-  { value: 'running' as const, label: '运行中', count: store.items.filter(item => item.status === 'running' || item.status === 'pending').length },
+  { value: 'running' as const, label: '运行中', count: store.items.filter(item => item.status === 'running').length },
   { value: 'attention' as const, label: '需关注', count: store.items.filter(item => item.status === 'waiting_user').length },
   { value: 'failed' as const, label: '异常', count: store.items.filter(item => item.status === 'failed').length },
   { value: 'completed' as const, label: '已完成', count: store.items.filter(item => item.status === 'completed').length },
@@ -191,10 +196,10 @@ const priority: Record<string, number> = { waiting_user: 0, failed: 1, running: 
 const filteredItems = computed(() => {
   const keyword = query.value.toLocaleLowerCase('zh-CN')
   return [...store.items]
-    .filter(item => !keyword || `${item.accountLabelMasked || ''} ${item.itemId}`.toLocaleLowerCase('zh-CN').includes(keyword))
+    .filter(item => !keyword || (item.accountLabelMasked || '').toLocaleLowerCase('zh-CN').includes(keyword))
     .filter(item => {
       if (activeFilter.value === 'all') return true
-      if (activeFilter.value === 'running') return item.status === 'running' || item.status === 'pending'
+      if (activeFilter.value === 'running') return item.status === 'running'
       if (activeFilter.value === 'attention') return item.status === 'waiting_user'
       return item.status === activeFilter.value
     })
@@ -204,14 +209,13 @@ const actionDescription = computed(() => {
   const item = store.selectedItem
   if (!item) return ''
   if (item.status === 'running') return store.isDemoBatch ? '该账号正在与其他账号同时推进演示步骤。' : '正在自动操作该账号的平台页面。'
-  if (item.status === 'waiting_user') return item.message || '该账号展示了需要关注的人工操作案例。'
-  if (item.status === 'completed') return item.message || '该账号已完成并通过结果核验。'
-  if (item.status === 'failed') return item.message || '该账号展示了异常结果案例。'
+  if (item.status === 'waiting_user') return item.message || (store.isDemoBatch ? '该账号展示了需要关注的人工操作案例。' : '请在下方页面完成操作，再点击继续处理。当前任务尚未完成。')
+  if (item.status === 'completed') return item.message || (store.isDemoBatch ? '该账号已展示完成案例。' : '该账号的执行已完成。')
+  if (item.status === 'failed') return item.message || (store.isDemoBatch ? '该账号展示了异常结果案例。' : '该账号未能完成。可查看执行现场并重新发起。')
   if (item.status === 'cancelled') return '该账号已随批次退出。'
   return '账号等待进入执行流程。'
 })
 
-function matchesStatus(item: BatchItem, status: string): boolean { return item.status === status }
 function statusIcon(status: string) {
   if (status === 'running') return LoaderCircle
   if (status === 'waiting_user' || status === 'failed') return CircleAlert
@@ -223,34 +227,24 @@ function displayStatus(item: BatchItem): string {
   if (store.isDemoBatch && item.status === 'failed') return '异常案例'
   return store.statusText(item.status)
 }
-function progressFor(item: BatchItem): number {
-  if (typeof item.progressPercent === 'number') return item.progressPercent
-  if (matchesStatus(item, 'completed') || matchesStatus(item, 'waiting_user') || matchesStatus(item, 'failed')) return 100
-  return item.status === 'running' ? 42 : 0
-}
-function stageIndexFor(item: BatchItem): number {
-  if (typeof item.stageIndex === 'number') return item.stageIndex
-  if (matchesStatus(item, 'completed') || matchesStatus(item, 'waiting_user')) return 4
-  if (matchesStatus(item, 'failed')) return 3
-  if (matchesStatus(item, 'running')) return 1
-  return 0
-}
 function stageLabel(item: BatchItem): string {
-  if (item.status === 'waiting_user') return '需要关注'
-  if (item.status === 'failed') return '结果异常'
-  if (item.status === 'cancelled') return '已退出'
-  return ['准备环境', '执行操作', '核验结果', '收尾确认', '已完成'][stageIndexFor(item)] || '等待开始'
+  return executionStage(item, store.isDemoBatch)
 }
-function stageClass(item: BatchItem, index: number): { done: boolean; active: boolean } {
-  const current = stageIndexFor(item)
-  return { done: current > index || progressFor(item) === 100, active: current === index && progressFor(item) < 100 }
+function progressDescription(item: BatchItem): string {
+  if (item.status === 'running') return store.isDemoBatch ? '演示中' : '处理中'
+  if (item.status === 'waiting_user') return store.isDemoBatch ? '案例已展示' : '等待你操作'
+  if (item.status === 'pending') return '排队中'
+  return displayStatus(item)
 }
 function resultText(item: BatchItem): string {
-  if (item.simulatedOutcome === 'attention_example') return '人工操作案例'
-  if (item.simulatedOutcome === 'failure_example') return '异常结果案例'
-  if (item.simulatedOutcome === 'completed_example') return '完成案例'
-  if (item.status === 'running') return '并发处理中'
+  if (store.isDemoBatch && item.simulatedOutcome === 'attention_example') return '人工操作案例'
+  if (store.isDemoBatch && item.simulatedOutcome === 'failure_example') return '异常结果案例'
+  if (store.isDemoBatch && item.simulatedOutcome === 'completed_example') return '完成案例'
+  if (item.status === 'running') return store.isDemoBatch ? '演示进行中' : '等待执行结果'
   if (item.status === 'cancelled') return '已随批次退出'
+  if (item.status === 'waiting_user') return item.message || '需要你完成操作'
+  if (item.status === 'completed') return item.message || '已完成'
+  if (item.status === 'failed') return item.message || '执行未完成'
   return item.message || '等待结果'
 }
 function durationFor(item: BatchItem): string {
@@ -291,6 +285,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.progress-description{color:var(--color-text-secondary);font-size:var(--type-meta);white-space:nowrap}
 .run-console{height:100%;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px}
 .run-header{min-height:62px;display:grid;grid-template-columns:minmax(230px,1fr) minmax(260px,420px) minmax(230px,1fr);align-items:center;gap:22px;padding:10px 15px;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);box-shadow:var(--shadow-low)}
 .batch-identity{display:flex;align-items:center;gap:10px;min-width:0}.professional-badge{padding:5px 7px;border-radius:6px;color:#765d38;background:var(--color-premium-soft);font-size:var(--type-micro);font-weight:800;letter-spacing:.1em;white-space:nowrap}.batch-identity>div{min-width:0;display:grid;gap:3px}.batch-identity strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-text);font-size:var(--type-control)}.batch-identity small{color:var(--color-text-tertiary);font-size:var(--type-micro)}

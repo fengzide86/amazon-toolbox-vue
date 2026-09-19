@@ -28,7 +28,7 @@ from schemas.expense import (
     ExpenseRenewalUpdate,
 )
 
-from .expense_common import ExpenseServiceBase, actor_id, money, shift_month
+from .expense_common import ExpenseServiceBase, actor_id, money, shift_month, validate_update_fields
 from .expense_ledger import fetch_expense
 
 CYCLE_MONTHS = {
@@ -171,8 +171,7 @@ class ExpenseRenewalService(ExpenseServiceBase):
         if renewal.status == ExpenseRenewalStatus.ENDED:
             raise ConflictException("已结束的续费项目不能修改")
         changes = payload.model_dump(exclude_unset=True)
-        if not changes:
-            raise ValidationException("没有可更新字段")
+        validate_update_fields(changes, nullable=frozenset({"vendor", "note"}))
         if changes.get("category_id") is not None:
             await self._active_category(int(changes["category_id"]))
         if "default_amount" in changes:
