@@ -2,10 +2,10 @@
 
 ## 产品定位
 
-这是面向跨境电商学员、教师和代运营人员的桌面自动化工具箱，不是课程平台，也不是模拟亚马逊网站。
+这是以亚马逊赛训为主的效率工具箱。C 端核心用户是参赛学生，B 端核心用户是代打团队；课程学员、指导教师与院校、培训机构是次级用户。它不是课程平台、模拟亚马逊网站或通用卖家 SaaS。
 
 - C 端：选择工具并启动，脚本自动处理；仅在登录、验证码或二次验证时要求用户介入。
-- B 端：教师和批量操作人员使用批量工作台，单 Runner 顺序执行，多浏览器现场互相隔离。
+- B 端：代打团队使用批量工作台；Live 使用单 Runner 顺序执行，多浏览器现场互相隔离；Demo 最多 50 个账号逻辑并发，不代表真实账号并发。
 - 管理端：处理授权、设备、公告、更新、工单和需要人工介入的批次。
 
 用户端不展示成功率、预计时间、线程、内部步骤、任务 ID 或虚假进度。
@@ -31,26 +31,29 @@
 7. 公告受众由后端按套餐解析，不信任前端传入的 consumer/business。
 8. 旧公告、旧更新上传和旧 launch-token 协议保留到 1.9.0；新版请求发送 `X-Toolbox-Version`。
 9. 只保留右上角账号菜单中的退出入口。
-10. 生产服务器已确认使用 `toolbox-backend.service` systemd 服务运行 Uvicorn；仓库不再维护未使用的 Docker Compose 入口。除非用户明确授权，不主动部署、停止或重启生产服务。
+10. 生产部署脚本使用 `toolbox-backend.service` systemd 服务运行 Uvicorn；仓库中的 Docker Compose 用于本地一致性和集成测试，不是默认生产部署方式。除非用户明确授权，不主动部署、停止或重启生产服务。
 
 ## 开发和验证
 
 - 新手入口：`开发预览.bat`、`检查.bat`、`一键发布.bat`
 - 前端开发：`npm run electron:dev`
-- 全量质量门禁：`npm run verify`
+- 开发综合检查：`npm run verify`
+- 完整发布门禁：`npm run verify:release`（`检查.bat full`）
 - 前端与 Electron 测试：`npm test`
 - 后端测试：`python -m pytest backend --rootdir=backend -q`
 - 桌面安装包：`npm run electron:build`
+- Node 使用 22 系列，CI 固定版本见 `.node-version`；Python CI 标准为 3.10，依赖约束见 `backend/constraints-py310.txt`。本机其他 Python 版本的通过结果不能替代 CI 兼容性检查。
 
 禁止使用 `git reset --hard`、自动 `git add .` 后推送 main、全仓无关格式化或绕过管理端的更新上传脚本。
 
 ## 发布与安全
 
 - 当前发行目标是 unsigned Windows NSIS，客户可能看到“未知发布者”，这是已接受的产品取舍。
-- 安装包只包含前端产物、编译后的 Electron CJS、必要生产依赖和内嵌后端。
-- 新版本通过管理端“应用更新”执行暂存、校验和原子发布。
-- 生产部署 SSH 使用 `.env.deploy` 指定的私钥和端口；当前从受限来源经公网 80 端口转发到服务器内部 2222，由 `toolbox-ssh-port80.service` 开机恢复。普通 HTTP 与证书续期不受影响。
-- 服务器已禁用 SSH 密码和交互式认证，root 仅允许公钥登录。不要重新写入明文服务器密码，也不要删除来源限定的 NAT 规则或持久化服务。
+- 当前 `internal` 安装包只包含前端产物、编译后的 Electron CJS、必要生产依赖和模板、费率、品牌资源，不包含 Python 后端；`npm run package:audit` 会拒绝内嵌后端文件。
+- 生产发布使用 `node scripts/toolbox-cli.mjs release --publish --version=x.y.z`，同一提交依次发布后端、Web 和桌面更新。要求干净工作区、HEAD 等于已推送的最新 `origin/main`、六项必需 CI 通过且版本高于线上和远端标签。
+- 生产发布禁止 `--skip-verify` 和 `--skip-build`。中断后使用匹配的 `--resume=release-id`，不得把本地构建的跳过参数用于生产。
+- 桌面更新经服务器私有暂存区和 `publish_update.py` 校验后原子发布；管理端“应用更新”仍用于查看记录和处理已暂存版本。
+- 生产部署 SSH 的目标、私钥和端口只读取当前忽略提交的 `.env.deploy`；未设置 `DEPLOY_SSH_PORT` 时脚本默认 22。不要照搬旧电脑的端口转发假设，也不要修改服务器认证或网络规则。
 - Token、私钥、数据库密码和远程地址只放环境变量；提交前运行 `npm run security:audit`。
 - 不推送分支、标签或发布包，除非用户明确授权。
 
