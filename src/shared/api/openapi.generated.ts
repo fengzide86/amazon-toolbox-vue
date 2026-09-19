@@ -837,7 +837,7 @@ export interface operations {
     responses: { "200": components['schemas']["LogResponse"]; "422": components['schemas']["HTTPValidationError"] }
   }
   "export_logs_api_logs_export_get": {
-    parameters: { "query": { "user_id"?: number | null; "start_date"?: string | null; "end_date"?: string | null; "tool_name"?: string | null; "status"?: string | null } }
+    parameters: { "query": { "user_id"?: number | null; "start_date"?: string | null; "end_date"?: string | null; "tool_name"?: string | null; "status"?: string | null; "platform_key"?: string | null } }
     requestBody: never
     responses: { "200": string; "422": components['schemas']["HTTPValidationError"] }
   }

@@ -21,9 +21,9 @@ async def seed_logs(db_session: AsyncSession):
     await db_session.flush()
 
     logs = [
-        RunLog(user_id=user.id, device_id="dev1", tool_name="工具A", module="模块1", status="success", detail="OK"),
-        RunLog(user_id=user.id, device_id="dev1", tool_name="工具B", module="模块2", status="failed", detail="Error"),
-        RunLog(user_id=user.id, device_id="dev1", tool_name="工具A", module="模块1", status="success", detail="OK"),
+        RunLog(user_id=user.id, device_id="dev1", tool_name="工具A", module="模块1", status="success", detail="OK", platform_key="amazon"),
+        RunLog(user_id=user.id, device_id="dev1", tool_name="工具B", module="模块2", status="failed", detail="Error", platform_key="aliexpress"),
+        RunLog(user_id=user.id, device_id="dev1", tool_name="工具A", module="模块1", status="success", detail="OK", platform_key="amazon"),
     ]
     for log in logs:
         db_session.add(log)
@@ -107,3 +107,12 @@ class TestExportLogs:
         content = resp.text
         assert "工具A" in content
         assert "工具B" in content
+
+    async def test_export_logs_filters_by_platform(self, client: AsyncClient, db_session: AsyncSession, auth_headers: dict):
+        """流式导出保留与列表一致的平台筛选。"""
+        await seed_logs(db_session)
+        resp = await client.get("/api/logs/export", params={"platform_key": "aliexpress"}, headers=auth_headers)
+        assert resp.status_code == 200
+        content = resp.content.decode("utf-8-sig")
+        assert "工具B" in content
+        assert "工具A" not in content

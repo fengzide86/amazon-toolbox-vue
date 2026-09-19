@@ -40,7 +40,7 @@ import BrandLockup from '@/components/brand/BrandLockup.vue'
 const route = useRoute()
 
 function isActive(path: string) {
-  return route.path === path
+  return route.path === path || route.path.startsWith(`${path}/`)
 }
 
 </script>

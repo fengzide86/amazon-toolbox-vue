@@ -12206,6 +12206,24 @@
               "description": "状态 (success/failed)",
               "title": "Status"
             }
+          },
+          {
+            "description": "平台标识 (amazon/aliexpress)",
+            "in": "query",
+            "name": "platform_key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "平台标识 (amazon/aliexpress)",
+              "title": "Platform Key"
+            }
           }
         ],
         "responses": {

@@ -374,6 +374,7 @@ async def test_expense_attachment_upload_download_and_delete(client, auth_header
     )
     assert uploaded.status_code == 201, uploaded.text
     attachment_id = uploaded.json()["data"]["id"]
+    assert not list(tmp_path.rglob("*.part"))
     downloaded = await client.get(
         f"/api/expenses/{expense_id}/attachments/{attachment_id}",
         headers=auth_headers,

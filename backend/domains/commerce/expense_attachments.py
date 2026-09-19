@@ -116,10 +116,14 @@ class ExpenseAttachmentService(ExpenseServiceBase):
         if root != target and root not in target.parents:
             raise ValidationException("凭证存储路径无效")
         target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.part")
         digest = hashlib.sha256()
         size = 0
+        committed = False
         try:
-            with target.open("wb") as output:
+            # Write beside the final file and publish it with one atomic rename.
+            # Readers never observe a partially-written receipt.
+            with temporary.open("xb") as output:
                 while chunk := await upload.read(1024 * 1024):
                     size += len(chunk)
                     if size > MAX_ATTACHMENT_BYTES:
@@ -139,6 +143,7 @@ class ExpenseAttachmentService(ExpenseServiceBase):
             )
             self.db.add(attachment)
             await self.db.flush()
+            os.replace(temporary, target)
             await self._audit(
                 "expense_attachment_add",
                 "expense_attachment",
@@ -148,9 +153,12 @@ class ExpenseAttachmentService(ExpenseServiceBase):
                 {"expense_id": expense_id, "name": safe_name},
             )
             await self.db.commit()
+            committed = True
             return serialize_attachment(attachment)
         except Exception:
-            target.unlink(missing_ok=True)
+            temporary.unlink(missing_ok=True)
+            if not committed:
+                target.unlink(missing_ok=True)
             raise
 
     async def attachment_file(

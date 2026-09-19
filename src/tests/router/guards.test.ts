@@ -19,10 +19,33 @@ function mockAuth(state: AuthState): void {
 
 afterEach(async () => {
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   await router.push('/user/terms')
 })
 
 describe('real route guards', () => {
+  it('keeps the public website landing visible even when the browser already has a session', async () => {
+    vi.stubGlobal('electronAPI', undefined)
+    mockAuth({ authenticated: true, user: { product_type: 'consumer' } })
+    await router.push('/')
+    expect(router.currentRoute.value.name).toBe('Landing')
+  })
+
+  it.each([
+    [{}, 'UserLogin'],
+    [{ authenticated: true, user: { product_type: 'consumer' } }, 'UserTools'],
+    [{ authenticated: true, user: {
+      product_type: 'business', business_workspace_enabled: true,
+      entitlements: { batch_execution: true, multi_account_workspace: true },
+    } }, 'BusinessOverview'],
+    [{ authenticated: true, backoffice: true, role: 'operator', user: {} }, 'AdminDashboard'],
+  ] as const)('keeps desktop root entry on the matching application route: %s', async (state, destination) => {
+    vi.stubGlobal('electronAPI', {})
+    mockAuth(state)
+    await router.push('/')
+    expect(router.currentRoute.value.name).toBe(destination)
+  })
+
   it('redirects anonymous user and administrator routes to their matching login', async () => {
     mockAuth({})
     await router.push('/user/tools')

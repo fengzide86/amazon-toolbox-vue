@@ -4,6 +4,7 @@
 """
 import csv
 import io
+from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any, NoReturn
 
@@ -22,6 +23,33 @@ from schemas.feedback import LogPageResponse
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+async def _stream_logs_csv(bind: Any, query: Any) -> AsyncIterator[str]:
+    """Stream the full filtered log result without a silent row cap."""
+    yield "\ufeff" + _csv_row(
+        ["ID", "用户ID", "设备ID", "工具名称", "模块", "状态", "错误码", "详情", "创建时间"]
+    )
+    async with AsyncSession(bind=bind, expire_on_commit=False) as session:
+        result = await session.stream(query.execution_options(yield_per=500))
+        async for log in result.scalars():
+            yield _csv_row([
+                log.id,
+                log.user_id or "",
+                log.device_id or "",
+                log.tool_name or "",
+                log.module or "",
+                log.status or "",
+                log.error_code or "",
+                log.detail or "",
+                log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
+            ])
+
+
+def _csv_row(values: list[object]) -> str:
+    output = io.StringIO(newline="")
+    csv.writer(output).writerow(values)
+    return output.getvalue()
 
 
 @router.get("", response_model=LogPageResponse)
@@ -120,6 +148,7 @@ async def export_logs(
     end_date: str | None = Query(None, description="结束日期 (YYYY-MM-DD)"),
     tool_name: str | None = Query(None, description="工具名称"),
     status: str | None = Query(None, description="状态 (success/failed)"),
+    platform_key: str | None = Query(None, description="平台标识 (amazon/aliexpress)"),
     db: AsyncSession = Depends(get_db),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> StreamingResponse:
@@ -148,41 +177,13 @@ async def export_logs(
         query = query.where(RunLog.tool_name == tool_name)
     if status:
         query = query.where(RunLog.status == status)
-    
-    query = query.order_by(RunLog.created_at.desc()).limit(10000)
-    
-    result = await db.execute(query)
-    logs = result.scalars().all()
-    
-    # 生成 CSV
-    output = io.StringIO()
-    # 添加 BOM 以支持 Excel 打开中文
-    output.write('\ufeff')
-    writer = csv.writer(output)
-    
-    # 写入表头
-    writer.writerow(['ID', '用户ID', '设备ID', '工具名称', '模块', '状态', '错误码', '详情', '创建时间'])
-    
-    # 写入数据
-    for log in logs:
-        writer.writerow([
-            log.id,
-            log.user_id or '',
-            log.device_id or '',
-            log.tool_name or '',
-            log.module or '',
-            log.status or '',
-            log.error_code or '',
-            log.detail or '',
-            log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else ''
-        ])
-    
-    # 返回 CSV 文件
-    output.seek(0)
+    if platform_key:
+        query = query.where(RunLog.platform_key == platform_key)
+
+    query = query.order_by(RunLog.created_at.desc(), RunLog.id.desc())
     filename = f"logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    
     return StreamingResponse(
-        iter([output.getvalue()]),
+        _stream_logs_csv(db.bind, query),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )

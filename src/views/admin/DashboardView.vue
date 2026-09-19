@@ -127,6 +127,7 @@ const batchLoading = ref(false)
 const batchDrawerVisible = ref(false)
 const batchDetail = ref<AdminBatchDetail | null>(null)
 const canSeeExpenses = authService.getRole() !== 'support'
+let loadSequence = 0
 
 const summaryCards = computed(() => [
   { key: 'expiring_authorizations', label: '即将到期授权', value: data.value.summary?.expiring_authorizations || 0, hint: '7 天内需要跟进', icon: TimerReset, tone: 'premium' },
@@ -137,11 +138,14 @@ const summaryCards = computed(() => [
 ])
 
 async function loadData() {
+  const requestSequence = ++loadSequence
   loading.value = true
   loadState.value = hasLoaded.value ? 'data' : 'loading'
   loadError.value = ''
   try {
-    data.value = adminActionCenterSchema.parse(await getAdminActionCenter())
+    const nextData = adminActionCenterSchema.parse(await getAdminActionCenter())
+    if (requestSequence !== loadSequence) return
+    data.value = nextData
     hasLoaded.value = true
     const itemCount = (data.value.expiring_authorizations?.length || 0)
       + (data.value.device_anomalies?.length || 0)
@@ -151,11 +155,14 @@ async function loadData() {
       + (data.value.expense_renewals?.length || 0)
     loadState.value = settledDataState(itemCount)
   } catch (error) {
+    if (requestSequence !== loadSequence) return
     loadError.value = error instanceof Error && error.message ? error.message : '行动中心加载失败，请稍后重试'
     loadState.value = failedDataState(hasLoaded.value)
     showToast('行动中心加载失败，请稍后重试', 'error')
   }
-  finally { loading.value = false }
+  finally {
+    if (requestSequence === loadSequence) loading.value = false
+  }
 }
 
 async function openBatch(batchId: string | number) {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
@@ -27,7 +27,33 @@ beforeEach(() => {
   window.location.hash = '#/user/login'
 })
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('remembered login recovery', () => {
+  it('does not block the public landing page with remembered-code verification', async () => {
+    window.location.hash = '#/'
+    mocks.load.mockResolvedValue('CODE-landing')
+    expect(await initializeRememberedLogin()).toBe(false)
+    expect(mocks.load).not.toHaveBeenCalled()
+    expect(mocks.verify).not.toHaveBeenCalled()
+  })
+
+  it.each(['', '#/#capabilities', '#/?source=website'])('keeps website entry %s public', async hash => {
+    window.location.hash = hash
+    expect(await initializeRememberedLogin()).toBe(false)
+    expect(mocks.load).not.toHaveBeenCalled()
+  })
+
+  it('still restores the desktop session at the root entry', async () => {
+    vi.stubGlobal('electronAPI', {})
+    window.location.hash = '#/'
+    mocks.load.mockResolvedValue('DESKTOP-CODE')
+    mocks.verify.mockResolvedValue({ success: true, data: { token: 'desktop-token', id: 2 } })
+    expect(await initializeRememberedLogin()).toBe(true)
+    expect(mocks.load).toHaveBeenCalledOnce()
+    expect(mocks.setLogin).toHaveBeenCalledWith(expect.objectContaining({ token: 'desktop-token' }))
+  })
+
   it('uses an existing session without reading the encrypted credential', async () => {
     sessionStorage.setItem('toolbox_token', 'existing')
     expect(await initializeRememberedLogin()).toBe(true)

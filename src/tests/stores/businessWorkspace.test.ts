@@ -148,6 +148,58 @@ describe('business workspace sync outbox', () => {
     store.dispose()
   })
 
+  it('lets the newest live history request win and own loading state', async () => {
+    let resolveOld!: (value: unknown) => void
+    let resolveNew!: (value: unknown) => void
+    apiMocks.getBusinessBatches
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveNew = resolve }))
+    const store = useBusinessWorkspaceStore()
+    const old = store.loadHistory()
+    const current = store.loadHistory()
+    expect(store.historyLoading).toBe(true)
+    resolveNew([{ id: 2 }])
+    await current
+    expect(store.history[0]).toMatchObject({ id: 2 })
+    expect(store.historyLoading).toBe(false)
+    resolveOld([{ id: 1 }])
+    await old
+    expect(store.history[0]).toMatchObject({ id: 2 })
+    expect(store.historyLoading).toBe(false)
+  })
+
+  it('lets the newest demo history request win and keeps the loading flag', async () => {
+    let resolveOld!: (value: unknown) => void
+    let resolveNew!: (value: unknown) => void
+    apiMocks.getDemoBatches
+      .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveNew = resolve }))
+    const store = useBusinessWorkspaceStore()
+    const old = store.loadDemoHistory()
+    const current = store.loadDemoHistory()
+    expect(store.historyLoading).toBe(true)
+    resolveNew({ data: [{ id: 'new', tool_id: 'tool-new' }] })
+    await current
+    expect(store.demoHistory[0]).toMatchObject({ id: 'new', tool_id: 'tool-new' })
+    expect(store.historyLoading).toBe(false)
+    resolveOld({ data: [{ id: 'old', tool_id: 'tool-old' }] })
+    await old
+    expect(store.demoHistory[0]).toMatchObject({ id: 'new', tool_id: 'tool-new' })
+    expect(store.historyLoading).toBe(false)
+  })
+
+  it('caps demo sample imports at 50 rows even when entitlement is larger', async () => {
+    const tool = { id: 'demo-tool', name: '演示工具', availability: 'demo_only', demo_scenario_id: 'demo' }
+    apiMocks.getBusinessBootstrap.mockResolvedValue({ entitlements: { max_batch_rows: 500 }, tools: [tool] })
+    electronBatch.loadSampleImport.mockResolvedValue({ importId: 'sample', validCount: 1, rows: [], errors: [] })
+    const store = useBusinessWorkspaceStore()
+    await store.init()
+    store.chooseTool(store.tools[0])
+    await store.loadSampleImport()
+    expect(electronBatch.loadSampleImport).toHaveBeenCalledWith(expect.objectContaining({ maxRows: 50 }))
+    store.dispose()
+  })
+
   it.each([8, 50])('starts %i demo accounts together without starting runner sessions', async count => {
     const tool = {
       id: 'demo-tool',

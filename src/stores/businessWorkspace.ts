@@ -41,6 +41,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const bootstrapStale = ref(false)
   const historyLoading = ref(false)
   const historyError = ref<string | null>(null)
+  let historyRequestSequence = 0
 
   const entitlements = computed(() => bootstrap.value?.entitlements || {})
   const tools = computed(() => bootstrap.value?.tools || [])
@@ -56,7 +57,9 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
 
   const imports = new WorkspaceImportCoordinator({
     getSelectedTool: () => selectedTool.value,
-    getMaxRows: () => entitlements.value.max_batch_rows || 50,
+    getMaxRows: () => selectedTool.value?.availability === 'demo_only'
+      ? 50
+      : entitlements.value.max_batch_rows || 50,
     getPreview: () => importPreview.value,
     setPreview: value => { importPreview.value = value },
     setLoading: value => { loading.value = value },
@@ -105,29 +108,33 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   async function loadHistory(): Promise<ServerBatchHistory[]> {
+    const requestSequence = ++historyRequestSequence
     historyLoading.value = true
     historyError.value = null
     try {
-      history.value = historySchema.parse(await getBusinessBatches({ limit: 30 }))
+      const nextHistory = historySchema.parse(await getBusinessBatches({ limit: 30 }))
+      if (requestSequence === historyRequestSequence) history.value = nextHistory
     } catch (cause) {
-      historyError.value = errorMessage(cause, '执行记录暂时无法加载')
+      if (requestSequence === historyRequestSequence) historyError.value = errorMessage(cause, '执行记录暂时无法加载')
       throw cause
     } finally {
-      historyLoading.value = false
+      if (requestSequence === historyRequestSequence) historyLoading.value = false
     }
     return history.value
   }
 
   async function loadDemoHistory(): Promise<DemoBatch[]> {
+    const requestSequence = ++historyRequestSequence
     historyLoading.value = true
     historyError.value = null
     try {
-      demoHistory.value = demoBatchListSchema.parse(unwrapApiData(await getDemoBatches({ page_size: 30 })))
+      const nextHistory = demoBatchListSchema.parse(unwrapApiData(await getDemoBatches({ page_size: 30 })))
+      if (requestSequence === historyRequestSequence) demoHistory.value = nextHistory
     } catch (cause) {
-      historyError.value = errorMessage(cause, '演示记录暂时无法加载')
+      if (requestSequence === historyRequestSequence) historyError.value = errorMessage(cause, '演示记录暂时无法加载')
       throw cause
     } finally {
-      historyLoading.value = false
+      if (requestSequence === historyRequestSequence) historyLoading.value = false
     }
     return demoHistory.value
   }

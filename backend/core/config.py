@@ -129,20 +129,27 @@ class Settings:
             self.CORS_ORIGINS.append("app://toolbox")
 
         # ===== 初始化数据库配置 =====
-        # 优先使用环境变量，否则根据环境自动选择
-        self.DB_TYPE = os.getenv("DB_TYPE", "").lower()
-
-        if self.DB_TYPE == "mysql":
+        # Development/test may intentionally use SQLite. Internal/production
+        # must declare MySQL explicitly so a missing variable cannot silently
+        # start a second local database and accept real traffic.
+        configured_db_type = os.getenv("DB_TYPE", "").strip().lower()
+        if configured_db_type == "mysql":
+            self.DB_TYPE = "mysql"
             # 生产环境：使用 MySQL
             self.MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
             self.MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
             self.MYSQL_USER = os.getenv("MYSQL_USER", "root")
             self.MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
             self.MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "amazon_toolbox")
-        else:
+        elif configured_db_type in {"", "sqlite"} and self.APP_ENV in {"development", "test"}:
             # 本地开发：使用 SQLite
             self.DB_TYPE = "sqlite"
             self.DB_PATH = self._get_db_path()
+        else:
+            raise ValueError(
+                "APP_ENV 为 internal/production 时必须显式配置 DB_TYPE=mysql，"
+                "拒绝静默切换到 SQLite。"
+            )
 
         # ===== 初始化 JWT 配置 =====
         # 生产环境必须设置强密码！

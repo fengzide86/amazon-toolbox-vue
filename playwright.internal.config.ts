@@ -8,7 +8,7 @@ const webServerCommand = process.env.PLAYWRIGHT_PREBUILT === '1'
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: 'internal-acceptance.spec.ts',
+  testMatch: ['internal-acceptance.spec.ts', 'landing.spec.ts'],
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: 0,

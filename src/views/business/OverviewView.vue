@@ -17,7 +17,7 @@
       <router-link to="/business/workspace">去处理</router-link>
     </section>
     <section class="capability-grid">
-      <article><FileSpreadsheet :size="20" /><div><span>内置演示样例</span><strong>最多 {{ store.entitlements.max_batch_rows || 50 }} 个演示项</strong></div><small>不读取真实客户资料</small></article>
+      <article><FileSpreadsheet :size="20" /><div><span>内置演示样例</span><strong>最多 50 个逻辑并发项</strong></div><small>不启动等量浏览器，不读取真实客户资料</small></article>
       <article><PanelsTopLeft :size="20" /><div><span>批量并发演示</span><strong>全部账号同步推进</strong></div><small>所有页面与结果均为模拟</small></article>
       <article><ShieldCheck :size="20" /><div><span>模拟人工提示</span><strong>展示完整交互状态</strong></div><small>不会登录或修改真实平台</small></article>
     </section>

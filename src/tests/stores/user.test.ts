@@ -1,7 +1,7 @@
 /**
  * User Store 单元测试
  */
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useUserStore } from '@/stores/user'
 
@@ -52,6 +52,23 @@ describe('User Store', () => {
   })
 
   describe('logout', () => {
+    it('clears shared response cache and notifies pending requests without removing unrelated preferences', () => {
+      const store = useUserStore()
+      store.setLogin({ token: 'test', role: 'user', auth_code: 'CODE', user: {} })
+      localStorage.setItem('toolbox_cache_previous-user', JSON.stringify({ data: ['private row'] }))
+      localStorage.setItem('preferred-density', 'compact')
+      const cleared = vi.fn()
+      window.addEventListener('toolbox:auth-cleared', cleared)
+      try {
+        store.logout()
+        expect(localStorage.getItem('toolbox_cache_previous-user')).toBeNull()
+        expect(localStorage.getItem('preferred-density')).toBe('compact')
+        expect(cleared).toHaveBeenCalledOnce()
+      } finally {
+        window.removeEventListener('toolbox:auth-cleared', cleared)
+      }
+    })
+
     it('应该清除登录状态', () => {
       const store = useUserStore()
       store.setLogin({ token: 'test', role: 'user', auth_code: 'CODE', user: {} })

@@ -15,6 +15,7 @@ import {
   authRoleSchema,
   isBackofficeRole,
 } from '@/features/auth/model'
+import { authService } from '@/utils/auth'
 
 export const useUserStore = defineStore('user', () => {
   // ===== State =====
@@ -140,6 +141,7 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('toolbox_role')
     localStorage.removeItem('toolbox_auth')
     localStorage.removeItem('toolbox_user')
+    authService.logout()
     window.electronAPI?.credentialStore?.clearUserCode?.().catch(() => {})
   }
 

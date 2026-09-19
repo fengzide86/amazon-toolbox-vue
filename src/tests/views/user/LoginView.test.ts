@@ -62,10 +62,12 @@ describe('LoginView', () => {
       expect(mark.attributes('aria-hidden')).toBe('true')
     })
 
-    it('左侧大数字指标应该显示完整金色单位', () => {
+    it('展示真实产品边界，不使用未经验证的提效指标', () => {
       const wrapper = mountWithPinia(LoginView)
       const units = wrapper.findAll('.stat-unit').map(item => item.text())
-      expect(units).toEqual(['%', '×', 'h'])
+      expect(units).toEqual(['端', '端', '项'])
+      expect(wrapper.text()).toContain('非真实账号并发')
+      expect(wrapper.text()).not.toContain('秒级响应')
     })
 
     it('应该显示授权码提示', () => {
