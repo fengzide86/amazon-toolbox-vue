@@ -108,6 +108,14 @@ export default defineConfig(({ command, mode }) => {
     },
     define: {
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(packageMetadata.version),
+      // .env.production contains the desktop control-plane fallback. A Web
+      // artifact must instead use its own origin (/api), unless an isolated
+      // build explicitly injects an API URL (for example real-backend E2E).
+      // Do not apply this override to Electron or the development server.
+      ...(command === 'build' && !desktopBuild ? {
+        'import.meta.env.VITE_CONTROL_API_BASE': JSON.stringify(process.env.VITE_CONTROL_API_BASE || ''),
+        'import.meta.env.VITE_API_BASE': JSON.stringify(process.env.VITE_API_BASE || ''),
+      } : {}),
     },
     base: './',
     server: {

@@ -212,11 +212,14 @@ test('C 端单工具即使记录接口失败也进入 Demo，并且不会写真�
 
   const workspace = page.getByTestId('tool-workspace')
   await expect(workspace).toBeVisible()
-  await expect(workspace.getByTestId('execution-scope-note')).toContainText('数据只存在本地沙盒')
-  await expect(workspace.getByTestId('result-boundary')).toHaveText('结果只代表本地沙盒操作成功')
+  await expect(workspace.getByTestId('execution-scope-note')).toContainText('不启动 Runner，不操作外部平台')
+  await expect(workspace.getByTestId('result-boundary')).toHaveText('预览完成不代表真实任务成功')
   await expect(workspace.locator('webview')).toHaveCount(0)
   await expect(workspace.getByText('成功率')).toHaveCount(0)
   await expect(workspace.getByText(/预计.*时间/)).toHaveCount(0)
+  await expect(workspace.locator('.result-card.success')).toContainText('流程预览已完成', { timeout: 20_000 })
+  await expect(workspace.locator('.result-proof-grid')).toHaveCount(0)
+  await expect(workspace.locator('.execution-evidence')).toHaveCount(0)
 
   expect(requestedPaths.some(path => path.startsWith('/api/logs'))).toBe(false)
   expect(requestedPaths.some(path => path.includes('launch-grant'))).toBe(false)
@@ -400,7 +403,7 @@ test('B 端接收桌面端脱敏预览，只发送行数和工具元数据，原
     'SECOND_COOKIE_PRIVATE',
   ]) expect(serializedRequests).not.toContain(secret)
   expect(demoBatchRequests.some(request => new URL(request.url()).pathname.startsWith('/api/business/batches'))).toBe(false)
-  await expect(page.getByText(/演示工具运行本地沙盒/)).toBeVisible()
+  await expect(page.getByText(/演示工具模拟批量流程，已发布工具由桌面端执行/)).toBeVisible()
 })
 
 const roleExpectations: Array<{

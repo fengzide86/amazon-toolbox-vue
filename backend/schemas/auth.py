@@ -70,6 +70,7 @@ class AdminLoginResponse(BaseModel):
 class UserAuthStatusData(BaseModel):
     role: Literal["user"]
     plan_name: str
+    plan_code: str | None = None
     expires_at: str | None = None
     product_type: str
     entitlements: EntitlementsResponse
@@ -98,6 +99,7 @@ class UserInfoData(BaseModel):
     device_id: str | None = None
     device_name: str | None = None
     plan_name: str
+    plan_code: str | None = None
     expires_at: str | None = None
     product_type: str
     entitlements: EntitlementsResponse

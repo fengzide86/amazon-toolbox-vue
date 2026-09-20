@@ -1,7 +1,6 @@
 """Validated plan catalogue and explicit plan lifecycle transitions."""
 
 import json
-import re
 from typing import Any
 
 from fastapi import Request
@@ -12,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.audit import log_admin_action
 from core.cache import CacheKeys, cache
 from core.exceptions import ConflictException, NotFoundException, ValidationException
-from domains.access import normalize_entitlements, serialize_entitlements
+from domains.access import (
+    fixed_plan_entitlements,
+    normalize_entitlements,
+    resolve_plan_code,
+    serialize_entitlements,
+)
 from models import AuthCode, Order, Plan, PlanStatus
 
 
@@ -82,6 +86,9 @@ class PlanService:
         request: Request,
     ) -> dict:
         product_type, entitlements = self._validate_product(data)
+        initial_code = resolve_plan_code(data["name"], None)
+        self._validate_identity(entitlements, initial_code)
+        entitlements = {**entitlements, "plan_code": initial_code}
         plan = Plan(
             name=data["name"],
             price=data["price"],
@@ -123,10 +130,15 @@ class PlanService:
                 raise ConflictException("启用中的套餐只能修改名称、展示说明和排序；请先禁用")
 
         before = self.serialize(plan)
+        # Pin the old identity before any display-name or entitlement update.
+        # Older admin clients omit this reserved key when replacing their JSON.
+        fixed_entitlements = fixed_plan_entitlements(plan.name, plan.entitlements)
         if self.COMMERCIAL_FIELDS.intersection(data):
             product_type, entitlements = self._validate_product(data, current=plan)
+            self._validate_identity(entitlements, fixed_entitlements["plan_code"])
             plan.product_type = product_type
-            plan.entitlements = serialize_entitlements(entitlements, product_type)
+            fixed_entitlements = {**entitlements, "plan_code": fixed_entitlements["plan_code"]}
+        plan.entitlements = serialize_entitlements(fixed_entitlements, plan.product_type or "consumer")
         for field in ("name", "price", "duration_days", "features", "code_prefix", "sort_order"):
             if field in data:
                 setattr(plan, field, data[field])
@@ -180,6 +192,9 @@ class PlanService:
             if active_codes:
                 raise ConflictException(f"套餐仍有 {active_codes} 个可用授权码，不能归档")
         before = self.serialize(plan)
+        plan.entitlements = serialize_entitlements(
+            fixed_plan_entitlements(plan.name, plan.entitlements), plan.product_type or "consumer",
+        )
         plan.status = target
         await self._audit(
             actor,
@@ -232,12 +247,17 @@ class PlanService:
 
     async def _locked_plan(self, plan_id: int) -> Plan:
         result = await self.db.execute(
-            select(Plan).where(Plan.id == plan_id).with_for_update()
+            select(Plan).where(Plan.id == plan_id).with_for_update().execution_options(populate_existing=True)
         )
         plan = result.scalar_one_or_none()
         if not plan:
             raise NotFoundException("套餐不存在")
         return plan
+
+    @staticmethod
+    def _validate_identity(entitlements: dict, expected: str | None) -> None:
+        if "plan_code" in entitlements and entitlements["plan_code"] != expected:
+            raise ValidationException("套餐权益标识不可修改；名称和授权码前缀仅用于展示与发码")
 
     @staticmethod
     def _validate_product(data: dict, current: Plan | None = None) -> tuple[str, dict]:
@@ -280,9 +300,7 @@ class PlanService:
 
     @staticmethod
     def serialize(plan: Plan, detailed: bool = False) -> dict:
-        name = plan.name or ""
-        plan_match = re.search(r"Y\d+", name, re.IGNORECASE)
-        plan_code = plan_match.group(0).upper() if plan_match else None
+        plan_code = resolve_plan_code(plan.name, plan.entitlements)
         feature_text = plan.features or ""
         benefits: list = []
         allowed_tools: list = []
@@ -316,7 +334,9 @@ class PlanService:
             "display_badge": "赛期主推" if plan_code == "Y199" else ("全程服务" if plan_code == "Y999" else None),
             "features": plan.features,
             "product_type": plan.product_type or "consumer",
-            "entitlements": normalize_entitlements(plan.entitlements, plan.product_type or "consumer"),
+            "entitlements": normalize_entitlements(
+                fixed_plan_entitlements(plan.name, plan.entitlements), plan.product_type or "consumer",
+            ),
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
         }
         if detailed:

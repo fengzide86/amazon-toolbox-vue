@@ -5,6 +5,7 @@ import ToolWorkspace from '@/components/ToolWorkspace.vue'
 import { useAppStore } from '@/stores/app'
 import { useTaskRunStore } from '@/stores/taskRun'
 import { AUTOMATION_EVENT } from '@/automation'
+import * as runtimeCapabilities from '@/runtime/capabilities'
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -63,10 +64,38 @@ describe('ToolWorkspace 极简运行工作台', () => {
     expect(useTaskRunStore().steps).toHaveLength(6)
     expect(wrapper.findAll('.stage-list li')).toHaveLength(4)
     expect(wrapper.text()).toContain('准备')
-    expect(wrapper.text()).toContain('执行')
+    expect(wrapper.text()).toContain('流程展示')
     expect(wrapper.text()).not.toContain('初始化工具环境')
     expect(wrapper.text()).not.toMatch(/\d{2}:\d{2}/)
     wrapper.unmount()
+  })
+
+  it('浏览器预览不把动画完成包装成真实填写、核验或证据截图', async () => {
+    const wrapper = mountWorkspace()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="execution-scope-note"]').text()).toContain('不启动 Runner')
+    expect(wrapper.get('[data-testid="result-boundary"]').text()).toContain('不代表真实任务成功')
+    await vi.advanceTimersByTimeAsync(14_000)
+    await flushPromises()
+    expect(wrapper.get('.result-card.success').text()).toContain('流程预览已完成')
+    expect(wrapper.text()).not.toContain('本地浏览器已完成真实填写')
+    expect(wrapper.find('.result-proof-grid').exists()).toBe(false)
+    expect(wrapper.find('.execution-evidence').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('具备桌面执行器时仍明确显示本地交互沙盒，而非浏览器轻量预览', async () => {
+    const capability = vi.spyOn(runtimeCapabilities, 'getRuntimeCapabilities').mockReturnValue({
+      ...runtimeCapabilities.resolveRuntimeCapabilities(undefined),
+      kind: 'desktop', isDesktop: true, singleLive: true,
+    })
+    const wrapper = mountWorkspace()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="execution-scope-note"]').text()).toContain('数据只存在本地沙盒')
+    expect(wrapper.text()).not.toContain('浏览器流程预览')
+    expect(wrapper.find('webview').exists()).toBe(true)
+    wrapper.unmount()
+    capability.mockRestore()
   })
 
   it('后台记录接口失败时仍正常启动本地演示', async () => {

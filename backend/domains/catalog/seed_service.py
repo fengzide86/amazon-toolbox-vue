@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from core.logging import get_logger
 from database import async_session_maker
+from domains.access import fixed_plan_entitlements, plan_entitlements_source
 from domains.catalog.tool_config import normalize_tool_configs
 from models import KnowledgeBase, Order, Plan, ProfitRecord, Setting, StaffUser
 from services.staff_service import migrate_legacy_admin_password
@@ -351,7 +352,7 @@ async def _seed_internal_validation_data(db: AsyncSession) -> None:
             features="仅用于验证 archived 终态",
             status="archived",
             product_type="consumer",
-            entitlements="{}",
+            entitlements='{"plan_code":null}',
         ))
         await db.flush()
 
@@ -559,9 +560,9 @@ async def seed_initial_data() -> None:
         existing_plans = result.scalars().all()
         if not existing_plans:
             plans = [
-                Plan(name="Y15 体验卡", price=15, duration_days=1, features="基础功能体验", status="disabled"),
-                Plan(name="Y49 开局提速卡", price=49, duration_days=7, features="物流模板+新手工具", status="active"),
-                Plan(name="Y199 5天冲刺包", price=199, duration_days=5, features="全部工具+广告脚本", status="active"),
+                Plan(name="Y15 体验卡", price=15, duration_days=1, features="基础功能体验", status="disabled", entitlements='{"plan_code":"Y15"}'),
+                Plan(name="Y49 开局提速卡", price=49, duration_days=7, features="物流模板+新手工具", status="active", entitlements='{"plan_code":"Y49"}'),
+                Plan(name="Y199 5天冲刺包", price=199, duration_days=5, features="全部工具+广告脚本", status="active", entitlements='{"plan_code":"Y199"}'),
                 Plan(
                     name="Y999 全程陪跑包",
                     price=999,
@@ -570,6 +571,7 @@ async def seed_initial_data() -> None:
                     status="active",
                     product_type="business",
                     entitlements=json.dumps({
+                        "plan_code": "Y999",
                         "batch_execution": True,
                         "multi_account_workspace": True,
                         "desktop_notification": True,
@@ -582,17 +584,23 @@ async def seed_initial_data() -> None:
             db.add_all(plans)
             logger.info("创建默认套餐")
         else:
-            business_plan = next((plan for plan in existing_plans if plan.name == "Y999 全程陪跑包"), None)
-            if business_plan:
-                business_plan.product_type = "business"
-                business_plan.entitlements = json.dumps({
-                    "batch_execution": True,
-                    "multi_account_workspace": True,
-                    "desktop_notification": True,
-                    "usage_metering": False,
-                    "max_batch_rows": 50,
-                    "max_open_sessions": 6,
-                }, ensure_ascii=False)
+            for plan in existing_plans:
+                source = plan_entitlements_source(plan.entitlements)
+                # One-time compatibility for the original default plan only.
+                # Once pinned, neither a rename nor a restart may change C/B rights.
+                if "plan_code" not in source and plan.name == "Y999 全程陪跑包":
+                    plan.product_type = "business"
+                    source.update({
+                        "batch_execution": True,
+                        "multi_account_workspace": True,
+                        "desktop_notification": True,
+                        "usage_metering": False,
+                        "max_batch_rows": 50,
+                        "max_open_sessions": 6,
+                    })
+                plan.entitlements = json.dumps(
+                    fixed_plan_entitlements(plan.name, source), ensure_ascii=False,
+                )
 
         # 默认工具配置
         result = await db.execute(select(Setting).where(Setting.key == "tool_configs"))

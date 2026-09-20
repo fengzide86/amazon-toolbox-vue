@@ -710,6 +710,7 @@ function verifyGithubCi(commitSha) {
     'MariaDB migrations and concurrency',
     'Responsive C B Admin smoke',
     'Internal critical-flow acceptance',
+    'Real backend C B Admin journeys',
     'Windows NSIS install and runtime smoke',
   ]
   const required = requiredNames.map(name => checks.find(check => check.name === name))

@@ -108,7 +108,7 @@
           <span class="section-label">什么时候需要你操作</span>
           <ul><li v-for="scenario in normalizedList(detailsTool.intervention_scenarios)" :key="scenario">{{ scenario }}</li></ul>
         </section>
-        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>{{ liveUnavailable(detailsTool) ? '真实自动化需要桌面端本地 Runner；网页版不会读取或执行外部平台操作。' : isLiveTool(detailsTool) ? '工具将在本机浏览器中操作比赛模拟平台，登录数据不上传。' : '这是本地交互沙盒，会真实填写和点击，但不访问外部平台。' }}</span></div>
+        <div class="drawer-assurance"><ShieldCheck :size="17" /><span>{{ liveUnavailable(detailsTool) ? '真实自动化需要桌面端本地 Runner；网页版不会读取或执行外部平台操作。' : isLiveTool(detailsTool) ? '工具将在本机浏览器中操作比赛模拟平台，登录数据不上传。' : runtime.singleLive ? '这是本地交互沙盒，会真实填写和点击，但不访问外部平台。' : '浏览器版展示模拟流程，不启动本地执行器，也不操作外部平台。' }}</span></div>
       </div>
       <template #footer>
         <button class="drawer-primary" :disabled="Boolean(detailsTool && toolState(detailsTool) === 'maintenance')" @click="launchFromDetails">
@@ -161,7 +161,7 @@ import { getTools } from '@/utils/api'
 import { showToast } from '@/utils'
 import { useAppStore } from '@/stores/app'
 import { usePlatformStore } from '@/stores/platform'
-import { readStoredLicense } from '@/features/user/model'
+import { licensePlanCode, readStoredLicense } from '@/features/user/model'
 import {
   errorMessage,
   toolCatalogItemSchema,
@@ -207,7 +207,7 @@ const userInfo = computed(() => {
 
 const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
 const currentPlanCode = computed(() => {
-  return userInfo.value.plan_code || userInfo.value.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase() || ''
+  return licensePlanCode(userInfo.value)
 })
 
 const iconMap = {
@@ -301,7 +301,7 @@ function toolState(tool: ToolCatalogItem) {
   const availablePlans = Array.isArray(tool.available_plans)
     ? tool.available_plans.map(item => String(item).toUpperCase())
     : []
-  if (availablePlans.length && currentPlanCode.value && !availablePlans.includes(currentPlanCode.value)) return 'locked'
+  if (availablePlans.length && !availablePlans.includes(currentPlanCode.value)) return 'locked'
   return 'available'
 }
 

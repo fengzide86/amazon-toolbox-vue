@@ -446,3 +446,32 @@ async def test_demo_mode_rejects_launch_grant_without_creating_state(
     assert (
         await db_session.execute(select(LaunchToken))
     ).scalars().all() == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("original_name", "expected_success"), [("Y49 Live launch test", True), ("定制套餐", False)])
+async def test_live_and_legacy_launch_paths_use_fixed_identity_after_admin_rename(
+    client, db_session, monkeypatch, auth_headers, original_name, expected_success,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    token, auth_code_id = await _seed_live_launch_access(db_session)
+    auth_code = await db_session.get(AuthCode, auth_code_id)
+    plan = await db_session.get(Plan, auth_code.plan_id)
+    plan.name = original_name
+    setting = (await db_session.execute(select(Setting).where(Setting.key == "tool_configs"))).scalar_one()
+    tools = json.loads(setting.value)
+    tools[0]["available_plans"] = ["Y49"]
+    setting.value = json.dumps(tools)
+    await db_session.commit()
+    # The new name is deliberately a valid restricted-tool entitlement name.
+    renamed = await client.patch(f"/api/plans/{plan.id}", headers=auth_headers, json={"name": "Y49 伪装的新名称"})
+    assert renamed.status_code == 200
+    for path in ("launch-grant", "launch-token"):
+        response = await client.post(f"/api/tools/live_tool/{path}", params={"platform_key": "amazon"},
+                                     headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200
+        assert response.json()["success"] is expected_success
+        if not expected_success:
+            assert response.json()["message"] == "当前套餐暂未包含该工具"
+    if not expected_success:
+        assert (await db_session.execute(select(LaunchToken))).scalars().all() == []

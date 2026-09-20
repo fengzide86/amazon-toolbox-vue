@@ -2,7 +2,6 @@
 认证服务模块
 包含授权码验证、管理员登录、Token 管理等业务逻辑
 """
-import re
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -13,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.logging import get_logger
 from core.response import ErrorCodes, error_response, success_response
 from core.security import create_access_token
-from domains.access import normalize_entitlements, resolve_product_access
+from domains.access import normalize_entitlements, resolve_plan_code, resolve_product_access
 from models import AuthCode, AuthSeat, Device, Plan, User
 from services.staff_service import authenticate_staff, create_staff_access_token, staff_to_dict
 
@@ -65,8 +64,7 @@ class AuthService:
         plan_name = row[1] or "未知"
         plan_duration = row[2] or 30  # 默认30天
         product_type = row[3] or "consumer"
-        plan_match = re.search(r"Y\d+", plan_name, re.IGNORECASE)
-        plan_code = plan_match.group(0).upper() if plan_match else None
+        plan_code = resolve_plan_code(plan_name, row[4])
         
         # 2. 检查状态
         if code_obj.status == "frozen":
@@ -382,6 +380,7 @@ class AuthService:
                 "role": "user",
                 "plan_name": plan_name,
                 "expires_at": code_obj.expires_at.isoformat() if code_obj.expires_at else None,
+                "plan_code": entitlements.get("plan_code"),
                 "product_type": product_type,
                 "entitlements": entitlements,
                 "business_workspace_enabled": business_workspace_enabled,
@@ -441,6 +440,7 @@ class AuthService:
             "device_id": user.device_id,
             "device_name": user.device_name,
             "plan_name": plan_name,
+            "plan_code": entitlements.get("plan_code"),
             "expires_at": expires_at,
             "product_type": product_type,
             "entitlements": entitlements,

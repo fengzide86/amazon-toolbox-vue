@@ -27,15 +27,21 @@ interface WorkspaceOutboxOptions {
   finishBatch: (batchId: string | number, status: BatchFinishStatus) => Promise<unknown>
   onState: (state: WorkspaceSyncState) => void
   retryDelays?: readonly number[]
+  maySync?: () => boolean
 }
 
 export class BusinessWorkspaceOutbox {
   private readonly itemOutbox = new Map<string, PendingItemSync>()
-  private batchOutbox: PendingBatchSync | null = null
-  private finishOutbox: PendingFinishSync | null = null
+  private readonly batchOutbox = new Map<string, PendingBatchSync>()
+  private readonly finishOutbox = new Map<string, PendingFinishSync>()
+  private readonly finishingBatches = new Set<string>()
+  private readonly finishedBatches = new Set<string>()
+  private readonly flushWaiters = new Map<ReturnType<typeof setTimeout>, () => void>()
   private retryTimer: ReturnType<typeof setTimeout> | null = null
   private retryIndex = 0
   private flushing: Promise<void> | null = null
+  private disposed = false
+  private lifecycle = 0
   private readonly retryDelays: readonly number[]
 
   constructor(private readonly options: WorkspaceOutboxOptions) {
@@ -43,29 +49,47 @@ export class BusinessWorkspaceOutbox {
   }
 
   queueItem(pending: PendingItemSync): void {
-    this.itemOutbox.set(pending.itemId, pending)
+    if (!this.canQueue(pending.batchId)) return
+    this.itemOutbox.set(JSON.stringify([String(pending.batchId), pending.itemId]), pending)
     void this.flush()
   }
 
   queueBatch(pending: PendingBatchSync): void {
-    this.batchOutbox = pending
+    if (!this.canQueue(pending.batchId)) return
+    this.batchOutbox.set(String(pending.batchId), pending)
     void this.flush()
   }
 
   queueFinish(pending: PendingFinishSync): void {
-    this.finishOutbox = pending
+    if (!this.canQueue(pending.batchId)) return
+    this.finishOutbox.set(String(pending.batchId), pending)
+  }
+
+  /** A late create response must stay with its original owner, even while paused. */
+  retainCancellation(batchId: string | number): void {
+    const key = String(batchId)
+    if (this.finishedBatches.has(key) || this.finishingBatches.has(key)) return
+    this.finishOutbox.set(key, { batchId, status: 'cancelled' })
+    void this.flush()
   }
 
   hasPending(): boolean {
-    return this.itemOutbox.size > 0 || this.batchOutbox !== null || this.finishOutbox !== null
+    return this.itemOutbox.size > 0 || this.batchOutbox.size > 0 || this.finishOutbox.size > 0
+  }
+
+  resume(): void {
+    this.disposed = false
+    this.reconnect()
   }
 
   reconnect(): void {
+    if (!this.maySync()) return
     this.clearRetry()
     if (this.hasPending()) void this.flush()
   }
 
   async flush(): Promise<void> {
+    if (!this.maySync()) return
     if (this.flushing) return this.flushing
     if (!this.hasPending()) {
       this.options.onState('synced')
@@ -73,45 +97,99 @@ export class BusinessWorkspaceOutbox {
     }
     this.clearRetry()
     this.options.onState('syncing')
-    let completedWithoutError = false
-    this.flushing = (async () => {
+    const lifecycle = this.lifecycle
+    const active = () => this.maySync() && this.lifecycle === lifecycle
+    let failed = false
+    // Defer draining one microtask so a terminal snapshot can enqueue all rows
+    // before the first request and so synchronous adapter errors cannot strand
+    // this.flushing as an already-completed promise.
+    this.flushing = Promise.resolve().then(async () => {
       try {
-        for (const [key, pending] of [...this.itemOutbox.entries()]) {
-          await this.options.updateItem(pending.batchId, pending.itemId, pending.payload)
-          if (this.itemOutbox.get(key) === pending) this.itemOutbox.delete(key)
+        while (active() && this.hasPending()) {
+          for (const [key, pending] of [...this.itemOutbox.entries()]) {
+            if (!active()) return
+            await this.options.updateItem(pending.batchId, pending.itemId, pending.payload)
+            if (!active()) return
+            if (this.itemOutbox.get(key) === pending) this.itemOutbox.delete(key)
+          }
+          for (const [key, pending] of [...this.batchOutbox.entries()]) {
+            if (!active()) return
+            await this.options.updateBatch(pending.batchId, pending.payload)
+            if (!active()) return
+            if (this.batchOutbox.get(key) === pending) this.batchOutbox.delete(key)
+          }
+          for (const [key, pending] of [...this.finishOutbox.entries()]) {
+            if (!active()) return
+            // New item versions can arrive while any previous request awaits.
+            // A finish is a per-batch barrier, not just the last entry in an
+            // earlier copied queue. Never finish ahead of those newer writes.
+            if (this.batchOutbox.has(key) || [...this.itemOutbox.values()].some(item => String(item.batchId) === key)) continue
+            this.finishingBatches.add(key)
+            try {
+              await this.options.finishBatch(pending.batchId, pending.status)
+              if (!active()) return
+              this.finishedBatches.add(key)
+              this.finishOutbox.delete(key)
+            } finally {
+              this.finishingBatches.delete(key)
+            }
+          }
         }
-        const pendingBatch = this.batchOutbox
-        if (pendingBatch) {
-          await this.options.updateBatch(pendingBatch.batchId, pendingBatch.payload)
-          if (this.batchOutbox === pendingBatch) this.batchOutbox = null
-        }
-        const pendingFinish = this.finishOutbox
-        if (pendingFinish) {
-          await this.options.finishBatch(pendingFinish.batchId, pendingFinish.status)
-          if (this.finishOutbox === pendingFinish) this.finishOutbox = null
-        }
+        if (!active()) return
         this.retryIndex = 0
-        this.options.onState(this.hasPending() ? 'syncing' : 'synced')
-        completedWithoutError = true
+        this.options.onState('synced')
       } catch {
+        if (!active()) return
+        failed = true
         this.options.onState('offline')
         this.scheduleRetry()
       } finally {
         this.flushing = null
-        if (completedWithoutError && this.hasPending()) void this.flush()
+        // A deliberate resume may occur before an old in-flight request ends.
+        // Only that new lifecycle can restart draining after disposal.
+        if (this.maySync() && this.hasPending() && (!failed || this.lifecycle !== lifecycle)) void this.flush()
       }
-    })()
+    })
     return this.flushing
   }
 
   async flushWithin(timeoutMs: number): Promise<boolean> {
-    await Promise.race([this.flush(), new Promise<void>(resolve => setTimeout(resolve, timeoutMs))])
-    return !this.hasPending()
+    if (!this.maySync()) return !this.hasPending()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<void>(resolve => {
+      timer = setTimeout(resolve, Math.max(0, timeoutMs))
+      this.flushWaiters.set(timer, resolve)
+    })
+    try {
+      await Promise.race([this.flush(), timeout])
+      return !this.hasPending()
+    } finally {
+      if (timer !== undefined) {
+        clearTimeout(timer)
+        this.flushWaiters.delete(timer)
+      }
+    }
   }
 
   dispose(): void {
+    this.disposed = true
+    this.lifecycle += 1
     this.clearRetry()
+    for (const [timer, resolve] of this.flushWaiters) {
+      clearTimeout(timer)
+      resolve()
+    }
+    this.flushWaiters.clear()
   }
+
+  private canQueue(batchId: string | number): boolean {
+    const key = String(batchId)
+    // Once finish is sent, the snapshot is sealed. The coordinator enqueues
+    // its complete final snapshot before this point; later events are stale.
+    return this.maySync() && !this.finishedBatches.has(key) && !this.finishingBatches.has(key)
+  }
+
+  private maySync(): boolean { return !this.disposed && (this.options.maySync?.() ?? true) }
 
   private clearRetry(): void {
     if (this.retryTimer) clearTimeout(this.retryTimer)
@@ -119,7 +197,7 @@ export class BusinessWorkspaceOutbox {
   }
 
   private scheduleRetry(): void {
-    if (this.retryTimer || !this.hasPending()) return
+    if (!this.maySync() || this.retryTimer || !this.hasPending()) return
     const fallbackDelay = this.retryDelays.at(-1) || 30_000
     const delay = this.retryDelays[Math.min(this.retryIndex, this.retryDelays.length - 1)] || fallbackDelay
     this.retryIndex += 1

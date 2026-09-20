@@ -8,12 +8,20 @@ from sqlalchemy import func, select
 
 from core.dependencies import get_current_user
 from main import app
-from models import AutomationBatch, RunLog, Setting, User
+from models import AuthCode, AutomationBatch, Plan, RunLog, Setting, User
 from models.demo import DemoBatch, DemoRun
 from models.feedback import ExecutionVerification
 
 
 async def _install_demo_tool(db_session) -> None:
+    plan = Plan(
+        name="专业演示套餐", price=100, duration_days=30, product_type="business",
+        entitlements=json.dumps({"batch_execution": True, "multi_account_workspace": True}),
+    )
+    db_session.add(plan)
+    await db_session.flush()
+    db_session.add(AuthCode(id=1, code="DEMO-BUSINESS-ACCESS", plan_id=plan.id, status="active"))
+    db_session.add(Setting(key="business_workspace_enabled", value="true"))
     db_session.add(
         Setting(
             key="tool_configs",
@@ -37,16 +45,71 @@ async def _install_demo_tool(db_session) -> None:
     await db_session.commit()
 
 
-def _as_user(user_id: int = 1):
+def _as_user(user_id: int = 1, auth_code_id: int | None = 1):
     async def dependency() -> dict:
         return {
             "user_id": user_id,
             "role": "user",
-            "auth_code_id": None,
+            "auth_code_id": auth_code_id,
             "device_id": "demo-device",
         }
 
     return dependency
+
+
+@pytest.mark.asyncio
+async def test_consumer_cannot_access_any_batch_endpoint_even_for_a_previously_owned_batch(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+    payload = {
+        "tool_id": "tool_demo_batch", "tool_name": "演示", "platform_key": "amazon",
+        "scenario_id": "demo", "row_count": 1,
+    }
+    created = await client.post("/api/demo/batches", json=payload)
+    assert created.status_code == 201
+    batch = created.json()
+    plan = (await db_session.execute(select(Plan))).scalar_one()
+    # Retain explicit batch flags to prove product_type is independently gated.
+    plan.product_type = "consumer"
+    await db_session.commit()
+    requests = [
+        ("POST", "/api/demo/batches", payload),
+        ("GET", "/api/demo/batches", None),
+        ("GET", f"/api/demo/batches/{batch['id']}", None),
+        ("PATCH", f"/api/demo/batches/{batch['id']}", {"event_seq": 1, "status": "running"}),
+        ("PUT", f"/api/demo/batches/{batch['id']}/items/{batch['items'][0]['item_ref']}", {"event_seq": 1, "status": "playing"}),
+        ("POST", f"/api/demo/batches/{batch['id']}/finish", {"event_seq": 1}),
+    ]
+    for method, path, body in requests:
+        response = await client.request(method, path, json=body)
+        assert response.status_code == 403, (method, path, response.text)
+    assert await db_session.scalar(select(func.count(DemoBatch.id))) == 1
+    assert (await db_session.get(DemoBatch, batch["id"])).status == "created"
+    single = await client.post("/api/demo/runs", json={
+        "tool_id": "tool_demo_batch", "tool_name": "单项演示", "platform_key": "amazon",
+        "scenario_id": "demo", "total_step_count": 1,
+    })
+    assert single.status_code == 201
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing_gate", ["global", "batch_execution", "multi_account_workspace", "authorization"])
+async def test_demo_batch_requires_all_existing_business_access_gates(client, db_session, missing_gate):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user(auth_code_id=None if missing_gate == "authorization" else 1)
+    if missing_gate == "global":
+        setting = (await db_session.execute(select(Setting).where(Setting.key == "business_workspace_enabled"))).scalar_one()
+        setting.value = "false"
+    elif missing_gate in {"batch_execution", "multi_account_workspace"}:
+        plan = (await db_session.execute(select(Plan))).scalar_one()
+        plan.entitlements = json.dumps({"batch_execution": True, "multi_account_workspace": True, missing_gate: False})
+    await db_session.commit()
+    response = await client.post("/api/demo/batches", json={
+        "tool_id": "tool_demo_batch", "tool_name": "演示", "platform_key": "amazon",
+        "scenario_id": "demo", "row_count": 1,
+    })
+    assert response.status_code == 403
+    assert await db_session.scalar(select(func.count(DemoBatch.id))) == 0
 
 
 @pytest.mark.asyncio

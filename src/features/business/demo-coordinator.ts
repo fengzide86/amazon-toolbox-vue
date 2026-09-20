@@ -22,6 +22,7 @@ import {
 } from './model'
 import { errorMessage, ipcPayload } from './workspace-helpers'
 import type { WorkspaceSyncState } from './workspace-outbox'
+import type { DemoBatchRecovery } from './demo-recovery'
 
 interface DemoResult {
   status: 'completed' | 'waiting_user' | 'failed'
@@ -34,6 +35,7 @@ export interface BusinessDemoDependencies {
   setSyncState(state: WorkspaceSyncState): void
   setError(message: string | null): void
   refreshHistory(): Promise<unknown>
+  recovery?: DemoBatchRecovery
 }
 
 /**
@@ -47,6 +49,7 @@ export class BusinessDemoCoordinator {
   private summaryQueue: Promise<void> = Promise.resolve()
   private controller: DemoConcurrencyController | null = null
   private readonly itemSequences = new Map<string, number>()
+  private recoveryScope: string | null = null
 
   constructor(private readonly dependencies: BusinessDemoDependencies) {}
 
@@ -57,7 +60,14 @@ export class BusinessDemoCoordinator {
   ): Promise<BusinessBatchSnapshot> {
     let serverBatchId: string | number | undefined
     this.stopController()
+    const startupToken = this.runToken
     this.batchEventSequence = 0
+    this.recoveryScope = this.dependencies.recovery?.currentScope() ?? null
+    const scope = this.recoveryScope
+    let startupActivityToken: string | null = null
+    const valid = () => startupToken === this.runToken
+      && (!this.dependencies.recovery || scope === this.dependencies.recovery.currentScope())
+    const assertCurrent = () => { if (!valid()) throw new Error('演示启动已取消') }
     this.dependencies.setError(null)
     try {
       const created = demoBatchSchema.parse(unwrapApiData(await createDemoBatch({
@@ -69,6 +79,7 @@ export class BusinessDemoCoordinator {
         row_count: preview.validCount,
       })))
       serverBatchId = created.id
+      assertCurrent()
       const itemRefs = created.items.length
         ? created.items.map(item => item.item_ref)
         : Array.from({ length: created.row_count }, (_, index) => `demo_item_${index + 1}`)
@@ -85,6 +96,7 @@ export class BusinessDemoCoordinator {
           importId: preview.importId,
           itemIds: itemRefs,
         }))
+        assertCurrent()
         localSnapshot = businessBatchSnapshotSchema.parse(await batchApi.create(ipcPayload({
           importId: localImport.importId,
           batchId: `demo_${clientBatchId}`,
@@ -93,6 +105,7 @@ export class BusinessDemoCoordinator {
           maxOpenSessions: 0,
           recordKind: 'demo',
         })))
+        assertCurrent()
       } else {
         if (itemRefs.length !== preview.rows.length) throw new Error('服务端任务数与本地导入行数不一致')
         localSnapshot = businessBatchSnapshotSchema.parse({
@@ -148,8 +161,9 @@ export class BusinessDemoCoordinator {
           status: 'playing',
           simulated_outcome: null,
         })
-        this.itemSequences.set(item.itemId, 1)
+        if (valid()) this.itemSequences.set(item.itemId, 1)
       }))
+      assertCurrent()
       this.batchEventSequence = 1
       await updateDemoBatch(created.id, {
         event_seq: this.batchEventSequence,
@@ -160,12 +174,23 @@ export class BusinessDemoCoordinator {
         skipped_count: 0,
         error_count: 0,
       })
-      this.activeActivityToken = demoActivityToken('batch', created.id)
-      await setDemoActivity(this.activeActivityToken, true)
+      assertCurrent()
+      startupActivityToken = demoActivityToken('batch', created.id)
+      this.activeActivityToken = startupActivityToken
+      await setDemoActivity(startupActivityToken, true)
+      assertCurrent()
       this.dependencies.setSyncState('synced')
       this.startConcurrency(created.id)
       return concurrentSnapshot
     } catch (cause) {
+      if (!valid()) {
+        if (startupActivityToken) {
+          if (this.activeActivityToken === startupActivityToken) this.activeActivityToken = null
+          await this.settleWithin(setDemoActivity(startupActivityToken, false), 1_500)
+        }
+        if (serverBatchId !== undefined) await this.closeSupersededStartup(serverBatchId, scope)
+        throw new Error('演示启动已取消', { cause })
+      }
       if (serverBatchId === undefined) throw cause
       throw new Error(await this.failPlayback(cause, serverBatchId), { cause })
     }
@@ -175,6 +200,7 @@ export class BusinessDemoCoordinator {
     const snapshot = this.dependencies.getSnapshot()
     const serverBatchId = snapshot.serverBatchId
     this.stopController()
+    const token = this.runToken
     const finishedAtMs = Date.now()
     const unfinishedItems = snapshot.items.filter(item => item.status === 'pending' || item.status === 'running')
     const unfinishedIds = new Set(unfinishedItems.map(item => item.itemId))
@@ -191,28 +217,42 @@ export class BusinessDemoCoordinator {
     })
     this.dependencies.setSnapshot(cancelledSnapshot)
 
+    const cancellationSequence = ++this.batchEventSequence
+    const itemSequences = new Map(this.itemSequences)
+    const activityStopped = this.deactivateActivity()
+    const receipt = serverBatchId === undefined ? null : this.dependencies.recovery?.remember(
+      serverBatchId, 'cancelled', cancellationSequence, this.recoveryScope,
+    ) ?? null
+
     const remoteCancellation = (async () => {
       await this.summaryQueue.catch(() => undefined)
       if (serverBatchId === undefined) return
       await Promise.allSettled(unfinishedItems.map(item => updateDemoBatchItem(serverBatchId, item.itemId, {
-        event_seq: Math.max(2, (this.itemSequences.get(item.itemId) || 0) + 1),
+        event_seq: Math.max(2, (itemSequences.get(item.itemId) || 0) + 1),
         status: 'skipped',
         simulated_outcome: null,
       })))
-      this.batchEventSequence += 1
-      await updateDemoBatch(serverBatchId, {
-        event_seq: this.batchEventSequence,
+      return updateDemoBatch(serverBatchId, {
+        event_seq: cancellationSequence,
         status: 'cancelled',
         ...this.serverCounts(nextItems),
       })
-    })()
+    })().then(response => {
+      if (!this.dependencies.recovery?.confirmTerminal(receipt, response) && receipt) throw new Error('演示退出终态尚未确认')
+    })
     const [persisted] = await Promise.all([
       this.settleWithin(remoteCancellation, 2_400),
       this.settleWithin(window.electronAPI?.batch?.cancel(status).then(() => undefined) || Promise.resolve(), 1_500),
+      this.settleWithin(activityStopped, 1_500),
     ])
-    await this.deactivateActivity()
+    if (token !== this.runToken) return
     this.dependencies.setSyncState(persisted ? 'synced' : 'offline')
-    if (!persisted) this.dependencies.setError('演示已在本地退出，但服务端记录尚未确认同步，请恢复网络后刷新记录核对')
+    if (!persisted) {
+      this.dependencies.setError(receipt?.durable
+        ? '演示已在本地退出，待同步状态已保留；使用同一授权联网后会核对并同步记录'
+        : '演示已在本地退出，但服务端记录尚未确认同步，请恢复网络后刷新记录核对')
+      this.dependencies.recovery?.retry()
+    }
     else await this.dependencies.refreshHistory().catch(() => undefined)
   }
 
@@ -358,17 +398,24 @@ export class BusinessDemoCoordinator {
     // The server locks the parent and terminalizes unfinished items atomically.
     // A newer parent sequence also prevents late startup/summary writes reopening it.
     this.batchEventSequence += 1
+    const receipt = serverBatchId === undefined ? null : this.dependencies.recovery?.remember(
+      serverBatchId, 'error', this.batchEventSequence, this.recoveryScope,
+    ) ?? null
     const terminalize = serverBatchId === undefined ? Promise.resolve() : updateDemoBatch(serverBatchId, {
       event_seq: this.batchEventSequence,
       status: 'error',
-    }).then(() => undefined)
+    }).then(response => {
+      if (!this.dependencies.recovery?.confirmTerminal(receipt, response) && receipt) throw new Error('演示停止终态尚未确认')
+    })
     const [persisted] = await Promise.all([
       this.settleWithin(terminalize, 2_400),
       this.settleWithin(window.electronAPI?.batch?.cancel('interrupted').then(() => undefined) || Promise.resolve(), 1_500),
       this.settleWithin(this.deactivateActivity(), 1_500),
     ])
-    const message = persisted ? localMessage
+    const message = persisted ? localMessage : receipt?.durable
+      ? `${localMessage}；待同步状态已保留，使用同一授权联网后会核对并同步记录`
       : `${localMessage}，但服务端记录尚未确认同步，请恢复网络后刷新记录核对`
+    if (!persisted) this.dependencies.recovery?.retry()
     if (token === this.runToken) {
       this.dependencies.setSyncState(persisted ? 'synced' : 'offline')
       this.dependencies.setError(message)
@@ -381,6 +428,18 @@ export class BusinessDemoCoordinator {
     this.runToken += 1
     this.controller?.stop()
     this.controller = null
+  }
+
+  private async closeSupersededStartup(serverBatchId: string | number, scope: string | null): Promise<void> {
+    const recovery = this.dependencies.recovery
+    const receipt = recovery?.remember(serverBatchId, 'cancelled', 2, scope) ?? null
+    // Never issue the old user's cleanup with a new authorization. The old
+    // scope's durable intent can be reconciled when that owner signs in again.
+    if (recovery && recovery.currentScope() !== scope) return
+    const work = updateDemoBatch(serverBatchId, { event_seq: 2, status: 'cancelled' }).then(response => {
+      if (receipt && !recovery?.confirmTerminal(receipt, response)) throw new Error('旧演示启动未确认停止')
+    })
+    if (!await this.settleWithin(work, 2_400)) recovery?.retry()
   }
 
   private async deactivateActivity(): Promise<void> {

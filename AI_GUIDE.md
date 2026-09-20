@@ -50,7 +50,7 @@
 
 - 当前发行目标是 unsigned Windows NSIS，客户可能看到“未知发布者”，这是已接受的产品取舍。
 - 当前 `internal` 安装包只包含前端产物、编译后的 Electron CJS、必要生产依赖和模板、费率、品牌资源，不包含 Python 后端；`npm run package:audit` 会拒绝内嵌后端文件。
-- 生产发布使用 `node scripts/toolbox-cli.mjs release --publish --version=x.y.z`，同一提交依次发布后端、Web 和桌面更新。要求干净工作区、HEAD 等于已推送的最新 `origin/main`、六项必需 CI 通过且版本高于线上和远端标签。
+- 生产发布使用 `node scripts/toolbox-cli.mjs release --publish --version=x.y.z`，同一提交依次发布后端、Web 和桌面更新。要求干净工作区、HEAD 等于已推送的最新 `origin/main`、七项必需 CI（含真实后端旅程）通过且版本高于线上和远端标签。
 - 生产发布禁止 `--skip-verify` 和 `--skip-build`。中断后使用匹配的 `--resume=release-id`，不得把本地构建的跳过参数用于生产。
 - 桌面更新经服务器私有暂存区和 `publish_update.py` 校验后原子发布；管理端“应用更新”仍用于查看记录和处理已暂存版本。
 - 生产部署 SSH 的目标、私钥和端口只读取当前忽略提交的 `.env.deploy`；未设置 `DEPLOY_SSH_PORT` 时脚本默认 22。不要照搬旧电脑的端口转发假设，也不要修改服务器认证或网络规则。

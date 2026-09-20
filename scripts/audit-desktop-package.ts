@@ -4,8 +4,9 @@ import { execFileSync } from 'node:child_process'
 import { extractFile } from '@electron/asar'
 
 const root = process.cwd()
-const asarPath = path.join(root, 'release', 'win-unpacked', 'resources', 'app.asar')
-const backendPath = path.join(root, 'release', 'win-unpacked', 'resources', 'toolbox-backend.exe')
+const packageRoot = process.env.TOOLBOX_DESKTOP_PACKAGE_DIR || path.join(root, 'release', 'win-unpacked')
+const asarPath = path.join(packageRoot, 'resources', 'app.asar')
+const backendPath = path.join(packageRoot, 'resources', 'toolbox-backend.exe')
 
 if (!fs.existsSync(asarPath)) throw new Error(`Packaged app not found: ${asarPath}`)
 if (fs.existsSync(backendPath)) throw new Error('Internal production package must not contain the embedded backend')
@@ -78,14 +79,18 @@ if (!/if\s*\(!this\.options\.automationEnabled\)\s*return/.test(automationContro
   || !automationControllerSource.includes("registerTrustedOn('launch-tool'")) {
   internalPolicyFailures.push('tool launch IPC gate')
 }
-const conditionalBridge = preloadSource.indexOf('...(automationEnabled ?')
+const conditionalBridge = /\.\.\.\(?automationEnabled\s*\?/.exec(preloadSource)?.index ?? -1
 const launchBridge = preloadSource.indexOf('launchTool:')
-const conditionalBridgeEnd = preloadSource.indexOf('} : {})', launchBridge)
+const conditionalBridgeEnd = preloadSource.indexOf('} : {}', launchBridge)
 if (conditionalBridge < 0 || launchBridge < conditionalBridge || conditionalBridgeEnd < launchBridge) {
   internalPolicyFailures.push('tool launch preload gate')
 }
-if (!preloadSource.includes("'demo-activity:set-active'")) {
+if (!preloadSource.includes('demo-activity:set-active')) {
   internalPolicyFailures.push('demo activity update lock bridge')
+}
+const preloadImports = [...preloadSource.matchAll(/\brequire\(["']([^"']+)["']\)/g)].map(match => match[1])
+if (!preloadImports.includes('electron') || preloadImports.some(module => module !== 'electron')) {
+  internalPolicyFailures.push('sandbox-compatible single-file preload')
 }
 if (!updateManagerSource.includes('this.updater.autoInstallOnAppQuit = false')) {
   internalPolicyFailures.push('automatic install-on-quit disabled')

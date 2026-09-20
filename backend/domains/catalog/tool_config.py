@@ -30,11 +30,6 @@ def slugify(value: str) -> str:
     return re.sub(r"_+", "_", value).strip("_") or "tool"
 
 
-def plan_code(plan_name: str) -> str | None:
-    match = re.search(r"Y\d+", plan_name or "", re.IGNORECASE)
-    return match.group(0).upper() if match else None
-
-
 def resolve_tool_runtime(tool: dict[str, Any], platform_key: str) -> tuple[str, str]:
     capability_key = tool.get("capability_key") or tool.get("id") or "unknown"
     script_key = tool.get("script_key") or f"{platform_key}.{capability_key}.v1"

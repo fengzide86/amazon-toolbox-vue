@@ -80,6 +80,7 @@ import { authService } from '@/utils/auth'
 import { staffRoleLabel } from '@/features/auth/permissions'
 import { logoutStaff } from '@/utils/api'
 import { useShellPageHeader } from '@/features/shell/pageHeaderContext'
+import { licensePlanCode, readStoredLicense } from '@/features/user/model'
 
 const props = withDefaults(defineProps<{ isAdmin?: boolean; isBusiness?: boolean }>(), { isAdmin: false, isBusiness: false })
 const emit = defineEmits<{ 'toggle-sidebar': []; 'platform-change': [platformKey: string] }>()
@@ -120,9 +121,8 @@ const availablePlatformsForUser = computed<PlatformOption[]>(() => {
 })
 const planBadge = computed(() => {
   try {
-    const user = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
     if (props.isBusiness) return '专业版'
-    const code = user.plan_code || user.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase()
+    const code = licensePlanCode(readStoredLicense())
     return code === 'Y999' ? '陪跑包' : code === 'Y199' ? '冲刺包' : ''
   } catch { return '' }
 })

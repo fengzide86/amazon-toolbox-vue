@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_user
 from database import get_db
+from domains.access import require_business_access
 from domains.automation import demo_service
 from schemas.demo import (
     DemoBatchCreate,
@@ -110,7 +111,7 @@ async def create_demo_batch(
     req: DemoBatchCreate,
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_business_access),
 ) -> DemoBatchResponse:
     return await demo_service.create_demo_batch(
         db,
@@ -125,7 +126,7 @@ async def list_demo_batches(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_business_access),
 ) -> PaginatedDemoBatches:
     return await demo_service.list_demo_batches(
         db,
@@ -139,7 +140,7 @@ async def list_demo_batches(
 async def get_demo_batch(
     batch_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_business_access),
 ) -> DemoBatchResponse:
     return await demo_service.get_demo_batch(db, batch_id, current_user)
 
@@ -149,7 +150,7 @@ async def update_demo_batch(
     batch_id: str,
     req: DemoBatchUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_business_access),
 ) -> DemoBatchResponse:
     return await demo_service.update_demo_batch(db, batch_id, req, current_user)
 
@@ -160,7 +161,7 @@ async def update_demo_batch_item(
     item_ref: str,
     req: DemoBatchItemUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_business_access),
 ) -> DemoBatchItemResponse:
     return await demo_service.update_demo_batch_item(db, batch_id, item_ref, req, current_user)
 
@@ -170,6 +171,6 @@ async def finish_demo_batch(
     batch_id: str,
     req: DemoEvent,
     db: AsyncSession = Depends(get_db),
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_business_access),
 ) -> DemoBatchResponse:
     return await demo_service.finish_demo_batch(db, batch_id, req, current_user)

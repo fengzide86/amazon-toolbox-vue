@@ -21,7 +21,7 @@
     "build": "node scripts/with-toolbox-data-root.mjs -- vite build --mode production",
     "build:desktop": "node scripts/with-toolbox-data-root.mjs --set TOOLBOX_BUILD_TARGET=electron -- vite build --mode production",
     "preview": "vite preview",
-    "electron:compile": "tsc -p tsconfig.electron.build.json",
+    "electron:compile": "tsc -p tsconfig.electron.build.json && node scripts/bundle-electron-preload.mjs",
     "electron:dev": "node scripts/electron-dev.mjs",
     "backend:build": "cd backend && python -m PyInstaller --noconfirm --clean --distpath build\\dist --workpath build\\work toolbox-backend.spec && copy /Y build\\dist\\toolbox-backend.exe ..\\electron\\toolbox-backend.exe",
     "electron:build": "npm run electron:compile && npm run build:desktop && node scripts/with-toolbox-data-root.mjs --set CSC_IDENTITY_AUTO_DISCOVERY=false -- electron-builder --win nsis",
@@ -34,7 +34,7 @@
     "test:unit": "vitest run --exclude src/tests/electron/automationWorkflow.test.ts",
     "test:electron-workflow": "vitest run src/tests/electron/automationWorkflow.test.ts --maxWorkers=1 --fileParallelism=false",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage --exclude src/tests/electron/automationWorkflow.test.ts && npm run test:electron-workflow",
+    "test:coverage": "npm run electron:compile && vitest run --coverage --exclude src/tests/electron/automationWorkflow.test.ts && npm run test:electron-workflow",
     "test:backend": "node scripts/run-python.mjs -- -m pytest backend --rootdir=backend -q",
     "test:backend:coverage": "node scripts/run-python.mjs -- -m pytest backend --rootdir=backend --cov=backend --cov-report=term-missing --cov-report=xml:backend/coverage.xml -q",
     "test:backend:diff-coverage": "node scripts/run-python.mjs -- scripts/check_diff_coverage.py --base HEAD --working-tree --threshold 80",
@@ -44,6 +44,7 @@
     "test:e2e": "node scripts/with-toolbox-data-root.mjs -- playwright test",
     "test:e2e:business": "node scripts/with-toolbox-data-root.mjs -- playwright test --config=playwright.business.config.ts",
     "test:e2e:internal": "node scripts/with-toolbox-data-root.mjs -- playwright test --config=playwright.internal.config.ts",
+    "test:e2e:real": "node scripts/run-real-e2e.mjs",
     "test:e2e:release": "npm run build:web && npm run web:audit && node scripts/with-toolbox-data-root.mjs --set PLAYWRIGHT_PREBUILT=1 -- playwright test --config=playwright.business.config.ts && node scripts/with-toolbox-data-root.mjs --set PLAYWRIGHT_PREBUILT=1 -- playwright test --config=playwright.internal.config.ts",
     "test:e2e:capture": "node scripts/with-toolbox-data-root.mjs -- playwright test --config=playwright.capture.config.ts",
     "test:embedded-browser": "npm run electron:compile && electron dist-electron/electron/smoke/embedded-browser-smoke.cjs",
@@ -73,7 +74,7 @@
     "verify:backend": "npm run test:backend && npm run verify:backend:static",
     "verify:quick": "npm test && npm run test:backend",
     "verify": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run api-contracts:check && npm run deadcode && npm test && npm run build:desktop && npm run verify:backend",
-    "verify:release": "npm run release:policy && npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run api-contracts:check && npm run deadcode && npm run test:coverage && npm run test:backend:coverage && npm run test:backend:diff-coverage && npm run verify:backend:static && npm run release:mariadb-gate && npm run test:e2e:release && npm run desktop:verify-package"
+    "verify:release": "npm run release:policy && npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run api-contracts:check && npm run deadcode && npm run test:coverage && npm run test:backend:coverage && npm run test:backend:diff-coverage && npm run verify:backend:static && npm run release:mariadb-gate && npm run test:e2e:release && npm run test:e2e:real && npm run desktop:verify-package"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",

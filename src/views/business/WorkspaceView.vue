@@ -3,13 +3,20 @@
     <PageHeader
       eyebrow="BATCH AUTOMATION"
       title="批量自动化工作台"
-      description="选择工具并导入本地 Excel，演示工具运行本地沙盒，已发布工具运行比赛模拟平台。"
+      description="选择工具并导入本地 Excel；演示工具模拟批量流程，已发布工具由桌面端执行。"
     >
       <template #actions>
         <div class="privacy-mark"><ShieldCheck :size="16" />Excel 原文和登录凭据仅留在本机</div>
       </template>
     </PageHeader>
     <AsyncStateNotice v-if="store.bootstrapStale" state="stale" :message="store.error || ''" @retry="refreshTools" />
+    <AsyncStateNotice
+      v-if="!store.isActive && (store.recoveryPending || store.recoveryStorageUnavailable)"
+      state="stale"
+      stale-title="演示退出记录待核对"
+      :message="store.recoveryStorageUnavailable ? '本机未能完整保存待同步状态，请保持页面打开，联网后核对执行记录。' : `有 ${store.recoveryPending} 个演示批次待同步；使用同一授权联网后会自动核对，不会重新启动任务。`"
+      @retry="store.retryRecovery()"
+    />
     <template v-if="!store.isActive && store.snapshot.status !== 'completed'">
       <section v-if="!store.bootstrap" class="workspace-loading-state">
         <template v-if="store.error">
@@ -32,7 +39,7 @@
         <div class="ready-flow" aria-label="批量演示方式">
           <article><FileSpreadsheet :size="19" /><div><strong>本地导入</strong><span>客户表格只在本机解析</span></div></article>
           <i></i>
-          <article><Layers3 :size="19" /><div><strong>队列播放</strong><span>逐行呈现模拟步骤</span></div></article>
+          <article><Layers3 :size="19" /><div><strong>并发演示</strong><span>各账号独立推进模拟步骤</span></div></article>
           <i></i>
           <article><CircleAlert :size="19" /><div><strong>案例提示</strong><span>只展示演示中的注意事项</span></div></article>
         </div>
@@ -49,7 +56,7 @@
 
       <section v-else class="batch-setup">
         <div class="setup-stage-rail" aria-label="批量执行流程">
-          <div v-for="(stage, index) in ['选择工具','导入数据','检查映射','队列执行']" :key="stage" :class="{ active: setupStageIndex === index, done: setupStageIndex > index }"><span>{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ stage }}</strong></div>
+          <div v-for="(stage, index) in ['选择工具','导入数据','检查映射',setupIsDemo ? '并发演示' : '队列执行']" :key="stage" :class="{ active: setupStageIndex === index, done: setupStageIndex > index }"><span>{{ String(index + 1).padStart(2, '0') }}</span><strong>{{ stage }}</strong></div>
         </div>
 
         <div class="setup-section">
@@ -58,7 +65,7 @@
           <div class="business-tools">
             <button v-for="tool in store.tools" :key="tool.id" :class="{ selected: store.selectedTool?.id === tool.id }" @click="store.chooseTool(tool)">
               <span class="tool-icon"><Boxes :size="19" /></span>
-              <span><strong>{{ tool.name }}</strong><small>{{ tool.availability === 'demo_only' ? '本地交互演示' : !runtime.batchLive ? '桌面端比赛模拟平台执行' : '比赛模拟平台执行' }} · {{ tool.business_description || tool.description }}</small></span>
+              <span><strong>{{ tool.name }}</strong><small>{{ tool.availability === 'demo_only' ? '批量流程演示' : !runtime.batchLive ? '桌面端比赛模拟平台执行' : '比赛模拟平台执行' }} · {{ tool.business_description || tool.description }}</small></span>
               <Check v-if="store.selectedTool?.id === tool.id" :size="17" />
             </button>
             <div v-if="!store.tools.length" class="no-tools">当前授权暂无已开放的批量工具，请联系管理员配置。</div>
@@ -108,7 +115,7 @@
           <button type="button" @click="downloadDesktop"><Download :size="16" />下载 KST 桌面端</button>
         </footer>
         <footer v-else class="setup-footer">
-          <div><strong>{{ setupIsDemo ? '交互演示' : '真实执行' }}</strong><span>{{ setupIsDemo ? '系统在本地沙盒按顺序真实填写、点击和核验。' : '系统按受控队列操作比赛模拟平台，只有结果核验通过才会记为成功。' }}</span></div>
+          <div><strong>{{ setupIsDemo ? '流程演示' : '真实执行' }}</strong><span>{{ setupIsDemo ? '账号在本地模拟流程中并发推进，不操作外部平台。' : '系统按受控队列操作比赛模拟平台，只有结果核验通过才会记为成功。' }}</span></div>
           <button :disabled="!store.importPreview?.validCount || store.loading" @click="beginBatch">
             <LoaderCircle v-if="store.loading" :size="16" class="spin" /><Play v-else :size="16" />{{ setupIsDemo ? '开始批量演示' : '开始批量执行' }}
           </button>
@@ -170,7 +177,7 @@ async function endBatch() {
   }
 }
 async function newBatch() { try { await store.resetWorkspace() } catch (error) { showToast(errorMessage(error, '暂时不能新建批次'), 'error') } }
-onMounted(() => { void store.init() })
+onMounted(() => { void store.init().catch(() => undefined) })
 onBeforeRouteLeave(async () => {
   if (!store.isActive) return true
   try {

@@ -52,7 +52,11 @@ npm run test:e2e:internal
 npm run verify:release
 ```
 
-该命令依次执行发布配置检查、密钥审计、TypeScript、ESLint、架构边界、OpenAPI 和前端契约检查、死代码检查、前端覆盖率与 Electron 工作流、后端覆盖率与修改代码覆盖率、Ruff 和 mypy、MariaDB 门禁、Business/Internal E2E，以及桌面构建和包内容审计。`npm run verify` 是开发综合检查，不等同于完整发布门禁。
+该命令依次执行发布配置检查、密钥审计、TypeScript、ESLint、架构边界、OpenAPI 和前端契约检查、死代码检查、前端覆盖率与 Electron 工作流、后端覆盖率与修改代码覆盖率、Ruff 和 mypy、MariaDB 门禁、Business/Internal E2E、真实隔离后端 C/B/Admin 旅程，以及桌面构建和包内容审计。`npm run verify` 是开发综合检查，不等同于完整发布门禁。
+
+`npm run test:e2e:real` 自动建立临时 SQLite、真实 FastAPI、随机测试授权和 Web 构建，不 mock 业务 API，不连接生产。Windows 证据位于 `D:\AmazonToolboxData\real-e2e\run-*`；其他平台位于系统临时目录，可用 `KST_REAL_E2E_ROOT` 覆盖。凭据文件结束时删除，报告只含隔离测试数据。浏览器 Demo 通过不等于真实外部平台 Runner 已验收。
+
+桌面编译先由 TypeScript 生成 CJS，再将 preload 打成只保留 `electron` 外部依赖的单文件，保持 `sandbox: true`。真实 NSIS 覆盖安装仅在一次性 GitHub-hosted Windows 执行，使用固定 SHA512 的 1.8.5 安装包与候选包验证旧数据、实际 `app://`、preload 和打包 Runner。任一安装崩溃直接失败并留诊断，不以重试成功掩盖。
 
 MariaDB 门禁必须使用真实数据库：单独运行检查时配置隔离测试库的 `MARIADB_TEST_URL`；正式发布器也可使用同一 HEAD 已通过的 GitHub MariaDB CI 结果，并会再次独立核验。不要把生产数据库配置为测试库，也不要把跳过的测试计作通过。
 
@@ -73,12 +77,13 @@ npm run verify:backend
 - HEAD 等于上游分支和最新 `origin/main`。
 - `package.json` 中版本等于请求版本，OpenAPI 等生成文件检查通过。
 - 请求版本高于线上桌面版本及远端最新版本标签；恢复发布则必须匹配原版本和提交。
-- 本机 `gh` 已登录，以下六项必需 CI 的最新结果均为当前 HEAD 的成功结果：
+- 本机 `gh` 已登录，以下七项必需 CI 的最新结果均为当前 HEAD 的成功结果：
   - `Frontend and Electron contracts`
   - `Backend domains and API`
   - `MariaDB migrations and concurrency`
   - `Responsive C B Admin smoke`
   - `Internal critical-flow acceptance`
+  - `Real backend C B Admin journeys`
   - `Windows NSIS install and runtime smoke`
 
 确认生产发布后，脚本执行完整质量门禁、构建及内容审计，再依次部署后端、Web 和桌面更新。发布阶段为 `prepared → backend_deployed → web_activated → desktop_published → verified`，状态与产物校验值保存到 `TOOLBOX_DATA_ROOT/release-workflows/<release-id>/`，Windows 默认位于 D 盘。后端部署包通过 `git archive` 从该提交的跟踪文件生成。最终核对健康信息、Web 版本、桌面清单后才创建并推送版本标签。
