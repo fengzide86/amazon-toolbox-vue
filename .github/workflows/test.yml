@@ -226,7 +226,7 @@ jobs:
         env:
           PLAYWRIGHT_PREBUILT: '1'
       - name: Verify marketing desktop, mobile, navigation, download and real motion
-        run: npm run test:e2e:marketing
+        run: npx playwright test --config=playwright.marketing.config.ts
         env:
           PLAYWRIGHT_MARKETING_PREBUILT: '1'
       - uses: actions/upload-artifact@v7
