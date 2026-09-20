@@ -109,6 +109,30 @@ describe('ToolsView 一键工具箱', () => {
     expect(mocks.createDemoRun).not.toHaveBeenCalled()
   })
 
+  it.each([null, undefined])('展示名称不能替代服务端权益标识 (%s)', async planCode => {
+    localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y199 新名称', plan_code: planCode }))
+    mocks.getTools.mockResolvedValue([
+      { id: 'listing', name: '受限工具', status: 'online', available_plans: ['Y199'] },
+      { id: 'public', name: '通用工具', status: 'online', available_plans: [] },
+    ])
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="tool-card-受限工具"]').classes()).toContain('is-locked')
+    expect(wrapper.find('[data-testid="tool-card-通用工具"]').classes()).toContain('is-available')
+  })
+
+  it('改名后的套餐继续使用原有权益而不是新名称中的数字', async () => {
+    localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y199 新名称', plan_code: 'Y49' }))
+    mocks.getTools.mockResolvedValue([
+      { id: 'logistics', name: '原有工具', status: 'online', available_plans: ['Y49'] },
+      { id: 'ads', name: '更高套餐工具', status: 'online', available_plans: ['Y199'] },
+    ])
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="tool-card-原有工具"]').classes()).toContain('is-available')
+    expect(wrapper.find('[data-testid="tool-card-更高套餐工具"]').classes()).toContain('is-locked')
+  })
+
   it('点击可用工具立即进入本地演示，不被远端记录接口阻塞', async () => {
     mocks.getTools.mockResolvedValue([
       { id: 'register', name: '注册工具', module: 'register', status: 'online', available_plans: ['Y15'] },

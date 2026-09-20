@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.config import settings
 from core.logging import get_logger
 from core.response import ErrorCodes, error_response, success_response
-from domains.access import resolve_product_access
-from domains.catalog import normalize_tool_config, plan_code, resolve_tool_runtime
+from domains.access import resolve_plan_code, resolve_product_access
+from domains.catalog import normalize_tool_config, resolve_tool_runtime
 from models import AuthCode, AuthSeat, AutomationBatch, Device, LaunchToken, Plan, Setting
 from services.tool_release_service import build_manifest, resolve_release_for_launch, sign_manifest
 
@@ -150,7 +150,7 @@ async def create_launch_grant(
             await db.execute(select(Plan).where(Plan.id == auth_code.plan_id))
         ).scalar_one_or_none()
         if plan:
-            current_plan_code = plan_code(plan.name)
+            current_plan_code = resolve_plan_code(plan.name, plan.entitlements)
             available_plans = [
                 str(item).upper() for item in target_tool.get("available_plans", [])
             ]

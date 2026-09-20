@@ -56,8 +56,15 @@ export const storedLicenseSchema = z.object({
   user_id: z.union([z.string(), z.number()]).optional(),
   max_devices: z.number().optional(),
   plan_name: z.string().optional(),
-  plan_code: z.string().optional(),
+  plan_code: z.string().nullable().optional(),
+  entitlements: z.object({ plan_code: z.string().nullable().optional() }).passthrough().optional(),
 }).passthrough()
+
+export function licensePlanCode(license: z.infer<typeof storedLicenseSchema>): string {
+  // An explicit null is a server decision, never infer rights from display text.
+  const code = license.plan_code !== undefined ? license.plan_code : license.entitlements?.plan_code
+  return typeof code === 'string' && /^Y\d+$/.test(code) ? code : ''
+}
 
 export function readStoredLicense() {
   try {

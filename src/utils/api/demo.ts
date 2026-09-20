@@ -64,3 +64,6 @@ export const finishDemoBatch = (batchId: EntityId, payload: Schemas['DemoEvent']
 
 export const getDemoBatches = (params: ApiQueryParams = {}): Promise<Schemas['DemoBatchResponse'][]> =>
   api.get('/api/demo/batches', params, { cache: false })
+
+export const getDemoBatch = (batchId: EntityId): Promise<Schemas['DemoBatchResponse']> =>
+  api.get(`/api/demo/batches/${encodeURIComponent(batchId)}`, {}, { cache: false })

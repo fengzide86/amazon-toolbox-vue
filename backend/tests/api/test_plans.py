@@ -1,8 +1,10 @@
+import json
 from decimal import Decimal
 
 import pytest
 
 from models import AuthCode, Plan, StaffRole
+from services.entitlement_service import resolve_product_access
 
 
 def data(response):
@@ -150,3 +152,121 @@ async def test_plan_customer_entitlements_remain_available(client, db_session):
     assert item["plan_code"] == "Y199"
     assert item["benefits"] == ["完整自动化工具"]
     assert item["allowed_tools"] == ["listing"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(("original_name", "expected"), [("Y49 旧名称", "Y49"), ("定制套餐", None)])
+async def test_legacy_rename_pins_original_identity_without_granting_new_tools(
+    client, db_session, auth_headers, original_name, expected,
+):
+    plan = Plan(name=original_name, price=49, duration_days=7, status="active", entitlements="{}")
+    db_session.add(plan)
+    await db_session.commit()
+    renamed = await client.patch(f"/api/plans/{plan.id}", headers=auth_headers, json={"name": "Y199 新展示名"})
+    assert renamed.status_code == 200
+    assert data(renamed)["plan_code"] == expected
+    assert data(renamed)["name"] == "Y199 新展示名"
+    await db_session.refresh(plan)
+    assert json.loads(plan.entitlements)["plan_code"] == expected
+    assert data(await client.get(f"/api/plans/{plan.id}"))["plan_code"] == expected
+
+
+@pytest.mark.asyncio
+async def test_legacy_client_create_and_replace_entitlements_preserve_identity(client, db_session, auth_headers):
+    created = await client.post("/api/plans", headers=auth_headers, json={
+        "name": "Y49 初始套餐", "price": 49, "duration_days": 7, "code_prefix": "OTHER",
+    })
+    assert created.status_code == 201
+    plan_id = data(created)["id"]
+    assert data(created)["entitlements"]["plan_code"] == "Y49"
+    assert data(created)["plan_code"] == "Y49"
+    updated = await client.put(f"/api/plans/{plan_id}", headers=auth_headers, json={
+        "name": "新的展示名", "code_prefix": "Y999", "entitlements": {"desktop_notification": False},
+    })
+    assert updated.status_code == 200
+    assert data(updated)["plan_code"] == "Y49"
+    assert data(updated)["entitlements"]["desktop_notification"] is False
+    cleared = await client.patch(f"/api/plans/{plan_id}", headers=auth_headers, json={"entitlements": None})
+    assert cleared.status_code == 200
+    assert data(cleared)["entitlements"]["plan_code"] == "Y49"
+    for action in ("enable", "disable", "enable"):
+        result = await client.post(f"/api/plans/{plan_id}/{action}", headers=auth_headers)
+        assert result.status_code == 200
+        assert data(result)["plan_code"] == "Y49"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("override", ["Y199", None, 49, "y49", {"code": "Y49"}])
+async def test_plan_identity_cannot_be_overwritten_through_admin_entitlements(
+    client, db_session, auth_headers, override,
+):
+    plan = Plan(name="Y49 旧套餐", price=49, duration_days=7, status="disabled", entitlements="{}")
+    db_session.add(plan)
+    await db_session.commit()
+    response = await client.patch(f"/api/plans/{plan.id}", headers=auth_headers, json={
+        "name": "Y199 新展示名", "entitlements": {"plan_code": override},
+    })
+    assert response.status_code == 422
+    await db_session.refresh(plan)
+    assert plan.name == "Y49 旧套餐"
+    assert "plan_code" not in json.loads(plan.entitlements)
+
+
+@pytest.mark.asyncio
+async def test_custom_plan_cannot_select_an_unrelated_identity_at_create(client, auth_headers):
+    rejected = await client.post("/api/plans", headers=auth_headers, json={
+        "name": "定制套餐", "price": 99, "duration_days": 30, "entitlements": {"plan_code": "Y199"},
+    })
+    assert rejected.status_code == 422
+    created = await client.post("/api/plans", headers=auth_headers, json={
+        "name": "定制套餐", "price": 99, "duration_days": 30, "code_prefix": "Y199",
+    })
+    assert created.status_code == 201
+    assert data(created)["plan_code"] is None
+    assert data(created)["entitlements"]["plan_code"] is None
+    denied = await client.patch(f"/api/plans/{data(created)['id']}", headers=auth_headers, json={
+        "name": "Y199 改名", "entitlements": {"plan_code": "Y199"},
+    })
+    assert denied.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("product_type", ["consumer", "business"])
+async def test_display_rename_does_not_change_c_b_access(client, db_session, auth_headers, product_type):
+    plan = Plan(
+        name="Y49 原始套餐", price=49, duration_days=7, status="active", product_type=product_type,
+        entitlements=json.dumps({"batch_execution": True, "multi_account_workspace": True}),
+    )
+    db_session.add(plan)
+    await db_session.flush()
+    code = AuthCode(code=f"IDENTITY-{product_type}", plan_id=plan.id, status="unused")
+    db_session.add(code)
+    await db_session.commit()
+    before = await resolve_product_access(db_session, code.id)
+    renamed = await client.patch(f"/api/plans/{plan.id}", headers=auth_headers, json={"name": "Y999 全程陪跑包"})
+    assert renamed.status_code == 200
+    after = await resolve_product_access(db_session, code.id)
+    assert after["product_type"] == before["product_type"] == product_type
+    assert after["entitlements"] == before["entitlements"]
+
+
+@pytest.mark.asyncio
+async def test_auth_legacy_contract_retains_stable_code_after_rename(client, db_session, auth_headers):
+    plan = Plan(name="Y49 原始套餐", price=49, duration_days=7, status="active")
+    db_session.add(plan)
+    await db_session.flush()
+    db_session.add(AuthCode(code="IDENTITY-LOGIN", plan_id=plan.id, status="unused", max_devices=1))
+    await db_session.commit()
+    assert (await client.patch(f"/api/plans/{plan.id}", headers=auth_headers, json={"name": "改名后的套餐"})).status_code == 200
+    login = await client.post("/api/auth/verify", json={
+        "code": "IDENTITY-LOGIN", "device_id": "identity-device", "device_name": "测试设备",
+    })
+    payload = data(login)
+    assert login.status_code == 200 and login.json()["success"] is True
+    assert payload["plan_name"] == "改名后的套餐"
+    assert payload["plan_code"] == "Y49"
+    assert payload["entitlements"]["plan_code"] == "Y49"
+    for method, endpoint in (("POST", "/api/auth/check"), ("GET", "/api/auth/me")):
+        result = await client.request(method, endpoint, headers={"Authorization": f"Bearer {payload['token']}"})
+        assert result.status_code == 200
+        assert data(result)["plan_code"] == "Y49"

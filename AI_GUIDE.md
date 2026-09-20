@@ -35,7 +35,7 @@
 
 ## 开发和验证
 
-- 新手入口：`开发预览.bat`、`检查.bat`、`一键发布.bat`
+- 新手入口：`开发预览.bat`、`检查.bat`、`仅打包.bat`（只生成本地安装包）、`一键发布.bat`（仅系统）、`官网预览.bat`、`官网发布.bat`、`联合发布.bat`（系统及独立宣传官网）。
 - 前端开发：`npm run electron:dev`
 - 开发综合检查：`npm run verify`
 - 完整发布门禁：`npm run verify:release`（`检查.bat full`）
@@ -50,8 +50,9 @@
 
 - 当前发行目标是 unsigned Windows NSIS，客户可能看到“未知发布者”，这是已接受的产品取舍。
 - 当前 `internal` 安装包只包含前端产物、编译后的 Electron CJS、必要生产依赖和模板、费率、品牌资源，不包含 Python 后端；`npm run package:audit` 会拒绝内嵌后端文件。
-- 生产发布使用 `node scripts/toolbox-cli.mjs release --publish --version=x.y.z`，同一提交依次发布后端、Web 和桌面更新。要求干净工作区、HEAD 等于已推送的最新 `origin/main`、六项必需 CI 通过且版本高于线上和远端标签。
+- 生产发布使用 `node scripts/toolbox-cli.mjs release --publish --version=x.y.z`，同一提交依次发布后端、Web 和桌面更新。要求干净工作区、HEAD 等于已推送的最新 `origin/main`、七项必需 CI（含真实后端旅程）通过且版本高于线上和远端标签。
 - 生产发布禁止 `--skip-verify` 和 `--skip-build`。中断后使用匹配的 `--resume=release-id`，不得把本地构建的跳过参数用于生产。
+- 系统与宣传官网一起发布使用 `node scripts/toolbox-cli.mjs joint-release --version=x.y.z` 或 `联合发布.bat`：先只读核验官网账号及已有项目，再执行原系统完整发布，最后发布 Cloudflare Pages 官网。`--resume` 传递给系统发布器，`--dry-run` 仅做本地官网配置检查，不连接网络。两个通道不是全局原子事务；官网失败但系统成功时只运行 `官网发布.bat` 恢复，不重复发布系统，也不声称整体已完成。
 - 桌面更新经服务器私有暂存区和 `publish_update.py` 校验后原子发布；管理端“应用更新”仍用于查看记录和处理已暂存版本。
 - 生产部署 SSH 的目标、私钥和端口只读取当前忽略提交的 `.env.deploy`；未设置 `DEPLOY_SSH_PORT` 时脚本默认 22。不要照搬旧电脑的端口转发假设，也不要修改服务器认证或网络规则。
 - Token、私钥、数据库密码和远程地址只放环境变量；提交前运行 `npm run security:audit`。

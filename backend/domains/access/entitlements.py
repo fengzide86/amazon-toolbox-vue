@@ -12,6 +12,8 @@ from core.dependencies import get_current_user
 from database import get_db
 from models import AuthCode, Plan, Setting
 
+from .plan_identity import fixed_plan_entitlements
+
 DEFAULT_ENTITLEMENTS = {
     "batch_execution": False,
     "multi_account_workspace": False,
@@ -63,7 +65,10 @@ async def resolve_product_access(db: AsyncSession, auth_code_id: int | None) -> 
         return {"product_type": "consumer", "entitlements": normalize_entitlements({}, "consumer"), "enabled": False}
     auth_code, plan = row
     product_type = (getattr(plan, "product_type", None) or "consumer").lower()
-    entitlements = normalize_entitlements(getattr(plan, "entitlements", None), product_type)
+    entitlements = normalize_entitlements(
+        fixed_plan_entitlements(getattr(plan, "name", None), getattr(plan, "entitlements", None)),
+        product_type,
+    )
     enabled = await _global_business_enabled(db)
     return {
         "auth_code": auth_code,

@@ -115,3 +115,69 @@ async def test_cancelled_items_do_not_make_legacy_summary_fail(db_session: Async
     )
     assert batch["status"] == "completed"
     assert batch["completed_count"] == batch["failed_count"] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("terminal_status", ["completed", "cancelled", "interrupted"])
+async def test_terminal_batch_ignores_late_heartbeats_and_item_mutations(
+    db_session: AsyncSession, live_batch, terminal_status: str,
+) -> None:
+    batch_id, context = live_batch
+    for item_id in ("one", "two"):
+        await service.upsert_batch_item(
+            db_session, batch_id, item_id,
+            BatchItemUpdate(account_label_masked="客户", status="completed"), context,
+        )
+    await service.finish_batch(db_session, batch_id, BatchFinish(status=terminal_status), context)
+    original = await service.get_batch(db_session, batch_id, context)
+    await service.update_batch(
+        db_session, batch_id, BatchUpdate(status="running", pending_count=1, running_count=1), context,
+    )
+    await service.upsert_batch_item(
+        db_session, batch_id, "one",
+        BatchItemUpdate(account_label_masked="被修改的名字", status="running"), context,
+    )
+    await service.finish_batch(db_session, batch_id, BatchFinish(status="cancelled"), context)
+    assert await service.get_batch(db_session, batch_id, context) == original
+
+
+@pytest.mark.asyncio
+async def test_terminal_batch_cannot_gain_a_late_new_item(db_session: AsyncSession, live_batch) -> None:
+    batch_id, context = live_batch
+    await service.finish_batch(db_session, batch_id, BatchFinish(status="cancelled"), context)
+    before = await service.get_batch(db_session, batch_id, context)
+    with pytest.raises(HTTPException) as conflict:
+        await service.upsert_batch_item(
+            db_session, batch_id, "late-new-row",
+            BatchItemUpdate(account_label_masked="客户", status="completed"), context,
+        )
+    assert conflict.value.status_code == 409
+    assert await service.get_batch(db_session, batch_id, context) == before
+
+
+@pytest.mark.asyncio
+async def test_failed_item_can_restart_while_batch_is_active(db_session: AsyncSession, live_batch) -> None:
+    batch_id, context = live_batch
+    for state in ("running", "failed"):
+        result = await service.upsert_batch_item(
+            db_session, batch_id, "retry-row", BatchItemUpdate(account_label_masked="客户", status=state), context,
+        )
+    assert result["completed_at"] is not None
+    restarted = await service.upsert_batch_item(
+        db_session, batch_id, "retry-row", BatchItemUpdate(account_label_masked="客户", status="pending"), context,
+    )
+    assert restarted["completed_at"] is None
+    assert restarted["started_at"] is None
+    batch = await service.get_batch(db_session, batch_id, context)
+    assert batch["status"] == "running"
+    assert batch["pending_count"] == 2
+    assert batch["failed_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_repeated_terminal_item_snapshot_keeps_its_original_completion_time(db_session: AsyncSession, live_batch) -> None:
+    batch_id, context = live_batch
+    payload = BatchItemUpdate(account_label_masked="客户", status="completed")
+    original = await service.upsert_batch_item(db_session, batch_id, "first", payload, context)
+    repeated = await service.upsert_batch_item(db_session, batch_id, "first", payload, context)
+    assert repeated["completed_at"] == original["completed_at"]

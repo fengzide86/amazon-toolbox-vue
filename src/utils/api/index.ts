@@ -380,7 +380,7 @@ export { getToolReleases, createToolRelease, publishToolRelease, rollbackToolRel
 export { getFreightRateReleases, createFreightRateDraft, publishFreightRatePack, rollbackFreightRatePack, getCurrentFreightRatePack } from './freight-rates'
 export { getFeedbacks, getMyFeedbacks, createFeedback, updateFeedback } from './feedback'
 export { getLogs, exportLogs, getLogTools, createLog } from './logs'
-export { createDemoRun, updateDemoRun, finishDemoRun, cancelDemoRun, getDemoRuns, createDemoBatch, updateDemoBatch, updateDemoBatchItem, finishDemoBatch, getDemoBatches } from './demo'
+export { createDemoRun, updateDemoRun, finishDemoRun, cancelDemoRun, getDemoRuns, createDemoBatch, updateDemoBatch, updateDemoBatchItem, finishDemoBatch, getDemoBatches, getDemoBatch } from './demo'
 export { getExecutions, getExecution } from './executions'
 export { getStaffAccounts, createStaffAccount, updateStaffAccount, resetStaffPassword, changeStaffPassword, logoutStaff } from './staff'
 export { getDashboard, getDashboardCharts, getProfit, getProfitSummary, getProfitPolicy, updateProfitPolicy } from './dashboard'

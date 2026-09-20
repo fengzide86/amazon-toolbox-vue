@@ -55,6 +55,7 @@ function importsOf(file: string): string[] {
 
 const entries = new Set<string>([
   'src/main.ts',
+  'src/marketing/main.ts',
   'electron/desktop-main.cts',
   'electron/preload.cts',
   'electron/automation-runner.cts',

@@ -41,7 +41,14 @@ const taskStarting = ref(false)
 
  const toolName = computed(() => appStore.currentTool?.name || '自动化工具')
  const isDemo = computed(() => appStore.currentTool?.executionMode !== 'live')
-const stageItems = computed(() => isDemo.value ? [
+ const isDesktop = computed(() => getRuntimeCapabilities().singleLive)
+ const isBrowserPreview = computed(() => isDemo.value && !isDesktop.value)
+const stageItems = computed(() => isBrowserPreview.value ? [
+  { key: 'prepare', label: '预览准备', description: '载入演示步骤与示例数据' },
+  { key: 'process', label: '流程展示', description: '展示工具执行流程，不操作外部页面' },
+  { key: 'verify', label: '模拟反馈', description: '了解执行结果和人工介入位置' },
+  { key: 'complete', label: '预览完成', description: '保存本次流程演示记录' },
+] : isDemo.value ? [
   { key: 'prepare', label: '沙盒准备', description: '正在启动本地交互页面和执行器' },
   { key: 'process', label: '真实操作', description: '执行器正在模拟页面中填写和点击' },
   { key: 'verify', label: '结果核验', description: '核对模拟平台返回的成功状态' },
@@ -64,9 +71,10 @@ const evidenceSummary = computed(() => ({
 const isActiveRun = computed(() => ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
 const isTerminal = computed(() => ['completed', 'failed', 'cancelled'].includes(runStatus.value))
  const isBrowserRetryableError = computed(() => false)
- const isDesktop = computed(() => getRuntimeCapabilities().singleLive)
  const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
- const displayUrl = computed(() => isDemo.value
+ const displayUrl = computed(() => isBrowserPreview.value
+   ? '浏览器流程预览 · 不执行平台操作'
+   : isDemo.value
    ? '本地交互沙盒 · 不访问外部平台'
    : taskRunStore.browserUrl || appStore.currentTool?.targetUrl || '比赛模拟平台')
 
@@ -79,12 +87,17 @@ const currentStageIndex = computed(() => {
 })
 
  const runningMessage = computed(() => {
+   if (isBrowserPreview.value) return '正在播放流程预览'
    if (runStatus.value === 'preparing' || runStatus.value === 'idle') return isDemo.value ? '正在准备交互沙盒' : '正在准备本地执行器'
    if (runStatus.value === 'paused') return isDemo.value ? '交互演示已暂停' : '自动处理已暂停'
    if (currentStageIndex.value === 2) return '正在核验页面结果'
    return isDemo.value ? '正在操作本地模拟页面' : '自动处理进行中'
  })
  const customerStatusText = computed(() => {
+   if (isBrowserPreview.value) {
+     const preview: Record<string, string> = { idle: '预览准备中', preparing: '预览准备中', running: '流程预览中', waiting_user: '人工介入示例', paused: '预览已暂停', completed: '预览完成', failed: '预览异常', cancelled: '已退出演示' }
+     return preview[runStatus.value] || '预览中'
+   }
    const demo: Record<string, string> = { idle: '沙盒准备中', preparing: '沙盒准备中', running: '交互演示中', waiting_user: '需要手动操作', paused: '演示已暂停', completed: '演示完成', failed: '演示异常', cancelled: '已退出演示' }
    const live: Record<string, string> = { idle: '等待执行', preparing: '执行准备中', running: '自动处理中', waiting_user: '需要你操作', paused: '已暂停', completed: '执行成功', failed: '执行失败', cancelled: '已停止' }
    return (isDemo.value ? demo : live)[runStatus.value] || '处理中'
@@ -149,7 +162,7 @@ async function closeWorkspace() {
   try {
     if (isActiveRun.value && !await confirmAction({
       title: isDemo.value ? '退出交互演示？' : '停止当前自动处理？',
-      message: isDemo.value ? '当前演示尚未完成，退出后本地沙盒会停止。' : '退出后会安全停止浏览器操作并保留问题记录。',
+      message: isBrowserPreview.value ? '当前流程预览尚未完成，退出后会停止播放。' : isDemo.value ? '当前演示尚未完成，退出后本地沙盒会停止。' : '退出后会安全停止浏览器操作并保留问题记录。',
       confirmText: isDemo.value ? '退出演示' : '停止处理',
       cancelText: '留在这里',
       danger: true,
@@ -333,7 +346,7 @@ onUnmounted(() => {
   taskRunStore.reset()
 })
   return {
-    browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop,
+    browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,
     platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
     freightQuote, adapterVersion, evidenceSummary,
     currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,

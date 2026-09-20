@@ -2,6 +2,20 @@
 
 ## 日常开发
 
+唯一源码目录为 `D:\开发项目\amazon-toolbox-vue`；入口均从自身所在目录解析项目，不依赖打开终端的位置，也不复制源码到旧目录。
+
+| 入口 | 执行范围 | 是否改线上 |
+| --- | --- | --- |
+| `开发预览.bat` | 本地后端与 Electron 管理员入口 | 否；`remote` 需明确指定 |
+| `检查.bat` / `检查.bat full` | 快速测试 / 完整发布门禁 | 否 |
+| `仅打包.bat` | 当前版本 NSIS、包内容审计、更新清单哈希检查 | 否；不改版本、不提交、不上传 |
+| `一键发布.bat` | 后端、Web 应用和桌面正式更新 | 是；完整生产门禁 |
+| `官网预览.bat` | 独立宣传官网构建、审计和本地预览 | 否 |
+| `官网发布.bat` | 独立 Cloudflare Pages 官网发布及上线核验 | 是；配置或认证缺失会失败 |
+| `联合发布.bat` | 先预检官网账号，再完整发布系统，最后发布宣传官网 | 是；任一步失败均中止并说明完成范围 |
+
+这些入口共用 `scripts/launch-toolbox.ps1`：仅在当前进程选择 Node 22，优先使用 `TOOLBOX_NODE_EXE` 显式配置或 PATH 中的 Node 22，再查找 D 盘 `TOOLBOX_DATA_ROOT/toolchains` 下已存在的 Node 22；不自动安装、不修改系统 PATH。Python 与 npm 检查共用 `scripts/run-python.mjs`：先实际执行 `--version` 验证显式 `TOOLBOX_PYTHON`，再尝试项目 `venv`、`.venv`，Windows 下再尝试 `TOOLBOX_DATA_ROOT/venvs/amazon-toolbox-test/Scripts/python.exe`（默认 D 盘），最后检查 PATH 的 Python；Linux 保持 `python3` 回退。显式配置无效时直接失败，不静默换解释器；迁移损坏的本地环境会跳过，不删除或重建。选中的 Python 和已有 GitHub CLI 仅加入本次进程 PATH，本地预览及管理员初始化也使用同一解释器，运行数据目录不变。中文、空格及 `&`、`!` 路径有 Windows 回归测试。失败默认保留窗口，自动化设置 `TOOLBOX_NO_PAUSE=1` 可禁用暂停。
+
 Node 使用 22 系列，CI 固定版本见 `.node-version`。Python CI 使用 3.10，并按 `backend/constraints-py310.txt` 验证生产依赖。使用 `npm ci` 保持依赖锁文件一致；本机其他 Python 版本的测试结果不替代 Python 3.10 CI。
 
 双击 `开发预览.bat`。它默认使用本地开发后端；如果 8000 端口尚未启动，脚本会自动启动 `backend/start.bat`，关闭 Electron 后再回收由它启动的后端进程。
@@ -17,6 +31,8 @@ Node 使用 22 系列，CI 固定版本见 `.node-version`。Python CI 使用 3.
 ```powershell
 开发预览.bat --dry-run
 ```
+
+开发预览、检查、仅打包、官网预览的 `--dry-run` 不安装依赖、不启动服务、不构建；联合发布的 `--dry-run` 也只读取本地官网配置并显示计划，不连接网络或调用生产预检。不能把配置检查通过当作实际运行验收。由预览入口启动的本地后端在 Electron 退出或启动失败时会回收，已经在运行的后端不受影响。
 
 等价的底层命令为：
 
@@ -52,7 +68,11 @@ npm run test:e2e:internal
 npm run verify:release
 ```
 
-该命令依次执行发布配置检查、密钥审计、TypeScript、ESLint、架构边界、OpenAPI 和前端契约检查、死代码检查、前端覆盖率与 Electron 工作流、后端覆盖率与修改代码覆盖率、Ruff 和 mypy、MariaDB 门禁、Business/Internal E2E，以及桌面构建和包内容审计。`npm run verify` 是开发综合检查，不等同于完整发布门禁。
+该命令依次执行发布配置检查、密钥审计、TypeScript、ESLint、架构边界、OpenAPI 和前端契约检查、死代码检查、前端覆盖率与 Electron 工作流、后端覆盖率与修改代码覆盖率、Ruff 和 mypy、MariaDB 门禁、Business/Internal E2E、真实隔离后端 C/B/Admin 旅程，以及桌面构建和包内容审计。`npm run verify` 是开发综合检查，不等同于完整发布门禁。
+
+`npm run test:e2e:real` 自动建立临时 SQLite、真实 FastAPI、随机测试授权和 Web 构建，不 mock 业务 API，不连接生产。Windows 证据位于 `D:\AmazonToolboxData\real-e2e\run-*`；其他平台位于系统临时目录，可用 `KST_REAL_E2E_ROOT` 覆盖。凭据文件结束时删除，报告只含隔离测试数据。浏览器 Demo 通过不等于真实外部平台 Runner 已验收。
+
+桌面编译先由 TypeScript 生成 CJS，再将 preload 打成只保留 `electron` 外部依赖的单文件，保持 `sandbox: true`。真实 NSIS 覆盖安装仅在一次性 GitHub-hosted Windows 执行，使用固定 SHA512 的 1.8.5 安装包与候选包验证旧数据、实际 `app://`、preload 和打包 Runner。任一安装崩溃直接失败并留诊断，不以重试成功掩盖。
 
 MariaDB 门禁必须使用真实数据库：单独运行检查时配置隔离测试库的 `MARIADB_TEST_URL`；正式发布器也可使用同一 HEAD 已通过的 GitHub MariaDB CI 结果，并会再次独立核验。不要把生产数据库配置为测试库，也不要把跳过的测试计作通过。
 
@@ -65,7 +85,20 @@ npm run deadcode
 npm run verify:backend
 ```
 
-## 构建 Windows 安装包
+## 仅在本机构建 Windows 安装包
+
+双击 `仅打包.bat`，使用 `package.json` 的当前版本执行 `desktop:verify-installer`，输出 `release\KST Setup <version>.exe`，并校验包内容、blockmap、更新清单和 SHA512。此入口不连接 SSH、不提交 Git、不上传更新、不改版本；不能用 `--publish`、`--skip-verify` 或 `--skip-build` 改变其边界。
+
+```powershell
+.\仅打包.bat --dry-run
+.\仅打包.bat
+# 等价命令
+node scripts/toolbox-cli.mjs pack
+```
+
+本地包审计不是完整 `verify:release`，也不代表真实安装、生产发布或客户 Live 任务已经验收。
+
+## 正式发布系统
 
 双击 `一键发布.bat` 或使用下述命令。生产发布前必须先将新版本及全部代码提交、合入最新 `main` 并推送，发布器不会替你提交代码或合并分支。它要求：
 
@@ -73,12 +106,13 @@ npm run verify:backend
 - HEAD 等于上游分支和最新 `origin/main`。
 - `package.json` 中版本等于请求版本，OpenAPI 等生成文件检查通过。
 - 请求版本高于线上桌面版本及远端最新版本标签；恢复发布则必须匹配原版本和提交。
-- 本机 `gh` 已登录，以下六项必需 CI 的最新结果均为当前 HEAD 的成功结果：
+- 本机 `gh` 已登录，以下七项必需 CI 的最新结果均为当前 HEAD 的成功结果：
   - `Frontend and Electron contracts`
   - `Backend domains and API`
   - `MariaDB migrations and concurrency`
   - `Responsive C B Admin smoke`
   - `Internal critical-flow acceptance`
+  - `Real backend C B Admin journeys`
   - `Windows NSIS install and runtime smoke`
 
 确认生产发布后，脚本执行完整质量门禁、构建及内容审计，再依次部署后端、Web 和桌面更新。发布阶段为 `prepared → backend_deployed → web_activated → desktop_published → verified`，状态与产物校验值保存到 `TOOLBOX_DATA_ROOT/release-workflows/<release-id>/`，Windows 默认位于 D 盘。后端部署包通过 `git archive` 从该提交的跟踪文件生成。最终核对健康信息、Web 版本、桌面清单后才创建并推送版本标签。
@@ -91,7 +125,7 @@ $releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
 node scripts/toolbox-cli.mjs release --publish "--version=$releaseVersion"
 ```
 
-只在本机生成安装包、不部署生产环境：
+推荐用 `仅打包.bat` 生成本地包。旧版完整本地发布命令仍保留兼容，会执行完整门禁，且明确传入不同版本时会修改本地版本文件；不用于替代新的“仅打包”入口：
 
 ```powershell
 $releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
@@ -125,6 +159,37 @@ npm run package:audit
 ```
 
 当前 `internal` 桌面安装包不包含 Python 后端；`package:audit` 会拒绝 `toolbox-backend.exe`。包内包含前端、编译后的 Electron/Runner、必要生产依赖和模板、费率、品牌资源。安装包不得包含 Token、测试、文档、运维脚本、TypeScript 源码或 source map。`backend:build` 仅保留为兼容场景的手动命令，不是默认发布步骤。
+
+## 独立宣传官网
+
+官网不再直接搬运业务应用。`官网预览.bat` 依次执行 `build:marketing`、`marketing:audit`、`preview:marketing`，只使用 `dist-marketing`，默认在 `http://127.0.0.1:4200` 预览，不覆盖桌面或业务 Web 产物。
+
+`官网发布.bat` 委托 `marketing:publish`，由独立发布器检查 `.env.marketing.local`、Cloudflare 账号、主分支及版本前置条件，构建并核对线上结果。未配置账号、站点或下载链接时必须明确失败，不生成占位“发布成功”。认证与实际生产发布由发布器控制，不由 BAT 隐式登录或静默跳过。
+
+```powershell
+.\官网预览.bat --dry-run
+.\官网预览.bat
+.\官网发布.bat --dry-run
+.\官网发布.bat
+```
+
+`一键发布.bat` 的原五阶段仍只负责后端、Web 应用与桌面更新；不能把系统发布成功描述成 Cloudflare 官网也已上线。需要两个通道一起更新时，使用以下联合入口。
+
+## 联合发布系统与宣传官网
+
+双击 `联合发布.bat`，默认使用当前 `package.json` 版本。它先通过官网发布器的 `--check-account` 核验本地配置、Cloudflare 登录与已存在项目，再调用原系统 `release --publish` 完整门禁和五阶段，最后运行独立官网发布器。账号预检不要求新系统版本此时已经上线；真正上传官网前仍会核对系统版本、下载清单、同一提交的 CI 与线上文件。
+
+```powershell
+.\联合发布.bat --dry-run
+$releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
+.\联合发布.bat "--version=$releaseVersion"
+# 非交互执行仍需要明确设置 TOOLBOX_AUTO_PUBLISH=1
+node scripts/toolbox-cli.mjs joint-release "--version=$releaseVersion"
+```
+
+联合入口不提交代码、不合并分支、不创建 Cloudflare 项目，也不隐式登录；执行前仍需准备已合入 `main` 且 CI 通过的新版本及 `.env.deploy`、`.env.marketing.local`。`--skip-verify`、`--skip-build` 和未知参数均被拒绝。原系统阶段中断时可以给联合入口传入原 `--resume=<release-id>`，它仍会先预检官网，然后由原发布器校验恢复状态。
+
+**两个发布器不是全局原子事务。** 系统未成功时绝不上传新官网；系统成功但官网失败时，联合命令返回失败并明确说明系统已经完成，不自动回滚系统，不自动重复发布版本。排除官网问题后只运行 `官网发布.bat`，按官网发布器的公开访问核验结果确认完成；不要因官网失败再不带 `--resume` 执行同一版本的系统发布。
 
 ## 发布应用更新
 

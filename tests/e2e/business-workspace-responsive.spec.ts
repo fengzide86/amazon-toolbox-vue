@@ -1,11 +1,16 @@
 import { resolve } from 'node:path'
 import { expect, test, type Page, type Request } from '@playwright/test'
 
+const browserErrors = new WeakMap<Page, string[]>()
 test.beforeEach(async ({ page }) => {
-  page.on('pageerror', error => console.error(`[pageerror] ${error.message}`))
+  const errors: string[] = []
+  browserErrors.set(page, errors)
+  page.on('pageerror', error => errors.push(error.message))
 })
+test.afterEach(async ({ page }) => { expect(browserErrors.get(page)).toEqual([]) })
 
 const businessUser = {
+  user_id: 701, auth_code_id: 801, device_id: 'responsive-test-device',
   role: 'user', product_type: 'business', business_workspace_enabled: true,
   plan_name: '专业批量版', seat_limit: 5, seat_used: 1,
   entitlements: { batch_execution: true, multi_account_workspace: true, desktop_notification: true, max_batch_rows: 50, max_open_sessions: 6 },

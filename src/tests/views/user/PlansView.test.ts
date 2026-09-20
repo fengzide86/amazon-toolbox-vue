@@ -83,4 +83,13 @@ describe('PlansView 套餐与授权', () => {
 
     expect(mocks.showToast).toHaveBeenCalledWith('购买 冲刺包：请联系客服 AmazonToolbox_Support', 'info')
   })
+
+  it('空权益标识不会从名称推断当前套餐，并保留展示名', async () => {
+    localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y199 自定义套餐', plan_code: null }))
+    mocks.getPlans.mockResolvedValue([{ id: 1, name: 'Y199 冲刺包', plan_code: 'Y199', status: 'active' }])
+    const wrapper = mount(PlansView)
+    await flushPromises()
+    expect(wrapper.find('.current-plan').text()).toContain('Y199 自定义套餐')
+    expect(wrapper.find('.plan-card.current').exists()).toBe(false)
+  })
 })

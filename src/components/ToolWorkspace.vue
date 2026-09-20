@@ -8,7 +8,7 @@
         <div class="tool-mark"><Zap :size="18" /></div>
         <div class="tool-identity">
           <h1>{{ toolName }}</h1>
-          <p>{{ platformName }} · {{ isDemo ? '本地交互演示' : '比赛模拟平台自动执行' }}</p>
+          <p>{{ platformName }} · {{ isBrowserPreview ? '浏览器流程预览' : isDemo ? '本地交互演示' : '比赛模拟平台自动执行' }}</p>
         </div>
       </div>
 
@@ -33,14 +33,14 @@
           <div class="browser-toolbar">
             <LockKeyhole :size="14" />
             <span>{{ displayUrl }}</span>
-            <span class="browser-note">{{ isDemo ? '本地沙盒' : '独立本地浏览器' }}</span>
+            <span class="browser-note">{{ isBrowserPreview ? '流程预览' : isDemo ? '本地沙盒' : '独立本地浏览器' }}</span>
           </div>
 
           <div class="browser-viewport">
             <div v-if="browserLoading" class="browser-loading">
               <span class="loading-orbit"><LoaderCircle :size="25" class="spin" /></span>
-              <strong>{{ isDemo ? '正在准备本地交互沙盒' : '正在启动本地自动化浏览器' }}</strong>
-              <p>准备完成后会自动执行，遇到登录或验证时才会暂停</p>
+              <strong>{{ isBrowserPreview ? '正在准备流程预览' : isDemo ? '正在准备本地交互沙盒' : '正在启动本地自动化浏览器' }}</strong>
+              <p>{{ isBrowserPreview ? '准备完成后播放示例流程，不访问外部平台' : '准备完成后会自动执行，遇到登录或验证时才会暂停' }}</p>
               <span class="loading-line"></span>
             </div>
 
@@ -62,7 +62,7 @@
                 <div class="mock-content">
                   <small>控制台 / {{ toolName }}</small>
                   <h2>{{ stageItems[currentStageIndex]?.label }}</h2>
-                  <p>{{ isDemo ? '可见浏览器中正在真实填写、点击并核验本地沙盒。' : '工具正在独立浏览器中操作比赛模拟平台。' }}</p>
+                  <p>{{ isBrowserPreview ? '当前为流程预览，画面和反馈仅为示例，不代表平台任务执行结果。' : isDemo ? '可见浏览器中正在真实填写、点击并核验本地沙盒。' : '工具正在独立浏览器中操作比赛模拟平台。' }}</p>
                   <div class="mock-cards"><i v-for="item in 3" :key="item"></i></div>
                   <div class="mock-table"><span v-for="item in 6" :key="item"></span></div>
                 </div>
@@ -78,7 +78,7 @@
 
       <aside class="progress-panel">
         <div class="demo-disclosure" role="note" data-testid="execution-scope-note">
-          {{ isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
+          {{ isBrowserPreview ? '浏览器预览：展示模拟流程，不启动 Runner，不操作外部平台。' : isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
         </div>
         <template v-if="!isTerminal">
           <header class="panel-heading">
@@ -106,15 +106,15 @@
 
           <div v-else class="running-note">
             <LoaderCircle :size="17" class="spin" />
-            <div><strong>{{ runningMessage }}</strong><span data-testid="result-boundary">{{ isDemo ? '结果只代表本地沙盒操作成功' : '只有通过平台结果核验才会标记成功' }}</span></div>
+            <div><strong>{{ runningMessage }}</strong><span data-testid="result-boundary">{{ isBrowserPreview ? '预览完成不代表真实任务成功' : isDemo ? '结果只代表本地沙盒操作成功' : '只有通过平台结果核验才会标记成功' }}</span></div>
           </div>
         </template>
 
         <div v-else-if="runStatus === 'completed'" class="result-card success">
           <div class="result-icon"><Check :size="28" /></div>
-          <h2>{{ isDemo ? '交互演示已完成' : '平台任务执行成功' }}</h2>
-          <p>{{ isDemo ? '本地浏览器已完成真实填写、点击和结果核验。' : '已完成页面操作并通过比赛模拟平台结果核验。' }}</p>
-          <div class="result-proof-grid">
+          <h2>{{ isBrowserPreview ? '流程预览已完成' : isDemo ? '交互演示已完成' : '平台任务执行成功' }}</h2>
+          <p>{{ isBrowserPreview ? '已走完模拟流程，未执行真实平台任务。' : isDemo ? '本地浏览器已完成真实填写、点击和结果核验。' : '已完成页面操作并通过比赛模拟平台结果核验。' }}</p>
+          <div v-if="!isBrowserPreview" class="result-proof-grid">
             <div><span>适配器版本</span><strong>v{{ adapterVersion }}</strong></div>
             <div><span>结果核验</span><strong>PASS</strong></div>
             <div><span>证据截图</span><strong>{{ evidenceSummary.screenshot ? '已生成' : '本地记录' }}</strong></div>
@@ -124,9 +124,9 @@
             <div class="freight-breakdown"><span>计费重 <b>{{ freightQuote.selected.billableWeightKg?.toFixed(2) }}kg</b></span><span>基础运费 <b>¥{{ freightQuote.selected.baseFreightCny?.toFixed(2) }}</b></span><span>固定费 <b>¥{{ freightQuote.selected.fixedFeeCny?.toFixed(2) }}</b></span><span>附加费 <b>¥{{ freightQuote.selected.surchargeCny?.toFixed(2) }}</b></span></div>
             <small>费率包 {{ freightQuote.ratePackVersion }} · 汇率 {{ freightQuote.exchangeRateCnyPerUsd }} · 已比较 {{ freightQuote.candidates.length }} 个渠道</small>
           </section>
-          <details class="execution-evidence"><summary>查看执行证据</summary><p>页面指纹：{{ evidenceSummary.fingerprint || '本地沙盒' }} · 签名：{{ evidenceSummary.signatureVerified ? '已验证' : (isDemo ? '内置演示适配器' : '等待验证记录') }}</p></details>
+          <details v-if="!isBrowserPreview" class="execution-evidence"><summary>查看执行证据</summary><p>页面指纹：{{ evidenceSummary.fingerprint || '本地沙盒' }} · 签名：{{ evidenceSummary.signatureVerified ? '已验证' : (isDemo ? '内置演示适配器' : '等待验证记录') }}</p></details>
           <button class="primary-action" type="button" @click="closeWorkspace">返回工具箱</button>
-          <button class="secondary-action" type="button" @click="restartRun">{{ isDemo ? '重新交互演示' : '使用新授权重新执行' }}</button>
+          <button class="secondary-action" type="button" @click="restartRun">{{ isBrowserPreview ? '重新预览' : isDemo ? '重新交互演示' : '使用新授权重新执行' }}</button>
         </div>
 
         <div v-else-if="runStatus === 'failed'" class="result-card failed">
@@ -148,7 +148,7 @@
         <div v-else class="result-card cancelled">
           <div class="result-icon"><Square :size="23" /></div>
           <h2>{{ isDemo ? '已退出演示' : '自动处理已停止' }}</h2>
-          <p>{{ isDemo ? '本地交互沙盒已经停止，不影响外部数据。' : '本次浏览器操作已安全停止。' }}</p>
+          <p>{{ isBrowserPreview ? '流程预览已经停止，不影响外部数据。' : isDemo ? '本地交互沙盒已经停止，不影响外部数据。' : '本次浏览器操作已安全停止。' }}</p>
           <button class="primary-action" type="button" @click="restartRun">{{ isDemo ? '重新演示' : '重新执行' }}</button>
           <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
         </div>
@@ -162,7 +162,7 @@ import { ArrowLeft, Check, CircleAlert, LoaderCircle, LockKeyhole, RotateCcw, Sq
 import { useSingleAutomationRun } from '@/features/automation/useSingleAutomationRun'
 
 const {
-  browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop,
+  browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
   freightQuote, adapterVersion, evidenceSummary,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,

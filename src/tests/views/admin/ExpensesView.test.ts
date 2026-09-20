@@ -41,6 +41,10 @@ interface ViewApi {
   expenseFilters: { month: string }
   summary: ExpenseSummary
   summaryError: string
+  categoriesLoading: boolean
+  categoryOptionsPending: boolean
+  categoryError: string
+  categories: unknown[]
   openExpenseDetail(item: ExpenseRecord): Promise<void>
   openRenewalDetail(item: ExpenseRenewal): Promise<void>
   openExpenseForm(): void
@@ -50,6 +54,9 @@ interface ViewApi {
   saveRenewal(): Promise<void>
   submitConfirmRenewal(): Promise<void>
   loadSummary(): Promise<void>
+  loadCategories(): Promise<void>
+  editExpense(item: ExpenseRecord): void
+  editRenewal(item: ExpenseRenewal): void
   handleVoidExpense(item: ExpenseRecord): Promise<void>
   handleDeleteAttachment(attachmentId: number): Promise<void>
 }
@@ -80,6 +87,62 @@ describe('expense drawer and summary request ownership', () => {
   })
 
   afterEach(() => { wrapper?.unmount() })
+
+  it.each(['expense', 'renewal'] as const)('fills only the unselected new %s draft after delayed initial categories arrive', async kind => {
+    const pending = deferred<unknown[]>()
+    view.categories = []
+    mocks.getExpenseCategories.mockReturnValueOnce(pending.promise)
+    const loading = view.loadCategories()
+    if (kind === 'expense') view.openExpenseForm()
+    else view.openRenewalForm()
+    const form = kind === 'expense' ? view.expenseForm : view.renewalForm
+    Object.assign(form, kind === 'expense' ? { title: '先填写的事项', amount: 320.5 } : { name: '先填写的会员', default_amount: 99 })
+    expect(view.categoryOptionsPending).toBe(true)
+    expect(form.category_id).toBeUndefined()
+    await (kind === 'expense' ? view.saveExpense() : view.saveRenewal())
+    expect(mocks.createExpense).not.toHaveBeenCalled()
+    expect(mocks.createExpenseRenewal).not.toHaveBeenCalled()
+    pending.resolve([
+      { id: 7, code: 'development', name: '开发', status: 'active', sort_order: 10, is_system: true },
+      { id: 8, code: 'tool_membership', name: '工具会员', status: 'active', sort_order: 30, is_system: true },
+    ])
+    await loading
+    expect(view.categoryOptionsPending).toBe(false)
+    expect(form.category_id).toBe(kind === 'expense' ? 7 : 8)
+    expect(form[kind === 'expense' ? 'title' : 'name']).toBe(kind === 'expense' ? '先填写的事项' : '先填写的会员')
+    mocks.createExpense.mockResolvedValueOnce(expense(1))
+    mocks.createExpenseRenewal.mockResolvedValueOnce(renewal(1))
+    await (kind === 'expense' ? view.saveExpense() : view.saveRenewal())
+    expect(kind === 'expense' ? mocks.createExpense : mocks.createExpenseRenewal).toHaveBeenCalledWith(expect.objectContaining({ category_id: kind === 'expense' ? 7 : 8 }))
+  })
+
+  it.each(['expense', 'renewal'] as const)('does not replace the selected or historical %s category during refresh', async kind => {
+    if (kind === 'expense') view.editExpense({ ...expense(1), category_id: 42 })
+    else view.editRenewal({ ...renewal(1), category_id: 42 })
+    const form = kind === 'expense' ? view.expenseForm : view.renewalForm
+    await view.loadCategories()
+    expect(form.category_id).toBe(42)
+    if (kind === 'expense') view.openExpenseForm()
+    else view.openRenewalForm()
+    form.category_id = 99
+    await view.loadCategories()
+    expect(form.category_id).toBe(99)
+  })
+
+  it('makes category failures recoverable without leaving creation permanently disabled', async () => {
+    view.categories = []
+    mocks.getExpenseCategories.mockRejectedValueOnce(new Error('分类连接失败'))
+    await view.loadCategories()
+    await flushPromises()
+    expect(view.categoriesLoading).toBe(false)
+    expect(view.categoryOptionsPending).toBe(false)
+    expect(wrapper!.get('[role="alert"]').text()).toContain('分类连接失败')
+    view.openExpenseForm()
+    await wrapper!.get('[role="alert"] button').trigger('click')
+    await flushPromises()
+    expect(view.categoryError).toBe('')
+    expect(view.expenseForm.category_id).toBe(1)
+  })
 
   it('keeps the newest expense detail when an earlier selection resolves last', async () => {
     const old = deferred<ExpenseRecord>()

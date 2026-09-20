@@ -18,6 +18,8 @@ export type Entitlements = z.infer<typeof entitlementsSchema>
 
 export const authenticatedUserSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
+  user_id: z.union([z.string(), z.number()]).optional(),
+  device_id: z.string().nullable().optional(),
   name: z.string().optional(),
   display_name: z.string().optional(),
   username: z.string().optional(),

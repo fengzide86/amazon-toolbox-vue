@@ -4,12 +4,16 @@
       <template #actions>
         <div class="page-actions">
           <button v-if="isSuperAdmin" class="ghost-button" @click="openCategories"><Tags :size="15" />分类管理</button>
-          <button class="primary-button" @click="activeLedger === 'expenses' ? openExpenseForm() : openRenewalForm()">
+          <button class="primary-button" :disabled="categoryOptionsPending" @click="activeLedger === 'expenses' ? openExpenseForm() : openRenewalForm()">
             <Plus :size="16" />{{ activeLedger === 'expenses' ? '记一笔支出' : '新建续费项目' }}
           </button>
         </div>
       </template>
     </PageHeader>
+
+    <p v-if="categoryError" role="alert" class="form-note">
+      {{ categoryError }}<button class="compact-button" :disabled="categoriesLoading" @click="loadCategories">重新加载分类</button>
+    </p>
 
     <section class="summary-grid" aria-label="公账支出概览">
       <article class="summary-card summary-card--primary">
@@ -144,11 +148,11 @@
         <label><span>金额（人民币）</span><el-input-number v-model="expenseForm.amount" :min="0.01" :precision="2" :step="0.01" controls-position="right" /></label>
         <label><span>支出日期</span><el-date-picker v-model="expenseForm.expense_date" type="date" value-format="YYYY-MM-DD" format="YYYY年MM月DD日" /></label>
         <label><span>支出事项</span><el-input v-model="expenseForm.title" maxlength="200" placeholder="例如：7 月阿里云服务器" /></label>
-        <label><span>分类</span><el-select v-model="expenseForm.category_id" placeholder="选择分类"><el-option v-for="item in activeCategories" :key="item.id" :label="item.name" :value="item.id" /></el-select></label>
+        <label><span>分类</span><el-select v-model="expenseForm.category_id" placeholder="选择分类" :loading="categoryOptionsPending" :disabled="categoryOptionsPending"><el-option v-for="item in activeCategories" :key="item.id" :label="item.name" :value="item.id" /></el-select></label>
         <label><span>收款方 <em>可选</em></span><el-input v-model="expenseForm.payee" maxlength="200" placeholder="公司或个人名称" /></label>
         <label><span>备注 <em>可选</em></span><el-input v-model="expenseForm.note" type="textarea" :rows="4" maxlength="4000" show-word-limit /></label>
         <label><span>图片或 PDF 凭证 <em>可选，最多 5 个</em></span><input class="file-input" type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" @change="selectFiles" /><small v-if="pendingFiles.length">已选择 {{ pendingFiles.length }} 个文件</small></label>
-        <div class="drawer-footer"><button type="button" class="ghost-button" @click="drawerVisible = false">取消</button><button class="primary-button" :disabled="saving">{{ saving ? '保存中…' : editingExpenseId ? '保存修改' : '确认入账' }}</button></div>
+        <div class="drawer-footer"><button type="button" class="ghost-button" @click="drawerVisible = false">取消</button><button class="primary-button" :disabled="saving || categoryOptionsPending">{{ saving ? '保存中…' : editingExpenseId ? '保存修改' : '确认入账' }}</button></div>
       </form>
 
       <div v-else-if="drawerMode === 'expense-detail' && selectedExpense" class="detail-sheet">
@@ -162,12 +166,12 @@
         <label><span>项目名称</span><el-input v-model="renewalForm.name" maxlength="200" placeholder="例如：Figma Professional" /></label>
         <label><span>供应商 <em>可选</em></span><el-input v-model="renewalForm.vendor" maxlength="200" /></label>
         <label><span>默认金额（人民币）</span><el-input-number v-model="renewalForm.default_amount" :min="0.01" :precision="2" :step="0.01" controls-position="right" /></label>
-        <label><span>分类</span><el-select v-model="renewalForm.category_id"><el-option v-for="item in activeCategories" :key="item.id" :label="item.name" :value="item.id" /></el-select></label>
+        <label><span>分类</span><el-select v-model="renewalForm.category_id" :loading="categoryOptionsPending" :disabled="categoryOptionsPending"><el-option v-for="item in activeCategories" :key="item.id" :label="item.name" :value="item.id" /></el-select></label>
         <div class="form-pair"><label><span>续费周期</span><el-select v-model="renewalForm.cycle"><el-option label="每月" value="monthly" /><el-option label="每季度" value="quarterly" /><el-option label="每半年" value="semiannual" /><el-option label="每年" value="annual" /></el-select></label><label><span>下次到期日</span><el-date-picker v-model="renewalForm.next_due_on" type="date" value-format="YYYY-MM-DD" format="YYYY年MM月DD日" /></label></div>
         <label><span>提前提醒天数</span><el-input-number v-model="renewalForm.reminder_days" :min="0" :max="90" controls-position="right" /></label>
         <label><span>备注 <em>可选</em></span><el-input v-model="renewalForm.note" type="textarea" :rows="4" maxlength="4000" /></label>
         <div class="form-note"><Info :size="15" />到期只生成提醒，确认已续费后才会进入实际支出。</div>
-        <div class="drawer-footer"><button type="button" class="ghost-button" @click="drawerVisible = false">取消</button><button class="primary-button" :disabled="saving">{{ saving ? '保存中…' : editingRenewalId ? '保存修改' : '创建项目' }}</button></div>
+        <div class="drawer-footer"><button type="button" class="ghost-button" @click="drawerVisible = false">取消</button><button class="primary-button" :disabled="saving || categoryOptionsPending">{{ saving ? '保存中…' : editingRenewalId ? '保存修改' : '创建项目' }}</button></div>
       </form>
 
       <div v-else-if="drawerMode === 'renewal-detail' && selectedRenewal" class="detail-sheet">
@@ -234,6 +238,9 @@ const activeLedger = ref<Ledger>(route.query.tab === 'renewals' ? 'renewals' : '
 const summary = ref<ExpenseSummary>(expenseSummarySchema.parse({ month: currentMonth, total: 0, previous_total: 0, change_percent: 0, count: 0, upcoming_renewals: 0, overdue_renewals: 0 }))
 const summaryError = ref('')
 const categories = ref<ExpenseCategory[]>([])
+const categoriesLoading = ref(true)
+const categoryError = ref('')
+const categoryOptionsPending = computed(() => categoriesLoading.value && !categories.value.length)
 const expenses = ref<ExpenseRecord[]>([])
 const renewals = ref<ExpenseRenewal[]>([])
 const expenseTotal = ref(0)
@@ -323,8 +330,22 @@ async function loadSummary() {
 }
 
 async function loadCategories() {
-  try { categories.value = expenseCategorySchema.array().parse(await getExpenseCategories(true)) }
-  catch (error) { showToast(errorText(error, '支出分类加载失败'), 'error') }
+  categoriesLoading.value = true
+  categoryError.value = ''
+  try {
+    categories.value = expenseCategorySchema.array().parse(await getExpenseCategories(true))
+    // A drawer can open before the initial category request finishes. Only fill
+    // an unselected new draft; never replace a selected or historical category.
+    if (drawerVisible.value && drawerMode.value === 'expense-form' && !editingExpenseId.value && expenseForm.category_id == null) {
+      expenseForm.category_id = activeCategories.value[0]?.id
+    }
+    if (drawerVisible.value && drawerMode.value === 'renewal-form' && !editingRenewalId.value && renewalForm.category_id == null) {
+      renewalForm.category_id = activeCategories.value.find(item => item.code === 'tool_membership')?.id || activeCategories.value[0]?.id
+    }
+  } catch (error) {
+    categoryError.value = errorText(error, '支出分类加载失败')
+    showToast(categoryError.value, 'error')
+  } finally { categoriesLoading.value = false }
 }
 
 async function loadExpenses() {
@@ -376,7 +397,7 @@ function selectFiles(event: Event) {
 }
 
 async function saveExpense() {
-  if (saving.value) return
+  if (saving.value || categoryOptionsPending.value) return
   if (!expenseForm.amount || !expenseForm.title.trim() || !expenseForm.category_id || !expenseForm.expense_date) { showToast('请完整填写金额、日期、事项和分类', 'warning'); return }
   const requestId = drawerRequestId
   const editingId = editingExpenseId.value
@@ -443,7 +464,7 @@ function openRenewalForm() { resetRenewalForm(); openDrawer('renewal-form') }
 function editRenewal(item: ExpenseRenewal) { Object.assign(renewalForm, { name: item.name, vendor: item.vendor || '', default_amount: item.default_amount, category_id: item.category_id, cycle: item.cycle, next_due_on: item.next_due_on, reminder_days: item.reminder_days, note: item.note || '' }); editingRenewalId.value = item.id; openDrawer('renewal-form') }
 
 async function saveRenewal() {
-  if (saving.value) return
+  if (saving.value || categoryOptionsPending.value) return
   if (!renewalForm.name.trim() || !renewalForm.default_amount || !renewalForm.category_id || !renewalForm.next_due_on) { showToast('请完整填写名称、金额、分类和到期日', 'warning'); return }
   const requestId = drawerRequestId
   const editingId = editingRenewalId.value

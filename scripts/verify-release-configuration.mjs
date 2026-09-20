@@ -60,6 +60,15 @@ if (!metadata.scripts['verify:release'].includes('npm run release:mariadb-gate')
 if (metadata.scripts['verify:release'].includes('npm run test:mariadb:required')) {
   throw new Error('verify:release must route MariaDB through release:mariadb-gate')
 }
+if (!metadata.scripts['verify:release'].includes('npm run test:e2e:real')) {
+  throw new Error('verify:release must execute isolated actual-backend journeys')
+}
+requireText('.github/workflows/test.yml', ['Real backend C B Admin journeys', 'node scripts/prepare-nsis-upgrade.mjs', 'test-results/nsis/**'])
+requireText('scripts/toolbox-cli.mjs', ["'Real backend C B Admin journeys'"])
+requireText('package.json', ['node scripts/bundle-electron-preload.mjs'])
+if (!metadata.scripts['test:coverage'].startsWith('npm run electron:compile && ')) {
+  throw new Error('test:coverage must build the current sandbox preload before testing it')
+}
 
 requireText('.gitattributes', [
   '*.sh text eol=lf',

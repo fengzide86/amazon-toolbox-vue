@@ -46,7 +46,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
 import { getPlans } from '@/utils/api'
 import { showToast } from '@/utils'
-import { customerPlanListSchema, readStoredLicense, type CustomerPlan } from '@/features/user/model'
+import { customerPlanListSchema, licensePlanCode, readStoredLicense, type CustomerPlan } from '@/features/user/model'
 
 const route = useRoute() || { query: {} }
 const plans = ref<CustomerPlan[]>([])
@@ -54,7 +54,7 @@ const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
 const userInfo = computed(readStoredLicense)
 const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
-const currentPlanCode = computed(() => userInfo.value.plan_code || userInfo.value.plan_name?.match(/Y\d+/i)?.[0]?.toUpperCase() || '')
+const currentPlanCode = computed(() => licensePlanCode(userInfo.value))
 
 function cleanPlanName(name = ''): string {
   return name.replace(/^Y\d+\s*/i, '') || name

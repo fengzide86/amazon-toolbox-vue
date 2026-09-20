@@ -6,7 +6,11 @@ import {
   getBusinessBootstrap,
   getBusinessBatches,
   getDemoBatches,
+  getDemoBatch,
+  updateDemoBatch,
 } from '@/utils/api'
+import { authService } from '@/utils/auth'
+import { getApiBase } from '@/shared/api/base'
 import {
   businessBatchSnapshotSchema,
   businessBootstrapSchema,
@@ -20,6 +24,7 @@ import {
 } from '@/features/business/model'
 import { demoBatchListSchema, unwrapApiData, type DemoBatch } from '@/features/demo/model'
 import { BusinessDemoCoordinator } from '@/features/business/demo-coordinator'
+import { DemoBatchRecovery } from '@/features/business/demo-recovery'
 import { BusinessLiveCoordinator } from '@/features/business/live-coordinator'
 import { WorkspaceImportCoordinator } from '@/features/business/workspace-import'
 import { createClientBatchId, errorMessage, statusText } from '@/features/business/workspace-helpers'
@@ -41,7 +46,14 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const bootstrapStale = ref(false)
   const historyLoading = ref(false)
   const historyError = ref<string | null>(null)
+  const recoveryPending = ref(0)
+  const recoveryStorageUnavailable = ref(false)
   let historyRequestSequence = 0
+  let startRequestSequence = 0
+  let pendingStartMode: 'demo' | 'live' | null = null
+  let initializedOwnerScope: string | null | undefined
+  let bootstrapRequestSequence = 0
+  let bootstrapInitialization: { owner: string | null; promise: Promise<BusinessBootstrap> } | null = null
 
   const entitlements = computed(() => bootstrap.value?.entitlements || {})
   const tools = computed(() => bootstrap.value?.tools || [])
@@ -65,7 +77,29 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     setLoading: value => { loading.value = value },
     setError: value => { error.value = value },
   })
+  function getOwnerScope(): string | null {
+    const user = authService.getUser()
+    const owner = user?.user_id ?? user?.id
+    if (!authService.getAuth() || authService.getRole() !== 'user' || owner === undefined) return null
+    return JSON.stringify([getApiBase(), owner, user?.auth_code_id ?? null, user?.device_id ?? null])
+  }
+
+  const recovery = new DemoBatchRecovery({
+    scope: getOwnerScope,
+    storage: () => localStorage,
+    getBatch: getDemoBatch,
+    updateBatch: updateDemoBatch,
+    onChange: (count, unavailable) => {
+      recoveryPending.value = count
+      recoveryStorageUnavailable.value = unavailable
+    },
+    onRecovered: id => {
+      if (String(snapshot.value.serverBatchId) === id && !isActive.value) syncState.value = 'synced'
+      void loadDemoHistory().catch(() => undefined)
+    },
+  })
   const demo = new BusinessDemoCoordinator({
+    recovery,
     getSnapshot: () => snapshot.value,
     setSnapshot: value => applySnapshot(value),
     setSyncState: value => { syncState.value = value },
@@ -73,6 +107,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     refreshHistory: () => loadDemoHistory(),
   })
   const live = new BusinessLiveCoordinator({
+    getOwnerScope,
     getSnapshot: () => snapshot.value,
     setSnapshot: value => applySnapshot(value),
     getSelectedTool: () => selectedTool.value,
@@ -82,28 +117,84 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   })
 
   async function init(): Promise<BusinessBootstrap> {
-    if (!bootstrap.value) bootstrap.value = businessBootstrapSchema.parse(await getBusinessBootstrap())
+    const owner = getOwnerScope()
+    if (initializedOwnerScope !== undefined && owner !== initializedOwnerScope) {
+      startRequestSequence += 1
+      bootstrapRequestSequence += 1
+      historyRequestSequence += 1
+      pendingStartMode = null
+      demo.dispose()
+      imports.invalidate()
+      bootstrap.value = null
+      history.value = []
+      demoHistory.value = []
+      importPreview.value = null
+      selectedTool.value = null
+      selectedItemId.value = null
+      snapshot.value = emptyBatchSnapshot()
+      loading.value = false
+      historyLoading.value = false
+      error.value = null
+      historyError.value = null
+      bootstrapStale.value = false
+    }
+    initializedOwnerScope = owner
+    recovery.initialize()
+    if (!bootstrap.value) {
+      // The shell and workspace mount together. They must share initialization,
+      // not invalidate each other's identical request as an authorization change.
+      if (!bootstrapInitialization || bootstrapInitialization.owner !== owner) {
+        const requestSequence = ++bootstrapRequestSequence
+        error.value = null
+        const promise = getBusinessBootstrap().then(response => {
+          const nextBootstrap = businessBootstrapSchema.parse(response)
+          if (owner !== getOwnerScope() || requestSequence !== bootstrapRequestSequence) {
+            throw new Error('授权已切换，请重新打开工作台')
+          }
+          bootstrap.value = nextBootstrap
+          return nextBootstrap
+        }).catch(cause => {
+          if (owner === getOwnerScope() && requestSequence === bootstrapRequestSequence) {
+            error.value = errorMessage(cause, '工作台暂时无法载入，请重试')
+          }
+          throw cause
+        }).finally(() => {
+          if (bootstrapInitialization?.promise === promise) bootstrapInitialization = null
+        })
+        bootstrapInitialization = { owner, promise }
+      }
+      await bootstrapInitialization.promise
+    }
     await live.initialize()
+    if (owner !== getOwnerScope() || !bootstrap.value) throw new Error('授权已切换，请重新打开工作台')
     return bootstrap.value
   }
 
   async function refreshBootstrap(): Promise<BusinessBootstrap> {
+    const owner = getOwnerScope()
+    const requestSequence = ++bootstrapRequestSequence
     loading.value = true
     error.value = null
     bootstrapStale.value = false
     try {
-      bootstrap.value = businessBootstrapSchema.parse(await getBusinessBootstrap())
+      const nextBootstrap = businessBootstrapSchema.parse(await getBusinessBootstrap())
+      if (owner !== getOwnerScope() || requestSequence !== bootstrapRequestSequence) {
+        throw new Error('工作台状态已刷新，请使用最新状态')
+      }
+      bootstrap.value = nextBootstrap
       if (selectedTool.value && !bootstrap.value.tools.some(tool => tool.id === selectedTool.value?.id)) {
         selectedTool.value = null
         importPreview.value = null
       }
       return bootstrap.value
     } catch (cause) {
-      error.value = errorMessage(cause, '工作台状态刷新失败')
-      bootstrapStale.value = bootstrap.value !== null
+      if (owner === getOwnerScope() && requestSequence === bootstrapRequestSequence) {
+        error.value = errorMessage(cause, '工作台状态刷新失败')
+        bootstrapStale.value = bootstrap.value !== null
+      }
       throw cause
     } finally {
-      loading.value = false
+      if (owner === getOwnerScope() && requestSequence === bootstrapRequestSequence) loading.value = false
     }
   }
 
@@ -140,7 +231,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   function chooseTool(tool: BusinessTool): void {
-    if (isActive.value) return
+    if (isActive.value || pendingStartMode) return
     imports.invalidate()
     selectedTool.value = tool
     importPreview.value = null
@@ -171,18 +262,23 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       throw new Error('真实批量执行仅支持课赛通 KST 桌面端')
     }
     const batchId = createClientBatchId()
+    const requestSequence = ++startRequestSequence
+    pendingStartMode = tool.availability === 'demo_only' ? 'demo' : 'live'
     loading.value = true
     try {
       const nextSnapshot = tool.availability === 'demo_only'
         ? await demo.start(tool, preview, batchId)
         : await live.start(tool, preview, batchId, entitlements.value.max_open_sessions || 6)
-      importPreview.value = null
+      if (requestSequence === startRequestSequence) importPreview.value = null
       return nextSnapshot
     } catch (cause) {
-      error.value = errorMessage(cause, '无法开始批次')
+      if (requestSequence === startRequestSequence) error.value = errorMessage(cause, '无法开始批次')
       throw cause
     } finally {
-      loading.value = false
+      if (requestSequence === startRequestSequence) {
+        pendingStartMode = null
+        loading.value = false
+      }
     }
   }
 
@@ -207,12 +303,19 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   async function cancelBatch(status: 'completed' | 'cancelled' | 'interrupted' = 'cancelled'): Promise<void> {
-    if (isDemoBatch.value) await demo.cancel(status)
+    const cancelDemo = pendingStartMode === 'demo' || isDemoBatch.value
+    startRequestSequence += 1
+    pendingStartMode = null
+    loading.value = false
+    if (cancelDemo) await demo.cancel(status)
     else await live.cancel(status)
   }
 
   async function resetWorkspace(): Promise<void> {
     if (isActive.value) throw new Error('当前批次仍在执行')
+    startRequestSequence += 1
+    pendingStartMode = null
+    loading.value = false
     imports.invalidate()
     await demo.reset()
     await live.cancelLocal(snapshot.value.status || 'completed')
@@ -239,13 +342,21 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   function dispose(): void {
+    startRequestSequence += 1
+    bootstrapRequestSequence += 1
+    bootstrapInitialization = null
+    pendingStartMode = null
+    loading.value = false
     live.dispose()
     demo.dispose()
+    recovery.dispose()
   }
+
+  function retryRecovery(): void { recovery.retry() }
 
   return {
     bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale, historyLoading, historyError,
-    entitlements, tools, items, openItems, isActive, isDemoBatch,
+    entitlements, tools, items, openItems, isActive, isDemoBatch, recoveryPending, recoveryStorageUnavailable, retryRecovery,
     init, refreshBootstrap, loadHistory, loadDemoHistory, chooseTool, loadSampleImport, saveSampleTemplate, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
     completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,
   }

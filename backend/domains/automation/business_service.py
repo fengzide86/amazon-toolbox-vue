@@ -27,6 +27,7 @@ INTERVENTION_MESSAGES = {
     "page_confirmation": "需要确认页面提示",
     "other": "需要人工完成页面操作",
 }
+TERMINAL_BATCH_STATUSES = {"completed", "cancelled", "interrupted"}
 
 async def _recount_batch_items(db: AsyncSession, batch_id: int) -> int:
     """Rebuild the parent counters from the item rows.
@@ -117,7 +118,7 @@ async def _owned_batch(
         AutomationBatch.device_id == (context.get("device_id") or ""),
     )
     if lock:
-        query = query.with_for_update()
+        query = query.with_for_update().execution_options(populate_existing=True)
     batch = (await db.execute(query)).scalar_one_or_none()
     if not batch:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="批次不存在")
@@ -233,6 +234,11 @@ async def update_batch(
 ) -> dict[str, Any]:
     require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context, lock=True)
+    if batch.status in TERMINAL_BATCH_STATUSES:
+        # Older desktop versions can send a delayed running heartbeat after
+        # finish. Acknowledge the canonical terminal snapshot without rewriting
+        # counters or timestamps, so idempotent retries also converge.
+        return serialize_batch(batch)
     counts = [
         request.pending_count,
         request.running_count,
@@ -283,9 +289,13 @@ async def upsert_batch_item(
         select(AutomationBatchItem).where(
             AutomationBatchItem.batch_id == batch.id,
             AutomationBatchItem.client_item_id == normalized_client_item_id,
-        )
+        ).execution_options(populate_existing=True)
     )
     item = result.scalar_one_or_none()
+    if batch.status in TERMINAL_BATCH_STATUSES:
+        if item is not None:
+            return serialize_item(item)
+        raise HTTPException(status_code=409, detail="批次已经结束，不能新增项目")
     if not item:
         existing_count = await db.scalar(
             select(func.count(AutomationBatchItem.id)).where(AutomationBatchItem.batch_id == batch.id)
@@ -298,6 +308,7 @@ async def upsert_batch_item(
             account_label_masked=_mask_label(request.account_label_masked),
         )
         db.add(item)
+    previous_status = item.status
     item.account_label_masked = _mask_label(request.account_label_masked)
     item.status = request.status
     item.intervention_type = request.intervention_type if request.status == "waiting_user" else None
@@ -309,7 +320,14 @@ async def upsert_batch_item(
     if request.status == "running" and not item.started_at:
         item.started_at = datetime.now()
     if request.status in {"completed", "failed", "cancelled"}:
-        item.completed_at = datetime.now()
+        if previous_status != request.status or item.completed_at is None:
+            item.completed_at = datetime.now()
+    else:
+        # A failed item may be explicitly restarted while its batch is active.
+        # Do not carry the earlier attempt's completion into the new attempt.
+        item.completed_at = None
+        if request.status == "pending":
+            item.started_at = None
     batch.last_heartbeat_at = datetime.now()
     await _recount_batch_items(db, batch.id)
     await db.commit()
@@ -325,6 +343,8 @@ async def finish_batch(
 ) -> dict[str, Any]:
     require_live_batch_write()
     batch = await _owned_batch(db, batch_id, context, lock=True)
+    if batch.status in TERMINAL_BATCH_STATUSES:
+        return serialize_batch(batch)
     item_count = await _recount_batch_items(db, batch.id)
     if request.status == "completed":
         unfinished = batch.pending_count + batch.running_count + batch.waiting_count

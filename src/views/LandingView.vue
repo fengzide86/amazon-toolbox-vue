@@ -11,7 +11,7 @@
           <RouterLink :to="anchor('faq')" @click="closeNavigation()">常见问题</RouterLink>
         </nav>
         <div class="nav-actions">
-          <RouterLink class="nav-login" to="/user/login">授权登录 <ArrowUpRight :size="14" aria-hidden="true" /></RouterLink>
+          <RouterLink v-if="!marketingOnly" class="nav-login" to="/user/login">授权登录 <ArrowUpRight :size="14" aria-hidden="true" /></RouterLink>
           <button class="nav-download" type="button" :disabled="isDownloading" :aria-busy="isDownloading" @click="downloadDesktop">{{ isDownloading ? '获取中…' : '下载桌面端' }}<ArrowDown :size="14" aria-hidden="true" /></button>
           <button ref="navToggle" class="nav-toggle" type="button" :aria-expanded="mobileNavOpen" :aria-label="mobileNavOpen ? '关闭导航' : '打开导航'" aria-controls="landing-navigation" @click="mobileNavOpen = !mobileNavOpen"><X v-if="mobileNavOpen" :size="22" aria-hidden="true" /><Menu v-else :size="22" aria-hidden="true" /></button>
         </div>
@@ -58,13 +58,13 @@
     </section>
     <section id="workflow" class="section workflow-section">
       <div class="landing-container workflow-grid">
-        <div data-reveal><p class="eyebrow">让第一次使用更顺畅</p><h2>三步，进入赛训节奏。</h2><p class="section-description">选对工具，确认授权，开始体验。<br>个人与团队，都有自己的起点。</p><dl class="authorization-paths"><div><dt>个人使用</dt><dd>确认所需工具、使用期限与设备范围。</dd></div><div><dt>团队使用</dt><dd>另行确认成员席位、批量任务与支持范围。</dd></div></dl><div class="workflow-entry"><button class="button button-primary" type="button" data-testid="consultation-trigger" aria-haspopup="dialog" @click="consultationOpen = true">咨询授权 <ArrowUpRight :size="16" aria-hidden="true" /></button><RouterLink class="text-link" to="/user/login">已有授权，前往登录 <ArrowUpRight :size="16" aria-hidden="true" /></RouterLink></div></div>
+        <div data-reveal><p class="eyebrow">让第一次使用更顺畅</p><h2>三步，进入赛训节奏。</h2><p class="section-description">选对工具，确认授权，开始体验。<br>个人与团队，都有自己的起点。</p><dl class="authorization-paths"><div><dt>个人使用</dt><dd>确认所需工具、使用期限与设备范围。</dd></div><div><dt>团队使用</dt><dd>另行确认成员席位、批量任务与支持范围。</dd></div></dl><div class="workflow-entry"><button class="button button-primary" type="button" data-testid="consultation-trigger" aria-haspopup="dialog" @click="consultationOpen = true">咨询授权 <ArrowUpRight :size="16" aria-hidden="true" /></button><RouterLink v-if="!marketingOnly" class="text-link" to="/user/login">已有授权，前往登录 <ArrowUpRight :size="16" aria-hidden="true" /></RouterLink></div></div>
         <div><ol class="workflow-steps"><li v-for="(step, index) in workflowSteps" :key="step.title" data-reveal><span class="step-number">0{{ index + 1 }}</span><div><h3>{{ step.title }}</h3><p>{{ step.description }}</p></div></li></ol><div class="authorization-note" data-reveal><Info :size="17" aria-hidden="true" /><p><strong>还没有授权？</strong>可先查看咨询说明，或联系向你介绍课赛通的交付方。当前咨询入口为预览演示，本站暂不提供在线购买，下载不代表已开通授权。</p></div></div>
       </div>
     </section>
     <section id="faq" class="section faq-section"><div class="landing-container faq-grid"><div data-reveal><p class="eyebrow">常见问题</p><h2>把你关心的，<br>说清楚。</h2></div><div class="faq-list" data-reveal><details v-for="question in questions" :key="question.title"><summary>{{ question.title }}<Plus :size="18" aria-hidden="true" /></summary><div class="faq-answer"><p>{{ question.answer }}</p></div></details></div></div></section>
     <section class="final-cta"><div class="landing-container final-inner" data-reveal><div><p class="eyebrow">课赛通 KST</p><h2>下一次赛训，<br class="mobile-only">从容一点。</h2><p>从一个合适的工具开始。</p></div><div class="final-actions"><button class="button button-primary" type="button" :disabled="isDownloading" :aria-busy="isDownloading" @click="downloadDesktop">{{ downloadLabel }}<ArrowDown :size="17" aria-hidden="true" /></button><span>Windows 桌面端 · 使用需有效授权</span></div></div></section>
-    <footer class="landing-footer"><div class="landing-container"><div class="footer-top"><BrandLockup audience="login" /><div class="footer-links"><RouterLink :to="anchor('workflow')">授权说明</RouterLink><RouterLink :to="anchor('faq')">常见问题</RouterLink><RouterLink to="/user/terms">服务条款</RouterLink><RouterLink to="/admin/login">内部运营</RouterLink></div></div><div class="footer-bottom"><span>© {{ currentYear }} 课赛通 KST</span><span>以亚马逊赛训为主 · 速卖通扩展验证中</span><RouterLink to="/">回到顶部 <ArrowUp :size="14" aria-hidden="true" /></RouterLink></div></div></footer>
+    <footer class="landing-footer"><div class="landing-container"><div class="footer-top"><BrandLockup audience="login" /><div class="footer-links"><RouterLink :to="anchor('workflow')">授权说明</RouterLink><RouterLink :to="anchor('faq')">常见问题</RouterLink><RouterLink :to="marketingOnly ? '/terms' : '/user/terms'">服务条款</RouterLink><RouterLink v-if="!marketingOnly" to="/admin/login">内部运营</RouterLink></div></div><div class="footer-bottom"><span>© {{ currentYear }} 课赛通 KST</span><span>以亚马逊赛训为主 · 速卖通扩展验证中</span><RouterLink to="/">回到顶部 <ArrowUp :size="14" aria-hidden="true" /></RouterLink></div></div></footer>
     <Transition name="download-notice"><div v-if="downloadState !== 'idle'" class="download-notice" :class="{ 'is-error': downloadState === 'error' }"><div><span v-if="isDownloading" class="download-spinner" aria-hidden="true"></span><CircleAlert v-else-if="downloadState === 'error'" :size="19" aria-hidden="true" /><Check v-else :size="19" aria-hidden="true" /><p id="desktop-download-feedback" :role="downloadState === 'error' ? 'alert' : 'status'" aria-atomic="true">{{ downloadFeedback }}</p></div><button v-if="downloadState === 'error'" type="button" @click="downloadDesktop">重试</button><button v-if="!isDownloading" class="notice-close" type="button" aria-label="关闭下载提示" @click="downloadState = 'idle'"><X :size="17" aria-hidden="true" /></button></div></Transition>
     <LandingConsultationDialog :open="consultationOpen" @close="consultationOpen = false" />
   </main>
@@ -79,6 +79,7 @@ import LandingConsultationDialog from '@/components/landing/LandingConsultationD
 import { useLandingMotion } from '@/composables/useLandingMotion'
 import { downloadDesktopInstaller } from '@/runtime/desktop-download'
 
+const props = withDefaults(defineProps<{ marketingOnly?: boolean }>(), { marketingOnly: false })
 const currentYear = new Date().getFullYear()
 const landingRoot = ref<HTMLElement | null>(null)
 const mainContent = ref<HTMLElement | null>(null)
@@ -148,13 +149,13 @@ const workflowSteps = [
   { title: '确认并开通授权', description: '联系交付方确认工具权限、使用期限、设备数量；团队另行确认成员席位。' },
   { title: '安装，开始体验', description: '安装 Windows 桌面端并登录，先用演示熟悉操作，再按工具开放范围使用。' },
 ]
-const questions = [
+const questions = computed(() => [
   { title: '课赛通适合谁？', answer: '主要面向参赛学生与代打团队：学生使用个人工具箱，团队使用专业批量工作台。课程学员、指导教师、院校与培训机构可先与交付方确认具体任务与授权方式。当前以亚马逊赛训为主，速卖通作为扩展验证方向。' },
-  { title: '官网和桌面端有什么区别？', answer: '官网用于了解产品与下载，手机和电脑都能浏览。已有授权可登录使用浏览器支持的管理与演示功能。真实自动执行需要 Windows 桌面端；当前工具以演示体验为主，真实场景仍需验证，须确认工具已开放并安排受控试运行。' },
+  { title: '官网和桌面端有什么区别？', answer: props.marketingOnly ? '官网用于了解产品、查看授权说明与下载，手机和电脑都能浏览。使用工具请安装 Windows 桌面端，并在桌面端完成授权登录。当前工具以演示体验为主，真实场景仍需验证，须确认工具已开放并安排受控试运行。' : '官网用于了解产品与下载，手机和电脑都能浏览。已有授权可登录使用浏览器支持的管理与演示功能。真实自动执行需要 Windows 桌面端；当前工具以演示体验为主，真实场景仍需验证，须确认工具已开放并安排受控试运行。' },
   { title: '批量演示等于真实账号并发执行吗？', answer: '不等于。批量演示最多可展示 50 个账号一起推进，不会同时创建 50 个真实浏览器。真实任务仅在 Windows 桌面端按账号顺序执行，目前不支持多个真实账号同时自动运行。演示状态不代表真实账号已经完成任务。' },
   { title: '下载后可以直接使用吗？套餐如何确定？', answer: '下载不代表已获得授权。使用需有效授权，工具、期限、设备与席位范围以有效套餐配置为准。请先通过向你介绍课赛通的交付渠道确认适用范围和授权，本站暂不提供免费注册或在线购买。' },
   { title: '遇到登录验证或任务异常怎么办？', answer: '需要人工介入时，在保留的任务现场完成确认，再选择继续或停止。结果以实际执行反馈为准，不以动画判断成功。可通过工具帮助、执行记录和问题反馈进一步排查。' },
-]
+])
 </script>
 
 <style scoped>

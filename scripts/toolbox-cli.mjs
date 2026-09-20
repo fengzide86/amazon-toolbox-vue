@@ -6,6 +6,7 @@ import path from 'node:path'
 import process from 'node:process'
 import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import { resolvePython } from './run-python.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const isWindows = process.platform === 'win32'
@@ -31,7 +32,8 @@ function invocation(command, args) {
   if (isWindows && command === 'npm') {
     return {
       command: process.env.ComSpec || 'cmd.exe',
-      args: ['/d', '/s', '/c', ['npm', ...args].map(cmdQuote).join(' ')],
+      args: ['/d', '/v:off', '/s', '/c', ['npm', ...args].map(cmdQuote).join(' ')],
+      windowsVerbatimArguments: true,
     }
   }
   return { command, args }
@@ -49,6 +51,7 @@ function run(command, args, options = {}) {
     env: options.env || process.env,
     stdio: options.stdio || 'inherit',
     windowsHide: true,
+    windowsVerbatimArguments: call.windowsVerbatimArguments,
     encoding: options.stdio === 'pipe' ? 'utf8' : undefined,
   })
   if (result.error) throw result.error
@@ -65,6 +68,7 @@ function runAsync(command, args, options = {}) {
       env: options.env || process.env,
       stdio: options.stdio || 'inherit',
       windowsHide: options.windowsHide ?? true,
+      windowsVerbatimArguments: call.windowsVerbatimArguments,
     })
     child.once('error', reject)
     child.once('exit', code => code === 0 ? resolve() : reject(new Error(`${command} 执行失败，退出码 ${code ?? 'unknown'}`)))
@@ -369,7 +373,7 @@ function localBackendEnvironment() {
 }
 
 function localPythonExecutable() {
-  return path.join(root, 'venv', isWindows ? 'Scripts' : 'bin', isWindows ? 'python.exe' : 'python')
+  return resolvePython()
 }
 
 function ensureLocalStaffAdmin(env) {
@@ -402,7 +406,6 @@ function ensureLocalStaffAdmin(env) {
 }
 
 async function preview(args) {
-  ensureDependencies()
   const adminEntry = args.includes('admin') || args.includes('--admin') || process.env.TOOLBOX_PREVIEW_ENTRY === 'admin'
   const requested = optionValue(args, 'backend', args.includes('remote') ? 'remote' : args.includes('local') ? 'local' : 'auto')
   if (!['auto', 'local', 'remote'].includes(requested)) fail(`未知后端模式：${requested}`)
@@ -416,46 +419,46 @@ async function preview(args) {
   let backendProcess
   let url
 
-  if (mode === 'remote') {
-    if (!remoteUrl) fail('远程预览缺少 TOOLBOX_CONTROL_API_URL')
-    url = remoteUrl
-    const result = await health(url)
-    if (result.status !== 'ok') fail(`远程后端状态异常：${result.status}`)
-    if (result.version !== packageVersion()) {
-      log(`警告：远程后端 v${result.version} 与本地 v${packageVersion()} 不一致；预览继续启动。`)
-    }
-  } else {
-    url = localUrl
-    try {
-      await health(url)
-      log(`复用已运行的本地后端：${url}`)
-    } catch {
-      if (dryRun) {
-        log(`本地后端尚未运行；正式预览时会自动启动：${url}`)
-      } else {
+  if (dryRun) {
+    url = mode === 'remote' ? remoteUrl : localUrl
+    if (!url) fail('远程预览缺少 TOOLBOX_CONTROL_API_URL')
+    log(`预览配置检查通过：${mode} / ${url}；未安装依赖、启动进程或连接后端。`)
+    return
+  }
+  ensureDependencies()
+  if (mode === 'local') backendEnv.TOOLBOX_PYTHON = localPythonExecutable()
+  try {
+    if (mode === 'remote') {
+      if (!remoteUrl) fail('远程预览缺少 TOOLBOX_CONTROL_API_URL')
+      url = remoteUrl
+      const result = await health(url)
+      if (result.status !== 'ok') fail(`远程后端状态异常：${result.status}`)
+      if (result.version !== packageVersion()) {
+        log(`警告：远程后端 v${result.version} 与本地 v${packageVersion()} 不一致；预览继续启动。`)
+      }
+    } else {
+      url = localUrl
+      try {
+        await health(url)
+        log(`复用已运行的本地后端：${url}`)
+      } catch {
         log('本地后端未运行，正在自动启动...')
         const backendBat = path.join(root, 'backend', 'start.bat')
-        backendProcess = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', cmdQuote(backendBat)], {
+        backendProcess = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/v:off', '/s', '/c', `call ${cmdQuote(backendBat)}`], {
           cwd: path.join(root, 'backend'),
           env: { ...backendEnv, TOOLBOX_NO_PAUSE: '1' },
           stdio: 'inherit',
           windowsHide: true,
+          windowsVerbatimArguments: true,
         })
         await waitForHealth(url)
       }
     }
-  }
 
-  try {
-    if (mode === 'local' && !dryRun) ensureLocalStaffAdmin(backendEnv)
+    if (mode === 'local') ensureLocalStaffAdmin(backendEnv)
 
     log(`预览后端：${url}`)
     if (adminEntry) log('启动入口：管理员登录（保留已记住的 C 端授权码）')
-    if (dryRun) {
-      log('预览配置检查通过。')
-      return
-    }
-
     const env = {
       ...process.env,
       TOOLBOX_CONTROL_API_URL: url,
@@ -471,14 +474,49 @@ async function preview(args) {
 }
 
 function check(args) {
-  ensureDependencies()
   const full = args.includes('full') || args.includes('--full')
   if (args.includes('--dry-run') || process.env.TOOLBOX_DRY_RUN === '1') {
     log(`检查入口配置通过；正式运行将执行${full ? '完整发布门禁' : '前后端快速测试'}。`)
     return
   }
+  ensureDependencies()
   run('npm', ['run', full ? 'verify:release' : 'verify:quick'])
   log(full ? '完整发布门禁通过。' : '快速检查通过；发布前请运行“检查.bat full”。')
+}
+
+function pack(args) {
+  if (args.some(arg => !['--dry-run'].includes(arg))) fail('仅打包只支持 --dry-run；版本取自 package.json，不接受发布或跳过审计参数')
+  const version = packageVersion()
+  log(`仅本地打包 v${version}：不改版本、不提交 Git、不部署、不上传更新。`)
+  if (args.includes('--dry-run') || process.env.TOOLBOX_DRY_RUN === '1') {
+    log('将执行 desktop:verify-installer（NSIS 构建、包内容审计、更新清单哈希检查）；尚未执行。')
+    return
+  }
+  ensureDependencies()
+  run('npm', ['run', 'desktop:verify-installer'])
+  log(`本地安装包已生成并审计：${path.join(root, 'release', `KST Setup ${version}.exe`)}`)
+  log('这是本地构建，不代表完整发布门禁通过或生产已更新。正式发布请使用“一键发布.bat”。')
+}
+
+async function marketing(args) {
+  const [action = 'preview', ...options] = args
+  if (!['preview', 'publish'].includes(action)) fail(`未知官网操作：${action}`)
+  if (action === 'publish') {
+    // The dedicated publisher owns Cloudflare configuration, authentication,
+    // release prerequisites and post-upload verification. Never report success
+    // when it fails or is not configured.
+    run('npm', ['run', 'marketing:publish', ...(options.length ? ['--', ...options] : [])])
+    return
+  }
+  if (options.some(arg => arg !== '--dry-run')) fail('官网预览只支持 --dry-run')
+  if (options.includes('--dry-run') || process.env.TOOLBOX_DRY_RUN === '1') {
+    log('官网预览配置：build:marketing → marketing:audit → preview:marketing；产物 dist-marketing，地址 http://127.0.0.1:4200，尚未构建或启动。')
+    return
+  }
+  ensureDependencies()
+  run('npm', ['run', 'build:marketing'])
+  run('npm', ['run', 'marketing:audit'])
+  await runAsync('npm', ['run', 'preview:marketing'])
 }
 
 function shellQuote(value) {
@@ -710,6 +748,7 @@ function verifyGithubCi(commitSha) {
     'MariaDB migrations and concurrency',
     'Responsive C B Admin smoke',
     'Internal critical-flow acceptance',
+    'Real backend C B Admin journeys',
     'Windows NSIS install and runtime smoke',
   ]
   const required = requiredNames.map(name => checks.find(check => check.name === name))
@@ -1115,7 +1154,6 @@ function createAndPushReleaseTag(state) {
 }
 
 async function release(args) {
-  ensureDependencies()
   const current = packageVersion()
   const publish = args.includes('--publish')
   const dryRun = args.includes('--dry-run') || process.env.TOOLBOX_DRY_RUN === '1'
@@ -1124,6 +1162,7 @@ async function release(args) {
   if (publish && (args.includes('--skip-verify') || args.includes('--skip-build'))) {
     fail('生产发布禁止 --skip-verify 和 --skip-build；紧急操作也必须先通过 verify:release')
   }
+  if (!dryRun) ensureDependencies()
   let version = optionValue(
     args,
     'version',
@@ -1298,6 +1337,7 @@ async function release(args) {
       state.leaseStatus = 'released'
       writeReleaseState(state)
       log(`发布流程完成：v${version}（生产环境，${state.releaseId}）`)
+      log('系统发布完成；独立宣传官网需运行“官网发布.bat”，其上线结果单独核验，不能以系统发布成功替代。')
       return
     } finally {
       releaseLock()
@@ -1318,11 +1358,65 @@ async function release(args) {
   log(`发布流程完成：v${version}（仅本地构建）`)
 }
 
+export async function jointRelease(args, actions = {
+  checkConfig: () => run(process.execPath, [path.join(root, 'scripts', 'publish-marketing.mjs'), '--dry-run']),
+  checkAccount: () => run(process.execPath, [path.join(root, 'scripts', 'publish-marketing.mjs'), '--check-account']),
+  releaseSystem: options => release(options),
+  publishWebsite: () => marketing(['publish']),
+}) {
+  if (args.some(arg => arg.startsWith('--skip-verify') || arg.startsWith('--skip-build'))) {
+    fail('生产发布禁止 --skip-verify 和 --skip-build；联合发布不得跳过完整门禁')
+  }
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index]
+    if (arg === '--dry-run') continue
+    if (arg === '--version' || arg === '--resume') {
+      if (!args[index + 1] || args[index + 1].startsWith('--')) fail(`${arg} 缺少参数`)
+      index += 1
+      continue
+    }
+    if (/^--(?:version|resume)=.+$/.test(arg)) continue
+    fail(`联合发布不支持参数：${arg}；仅支持 --version、--resume 和 --dry-run`)
+  }
+  const explicitVersion = optionValue(args, 'version', process.env.TOOLBOX_RELEASE_VERSION || '')
+  if (explicitVersion) semverKey(explicitVersion)
+  const resumeId = optionValue(args, 'resume', '')
+  if (resumeId && !/^[A-Za-z0-9._-]+$/.test(resumeId)) fail(`发布 ID 无效：${resumeId}`)
+  const dryRun = args.includes('--dry-run') || process.env.TOOLBOX_DRY_RUN === '1'
+  if (dryRun) {
+    await actions.checkConfig()
+    log(`联合发布配置检查通过：${explicitVersion ? `v${explicitVersion}` : resumeId ? `恢复 ${resumeId}` : `v${packageVersion()}`}。`)
+    log('正式运行顺序：官网账号和已有项目预检 → 系统完整生产发布 → 独立官网发布及公开访问核验。')
+    log('未连接网络、安装依赖、构建或改动线上；此结果不是发布验收。')
+    return
+  }
+
+  log('联合发布先核验官网配置、Cloudflare 登录与已有项目；此时不会发布系统或官网。')
+  await actions.checkAccount()
+  const systemOptions = [...args, '--publish']
+  if (!explicitVersion && !resumeId) systemOptions.push(`--version=${packageVersion()}`)
+  log('官网账号预检通过，开始系统完整生产发布；原有质量门禁、确认和可恢复五阶段保持不变。')
+  await actions.releaseSystem(systemOptions)
+  log('系统发布已完成，开始独立宣传官网发布。两者不是跨服务原子事务。')
+  try {
+    await actions.publishWebsite()
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    fail(`系统已发布完成，但官网发布失败：${reason}。系统不会自动回滚或再次发布；排除官网问题后仅运行“官网发布.bat”恢复，并核对公开访问结果。`)
+  }
+  log('联合发布完成：系统与独立宣传官网均已完成各自发布器的上线核验。')
+}
+
 function help() {
   console.log(`用法：
   node scripts/toolbox-cli.mjs preview [admin] [local|remote] [--dry-run]
   node scripts/toolbox-cli.mjs check [full] [--dry-run]
+  node scripts/toolbox-cli.mjs pack [--dry-run]
+  node scripts/toolbox-cli.mjs marketing preview [--dry-run]
+  node scripts/toolbox-cli.mjs marketing publish [--dry-run]
   node scripts/toolbox-cli.mjs release [--version=x.y.z] [--publish] [--resume=release-id] [--dry-run]
+  node scripts/toolbox-cli.mjs joint-release [--version=x.y.z] [--resume=release-id] [--dry-run]
+  联合发布依次更新系统和独立宣传官网；官网失败后仅运行 marketing publish 恢复。
   本地构建可使用 --skip-verify/--skip-build；生产发布禁止跳过完整门禁。
 `)
 }
@@ -1332,11 +1426,18 @@ async function main() {
   const [command = 'help', ...args] = process.argv.slice(2)
   if (command === 'preview') await preview(args)
   else if (command === 'check') check(args)
+  else if (command === 'pack') pack(args)
+  else if (command === 'marketing') await marketing(args)
   else if (command === 'release') await release(args)
-  else help()
+  else if (command === 'joint-release') await jointRelease(args)
+  else if (['help', '--help', '-h'].includes(command)) help()
+  else fail(`未知操作：${command}；运行 help 查看支持的命令`)
 }
 
-main().catch(error => {
-  console.error(`[TOOLBOX] 失败：${error instanceof Error ? error.message : error}`)
-  process.exitCode = 1
-})
+if (process.argv[1] && fs.existsSync(process.argv[1])
+  && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))) {
+  main().catch(error => {
+    console.error(`[TOOLBOX] 失败：${error instanceof Error ? error.message : error}`)
+    process.exitCode = 1
+  })
+}
