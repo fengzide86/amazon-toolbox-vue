@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   createLog: vi.fn(),
   createDemoRun: vi.fn(),
   confirmAction: vi.fn(),
+  showToast: vi.fn(),
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }))
 vi.mock('@/utils/api', () => ({
@@ -20,7 +21,7 @@ vi.mock('@/utils/api', () => ({
   finishDemoRun: vi.fn().mockResolvedValue({}),
   cancelDemoRun: vi.fn().mockResolvedValue({}),
 }))
-vi.mock('@/utils', () => ({ showToast: vi.fn() }))
+vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
 vi.mock('@/shared/ui/confirm', () => ({ confirmAction: mocks.confirmAction }))
 
 describe('ToolWorkspace 极简运行工作台', () => {
@@ -103,7 +104,7 @@ describe('ToolWorkspace 极简运行工作台', () => {
 
     const stopButton = wrapper.findAll('button').find(button => button.text().includes('停止演示'))
     await stopButton.trigger('click')
-    await wrapper.vm.$nextTick()
+    await flushPromises()
 
     expect(mocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({
       title: '停止本次处理？',
@@ -113,6 +114,64 @@ describe('ToolWorkspace 极简运行工作台', () => {
     expect(wrapper.find('.result-card.cancelled').text()).toContain('已退出演示')
     expect(wrapper.find('.result-card.cancelled').text()).toContain('重新演示')
     expect(wrapper.find('.workspace-topbar').text()).not.toContain('返回工具箱')
+    wrapper.unmount()
+  })
+
+  it('取消仍在等待时保留工作台并防止再次停止或退出', async () => {
+    mocks.confirmAction.mockResolvedValue(true)
+    const wrapper = mountWorkspace()
+    await flushPromises()
+    const store = useTaskRunStore()
+    const runId = store.runId
+    let release!: () => void
+    const cancel = vi.spyOn(store, 'cancel').mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve }))
+    await wrapper.get('[aria-label="返回工具箱"]').trigger('click')
+    await flushPromises()
+    expect(useAppStore().toolVisible).toBe(true)
+    expect(store.runId).toBe(runId)
+    expect(wrapper.get('[aria-label="返回工具箱"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('.control-button.danger').text()).toContain('正在停止')
+    await wrapper.get('.control-button.danger').trigger('click')
+    expect(cancel).toHaveBeenCalledOnce()
+    release()
+    await flushPromises()
+    expect(useAppStore().toolVisible).toBe(false)
+    expect(store.runId).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('退出取消失败时保留现场并显示可重试反馈', async () => {
+    mocks.confirmAction.mockResolvedValue(true)
+    const wrapper = mountWorkspace()
+    await flushPromises()
+    const store = useTaskRunStore()
+    const runId = store.runId
+    vi.spyOn(store, 'cancel').mockRejectedValueOnce(new Error('IPC disconnected'))
+    await wrapper.get('[aria-label="返回工具箱"]').trigger('click')
+    await flushPromises()
+    expect(useAppStore().toolVisible).toBe(true)
+    expect(store.runId).toBe(runId)
+    expect(store.status).toBe('running')
+    expect(wrapper.get('[aria-label="返回工具箱"]').attributes('disabled')).toBeUndefined()
+    expect(mocks.showToast).toHaveBeenCalledWith('暂时无法退出，当前现场已保留，请重试', 'error')
+    await wrapper.get('[aria-label="返回工具箱"]').trigger('click')
+    await flushPromises()
+    expect(useAppStore().toolVisible).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('停止失败不会显示已停止或丢失继续操作入口', async () => {
+    mocks.confirmAction.mockResolvedValue(true)
+    const wrapper = mountWorkspace()
+    await flushPromises()
+    const store = useTaskRunStore()
+    vi.spyOn(store, 'cancel').mockRejectedValueOnce(new Error('IPC disconnected'))
+    await wrapper.get('.control-button.danger').trigger('click')
+    await flushPromises()
+    expect(store.status).toBe('running')
+    expect(wrapper.find('.result-card.cancelled').exists()).toBe(false)
+    expect(wrapper.get('.control-button.danger').attributes('disabled')).toBeUndefined()
+    expect(mocks.showToast).toHaveBeenCalledWith('暂时无法停止，当前现场已保留，请重试', 'error')
     wrapper.unmount()
   })
 

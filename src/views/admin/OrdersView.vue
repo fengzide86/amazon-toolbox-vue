@@ -5,23 +5,23 @@
 
     <section v-if="loadState !== 'loading' && loadState !== 'error'" class="order-stats" aria-label="订单统计">
       <article class="stat-card">
-          <div class="stat-label">总订单数</div>
+          <div class="stat-label">{{ filterStatus ? '匹配订单数' : '总订单数' }}</div>
           <div class="stat-value" style="color: var(--color-primary);">{{ stats.total }}</div>
       </article>
       <article class="stat-card">
-          <div class="stat-label">已收款</div>
+          <div class="stat-label">本页已收款</div>
           <div class="stat-value">{{ stats.paid }}</div>
       </article>
       <article class="stat-card">
-          <div class="stat-label">待收款</div>
+          <div class="stat-label">本页待收款</div>
           <div class="stat-value" style="color: var(--color-warning);">{{ stats.pending }}</div>
       </article>
       <article class="stat-card">
-          <div class="stat-label">已退款</div>
+          <div class="stat-label">本页已退款</div>
           <div class="stat-value" style="color: var(--color-danger);">{{ stats.refunded }}</div>
       </article>
       <article class="stat-card">
-          <div class="stat-label">已取消</div>
+          <div class="stat-label">本页已取消</div>
           <div class="stat-value">{{ stats.cancelled }}</div>
       </article>
     </section>
@@ -65,7 +65,7 @@
     <el-card v-if="loadState !== 'loading' && loadState !== 'error'" class="table-card">
       <template #header>
         <div class="card-header">
-          <h3>全部订单</h3>
+          <h3>订单列表</h3>
         </div>
       </template>
       <DataToolbar label="订单筛选">
@@ -75,7 +75,7 @@
           <el-option label="已退款" value="refunded" />
           <el-option label="已取消" value="cancelled" />
         </el-select>
-        <template #summary>共 {{ filteredOrders.length }} 笔</template>
+        <template #summary>共 {{ total }} 笔 · 本页 {{ orders.length }} 笔</template>
         <template #actions>
           <el-button @click="exportOrdersData">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -83,7 +83,7 @@
           </el-button>
         </template>
       </DataToolbar>
-      <el-table :data="filteredOrders" style="width: 100%">
+      <el-table :data="orders" style="width: 100%">
         <el-table-column label="订单号" min-width="140">
           <template #default="{ row }">
             <span style="font-family: monospace; font-size: 0.85rem;">{{ row.order_no }}</span>
@@ -139,6 +139,9 @@
           <div class="empty-state">暂无订单</div>
         </template>
       </el-table>
+      <div class="orders-pagination">
+        <el-pagination :current-page="page" :page-size="pageSize" :total="total" :pager-count="5" layout="prev, pager, next" @current-change="changePage" />
+      </div>
     </el-card>
 
     <AdminDetailDrawer v-model="showDetailDrawer" title="订单详情">
@@ -157,10 +160,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { getOrders, createOrder as apiCreateOrder, markOrderPaid, cancelOrder, refundOrder, getPlansAdmin, exportOrders } from '@/utils/api'
+import { getOrdersPage, createOrder as apiCreateOrder, markOrderPaid, cancelOrder, refundOrder, getPlansAdmin, exportOrders } from '@/utils/api'
 import { showToast } from '@/utils'
 import { usePlatformStore } from '@/stores/platform'
 import { useCompactLayout } from '@/composables/useCompactLayout'
@@ -187,6 +190,10 @@ const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
 const isLoading = ref(false)
 const filterStatus = ref('')
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
+let loadGeneration = 0
 const planNameMap = reactive<Record<string, string>>({})
 
 const platformStore = usePlatformStore()
@@ -202,17 +209,12 @@ const newOrder = ref<{ plan_id: string | number | null; amount: number; channel:
 const activePlans = computed(() => plans.value.filter((plan) => plan.status === 'active'))
 
 const stats = computed(() => ({
-  total: orders.value.length,
+  total: total.value,
   paid: orders.value.filter(o => o.status === 'paid').length,
   pending: orders.value.filter(o => o.status === 'pending').length,
   refunded: orders.value.filter(o => o.status === 'refunded').length,
   cancelled: orders.value.filter(o => o.status === 'cancelled').length,
 }))
-
-const filteredOrders = computed(() => {
-  if (!filterStatus.value) return orders.value
-  return orders.value.filter(o => o.status === filterStatus.value)
-})
 
 function getPlanName(planId?: string | number | null) {
   return planId === null || planId === undefined ? '未知套餐' : planNameMap[String(planId)] || '未知套餐'
@@ -248,15 +250,18 @@ function formatTime(timeStr?: string | null) {
 }
 
 async function loadData() {
+  const generation = ++loadGeneration
   loadState.value = orders.value.length || plans.value.length ? 'data' : 'loading'
   loadError.value = ''
   try {
     const platformKey = platformStore.adminPlatform !== 'all' ? platformStore.adminPlatform : undefined
-    const params = platformKey ? { platform_key: platformKey } : {}
-    const [ordersRes, plansRes] = await Promise.all([getOrders(params), getPlansAdmin({ page_size: 100 })])
-    const parsedOrders = adminOrdersSchema.parse(ordersRes)
+    const params = { platform_key: platformKey, status: filterStatus.value || undefined, page: page.value, page_size: pageSize }
+    const [ordersRes, plansRes] = await Promise.all([getOrdersPage(params), getPlansAdmin({ page_size: 100 })])
+    if (generation !== loadGeneration) return
+    const parsedOrders = adminOrdersSchema.parse(ordersRes.items)
     const parsedPlans = adminPlansSchema.parse(plansRes)
     orders.value = parsedOrders
+    total.value = ordersRes.total
     plans.value = parsedPlans
     const selectedPlan = parsedPlans.find((plan) => plan.status === 'active')
     if (!parsedPlans.some((plan) => plan.id === newOrder.value.plan_id && plan.status === 'active')) {
@@ -266,15 +271,29 @@ async function loadData() {
     parsedPlans.forEach((plan) => { planNameMap[String(plan.id)] = plan.name })
     loadState.value = settledDataState(parsedOrders.length)
   } catch (error) {
+    if (generation !== loadGeneration) return
     loadError.value = error instanceof Error && error.message ? error.message : '订单与套餐数据暂时无法加载'
     loadState.value = failedDataState(orders.value.length > 0 || plans.value.length > 0)
   }
 }
 
-watch(() => platformStore.adminPlatform, () => { loadData() })
+function changePage(nextPage: number) {
+  page.value = nextPage
+  orders.value = []
+  void loadData()
+}
+
+watch([() => platformStore.adminPlatform, filterStatus], () => {
+  page.value = 1
+  total.value = 0
+  orders.value = []
+  showDetailDrawer.value = false
+  detailOrder.value = null
+  void loadData()
+})
 
 async function createOrder() {
-  if (!canWrite.value) return
+  if (!canWrite.value || isLoading.value) return
   if (!newOrder.value.plan_id) { showToast('请选择套餐', 'error'); return }
   if (!newOrder.value.amount || newOrder.value.amount <= 0) { showToast('订单金额必须大于0', 'error'); return }
   isLoading.value = true
@@ -378,6 +397,7 @@ async function exportOrdersData() {
   try {
     const params: Record<string, string> = {}
     if (filterStatus.value) params.status = filterStatus.value
+    if (platformStore.adminPlatform !== 'all') params.platform_key = platformStore.adminPlatform
     const blob = await exportOrders(params)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -392,6 +412,7 @@ async function exportOrdersData() {
 }
 
 onMounted(loadData)
+onBeforeUnmount(() => { loadGeneration += 1 })
 </script>
 
 <style scoped>
@@ -456,6 +477,7 @@ onMounted(loadData)
 .order-field :deep(.el-select), .order-field :deep(.el-input) { width: 100%; }
 .order-submit { display: flex; justify-content: flex-end; }
 .data-toolbar-v6 { margin-bottom: 1rem; }
+.orders-pagination { display: flex; justify-content: flex-end; margin-top: 16px; overflow-x: auto; }
 
 .empty-state {
   padding: 2rem;

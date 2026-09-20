@@ -330,6 +330,101 @@ async def test_cancelling_demo_batch_terminalizes_unfinished_items(client, db_se
 
 
 @pytest.mark.asyncio
+async def test_late_batch_snapshot_cannot_overwrite_persisted_item_counts(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+    created = await client.post(
+        "/api/demo/batches",
+        json={
+            "tool_id": "tool_demo_batch", "tool_name": "demo", "platform_key": "amazon",
+            "scenario_id": "demo", "row_count": 2,
+        },
+    )
+    assert created.status_code == 201, created.text
+    batch = created.json()
+    batch_id = batch["id"]
+    item_ref = batch["items"][0]["item_ref"]
+    for seq, item_status in ((1, "playing"), (2, "played")):
+        updated = await client.put(
+            f"/api/demo/batches/{batch_id}/items/{item_ref}",
+            json={
+                "event_seq": seq,
+                "status": item_status,
+                "simulated_outcome": "completed_example" if item_status == "played" else None,
+            },
+        )
+        assert updated.status_code == 200, updated.text
+
+    # The parent snapshot was prepared before the first item finished.
+    response = await client.patch(
+        f"/api/demo/batches/{batch_id}",
+        json={
+            "event_seq": 1,
+            "status": "running",
+            "queued_count": 1,
+            "playing_count": 1,
+            "played_count": 0,
+            "skipped_count": 0,
+            "error_count": 0,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["played_count"] == 1
+    assert response.json()["playing_count"] == 0
+    assert response.json()["queued_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_error_batch_terminalizes_only_unfinished_items(client, db_session):
+    await _install_demo_tool(db_session)
+    app.dependency_overrides[get_current_user] = _as_user()
+    created = await client.post(
+        "/api/demo/batches",
+        json={
+            "tool_id": "tool_demo_batch", "tool_name": "demo", "platform_key": "amazon",
+            "scenario_id": "demo", "row_count": 3,
+        },
+    )
+    assert created.status_code == 201, created.text
+    batch = created.json()
+    batch_id = batch["id"]
+    first, second, _ = [item["item_ref"] for item in batch["items"]]
+    for item_ref in (first, second):
+        assert (await client.put(
+            f"/api/demo/batches/{batch_id}/items/{item_ref}",
+            json={"event_seq": 1, "status": "playing"},
+        )).status_code == 200
+    assert (await client.put(
+        f"/api/demo/batches/{batch_id}/items/{first}",
+        json={"event_seq": 2, "status": "played", "simulated_outcome": "completed_example"},
+    )).status_code == 200
+
+    response = await client.patch(
+        f"/api/demo/batches/{batch_id}",
+        json={"event_seq": 1, "status": "error"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["played_count"] == 1
+    assert body["error_count"] == 2
+    assert body["queued_count"] == body["playing_count"] == 0
+    assert [item["status"] for item in body["items"]] == ["played", "error", "error"]
+    assert all(item["finished_at"] is not None for item in body["items"])
+
+    replay = await client.put(
+        f"/api/demo/batches/{batch_id}/items/{second}",
+        json={"event_seq": 1, "status": "playing"},
+    )
+    assert replay.status_code == 200
+    assert replay.json()["status"] == "error"
+    late = await client.put(
+        f"/api/demo/batches/{batch_id}/items/{second}",
+        json={"event_seq": 3, "status": "played", "simulated_outcome": "completed_example"},
+    )
+    assert late.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_verified_execution_endpoint_hides_legacy_records(client, db_session):
     await _install_demo_tool(db_session)
     app.dependency_overrides[get_current_user] = _as_user()

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import Request
-from sqlalchemy import desc, func, select
+from sqlalchemy import case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
@@ -204,9 +204,9 @@ class FeedbackService:
         stats_result = await self.db.execute(
             select(
                 func.count(Feedback.id),
-                func.sum(func.case((Feedback.status == "pending", 1), else_=0)),
-                func.sum(func.case((Feedback.status == "processing", 1), else_=0)),
-                func.sum(func.case((Feedback.status == "resolved", 1), else_=0)),
+                func.sum(case((Feedback.status == "pending", 1), else_=0)),
+                func.sum(case((Feedback.status == "processing", 1), else_=0)),
+                func.sum(case((Feedback.status == "resolved", 1), else_=0)),
             )
         )
         total, pending, processing, resolved = stats_result.one()

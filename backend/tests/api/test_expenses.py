@@ -434,3 +434,93 @@ async def test_expense_permissions(client, staff_headers_factory):
     assert (await client.get("/api/expenses", headers=operator)).status_code == 200
     assert (await client.get("/api/expenses", headers=support)).status_code == 403
     assert (await client.get("/api/expenses")).status_code == 401
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["amount", "expense_date", "title", "category_id"])
+async def test_expense_patch_rejects_null_required_fields(client, auth_headers, field):
+    category_id = await _category_id(client, auth_headers)
+    original = {
+        "amount": "88.50",
+        "expense_date": date.today().isoformat(),
+        "title": "不能清空的有效支出",
+        "category_id": category_id,
+    }
+    created = await client.post("/api/expenses", headers=auth_headers, json=original)
+    assert created.status_code == 201, created.text
+    expense_id = created.json()["data"]["id"]
+
+    response = await client.patch(
+        f"/api/expenses/{expense_id}", headers=auth_headers, json={field: None},
+    )
+    assert response.status_code == 422, response.text
+    detail = await client.get(f"/api/expenses/{expense_id}", headers=auth_headers)
+    assert detail.json()["data"][field] == original[field]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "field", ["name", "default_amount", "category_id", "cycle", "next_due_on", "reminder_days"],
+)
+async def test_renewal_patch_rejects_null_required_fields(client, auth_headers, field):
+    category_id = await _category_id(client, auth_headers)
+    original = {
+        "name": "保留有效续费配置",
+        "default_amount": "38.50",
+        "category_id": category_id,
+        "cycle": "monthly",
+        "next_due_on": "2027-01-31",
+        "reminder_days": 7,
+    }
+    created = await client.post("/api/expenses/renewals", headers=auth_headers, json=original)
+    assert created.status_code == 201, created.text
+    renewal_id = created.json()["data"]["id"]
+
+    response = await client.patch(
+        f"/api/expenses/renewals/{renewal_id}", headers=auth_headers, json={field: None},
+    )
+    assert response.status_code == 422, response.text
+    detail = await client.get(f"/api/expenses/renewals/{renewal_id}", headers=auth_headers)
+    assert detail.json()["data"][field] == original[field]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["name", "sort_order", "status"])
+async def test_category_patch_rejects_null_required_fields(client, auth_headers, field):
+    category_id = await _category_id(client, auth_headers)
+    response = await client.patch(
+        f"/api/expenses/categories/{category_id}", headers=auth_headers, json={field: None},
+    )
+    assert response.status_code == 422, response.text
+    categories = await client.get("/api/expenses/categories", headers=auth_headers)
+    category = next(item for item in categories.json()["data"] if item["id"] == category_id)
+    assert category[field] is not None
+
+
+@pytest.mark.asyncio
+async def test_expense_and_renewal_optional_text_can_still_be_cleared(client, auth_headers):
+    category_id = await _category_id(client, auth_headers)
+    expense = await client.post(
+        "/api/expenses", headers=auth_headers,
+        json={
+            "amount": "20.00", "expense_date": date.today().isoformat(),
+            "title": "可清空可选内容", "category_id": category_id,
+            "payee": "收款方", "note": "备注",
+        },
+    )
+    renewal = await client.post(
+        "/api/expenses/renewals", headers=auth_headers,
+        json={
+            "name": "可清空可选内容", "default_amount": "20.00", "category_id": category_id,
+            "cycle": "monthly", "next_due_on": "2027-01-31", "vendor": "供应商", "note": "备注",
+        },
+    )
+    for path, identifier, fields in (
+        ("/api/expenses", expense.json()["data"]["id"], ["payee", "note"]),
+        ("/api/expenses/renewals", renewal.json()["data"]["id"], ["vendor", "note"]),
+    ):
+        response = await client.patch(
+            f"{path}/{identifier}", headers=auth_headers, json=dict.fromkeys(fields),
+        )
+        assert response.status_code == 200, response.text
+        assert all(response.json()["data"][field] is None for field in fields)

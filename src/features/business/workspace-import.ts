@@ -8,7 +8,7 @@ import {
 import { parseBrowserDemoSpreadsheet } from '@/features/demo/browserSpreadsheet'
 
 import { importPreviewSchema, type BusinessTool, type ImportPreview } from './model'
-import { errorMessage, importOptions, ipcPayload, requireBatchApi } from './workspace-helpers'
+import { errorMessage, importOptions, ipcPayload, requireBatchApi, toolCapabilityKey } from './workspace-helpers'
 
 export interface WorkspaceImportDependencies {
   getSelectedTool(): BusinessTool | null
@@ -24,10 +24,31 @@ export interface WorkspaceImportDependencies {
  * public facade. Imported rows always return through the same validated model.
  */
 export class WorkspaceImportCoordinator {
+  private requestSequence = 0
+  private loadingRequestId: number | null = null
+
   constructor(private readonly dependencies: WorkspaceImportDependencies) {}
+
+  private isCurrent(requestId: number, tool: BusinessTool): boolean {
+    return requestId === this.requestSequence && this.dependencies.getSelectedTool() === tool
+  }
+
+  invalidate(): void {
+    this.requestSequence += 1
+    if (this.loadingRequestId !== null) this.dependencies.setLoading(false)
+    this.loadingRequestId = null
+  }
+
+  private finishLoading(requestId: number): void {
+    if (this.loadingRequestId !== requestId) return
+    this.loadingRequestId = null
+    this.dependencies.setLoading(false)
+  }
 
   async loadSample(): Promise<ImportPreview> {
     const tool = this.requireTool()
+    const requestId = ++this.requestSequence
+    this.loadingRequestId = requestId
     this.dependencies.setLoading(true)
     this.dependencies.setError(null)
     try {
@@ -37,13 +58,13 @@ export class WorkspaceImportCoordinator {
         ? await batch.loadSampleImport(importOptions(tool, maxRows))
         : createLocalDemoSample(tool.batch_input_schema || [], maxRows)
       const preview = importPreviewSchema.parse(payload)
-      this.dependencies.setPreview(preview)
+      if (this.isCurrent(requestId, tool)) this.dependencies.setPreview(preview)
       return preview
     } catch (cause) {
-      this.dependencies.setError(errorMessage(cause, '内置演示数据载入失败'))
+      if (this.isCurrent(requestId, tool)) this.dependencies.setError(errorMessage(cause, '内置演示数据载入失败'))
       throw cause
     } finally {
-      this.dependencies.setLoading(false)
+      this.finishLoading(requestId)
     }
   }
 
@@ -55,6 +76,8 @@ export class WorkspaceImportCoordinator {
 
   async selectFile(): Promise<ImportPreview> {
     const tool = this.requireTool()
+    const requestId = ++this.requestSequence
+    this.loadingRequestId = requestId
     this.dependencies.setLoading(true)
     this.dependencies.setError(null)
     try {
@@ -65,17 +88,17 @@ export class WorkspaceImportCoordinator {
       else {
         const file = await chooseLocalDemoSpreadsheet()
         if (!file) throw new Error('未选择 Excel 或 CSV 文件')
-        payload = await parseBrowserDemoSpreadsheet(file, tool.batch_input_schema || [], maxRows)
+        payload = await parseBrowserDemoSpreadsheet(file, tool.batch_input_schema || [], maxRows, { capabilityKey: toolCapabilityKey(tool) })
       }
       if (!payload) throw new Error('未选择 Excel 文件')
       const preview = importPreviewSchema.parse(payload)
-      this.dependencies.setPreview(preview)
+      if (this.isCurrent(requestId, tool)) this.dependencies.setPreview(preview)
       return preview
     } catch (cause) {
-      this.dependencies.setError(errorMessage(cause, '文件导入失败'))
+      if (this.isCurrent(requestId, tool)) this.dependencies.setError(errorMessage(cause, '文件导入失败'))
       throw cause
     } finally {
-      this.dependencies.setLoading(false)
+      this.finishLoading(requestId)
     }
   }
 

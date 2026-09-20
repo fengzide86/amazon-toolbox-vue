@@ -13,7 +13,7 @@ for (const filename of required) {
 
 const serviceWorker = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
 const urls = [...serviceWorker.matchAll(/url:\s*["']([^"']+)["']/g)].map(match => match[1])
-const hashedStatic = /^assets\/(?:.+\/)?[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|svg)$/i
+const hashedStatic = /^assets\/(?:.+\/)?[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|webp|svg)$/i
 const invalid = urls.filter(url => !hashedStatic.test(url))
 if (!urls.length || invalid.length) {
   throw new Error(`Service worker precache must contain only hashed static assets: ${invalid.join(', ') || 'empty'}`)

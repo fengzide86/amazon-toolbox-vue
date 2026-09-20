@@ -1,6 +1,7 @@
-import type { Worksheet } from 'exceljs'
+import type { Workbook, Worksheet } from 'exceljs'
 
 import { importPreviewSchema, type ImportPreview } from '@/features/business/model'
+import { findSpreadsheetHeader, loadXlsxWorkbook, selectSpreadsheetWorksheet, type SpreadsheetSelectionOptions } from '@/shared/spreadsheet/workbook'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 const FORMULA_PREFIX = /^[=+\-@]/
@@ -15,10 +16,6 @@ interface DemoInputField {
 function localId(prefix: string): string {
   const suffix = globalThis.crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(16).slice(2)}`
   return `${prefix}_${suffix}`
-}
-
-function normalizeHeader(value: unknown): string {
-  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, '_')
 }
 
 function cellText(cell: ReturnType<Worksheet['getCell']>): string {
@@ -107,22 +104,15 @@ export function parseDemoWorksheet(
   maxRows = 50,
 ): ImportPreview {
   const fields = normalizeFields(inputSchema)
-  const headers = new Map<string, number>()
-  worksheet.getRow(1).eachCell((cell, columnNumber) => {
-    headers.set(normalizeHeader(cell.text || cell.value), columnNumber)
-  })
-  const fieldColumns = new Map<string, number>()
-  for (const field of fields) {
-    const column = headers.get(normalizeHeader(field.key)) || headers.get(normalizeHeader(field.label))
-    if (column) fieldColumns.set(field.key, column)
-  }
+  const header = findSpreadsheetHeader(worksheet, fields)
+  const fieldColumns = header.columns
   const missing = fields.filter(field => field.required && !fieldColumns.has(field.key))
   if (missing.length) throw new Error(`缺少必填列：${missing.map(field => field.label).join('、')}`)
 
   const rows: ImportPreview['rows'] = []
   const errors: ImportPreview['errors'] = []
   const rowLimit = Math.max(1, Math.min(Math.floor(maxRows), 500))
-  for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber += 1) {
+  for (let rowNumber = header.rowNumber + 1; rowNumber <= worksheet.rowCount; rowNumber += 1) {
     const row = worksheet.getRow(rowNumber)
     if (!row.hasValues) continue
     if (rows.length >= rowLimit) {
@@ -166,12 +156,13 @@ export async function parseLocalDemoSpreadsheet(
   file: File,
   inputSchema: Array<Record<string, unknown>> = [],
   maxRows = 50,
+  selection: SpreadsheetSelectionOptions = {},
 ): Promise<ImportPreview> {
   if (file.size > MAX_FILE_SIZE) throw new Error('导入文件不能超过 10MB')
   const extension = extensionOf(file.name)
   if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error('演示导入仅支持 .xlsx 或 .csv 文件')
   const buffer = await file.arrayBuffer()
-  return parseDemoSpreadsheetBuffer(buffer, file.name, inputSchema, maxRows)
+  return parseDemoSpreadsheetBuffer(buffer, file.name, inputSchema, maxRows, selection)
 }
 
 export async function parseDemoSpreadsheetBuffer(
@@ -179,23 +170,23 @@ export async function parseDemoSpreadsheetBuffer(
   fileName: string,
   inputSchema: Array<Record<string, unknown>> = [],
   maxRows = 50,
+  selection: SpreadsheetSelectionOptions = {},
 ): Promise<ImportPreview> {
   if (buffer.byteLength > MAX_FILE_SIZE) throw new Error('导入文件不能超过 10MB')
   const extension = extensionOf(fileName)
   if (!ALLOWED_EXTENSIONS.has(extension)) throw new Error('演示导入仅支持 .xlsx 或 .csv 文件')
-  const module = await import('exceljs')
-  const ExcelJS = module.default
-  const workbook = new ExcelJS.Workbook()
+  let workbook: Workbook
   if (extension === '.csv') {
+    const { default: ExcelJS } = await import('exceljs')
+    workbook = new ExcelJS.Workbook()
     const worksheet = workbook.addWorksheet('CSV')
     worksheet.addRows(parseCsvRows(new TextDecoder('utf-8').decode(buffer)))
   } else {
-    await workbook.xlsx.load(buffer)
+    workbook = await loadXlsxWorkbook(buffer)
   }
-  const worksheet = workbook.worksheets.find(sheet => sheet.state === 'visible') || workbook.worksheets[0]
-  if (!worksheet) throw new Error('导入文件没有可读取的工作表')
+  const { worksheet, templateVersion } = selectSpreadsheetWorksheet(workbook, normalizeFields(inputSchema), selection)
   const preview = parseDemoWorksheet(worksheet, fileName, inputSchema, maxRows)
-  return importPreviewSchema.parse({ ...preview, worksheetName: worksheet.name })
+  return importPreviewSchema.parse({ ...preview, worksheetName: worksheet.name, templateVersion: templateVersion || null })
 }
 
 export function chooseLocalDemoSpreadsheet(): Promise<File | null> {

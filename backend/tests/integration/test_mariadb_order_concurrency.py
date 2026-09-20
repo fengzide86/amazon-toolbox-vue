@@ -3,26 +3,33 @@ import os
 import uuid
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from core.exceptions import ConflictException
 from core.security import hash_password
 from database import Base, get_db
+from domains.automation import demo_service
+from domains.knowledge import chat_service
 from main import app
 from models import (
     AuditLog,
     AuthCode,
     AuthSeat,
+    ChatSession,
     Device,
     ExpenseAttachment,
     ExpenseCategory,
     ExpenseRecord,
     ExpenseRenewal,
     ExpenseRenewalOccurrence,
+    Feedback,
     Order,
     Plan,
     ProfitRecord,
@@ -31,7 +38,90 @@ from models import (
     StaffUser,
     User,
 )
+from models.demo import DemoBatch, DemoBatchItem
+from schemas.demo import DemoBatchItemUpdate, DemoBatchResponse, DemoBatchUpdate, DemoEvent
 from services.staff_service import create_staff_access_token
+
+
+@pytest.mark.asyncio
+async def test_twenty_concurrent_chat_handoffs_create_one_scoped_ticket():
+    engine = create_async_engine(
+        _mariadb_test_url(), pool_size=20, max_overflow=0,
+        pool_pre_ping=True, isolation_level="READ COMMITTED",
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    suffix = uuid.uuid4().hex[:12]
+    session_id = f"handoff-{suffix}"
+    owner_id: int | None = None
+    all_preloaded = asyncio.Event()
+    preloaded_count = 0
+    tasks: list[asyncio.Task[Any]] = []
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as db:
+            owner = User(name=f"Handoff {suffix}", is_active=True)
+            db.add(owner)
+            await db.flush()
+            owner_id = owner.id
+            db.add(ChatSession(
+                session_id=session_id, user_id=owner_id, status="active",
+                platform_key="amazon", capability_key="logistics_template",
+            ))
+            await db.commit()
+
+        async def transfer() -> int | None | ConflictException:
+            nonlocal preloaded_count
+            async with sessions() as db:
+                # Model the router ownership check: every identity map holds
+                # the initial active row before any worker can transfer it.
+                stale_session = (await db.execute(
+                    select(ChatSession).where(ChatSession.session_id == session_id)
+                )).scalar_one()
+                assert stale_session.status == "active"
+                preloaded_count += 1
+                if preloaded_count == 20:
+                    all_preloaded.set()
+                await asyncio.wait_for(all_preloaded.wait(), timeout=15)
+                try:
+                    return await chat_service.transfer_to_human(db, session_id, user_id=owner_id)
+                except ConflictException as error:
+                    return error
+
+        tasks = [asyncio.create_task(transfer()) for _ in range(20)]
+        results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=30)
+        ids = [result for result in results if isinstance(result, int)]
+        conflicts = [result for result in results if isinstance(result, ConflictException)]
+        assert len(ids) == 1, results
+        assert len(conflicts) == 19
+        assert all(error.code == 409 for error in conflicts)
+        async with sessions() as db:
+            tickets = (await db.execute(select(Feedback).where(Feedback.user_id == owner_id))).scalars().all()
+            assert len(tickets) == 1
+            assert tickets[0].id == ids[0]
+            assert (tickets[0].platform_key, tickets[0].capability_key) == ("amazon", "logistics_template")
+            conversation = (await db.execute(
+                select(ChatSession).where(ChatSession.session_id == session_id)
+            )).scalar_one()
+            assert conversation.status == "transferred"
+            assert conversation.transferred_to_human is True
+    finally:
+        all_preloaded.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            if owner_id is not None:
+                async with sessions() as db:
+                    await db.execute(delete(Feedback).where(Feedback.user_id == owner_id))
+                    await db.execute(delete(ChatSession).where(ChatSession.session_id == session_id))
+                    await db.execute(delete(User).where(User.id == owner_id))
+                    await db.commit()
+        finally:
+            await engine.dispose()
 
 
 def _mariadb_test_url() -> str:
@@ -161,6 +251,188 @@ async def test_twenty_concurrent_manual_paid_transitions_create_one_profit_recor
                     await session.execute(delete(StaffUser).where(StaffUser.id == staff_id))
                 await session.commit()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_demo_last_item_snapshot_and_finish_use_one_serialized_state(monkeypatch):
+    """Hold the last child transaction open while two real connections contend.
+
+    No timing sleeps decide the winner: either the stale snapshot gets the
+    parent lock first and must recount, or finish wins and rejects the snapshot.
+    """
+    engine = create_async_engine(
+        _mariadb_test_url(),
+        pool_size=5,
+        max_overflow=0,
+        pool_pre_ping=True,
+        isolation_level="READ COMMITTED",
+    )
+    last_item_flushed = asyncio.Event()
+    release_last_item = asyncio.Event()
+    at_lock_query = {name: asyncio.Event() for name in ("snapshot", "finish")}
+    acquired_parent_lock: list[str] = []
+    connection_ids: dict[str, int] = {}
+
+    class CoordinatedSession(AsyncSession):
+        async def commit(self) -> None:
+            if self.info.get("operation") == "last_item":
+                # At this point the actual service has changed both child and
+                # parent counts, but its FOR UPDATE locks remain uncommitted.
+                await self.flush()
+                last_item_flushed.set()
+                await asyncio.wait_for(release_last_item.wait(), timeout=15)
+            await super().commit()
+
+    sessions = async_sessionmaker(
+        engine, class_=CoordinatedSession, expire_on_commit=False, autoflush=False,
+    )
+    original_owned_batch = demo_service._owned_batch
+
+    async def observe_owned_batch(
+        db: AsyncSession, batch_id: str, user_id: int, *, lock: bool = False,
+    ) -> DemoBatch:
+        operation = str(db.info.get("operation", ""))
+        if operation in at_lock_query:
+            assert lock, "Concurrent mutations must take the parent row lock"
+            at_lock_query[operation].set()
+        batch = await original_owned_batch(db, batch_id, user_id, lock=lock)
+        if operation:
+            acquired_parent_lock.append(operation)
+        return batch
+
+    monkeypatch.setattr(demo_service, "_owned_batch", observe_owned_batch)
+    suffix = uuid.uuid4().hex[:12]
+    batch_id = f"demo_race_{suffix}"
+    last_item_ref = f"last_{suffix}"
+    user_id: int | None = None
+    tasks: list[asyncio.Task[Any]] = []
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+
+        async with sessions() as session:
+            owner = User(name=f"Demo race {suffix}", is_active=True)
+            session.add(owner)
+            await session.flush()
+            user_id = owner.id
+            session.add(DemoBatch(
+                id=batch_id, user_id=user_id, tool_id="demo-race",
+                tool_name_snapshot="Demo race regression", platform_key="amazon",
+                scenario_id="demo_batch_walkthrough_v1", row_count=2,
+                status="running", event_seq=1, queued_count=0, playing_count=1,
+                played_count=1, skipped_count=0, error_count=0,
+            ))
+            await session.flush()
+            session.add_all([
+                DemoBatchItem(
+                    batch_id=batch_id, item_ref=f"done_{suffix}", status="played",
+                    event_seq=2, simulated_outcome="completed_example",
+                ),
+                DemoBatchItem(
+                    batch_id=batch_id, item_ref=last_item_ref, status="playing", event_seq=1,
+                ),
+            ])
+            await session.commit()
+
+        owner_context = {"user_id": user_id}
+
+        async def mutate(operation: str) -> Any:
+            async with sessions() as session:
+                session.info["operation"] = operation
+                connection_ids[operation] = int(
+                    (await session.execute(select(func.connection_id()))).scalar_one()
+                )
+                try:
+                    if operation == "last_item":
+                        return await demo_service.update_demo_batch_item(
+                            session, batch_id, last_item_ref,
+                            DemoBatchItemUpdate(
+                                event_seq=2, status="played", simulated_outcome="completed_example",
+                            ),
+                            owner_context,
+                        )
+                    if operation == "snapshot":
+                        return await demo_service.update_demo_batch(
+                            session, batch_id,
+                            DemoBatchUpdate(
+                                event_seq=2, status="running", queued_count=0,
+                                playing_count=1, played_count=1, skipped_count=0, error_count=0,
+                            ),
+                            owner_context,
+                        )
+                    return await demo_service.finish_demo_batch(
+                        session, batch_id, DemoEvent(event_seq=3), owner_context,
+                    )
+                except HTTPException as error:
+                    return error
+
+        tasks.append(asyncio.create_task(mutate("last_item")))
+        await asyncio.wait_for(last_item_flushed.wait(), timeout=15)
+        tasks.extend([
+            asyncio.create_task(mutate("snapshot")),
+            asyncio.create_task(mutate("finish")),
+        ])
+        await asyncio.wait_for(
+            asyncio.gather(*(event.wait() for event in at_lock_query.values())), timeout=15,
+        )
+        assert len(set(connection_ids.values())) == 3, connection_ids
+        assert acquired_parent_lock == ["last_item"]
+        release_last_item.set()
+        item, snapshot, finished = await asyncio.wait_for(asyncio.gather(*tasks), timeout=15)
+
+        assert not isinstance(item, HTTPException), item
+        assert item.status == "played"
+        assert isinstance(finished, DemoBatchResponse), finished
+        assert finished.status == "completed"
+        assert (finished.played_count, finished.playing_count, finished.queued_count) == (2, 0, 0)
+        if isinstance(snapshot, HTTPException):
+            assert snapshot.status_code == 409
+            assert acquired_parent_lock == ["last_item", "finish", "snapshot"]
+        else:
+            assert (snapshot.played_count, snapshot.playing_count, snapshot.queued_count) == (2, 0, 0)
+            assert acquired_parent_lock == ["last_item", "snapshot", "finish"]
+
+        # Replays and an even newer stale heartbeat cannot reopen completion.
+        async with sessions() as session:
+            replay = await demo_service.finish_demo_batch(
+                session, batch_id, DemoEvent(event_seq=3), owner_context,
+            )
+            assert replay.status == "completed"
+            with pytest.raises(HTTPException) as late_snapshot:
+                await demo_service.update_demo_batch(
+                    session, batch_id, DemoBatchUpdate(event_seq=4, status="running"), owner_context,
+                )
+            assert late_snapshot.value.status_code == 409
+
+        async with sessions() as session:
+            persisted = (await session.execute(
+                select(DemoBatch).where(DemoBatch.id == batch_id)
+            )).scalar_one()
+            children = (await session.execute(
+                select(DemoBatchItem).where(DemoBatchItem.batch_id == batch_id)
+            )).scalars().all()
+            assert (persisted.status, persisted.event_seq) == ("completed", 3)
+            assert (persisted.played_count, persisted.playing_count, persisted.queued_count) == (2, 0, 0)
+            assert persisted.skipped_count == persisted.error_count == 0
+            assert len(children) == 2
+            assert all(child.status == "played" and child.event_seq == 2 for child in children)
+    finally:
+        release_last_item.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            if user_id is not None:
+                async with sessions() as session:
+                    await session.execute(delete(DemoBatchItem).where(DemoBatchItem.batch_id == batch_id))
+                    await session.execute(delete(DemoBatch).where(DemoBatch.id == batch_id))
+                    await session.execute(delete(User).where(User.id == user_id))
+                    await session.commit()
+        finally:
+            await engine.dispose()
 
 
 @pytest.mark.asyncio

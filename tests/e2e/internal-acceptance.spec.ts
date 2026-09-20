@@ -666,6 +666,31 @@ test('订单人工确认收款走独立动作接口，随后可见分润，退�
   await expect(page.getByRole('row', { name: /INTERNAL-ORDER-001.*已退款/ })).toBeVisible()
 })
 
+test('订单超过一页仍可翻页，状态筛选查询完整账本', async ({ page }) => {
+  await installSession(page, 'super_admin')
+  const requests: URLSearchParams[] = []
+  await installApi(page, (request, path) => {
+    if (path === '/api/orders' && request.method() === 'GET') {
+      const query = new URL(request.url()).searchParams
+      requests.push(query)
+      const current = Number(query.get('page') || 1)
+      const status = query.get('status') || 'pending'
+      return { body: { success: true, data: [{ id: current, order_no: `PAGED-ORDER-${current}`, amount: 99, status, created_at: now }], total: status === 'paid' ? 3 : 41, page: current, page_size: 20 } }
+    }
+    if (path === '/api/plans/admin') return wrapped([])
+    return undefined
+  })
+  await page.goto('/#/admin/orders')
+  await expect(page.getByText('共 41 笔 · 本页 1 笔')).toBeVisible()
+  await page.locator('.orders-pagination .number').filter({ hasText: /^2$/ }).click()
+  await expect(page.getByText('PAGED-ORDER-2', { exact: true })).toBeVisible()
+  await page.getByRole('group', { name: '订单筛选' }).locator('.el-select').click()
+  await page.getByRole('option', { name: '已收款', exact: true }).click()
+  await expect(page.getByText('共 3 笔 · 本页 1 笔')).toBeVisible()
+  expect(requests.at(-1)?.get('page')).toBe('1')
+  expect(requests.at(-1)?.get('status')).toBe('paid')
+})
+
 test('知识库和客服按区域降级，分页元数据与规则预览保持可用', async ({ page }) => {
   await installSession(page, 'super_admin')
   await installApi(page, (request, path) => {

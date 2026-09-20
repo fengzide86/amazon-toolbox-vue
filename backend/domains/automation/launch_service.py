@@ -358,8 +358,10 @@ async def verify_launch_grant(db: AsyncSession, token: str) -> dict[str, Any]:
     ).scalar_one_or_none()
     if not launch:
         return await _error(db, "Token 不存在", 404)
-    if launch.status == "used":
+    if launch.status in {"used", "reported"}:
         return await _error(db, "Token 已使用", 403)
+    if launch.status != "pending":
+        return await _error(db, "Token 状态无效", 403)
     if launch.expires_at < datetime.now():
         return await _error(db, "Token 已过期", 403)
 

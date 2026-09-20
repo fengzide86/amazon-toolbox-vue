@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { api, request, ApiError, verifyAuthCode, adminLogin, getPlans, getPlansAdmin, updatePlan, enablePlan, disablePlan, archivePlan, getAuthCodes, updateAuthCode, deleteAuthCode, unbindDevice, getOrders, markOrderPaid, cancelOrder, refundOrder, getUsers, getLogs, getFeedbacks, getDashboard, getSettings, getTools, getProfit, getProfitPolicy, updateProfitPolicy } from '@/utils/api'
+import { getOrdersPage } from '@/utils/api/orders'
 
 // Mock fetch
 global.fetch = vi.fn()
@@ -305,6 +306,18 @@ describe('API Utils', () => {
         expect.stringContaining('/api/orders'),
         expect.objectContaining({ method: 'GET' })
       )
+    })
+
+    it('getOrdersPage 保留后端分页总数，而不是把当前页当成全部数据', async () => {
+      mockedFetch.mockResolvedValueOnce({ ok: true, json: async () => ({
+        success: true, data: [{ id: 21 }], total: 41, page: 2, page_size: 20,
+      }) })
+      const result = await getOrdersPage({ page: 2, status: 'paid', platform_key: 'amazon' })
+      expect(result).toEqual({ items: [{ id: 21 }], total: 41, page: 2, page_size: 20 })
+      const url = new URL(String(mockedFetch.mock.calls[0][0]))
+      expect(url.searchParams.get('page')).toBe('2')
+      expect(url.searchParams.get('status')).toBe('paid')
+      expect(url.searchParams.get('platform_key')).toBe('amazon')
     })
 
     it('getUsers 应该调用正确的接口', async () => {

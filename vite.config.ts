@@ -9,7 +9,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { readFileSync } from 'node:fs'
 
 const packageMetadata = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }
-const hashedStaticAsset = /^assets\/(?:.+\/)?[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|svg)$/i
+const hashedStaticAsset = /^assets\/(?:.+\/)?[^/]+-[A-Za-z0-9_-]{8,}\.(?:js|css|woff2?|png|webp|svg)$/i
 
 function keepOnlyHashedStaticAssets(
   entries: Array<{ url: string, revision: string | null, integrity?: string, size: number }>,
@@ -83,7 +83,7 @@ export default defineConfig(({ command, mode }) => {
         workbox: {
           cleanupOutdatedCaches: true,
           navigateFallback: null,
-          globPatterns: ['assets/**/*.{js,css,png,svg,woff,woff2}'],
+          globPatterns: ['assets/**/*.{js,css,png,webp,svg,woff,woff2}'],
           manifestTransforms: [keepOnlyHashedStaticAssets],
           runtimeCaching: [
             {

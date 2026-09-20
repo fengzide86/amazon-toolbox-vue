@@ -2,7 +2,7 @@
   <section class="tool-workspace" data-testid="tool-workspace">
     <header class="workspace-topbar">
       <div class="workspace-heading">
-        <button class="icon-button" type="button" aria-label="返回工具箱" @click="closeWorkspace">
+        <button class="icon-button" type="button" aria-label="返回工具箱" :disabled="endingRun" @click="closeWorkspace">
           <ArrowLeft :size="18" />
         </button>
         <div class="tool-mark"><Zap :size="18" /></div>
@@ -16,10 +16,10 @@
         <span :class="['status-pill', `is-${runStatus}`]">
           <span class="status-dot"></span>{{ customerStatusText }}
         </span>
-        <button v-if="isActiveRun" class="control-button danger" type="button" @click="stopRun">
-          <Square :size="14" />{{ isDemo ? '停止演示' : '停止执行' }}
+        <button v-if="isActiveRun" class="control-button danger" type="button" :disabled="endingRun" @click="stopRun">
+          <Square :size="14" />{{ endingRun ? '正在停止…' : isDemo ? '停止演示' : '停止执行' }}
         </button>
-        <button v-else-if="isTerminal" class="control-button" type="button" :disabled="restarting" @click="restartRun">
+        <button v-else-if="isTerminal" class="control-button" type="button" :disabled="restarting || endingRun" @click="restartRun">
           <LoaderCircle v-if="restarting" :size="14" class="spin" />
           <RotateCcw v-else :size="14" />
           {{ restarting ? '正在打开…' : (isDemo ? '重新演示' : '重新执行') }}
@@ -162,7 +162,7 @@ import { ArrowLeft, Check, CircleAlert, LoaderCircle, LockKeyhole, RotateCcw, Sq
 import { useSingleAutomationRun } from '@/features/automation/useSingleAutomationRun'
 
 const {
-  browserLoading, restarting, stageItems, toolName, isDemo, isDesktop,
+  browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
   freightQuote, adapterVersion, evidenceSummary,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,

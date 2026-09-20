@@ -206,10 +206,18 @@ async def get_faq_list(
     conditions = [KnowledgeBase.status == "active"]
 
     if platform_key:
-        conditions.append(or_(KnowledgeBase.platform_key == platform_key, KnowledgeBase.platform_key.is_(None)))
+        conditions.append(or_(
+            KnowledgeBase.platform_key == platform_key,
+            KnowledgeBase.platform_key.is_(None),
+            KnowledgeBase.platform_key == "",
+        ))
 
     if capability_key:
-        conditions.append(or_(KnowledgeBase.capability_key == capability_key, KnowledgeBase.capability_key.is_(None)))
+        conditions.append(or_(
+            KnowledgeBase.capability_key == capability_key,
+            KnowledgeBase.capability_key.is_(None),
+            KnowledgeBase.capability_key == "",
+        ))
 
     if category:
         conditions.append(KnowledgeBase.category == category)

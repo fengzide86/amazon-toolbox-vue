@@ -31,7 +31,14 @@ from schemas.expense import (
 )
 
 from .expense_attachments import serialize_attachment
-from .expense_common import ExpenseServiceBase, actor_id, money, month_start, shift_month
+from .expense_common import (
+    ExpenseServiceBase,
+    actor_id,
+    money,
+    month_start,
+    shift_month,
+    validate_update_fields,
+)
 
 DEFAULT_CATEGORIES = (
     ("development", "开发", 10),
@@ -185,8 +192,7 @@ class ExpenseLedgerService(ExpenseServiceBase):
     ) -> dict[str, Any]:
         category = await self._category(category_id)
         changes = payload.model_dump(exclude_unset=True)
-        if not changes:
-            raise ValidationException("没有可更新字段")
+        validate_update_fields(changes, nullable=frozenset())
         if "name" in changes:
             duplicate = await self.db.execute(
                 select(ExpenseCategory.id).where(
@@ -306,8 +312,7 @@ class ExpenseLedgerService(ExpenseServiceBase):
         if record.status != ExpenseRecordStatus.ACTIVE:
             raise ConflictException("已作废的支出不能修改")
         changes = payload.model_dump(exclude_unset=True)
-        if not changes:
-            raise ValidationException("没有可更新字段")
+        validate_update_fields(changes, nullable=frozenset({"payee", "note"}))
         if changes.get("category_id") is not None:
             await self._active_category(int(changes["category_id"]))
         before = {field: str(getattr(record, field)) for field in changes}

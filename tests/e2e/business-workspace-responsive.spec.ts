@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { resolve } from 'node:path'
+import { expect, test, type Page, type Request } from '@playwright/test'
 
 test.beforeEach(async ({ page }) => {
   page.on('pageerror', error => console.error(`[pageerror] ${error.message}`))
@@ -113,6 +114,98 @@ test('载入演示数据后准备页可滚动到开始按钮', async ({ page }) 
   }))).toMatchObject({ overflowY: 'auto' })
   await startButton.scrollIntoViewIfNeeded()
   await expect(startButton).toBeInViewport()
+})
+
+test('真实随附模板经浏览器 Worker 匹配非首张工作表，八行脱敏且原文不上传', async ({ page }) => {
+  await mockControlPlane(page, 'business')
+  const tool = {
+    ...batchTool,
+    id: 'tool_logistics_standard', name: '物流模板演示',
+    capability_key: 'logistics_standard', platform_key: 'amazon',
+    availability: 'demo_only', demo_scenario_id: 'template-worker-e2e',
+  }
+  await page.route('**/api/business/bootstrap', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ success: true, data: { ...businessUser, tools: [tool] } }),
+  }))
+  const apiRequests: Request[] = []
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request)
+  })
+  await page.route('**/api/demo/**', async route => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const data = path === '/api/demo/batches' && request.method() === 'POST'
+      ? {
+          id: 'template-worker-batch', tool_id: tool.id, row_count: 8, status: 'created',
+          items: Array.from({ length: 8 }, (_, index) => ({ item_ref: `template-item-${index + 1}`, status: 'queued', event_seq: 0 })),
+        }
+      : request.method() === 'GET' ? [] : {}
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data }) })
+  })
+  await page.addInitScript(() => {
+    const observation = window as typeof window & { __spreadsheetWorkerReplies: unknown[] }
+    observation.__spreadsheetWorkerReplies = []
+    // Observe actual native Worker replies without replacing its constructor,
+    // file bytes, parser or result. This also detects a silent inline fallback.
+    const nativeAddEventListener = Worker.prototype.addEventListener
+    const observed = new WeakSet<Worker>()
+    Worker.prototype.addEventListener = function (this: Worker, ...args: Parameters<Worker['addEventListener']>) {
+      if (!observed.has(this)) {
+        observed.add(this)
+        nativeAddEventListener.call(this, 'message', (event: Event) => {
+          observation.__spreadsheetWorkerReplies.push((event as MessageEvent).data)
+        })
+      }
+      return nativeAddEventListener.apply(this, args)
+    }
+  })
+
+  await page.setViewportSize({ width: 1365, height: 900 })
+  await page.goto('/#/business/workspace', { waitUntil: 'domcontentloaded' })
+  expect(await page.evaluate(() => typeof (window as Window & { electronAPI?: unknown }).electronAPI)).toBe('undefined')
+  await page.getByRole('button', { name: tool.name }).click()
+  const workerStarted = page.waitForEvent('worker')
+  const chooserOpened = page.waitForEvent('filechooser')
+  await page.getByTestId('business-file-upload').click()
+  await (await chooserOpened).setFiles(resolve('resources/templates/B端批量自动化测试数据.xlsx'))
+  expect((await workerStarted).url()).toContain('spreadsheet.worker-')
+
+  const expectedLabels = Array.from({ length: 8 }, (_, index) => `模板***${String(index + 1).padStart(2, '0')}`)
+  await expect(page.locator('.selected-import')).toContainText('已匹配工作表：物流模板 · 模板 1.0.0')
+  await expect(page.locator('.import-result')).toHaveText('8 个演示项')
+  await expect(page.locator('.preview-list > div:not(.more-row) > span')).toHaveText(expectedLabels.slice(0, 6))
+  await expect(page.locator('.preview-list .more-row')).toHaveText('还有 2 行未展开')
+  const replies = await page.evaluate(() => (window as typeof window & { __spreadsheetWorkerReplies: unknown[] }).__spreadsheetWorkerReplies)
+  expect(replies).toHaveLength(1)
+  expect(replies[0]).toMatchObject({
+    ok: true,
+    result: {
+      fileName: 'B端批量自动化测试数据.xlsx', worksheetName: '物流模板', templateVersion: '1.0.0',
+      validCount: 8, errorCount: 0,
+      rows: expectedLabels.map(account_label => ({ preview: { account_label } })),
+    },
+  })
+
+  await page.getByRole('button', { name: '开始批量演示' }).click()
+  const runConsole = page.getByTestId('business-run-console')
+  await expect(runConsole.locator('tbody tr')).toHaveCount(8)
+  await expect(runConsole.locator('.account-cell strong')).toHaveText(expectedLabels)
+  await expect(runConsole.locator('.sync-state')).toHaveText('状态已同步')
+  const createRequest = apiRequests.find(request => new URL(request.url()).pathname === '/api/demo/batches' && request.method() === 'POST')
+  expect(createRequest?.postDataJSON()).toEqual({
+    tool_id: tool.id, tool_name: tool.name, platform_key: 'amazon',
+    scenario_id: tool.demo_scenario_id, row_count: 8,
+  })
+  const transferred = apiRequests.map(request => `${request.url()}\n${request.postData() || ''}`).join('\n')
+  const rendered = await page.locator('body').innerText()
+  for (let index = 1; index <= 8; index += 1) {
+    const customerLabel = `模板演示-${String(index).padStart(2, '0')}`
+    expect(transferred).not.toContain(customerLabel)
+    expect(transferred).not.toContain(`赛训物流模板 ${index}`)
+    expect(rendered).not.toContain(customerLabel)
+  }
+  expect(apiRequests.some(request => new URL(request.url()).pathname.startsWith('/api/business/batches') && request.method() !== 'GET')).toBe(false)
 })
 
 test('并发运行总览在桌面尺寸可滚动、可筛选并可关闭详情', async ({ page }, testInfo) => {

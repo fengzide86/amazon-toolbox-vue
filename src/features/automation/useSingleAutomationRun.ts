@@ -31,6 +31,7 @@ const taskRunStore = useTaskRunStore()
 
  const browserLoading = ref(true)
 const restarting = ref(false)
+const endingRun = ref(false)
 const taskStarted = ref(false)
 const taskStarting = ref(false)
  const browserRegistered = ref(false)
@@ -124,32 +125,48 @@ async function completeUserAction() {
 }
 
 async function stopRun() {
-  if (!await confirmAction({
-    title: '停止本次处理？',
-    message: '停止后可以返回工具箱重新发起。',
-    confirmText: '停止处理',
-    cancelText: '继续运行',
-    danger: true,
-  })) return
-  await taskRunStore.cancel()
+  if (endingRun.value) return
+  endingRun.value = true
+  try {
+    if (!await confirmAction({
+      title: '停止本次处理？',
+      message: '停止后可以返回工具箱重新发起。',
+      confirmText: '停止处理',
+      cancelText: '继续运行',
+      danger: true,
+    })) return
+    await taskRunStore.cancel()
+  } catch {
+    showToast('暂时无法停止，当前现场已保留，请重试', 'error')
+  } finally {
+    endingRun.value = false
+  }
 }
 
 async function closeWorkspace() {
-  if (isActiveRun.value && !await confirmAction({
-    title: isDemo.value ? '退出交互演示？' : '停止当前自动处理？',
-    message: isDemo.value ? '当前演示尚未完成，退出后本地沙盒会停止。' : '退出后会安全停止浏览器操作并保留问题记录。',
-    confirmText: isDemo.value ? '退出演示' : '停止处理',
-    cancelText: '留在这里',
-    danger: true,
-  })) return
-  if (isActiveRun.value) await taskRunStore.cancel()
-  await deactivateDemoActivity()
-  taskRunStore.reset()
-  appStore.closeTool()
+  if (endingRun.value) return
+  endingRun.value = true
+  try {
+    if (isActiveRun.value && !await confirmAction({
+      title: isDemo.value ? '退出交互演示？' : '停止当前自动处理？',
+      message: isDemo.value ? '当前演示尚未完成，退出后本地沙盒会停止。' : '退出后会安全停止浏览器操作并保留问题记录。',
+      confirmText: isDemo.value ? '退出演示' : '停止处理',
+      cancelText: '留在这里',
+      danger: true,
+    })) return
+    if (isActiveRun.value) await taskRunStore.cancel()
+    await deactivateDemoActivity()
+    taskRunStore.reset()
+    appStore.closeTool()
+  } catch {
+    showToast('暂时无法退出，当前现场已保留，请重试', 'error')
+  } finally {
+    endingRun.value = false
+  }
 }
 
 async function restartRun() {
-  if (restarting.value) return
+  if (restarting.value || endingRun.value) return
   restarting.value = true
   try {
     const currentTool = appStore.currentTool
@@ -316,7 +333,7 @@ onUnmounted(() => {
   taskRunStore.reset()
 })
   return {
-    browserLoading, restarting, stageItems, toolName, isDemo, isDesktop,
+    browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop,
     platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
     freightQuote, adapterVersion, evidenceSummary,
     currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,

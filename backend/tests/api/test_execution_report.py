@@ -14,10 +14,37 @@ from tests.conftest import get_data
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("grant_status", "expiry_minutes"), [("reported", 5), ("revoked", 5), ("expired", 5), ("pending", -1)],
+)
+async def test_verify_does_not_consume_terminal_or_expired_grants(
+    client, db_session, monkeypatch, grant_status, expiry_minutes,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    token_value = f"invalid-grant-{grant_status}"
+    launch = LaunchToken(
+        token=token_value, user_id=999, auth_code_id=999, platform_key="amazon",
+        tool_id="audit-tool", script_key="audit-tool.v1", device_id="test-device",
+        expires_at=datetime.now() + timedelta(minutes=expiry_minutes),
+        status=grant_status, execution_mode="single",
+    )
+    db_session.add(launch)
+    await db_session.commit()
+    response = await client.post("/api/tools/launch-grant/verify", params={"token": token_value})
+    assert response.status_code == 200
+    assert response.json()["success"] is False
+    await db_session.refresh(launch)
+    assert launch.status == grant_status
+    assert launch.used_at is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("expiry_minutes", [-1, 5])
 async def test_consumed_single_launch_grant_creates_one_verified_execution(
     client: AsyncClient,
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
+    expiry_minutes: int,
 ):
     monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
     auth_code = AuthCode(code="REPORT-LIVE-001", status="active")
@@ -26,6 +53,7 @@ async def test_consumed_single_launch_grant_creates_one_verified_execution(
     user = User(name="Runner Report User", auth_code_id=auth_code.id, device_id="device-report")
     db_session.add(user)
     await db_session.flush()
+    user_id = user.id
     tool_config_value = json.dumps([{
             "id": "tool_listing_script",
             "name": "自动上品脚本",
@@ -50,7 +78,7 @@ async def test_consumed_single_launch_grant_creates_one_verified_execution(
         tool_id="tool_listing_script",
         script_key="amazon.listing_script.v1",
         device_id="device-report",
-        expires_at=datetime.now() - timedelta(minutes=1),
+        expires_at=datetime.now() + timedelta(minutes=expiry_minutes),
         used_at=datetime.now(),
         status="used",
         execution_mode="single",
@@ -77,10 +105,18 @@ async def test_consumed_single_launch_grant_creates_one_verified_execution(
     assert log.tool_id == "tool_listing_script"
     assert "runner-report-token" not in (log.detail or "")
 
+    replay = await client.post(
+        "/api/tools/launch-grant/verify", params={"token": launch.token},
+    )
+    assert replay.status_code == 200
+    assert replay.json()["success"] is False
+    await db_session.refresh(launch)
+    assert launch.status == "reported"
+
     duplicate = await client.post("/api/executions/report", json=payload)
     assert duplicate.status_code == 200
     assert get_data(duplicate)["duplicate"] is True
-    logs = (await db_session.execute(select(RunLog).where(RunLog.user_id == user.id))).scalars().all()
+    logs = (await db_session.execute(select(RunLog).where(RunLog.user_id == user_id))).scalars().all()
     assert len(logs) == 1
 
 

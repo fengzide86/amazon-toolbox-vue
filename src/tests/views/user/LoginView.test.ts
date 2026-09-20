@@ -70,6 +70,13 @@ describe('LoginView', () => {
       expect(wrapper.text()).not.toContain('秒级响应')
     })
 
+    it('功能标签只展示当前产品能力，不宣传未落地的自动化脚本', () => {
+      const wrapper = mountWithPinia(LoginView)
+      const featureTags = wrapper.findAll('.feature-tag').map(tag => tag.text())
+      expect(featureTags).toEqual(['物流模板', '运费比较', '个人工具箱', '批量工作台', '人工接手', '执行记录'])
+      expect(wrapper.text()).not.toMatch(/广告脚本|自动上品|自动发货|FBA \/ AGL/)
+    })
+
     it('应该显示授权码提示', () => {
       const wrapper = mountWithPinia(LoginView)
       expect(wrapper.text()).toContain('请输入授权码激活您的工具箱')
@@ -244,6 +251,14 @@ describe('LoginView', () => {
   })
 
   describe('帮助弹窗测试', () => {
+    it('设备绑定说明兼容浏览器使用，不声称只能绑定 Windows', async () => {
+      const wrapper = mountWithPinia(LoginView)
+      await wrapper.findAll('.footer-link')[0].trigger('click')
+      const helpText = wrapper.get('.help-steps').text()
+      expect(helpText).toContain('系统会自动绑定您当前使用的设备')
+      expect(helpText).not.toContain('Windows')
+    })
+
     it('点击使用帮助应该显示弹窗', async () => {
       const wrapper = mountWithPinia(LoginView)
       const helpLink = wrapper.findAll('.footer-link')[0]

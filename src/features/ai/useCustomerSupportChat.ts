@@ -153,8 +153,8 @@ async function transferToHuman() {
     })
     scrollToBottom()
     showToast('已转人工客服', 'success')
-  } catch {
-    showToast('转接失败', 'error')
+  } catch (error) {
+    showToast(error instanceof Error && error.message.trim() ? error.message : '转接失败，请稍后重试', 'error')
   }
 }
 

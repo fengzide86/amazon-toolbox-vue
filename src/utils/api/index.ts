@@ -369,7 +369,7 @@ export const api = {
 export { verifyAuthCode, adminLogin, checkAuthStatus, getCurrentUser } from './auth'
 export { getAuthCodes, batchGenerateAuthCodes, updateAuthCode, deleteAuthCode } from './auth-codes'
 export { getPlans, getPlansAdmin, createPlan, updatePlan, enablePlan, disablePlan, archivePlan } from './plans'
-export { getOrders, exportOrders, createOrder, updateOrder, markOrderPaid, cancelOrder, refundOrder } from './orders'
+export { getOrders, getOrdersPage, exportOrders, createOrder, updateOrder, markOrderPaid, cancelOrder, refundOrder } from './orders'
 export { getUsers, updateUser } from './users'
 export { getDevices, getMyDevices, unbindDevice, userUnbindDevice } from './devices'
 export { getKnowledgeList, getKnowledgeCategories, getKnowledgeStats, getKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, batchImportKnowledge, syncKnowledgeVector, testKnowledgeRetrieval } from './knowledge'

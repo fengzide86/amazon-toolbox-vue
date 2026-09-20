@@ -28,6 +28,15 @@ def money(value: object) -> Decimal:
     return Decimal(str(value or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
+def validate_update_fields(changes: dict[str, Any], *, nullable: frozenset[str]) -> None:
+    """Distinguish omitted PATCH fields from an explicit invalid null value."""
+    if not changes:
+        raise ValidationException("没有可更新字段")
+    invalid = [field for field, value in changes.items() if value is None and field not in nullable]
+    if invalid:
+        raise ValidationException(f"以下字段不能为空：{', '.join(invalid)}")
+
+
 def month_start(value: str | None) -> date:
     """Parse a YYYY-MM filter, defaulting to the current month."""
     if not value:
@@ -131,4 +140,5 @@ __all__ = [
     "money",
     "month_start",
     "shift_month",
+    "validate_update_fields",
 ]

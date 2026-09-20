@@ -55,6 +55,10 @@ export class BusinessDemoCoordinator {
     preview: ImportPreview,
     clientBatchId: string,
   ): Promise<BusinessBatchSnapshot> {
+    let serverBatchId: string | number | undefined
+    this.stopController()
+    this.batchEventSequence = 0
+    this.dependencies.setError(null)
     try {
       const created = demoBatchSchema.parse(unwrapApiData(await createDemoBatch({
         client_demo_batch_id: `demo_${clientBatchId}`,
@@ -64,6 +68,7 @@ export class BusinessDemoCoordinator {
         scenario_id: tool.demo_scenario_id,
         row_count: preview.validCount,
       })))
+      serverBatchId = created.id
       const itemRefs = created.items.length
         ? created.items.map(item => item.item_ref)
         : Array.from({ length: created.row_count }, (_, index) => `demo_item_${index + 1}`)
@@ -161,9 +166,8 @@ export class BusinessDemoCoordinator {
       this.startConcurrency(created.id)
       return concurrentSnapshot
     } catch (cause) {
-      this.stopController()
-      await this.deactivateActivity()
-      throw cause
+      if (serverBatchId === undefined) throw cause
+      throw new Error(await this.failPlayback(cause, serverBatchId), { cause })
     }
   }
 
@@ -208,7 +212,7 @@ export class BusinessDemoCoordinator {
     ])
     await this.deactivateActivity()
     this.dependencies.setSyncState(persisted ? 'synced' : 'offline')
-    if (!persisted) this.dependencies.setError('演示已在本地退出，记录将在网络恢复后刷新')
+    if (!persisted) this.dependencies.setError('演示已在本地退出，但服务端记录尚未确认同步，请恢复网络后刷新记录核对')
     else await this.dependencies.refreshHistory().catch(() => undefined)
   }
 
@@ -232,7 +236,7 @@ export class BusinessDemoCoordinator {
       onProgress: updates => this.applyProgress(updates),
       onItemComplete: completion => this.finishItem(batchId, token, completion),
       onComplete: () => this.completeBatch(batchId, token),
-      onError: cause => this.failPlayback(cause),
+      onError: cause => { void this.failPlayback(cause) },
     })
     this.controller.start(this.dependencies.getSnapshot().items.map(item => item.itemId))
   }
@@ -307,6 +311,7 @@ export class BusinessDemoCoordinator {
       if (token !== this.runToken || snapshot.status !== 'running') return
       this.batchEventSequence += 1
       await finishDemoBatch(batchId, { event_seq: this.batchEventSequence })
+      if (token !== this.runToken || this.dependencies.getSnapshot().status !== 'running') return
       this.dependencies.setSnapshot(businessBatchSnapshotSchema.parse({
         ...snapshot,
         status: 'completed',
@@ -320,19 +325,56 @@ export class BusinessDemoCoordinator {
       this.dependencies.setSyncState('synced')
       await this.dependencies.refreshHistory().catch(() => undefined)
     } catch (cause) {
-      this.failPlayback(cause)
+      if (token === this.runToken) await this.failPlayback(cause)
     }
   }
 
-  private failPlayback(cause: unknown): void {
+  private async failPlayback(
+    cause: unknown,
+    serverBatchId = this.dependencies.getSnapshot().serverBatchId,
+  ): Promise<string> {
     this.stopController()
-    void this.deactivateActivity()
-    this.dependencies.setError(errorMessage(cause, '批量演示同步失败，请重新开始'))
+    const token = this.runToken
+    const snapshot = this.dependencies.getSnapshot()
+    const failure = errorMessage(cause, '批量演示同步失败')
+    const localMessage = `${failure}；演示已在本地停止`
+    this.dependencies.setError(localMessage)
     this.dependencies.setSyncState('offline')
-    this.dependencies.setSnapshot(businessBatchSnapshotSchema.parse({
-      ...this.dependencies.getSnapshot(),
+    if (snapshot.recordKind === 'demo' && snapshot.serverBatchId === serverBatchId) {
+      const finishedAtMs = Date.now()
+      const items = snapshot.items.map(item => item.status === 'pending' || item.status === 'running'
+        ? { ...item, status: 'failed', message: '演示同步中断，未确认完成', finishedAtMs }
+        : item)
+      this.dependencies.setSnapshot(businessBatchSnapshotSchema.parse({
+        ...snapshot,
+        status: 'error',
+        activeItemId: null,
+        provisioningItemId: null,
+        items,
+        counts: this.localCounts(items),
+      }))
+    }
+
+    // The server locks the parent and terminalizes unfinished items atomically.
+    // A newer parent sequence also prevents late startup/summary writes reopening it.
+    this.batchEventSequence += 1
+    const terminalize = serverBatchId === undefined ? Promise.resolve() : updateDemoBatch(serverBatchId, {
+      event_seq: this.batchEventSequence,
       status: 'error',
-    }))
+    }).then(() => undefined)
+    const [persisted] = await Promise.all([
+      this.settleWithin(terminalize, 2_400),
+      this.settleWithin(window.electronAPI?.batch?.cancel('interrupted').then(() => undefined) || Promise.resolve(), 1_500),
+      this.settleWithin(this.deactivateActivity(), 1_500),
+    ])
+    const message = persisted ? localMessage
+      : `${localMessage}，但服务端记录尚未确认同步，请恢复网络后刷新记录核对`
+    if (token === this.runToken) {
+      this.dependencies.setSyncState(persisted ? 'synced' : 'offline')
+      this.dependencies.setError(message)
+      if (persisted) void this.dependencies.refreshHistory().catch(() => undefined)
+    }
+    return message
   }
 
   private stopController(): void {

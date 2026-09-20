@@ -2,6 +2,8 @@
 
 ## 日常开发
 
+Node 使用 22 系列，CI 固定版本见 `.node-version`。Python CI 使用 3.10，并按 `backend/constraints-py310.txt` 验证生产依赖。使用 `npm ci` 保持依赖锁文件一致；本机其他 Python 版本的测试结果不替代 Python 3.10 CI。
+
 双击 `开发预览.bat`。它默认使用本地开发后端；如果 8000 端口尚未启动，脚本会自动启动 `backend/start.bat`，关闭 Electron 后再回收由它启动的后端进程。
 
 需要明确连接生产控制面进行兼容性检查时运行：
@@ -19,7 +21,7 @@
 等价的底层命令为：
 
 ```powershell
-npm install
+npm ci
 npm run electron:dev
 ```
 
@@ -47,10 +49,12 @@ npm run test:e2e:internal
 等价命令：
 
 ```powershell
-npm run verify
+npm run verify:release
 ```
 
-该命令依次执行密钥审计、TypeScript、ESLint、死代码检查、前端/Electron 测试、桌面前端构建以及后端测试和类型检查。
+该命令依次执行发布配置检查、密钥审计、TypeScript、ESLint、架构边界、OpenAPI 和前端契约检查、死代码检查、前端覆盖率与 Electron 工作流、后端覆盖率与修改代码覆盖率、Ruff 和 mypy、MariaDB 门禁、Business/Internal E2E，以及桌面构建和包内容审计。`npm run verify` 是开发综合检查，不等同于完整发布门禁。
+
+MariaDB 门禁必须使用真实数据库：单独运行检查时配置隔离测试库的 `MARIADB_TEST_URL`；正式发布器也可使用同一 HEAD 已通过的 GitHub MariaDB CI 结果，并会再次独立核验。不要把生产数据库配置为测试库，也不要把跳过的测试计作通过。
 
 如果只验证某一层：
 
@@ -63,30 +67,49 @@ npm run verify:backend
 
 ## 构建 Windows 安装包
 
-双击 `一键发布.bat`，可选输入新版本号。确认生产发布后，脚本会依次执行完整质量门禁、发布环境校验、安装包构建、内容审计、生产后端备份部署、安装包上传和 `latest.yml` 原子发布。任一步骤失败都会停止，服务端部署失败会使用既有回滚逻辑恢复。
+双击 `一键发布.bat` 或使用下述命令。生产发布前必须先将新版本及全部代码提交、合入最新 `main` 并推送，发布器不会替你提交代码或合并分支。它要求：
+
+- 工作区干净，包括没有未跟踪文件。
+- HEAD 等于上游分支和最新 `origin/main`。
+- `package.json` 中版本等于请求版本，OpenAPI 等生成文件检查通过。
+- 请求版本高于线上桌面版本及远端最新版本标签；恢复发布则必须匹配原版本和提交。
+- 本机 `gh` 已登录，以下六项必需 CI 的最新结果均为当前 HEAD 的成功结果：
+  - `Frontend and Electron contracts`
+  - `Backend domains and API`
+  - `MariaDB migrations and concurrency`
+  - `Responsive C B Admin smoke`
+  - `Internal critical-flow acceptance`
+  - `Windows NSIS install and runtime smoke`
+
+确认生产发布后，脚本执行完整质量门禁、构建及内容审计，再依次部署后端、Web 和桌面更新。发布阶段为 `prepared → backend_deployed → web_activated → desktop_published → verified`，状态与产物校验值保存到 `TOOLBOX_DATA_ROOT/release-workflows/<release-id>/`，Windows 默认位于 D 盘。后端部署包通过 `git archive` 从该提交的跟踪文件生成。最终核对健康信息、Web 版本、桌面清单后才创建并推送版本标签。
 
 无人值守发布示例：
 
 ```powershell
-$env:TOOLBOX_RELEASE_VERSION='1.7.9'
 $env:TOOLBOX_AUTO_PUBLISH='1'
-node scripts/toolbox-cli.mjs release --publish --version=1.7.9
+$releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
+node scripts/toolbox-cli.mjs release --publish "--version=$releaseVersion"
 ```
 
 只在本机生成安装包、不部署生产环境：
 
 ```powershell
-node scripts/toolbox-cli.mjs release --version=1.7.9
+$releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
+node scripts/toolbox-cli.mjs release "--version=$releaseVersion"
 ```
 
-如果构建已完成、仅需重试生产部署与原子发布，可避免重复打包：
+中断后根据发布器输出或状态文件取得原 release ID，再恢复同一提交的发布。以下占位值必须替换为真实发布 ID：
 
 ```powershell
 $env:TOOLBOX_AUTO_PUBLISH='1'
-node scripts/toolbox-cli.mjs release --publish --version=1.7.9 --skip-verify --skip-build
+$releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
+$releaseId='<原发布 ID>'
+node scripts/toolbox-cli.mjs release --publish "--version=$releaseVersion" "--resume=$releaseId"
 ```
 
-等价命令：
+**生产禁止 `--skip-verify` 和 `--skip-build`。** `--resume` 会验证原状态、产物哈希和已完成阶段的线上版本，不是绕过验证。发布过程中保留服务器发布租约，失败后应按原 release ID 恢复，不要手动清理租约或另起一轮发布。
+
+仅打包的低层命令如下；它不等同于完整门禁，也不部署或发布：
 
 ```powershell
 npm run electron:build
@@ -101,7 +124,7 @@ npx electron-builder --win --dir
 npm run package:audit
 ```
 
-安装包不得包含 Token、测试、文档、运维脚本、TypeScript 源码或 source map。
+当前 `internal` 桌面安装包不包含 Python 后端；`package:audit` 会拒绝 `toolbox-backend.exe`。包内包含前端、编译后的 Electron/Runner、必要生产依赖和模板、费率、品牌资源。安装包不得包含 Token、测试、文档、运维脚本、TypeScript 源码或 source map。`backend:build` 仅保留为兼容场景的手动命令，不是默认发布步骤。
 
 ## 发布应用更新
 
@@ -113,11 +136,13 @@ SSH 连接信息统一放在忽略提交的 `.env.deploy`。服务器使用非 2
 
 ## 回滚
 
-- 查看清理前快照：`git show pre-legacy-cleanup-20260716`
-- 从快照建立恢复分支：`git switch -c codex/recovery-legacy-cleanup pre-legacy-cleanup-20260716`
-- 回退单阶段：`git revert <commit>`
+- 后端部署脚本在停服后冻结写入并备份数据库、附件及代码/配置，避免数据库与凭证文件备份时间不一致。Alembic 已开始后的失败使用 `ops/deploy/restore-backup.sh` 恢复一致备份；此前失败恢复代码、配置和 Python 环境指针。
+- Web 构建发布到独立版本目录，用 `current` 软链接原子切换；该阶段验证失败会恢复上一 Web 指针。带哈希的静态资源保留兼容旧的已打开页面。
+- 桌面清单经暂存、校验后原子发布。若较早阶段已成功而后续失败，已成功阶段不会自动全部回旧版；优先用同一 release ID 恢复。三项发布不是跨服务的全局原子事务。
+- 需要人工恢复后端时，先核对本次部署输出的 `backup_dir`、恢复影响和备份完整性，再使用服务器已安装的 `toolbox-restore-backup`；该操作会恢复数据库和附件，不得只因网页问题就盲目执行。
+- 代码回退使用经过评审的 `git revert <commit>`，再按新版本发布。
 
-不要使用 `git reset --hard`。数据库新增列和 receipt/批次表保留，回滚代码时不做破坏性降级。
+不要使用 `git reset --hard`、强推或覆盖已发布标签。不要把某一阶段的回滚成功描述为三端都已回滚；必须重新核对后端健康、Web 元数据和桌面更新清单。
 
 ## 仍需人工确认
 
@@ -126,8 +151,7 @@ SSH 连接信息统一放在忽略提交的 `.env.deploy`。服务器使用非 2
 1. 用真实 C 端授权运行一次工具。
 2. 用真实 B 端授权导入一个小批次并处理一次登录或验证码现场。
 3. 登录管理后台，检查行动中心、公告和更新发布。
-生产服务器当前仍使用 `/etc/systemd/system/toolbox-backend.service`，通过 Uvicorn 运行后端；服务器尚未安装 Docker。仓库中的 Compose 先用于本地一致性和 MariaDB 集成测试，生产容器迁移必须按 `docs/DOCKER_OPTIMIZATION_PLAN.md` 的旁路验证与回滚步骤分阶段执行。
 
-2026-07-16 已将生产控制面升级到 1.7.2，并完成 MariaDB 备份、Alembic 迁移、Python 3.10 兼容检查、CORS 桌面协议检查和失败自动回滚验证。服务器保留 `pre-1.7.2-*` 数据库与代码备份，以及 `pre-cors-*` 代码备份。
+仓库生产部署脚本使用 `toolbox-backend.service`，通过发布版 Python 环境的 `current-venv` 指针启动 Uvicorn。Compose 用于本地一致性和 MariaDB 集成测试，不是默认生产部署方式；不要因本机没有 Docker 而安装或迁移生产环境。
 
-生产控制面和更新目录统一使用 `https://8.130.113.104`。Nginx 终止 TLS 并反向代理本机 8000 端口；公网客户端不再直接连接 8000。服务器使用受信任的短期 IP 证书，`toolbox-certbot-renew.timer` 每日两次自动续期并在成功后重载 Nginx。证书续期依赖公网 80 端口的 ACME challenge 路径，请勿关闭该端口或删除对应 Nginx location。
+控制面及部署目标以当前 `.env.deploy` 为准；Web 和桌面更新使用同一 HTTPS 控制面。仓库 Nginx 配置分别提供 `/api/`、`/updates/` 和 Web 静态页面。发布前实时验证 TLS、健康信息和版本，不把旧部署记录或旧电脑端口配置当作当前事实；不要关闭证书续期相关入口或擅自修改网络规则。

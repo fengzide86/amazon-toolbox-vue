@@ -498,16 +498,18 @@ async def update_demo_batch(
     }
     if sum(next_counts.values()) != batch.row_count:
         raise HTTPException(status_code=422, detail="演示批次数量汇总必须等于总行数")
-    if request.status == "cancelled":
+    # Item writes and parent snapshots can arrive in a different order. Keep
+    # accepting the legacy count fields, but persisted items own the totals.
+    items = await _locked_batch_items(db, batch.id)
+    if request.status in {"cancelled", "error"}:
         now = datetime.now()
-        items = await _locked_batch_items(db, batch.id)
         for item in items:
             if item.status not in {"queued", "playing"}:
                 continue
-            item.status = "skipped"
+            item.status = "skipped" if request.status == "cancelled" else "error"
             item.event_seq += 1
             item.finished_at = now
-        next_counts = _batch_item_counts(items)
+    next_counts = _batch_item_counts(items)
     batch.event_seq = request.event_seq
     batch.status = request.status
     _apply_batch_item_counts(batch, next_counts)
