@@ -1,5 +1,4 @@
 @echo off
-setlocal EnableExtensions
-cd /d "%~dp0"
-call "%~dp0dev-preview.bat" admin %*
+setlocal EnableExtensions DisableDelayedExpansion
+call "%~dp0scripts\toolbox-entry.bat" preview admin %*
 exit /b %ERRORLEVEL%

@@ -6,6 +6,7 @@ cd /d "%~dp0"
 set "PROJECT_ROOT=%~dp0.."
 set "VENV_DIR=%PROJECT_ROOT%\venv"
 set "PYTHON=%VENV_DIR%\Scripts\python.exe"
+if defined TOOLBOX_PYTHON set "PYTHON=%TOOLBOX_PYTHON%"
 set "PIP=%VENV_DIR%\Scripts\pip.exe"
 if not defined TOOLBOX_RUNTIME_DIR set "TOOLBOX_RUNTIME_DIR=%LOCALAPPDATA%\AmazonToolboxData"
 
@@ -21,6 +22,14 @@ if not defined PYTHONIOENCODING set "PYTHONIOENCODING=utf-8"
 echo ============================================
 echo   Amazon Toolbox - Local Backend
 echo ============================================
+
+if defined TOOLBOX_PYTHON (
+    "%PYTHON%" --version >nul 2>&1
+    if errorlevel 1 (
+        echo [ERROR] TOOLBOX_PYTHON is not runnable. No replacement environment was created.
+        goto :failed
+    )
+)
 
 if not exist "%PYTHON%" (
     where py >nul 2>&1

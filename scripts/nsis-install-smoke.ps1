@@ -1,5 +1,6 @@
 param(
     [string]$PreviousInstaller = $env:NSIS_PREVIOUS_INSTALLER,
+    [string]$PreviousVersion = $(if ($env:NSIS_PREVIOUS_VERSION) { $env:NSIS_PREVIOUS_VERSION } elseif ($env:NSIS_BASELINE_VERSION) { $env:NSIS_BASELINE_VERSION } else { '1.8.5' }),
     [ValidateRange(1, 3)][int]$DiagnosticAttempts = 1
 )
 $ErrorActionPreference = 'Stop'
@@ -108,9 +109,13 @@ function Invoke-Runtime([string]$Mode, [string]$Version) {
 
 try {
     if ($PreviousInstaller) {
-        $fixture = Get-Content (Join-Path $PSScriptRoot 'nsis-upgrade-fixture.json') -Raw | ConvertFrom-Json
-        if ((Get-FileHash -LiteralPath $PreviousInstaller -Algorithm SHA512).Hash.ToLowerInvariant() -ne $fixture.sha512) {
-            throw 'Old installer does not match the pinned released 1.8.5 binary'
+        $fixtureFiles = @{ '1.8.5' = 'nsis-upgrade-fixture.json'; '1.8.7' = 'nsis-upgrade-fixture-1.8.7.json' }
+        if (-not $fixtureFiles.ContainsKey($PreviousVersion)) { throw "Unsupported pinned NSIS baseline: $PreviousVersion" }
+        $fixture = Get-Content (Join-Path $PSScriptRoot $fixtureFiles[$PreviousVersion]) -Raw | ConvertFrom-Json
+        if ($fixture.version -ne $PreviousVersion -or
+            (Get-Item -LiteralPath $PreviousInstaller).Length -ne $fixture.size -or
+            (Get-FileHash -LiteralPath $PreviousInstaller -Algorithm SHA512).Hash.ToLowerInvariant() -ne $fixture.sha512) {
+            throw "Old installer does not match the pinned released $PreviousVersion binary"
         }
         Invoke-Install $PreviousInstaller 'old-version'
         Invoke-Runtime 'seed' $fixture.version
@@ -144,7 +149,7 @@ try {
         }
     }
     if ($hadInstallFailure) { throw 'A diagnostic retry recovered, but an installer crash occurred; gate remains failed' }
-    @{ status = 'passed'; upgradeFrom = $(if ($PreviousInstaller) { '1.8.5' } else { $null }); version = $metadata.version;
+    @{ status = 'passed'; upgradeFrom = $(if ($PreviousInstaller) { $fixture.version } else { $null }); version = $metadata.version;
         userDataPreserved = $true; unrelatedDirectoryPreserved = $true } |
         ConvertTo-Json | Set-Content (Join-Path $diagnostics 'result.json') -Encoding UTF8
     Write-Output 'nsis_install_smoke=passed'

@@ -29,6 +29,8 @@ jobs:
       - run: npm run deadcode
       - run: npm run electron:compile
       - run: npm run test:coverage
+      - name: Verify marketing publication guards
+        run: npm run test:marketing-publish
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -42,6 +44,17 @@ jobs:
         with:
           name: web-dist
           path: dist/
+          retention-days: 1
+      - name: Build and audit the independent marketing website
+        run: npm run build:marketing && npm run marketing:audit
+        env:
+          KST_MARKETING_SITE_URL: https://marketing.example.test
+          VITE_DESKTOP_DOWNLOAD_URL: https://downloads.example.test/KST%20Setup.exe
+      - uses: actions/upload-artifact@v7
+        with:
+          name: marketing-dist
+          path: dist-marketing/
+          if-no-files-found: error
           retention-days: 1
 
   backend:
@@ -204,15 +217,25 @@ jobs:
         with:
           name: web-dist
           path: dist
+      - uses: actions/download-artifact@v8
+        with:
+          name: marketing-dist
+          path: dist-marketing
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --config=playwright.internal.config.ts
         env:
           PLAYWRIGHT_PREBUILT: '1'
+      - name: Verify marketing desktop, mobile, navigation, download and real motion
+        run: npm run test:e2e:marketing
+        env:
+          PLAYWRIGHT_MARKETING_PREBUILT: '1'
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: internal-acceptance-artifacts
-          path: test-results/internal-acceptance/
+          path: |
+            test-results/internal-acceptance/
+            test-results/marketing/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -258,17 +281,28 @@ jobs:
           node-version: '22.18.0'
           cache: npm
       - run: npm ci
+      - name: Verify Windows launchers and immutable upgrade fixture selection
+        run: npx vitest run src/tests/scripts/toolboxLaunchers.test.ts src/tests/scripts/nsisUpgradeFixtures.test.ts
       - name: Build and audit the real NSIS/update artifacts
         run: npm run desktop:verify-installer
       - name: Verify app protocol renderer boot
         run: npm run test:app-protocol
       - name: Verify packaged automation runner protocol
         run: npm run test:automation-smoke -- --mock
-      - name: Fetch immutable previous release for upgrade acceptance
+      - name: Fetch immutable 1.8.5 release for upgrade acceptance
         run: node scripts/prepare-nsis-upgrade.mjs
-      - name: Verify silent old-to-new upgrade, retained data, packaged runtime and uninstall
+        env:
+          NSIS_BASELINE_VERSION: '1.8.5'
+      - name: Verify 1.8.5 upgrade, retained data, packaged runtime and uninstall
         shell: pwsh
-        run: ./scripts/nsis-install-smoke.ps1
+        run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.5' -DiagnosticAttempts 1
+      - name: Fetch immutable 1.8.7 release for upgrade acceptance
+        run: node scripts/prepare-nsis-upgrade.mjs
+        env:
+          NSIS_BASELINE_VERSION: '1.8.7'
+      - name: Verify 1.8.7 upgrade, retained data, packaged runtime and uninstall
+        shell: pwsh
+        run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.7' -DiagnosticAttempts 1
       - uses: actions/upload-artifact@v7
         if: always()
         with:

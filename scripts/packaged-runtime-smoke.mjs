@@ -65,14 +65,14 @@ try {
   assert.equal(runtime.version, expectedVersion)
   assert.equal(path.resolve(runtime.root), runtimeRoot)
   const bridge = await window.evaluate(() => Boolean(window.electronAPI?.runtime?.deviceId))
-  const legacyBaseline = mode === 'seed' && expectedVersion === '1.8.5' && !bridge
+  const legacyBaseline = mode === 'seed' && ['1.8.5', '1.8.7'].includes(expectedVersion) && !bridge
   if (!bridge && !legacyBaseline) throw new Error('Packaged preload bridge is unavailable')
-  // The released 1.8.5 had a broken sandbox preload. Keep the binary unchanged:
+  // Both pinned releases had a broken sandbox preload. Keep the binary unchanged:
   // seed its real credential format via the same Electron safeStorage codec.
   const deviceId = bridge
     ? await window.evaluate(() => window.electronAPI.runtime.deviceId)
     : await application.evaluate(() => {
-      // This is the exact identity formula verified in the pinned 1.8.5 ASAR.
+      // This is the exact identity formula verified in both pinned release ASARs.
       const os = process.mainModule.require('node:os')
       const crypto = process.mainModule.require('node:crypto')
       return `DEV-${crypto.createHash('sha256').update([os.hostname(), os.homedir(), os.platform(), os.arch()].join('|')).digest('hex').slice(0, 20).toUpperCase()}`
@@ -83,7 +83,7 @@ try {
     assert.equal(await window.evaluate(() => window.electronAPI.runtime.controlApiBase), api)
     assert.deepEqual(await window.evaluate(() => window.electronAPI.batch.getSnapshot()), { status: 'idle', items: [] })
     diagnostic.checks.push('preload runtime', 'preload batch IPC')
-  } else diagnostic.knownOldVersionDefect = 'Released 1.8.5 sandbox preload unavailable; old credential fixture seeded through safeStorage, not old IPC'
+  } else diagnostic.knownOldVersionDefect = `Released ${expectedVersion} sandbox preload unavailable; old credential fixture seeded through safeStorage, not old IPC`
 
   if (mode === 'seed') {
     if (legacyBaseline) {

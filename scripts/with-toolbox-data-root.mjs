@@ -65,13 +65,14 @@ const command = isWindows && resolvedCommand.toLowerCase().endsWith('.cmd')
   : resolvedCommand
 const spawnedArgs = command === resolvedCommand
   ? requestedArgs
-  : ['/d', '/s', '/c', [resolvedCommand, ...requestedArgs].map(quoteForCmd).join(' ')]
+  : ['/d', '/v:off', '/s', '/c', `call ${[resolvedCommand, ...requestedArgs].map(quoteForCmd).join(' ')}`]
 
 const child = spawn(command, spawnedArgs, {
   cwd: process.cwd(),
   env,
   stdio: 'inherit',
   windowsHide: true,
+  windowsVerbatimArguments: command !== resolvedCommand,
 })
 
 child.once('error', error => {
