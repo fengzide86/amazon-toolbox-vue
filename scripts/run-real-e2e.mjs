@@ -10,6 +10,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
+import { resolvePython } from './run-python.mjs'
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const runtimeParent = resolve(process.env.KST_REAL_E2E_ROOT
@@ -18,7 +19,7 @@ await mkdir(runtimeParent, { recursive: true })
 const runtime = await mkdtemp(join(runtimeParent, 'run-'))
 const releaseIdentity = `real-e2e-${randomBytes(12).toString('hex')}`
 await writeFile(join(runtime, '.kst-real-e2e-owned'), 'kst-real-e2e-v1')
-const python = process.env.TOOLBOX_PYTHON || (process.platform === 'win32' ? 'python' : 'python3')
+const python = resolvePython()
 const port = await new Promise((resolvePort, reject) => {
   const server = createServer()
   server.once('error', reject)
