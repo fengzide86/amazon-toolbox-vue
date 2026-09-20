@@ -63,6 +63,8 @@
 
 ## 本机安全验证
 
+快捷方式目标核验使用 `read-windows-shortcut.ps1` 的原生 `IShellLinkW` 与只读 `IPersistFile.Load`，不使用会在中文路径下返回空目标的 WScript.Shell。检查保留 HRESULT，空目标、损坏或缺失文件均失败；不调用 Resolve、Save，不启动快捷方式。本地回归从同一临时中文/emoji `.lnk` 验证原生读取正确、旧读取为空，读取前后文件字节不变。临时文件仅在 D 盘独占测试目录，不写桌面、开始菜单或注册表。真实安装后仍核对桌面与开始菜单目标及卸载清理。
+
 ```powershell
 # 从真实项目路径运行，避免目录 Junction 导致 Vitest 路径解析偏差。
 pwsh -NoProfile -File scripts/nsis-unpacked-upgrade-smoke.ps1 `

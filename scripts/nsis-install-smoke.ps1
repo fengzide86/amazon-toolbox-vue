@@ -15,6 +15,7 @@ if ($LegacyInstallLocationHint -and (-not $PreviousInstaller -or $DiagnosticAtte
     throw 'LegacyInstallLocationHint requires a pinned old installer and exactly one installation attempt'
 }
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+. (Join-Path $PSScriptRoot 'read-windows-shortcut.ps1')
 $metadata = Get-Content (Join-Path $projectRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $identityJson = & node (Join-Path $PSScriptRoot 'nsis-install-identity.mjs') identity
 if ($LASTEXITCODE -ne 0) { throw 'Unable to verify the locked NSIS application identity' }
@@ -152,17 +153,12 @@ function Assert-InstalledIdentity([string]$ExpectedVersion, [string]$Stage) {
         throw "Installed application executable version mismatch at $Stage"
     }
     $verifiedShortcuts = @()
-    $shell = New-Object -ComObject WScript.Shell
-    try {
-        foreach ($shortcutPath in $shortcutPaths) {
-            if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) { throw "Real installer shortcut missing: $shortcutPath" }
-            $shortcut = $shell.CreateShortcut($shortcutPath)
-            try {
-                if ([IO.Path]::GetFullPath($shortcut.TargetPath) -ne $executable) { throw "Shortcut targets a different installation: $shortcutPath" }
-                $verifiedShortcuts += @{ path = $shortcutPath; target = $shortcut.TargetPath }
-            } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) | Out-Null }
-        }
-    } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null }
+    foreach ($shortcutPath in $shortcutPaths) {
+        if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) { throw "Real installer shortcut missing: $shortcutPath" }
+        $actualTarget = Get-WindowsShortcutTarget $shortcutPath
+        if ([IO.Path]::GetFullPath($actualTarget) -ne $executable) { throw "Shortcut targets a different installation: $shortcutPath" }
+        $verifiedShortcuts += @{ path = $shortcutPath; target = $actualTarget; reader = 'IShellLinkW/IPersistFile' }
+    }
     @{ stage = $Stage; expectedVersion = $ExpectedVersion; asar = $archiveIdentity;
         registeredVersion = $registration.DisplayVersion; uninstallString = $registration.UninstallString;
         installationDirectory = $installDir; executable = $executable; executableVersion = $executableVersion;

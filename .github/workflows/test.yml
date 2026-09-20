@@ -281,8 +281,8 @@ jobs:
           node-version: '22.18.0'
           cache: npm
       - run: npm ci
-      - name: Verify Windows launchers and immutable upgrade fixture selection
-        run: npx vitest run src/tests/scripts/toolboxLaunchers.test.ts src/tests/scripts/nsisUpgradeFixtures.test.ts
+      - name: Verify Windows launchers, Unicode shortcuts and immutable upgrade fixtures
+        run: npx vitest run src/tests/scripts/toolboxLaunchers.test.ts src/tests/scripts/nsisUpgradeFixtures.test.ts src/tests/scripts/nsisLegacyInstallHint.test.ts src/tests/scripts/windowsShortcutReader.test.ts
       - name: Build and audit the real NSIS/update artifacts
         run: npm run desktop:verify-installer
       - name: Verify NSIS pointer copy at protected memory boundaries
