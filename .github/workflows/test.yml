@@ -289,6 +289,13 @@ jobs:
         run: npm run test:app-protocol
       - name: Verify packaged automation runner protocol
         run: npm run test:automation-smoke -- --mock
+      - name: Cache immutable historical installers (always recheck SHA512)
+        uses: actions/cache@v5
+        with:
+          path: |
+            D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
+            D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.7.exe
+          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture*.json') }}
       - name: Fetch immutable 1.8.5 release for upgrade acceptance
         run: node scripts/prepare-nsis-upgrade.mjs
         env:
