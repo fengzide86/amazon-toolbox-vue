@@ -9,6 +9,22 @@ from models import Feedback, Plan, User
 from tests.conftest import get_data
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("statuses", [[], ["pending", "pending", "processing", "resolved"]])
+async def test_feedback_stats_count_each_state(client, auth_headers, db_session, statuses):
+    db_session.add_all([
+        Feedback(title=f"统计 {index}", content="统计测试", status=status)
+        for index, status in enumerate(statuses)
+    ])
+    await db_session.commit()
+    response = await client.get("/api/feedback/stats", headers=auth_headers)
+    assert response.status_code == 200, response.text
+    assert get_data(response) == {
+        "total": len(statuses), "pending": statuses.count("pending"),
+        "processing": statuses.count("processing"), "resolved": statuses.count("resolved"),
+    }
+
+
 async def seed_feedback(db_session: AsyncSession):
     """创建测试工单数据"""
     plan = Plan(name="测试", price=99, duration_days=30, status="active")

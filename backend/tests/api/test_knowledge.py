@@ -6,6 +6,34 @@ import pytest
 from models import KnowledgeBase
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("generic_scope", [None, ""])
+async def test_global_knowledge_is_visible_in_platform_and_capability_lists(
+    client, db_session, auth_headers, generic_scope,
+):
+    global_item = KnowledgeBase(
+        title="通用说明", content="通用内容", category="使用教程",
+        platform_key=generic_scope, capability_key=generic_scope, status="active",
+    )
+    scoped_item = KnowledgeBase(
+        title="物流说明", content="物流内容", category="使用教程",
+        platform_key="amazon", capability_key="logistics_template", status="active",
+    )
+    unrelated = KnowledgeBase(
+        title="另一平台", content="不应显示", category="使用教程",
+        platform_key="aliexpress", capability_key="listing", status="active",
+    )
+    db_session.add_all([global_item, scoped_item, unrelated])
+    await db_session.commit()
+    params = {"platform_key": "amazon", "capability_key": "logistics_template"}
+    admin = await client.get("/api/knowledge", params=params, headers=auth_headers)
+    faq = await client.get("/api/help/faq/list", params=params)
+    assert admin.status_code == faq.status_code == 200
+    expected = {global_item.id, scoped_item.id}
+    assert {item["id"] for item in admin.json()["items"]} == expected
+    assert {item["id"] for item in faq.json()["data"]["items"]} == expected
+
+
 class TestKnowledgeAPI:
     """知识库 API 测试"""
 

@@ -12,20 +12,24 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from core.exceptions import ConflictException
 from core.security import hash_password
 from database import Base, get_db
 from domains.automation import demo_service
+from domains.knowledge import chat_service
 from main import app
 from models import (
     AuditLog,
     AuthCode,
     AuthSeat,
+    ChatSession,
     Device,
     ExpenseAttachment,
     ExpenseCategory,
     ExpenseRecord,
     ExpenseRenewal,
     ExpenseRenewalOccurrence,
+    Feedback,
     Order,
     Plan,
     ProfitRecord,
@@ -37,6 +41,87 @@ from models import (
 from models.demo import DemoBatch, DemoBatchItem
 from schemas.demo import DemoBatchItemUpdate, DemoBatchResponse, DemoBatchUpdate, DemoEvent
 from services.staff_service import create_staff_access_token
+
+
+@pytest.mark.asyncio
+async def test_twenty_concurrent_chat_handoffs_create_one_scoped_ticket():
+    engine = create_async_engine(
+        _mariadb_test_url(), pool_size=20, max_overflow=0,
+        pool_pre_ping=True, isolation_level="READ COMMITTED",
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    suffix = uuid.uuid4().hex[:12]
+    session_id = f"handoff-{suffix}"
+    owner_id: int | None = None
+    all_preloaded = asyncio.Event()
+    preloaded_count = 0
+    tasks: list[asyncio.Task[Any]] = []
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as db:
+            owner = User(name=f"Handoff {suffix}", is_active=True)
+            db.add(owner)
+            await db.flush()
+            owner_id = owner.id
+            db.add(ChatSession(
+                session_id=session_id, user_id=owner_id, status="active",
+                platform_key="amazon", capability_key="logistics_template",
+            ))
+            await db.commit()
+
+        async def transfer() -> int | None | ConflictException:
+            nonlocal preloaded_count
+            async with sessions() as db:
+                # Model the router ownership check: every identity map holds
+                # the initial active row before any worker can transfer it.
+                stale_session = (await db.execute(
+                    select(ChatSession).where(ChatSession.session_id == session_id)
+                )).scalar_one()
+                assert stale_session.status == "active"
+                preloaded_count += 1
+                if preloaded_count == 20:
+                    all_preloaded.set()
+                await asyncio.wait_for(all_preloaded.wait(), timeout=15)
+                try:
+                    return await chat_service.transfer_to_human(db, session_id, user_id=owner_id)
+                except ConflictException as error:
+                    return error
+
+        tasks = [asyncio.create_task(transfer()) for _ in range(20)]
+        results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=30)
+        ids = [result for result in results if isinstance(result, int)]
+        conflicts = [result for result in results if isinstance(result, ConflictException)]
+        assert len(ids) == 1, results
+        assert len(conflicts) == 19
+        assert all(error.code == 409 for error in conflicts)
+        async with sessions() as db:
+            tickets = (await db.execute(select(Feedback).where(Feedback.user_id == owner_id))).scalars().all()
+            assert len(tickets) == 1
+            assert tickets[0].id == ids[0]
+            assert (tickets[0].platform_key, tickets[0].capability_key) == ("amazon", "logistics_template")
+            conversation = (await db.execute(
+                select(ChatSession).where(ChatSession.session_id == session_id)
+            )).scalar_one()
+            assert conversation.status == "transferred"
+            assert conversation.transferred_to_human is True
+    finally:
+        all_preloaded.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            if owner_id is not None:
+                async with sessions() as db:
+                    await db.execute(delete(Feedback).where(Feedback.user_id == owner_id))
+                    await db.execute(delete(ChatSession).where(ChatSession.session_id == session_id))
+                    await db.execute(delete(User).where(User.id == owner_id))
+                    await db.commit()
+        finally:
+            await engine.dispose()
 
 
 def _mariadb_test_url() -> str:

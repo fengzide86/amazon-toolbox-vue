@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
 from core.config import settings
+from core.exceptions import ConflictException
 from core.logging import get_logger
 from models import ChatConfig, ChatMessage, ChatSession, Feedback, User
 
@@ -379,9 +380,17 @@ async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int |
 
 async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | None = None) -> int | None:
     """转人工 - 自动创建工单"""
-    session = await get_session_record(db, session_id)
+    session = (await db.execute(
+        select(ChatSession)
+        .where(ChatSession.session_id == session_id)
+        .with_for_update()
+        # The router's ownership check may already have loaded an older row.
+        .execution_options(populate_existing=True)
+    )).scalar_one_or_none()
     if not session:
         return None
+    if session.transferred_to_human or session.status == "transferred":
+        raise ConflictException("该会话已转人工，请到我的工单查看")
 
     # 获取对话记录
     messages_result = await db.execute(
@@ -407,6 +416,8 @@ async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | No
         content=content,
         status="pending",
         priority="normal",
+        platform_key=session.platform_key,
+        capability_key=session.capability_key,
     )
     db.add(feedback)
 

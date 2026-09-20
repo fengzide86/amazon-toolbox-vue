@@ -40,7 +40,8 @@ async def get_list(
         from sqlalchemy import or_
         platform_cond = or_(
             KnowledgeBase.platform_key == platform_key,
-            KnowledgeBase.platform_key.is_(None)
+            KnowledgeBase.platform_key.is_(None),
+            KnowledgeBase.platform_key == "",
         )
         query = query.where(platform_cond)
         count_query = count_query.where(platform_cond)
@@ -48,7 +49,8 @@ async def get_list(
         from sqlalchemy import or_
         cap_cond = or_(
             KnowledgeBase.capability_key == capability_key,
-            KnowledgeBase.capability_key.is_(None)
+            KnowledgeBase.capability_key.is_(None),
+            KnowledgeBase.capability_key == "",
         )
         query = query.where(cap_cond)
         count_query = count_query.where(cap_cond)
