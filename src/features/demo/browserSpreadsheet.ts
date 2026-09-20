@@ -1,4 +1,5 @@
 import { importPreviewSchema, type ImportPreview } from '@/features/business/model'
+import type { SpreadsheetSelectionOptions } from '@/shared/spreadsheet/workbook'
 import { parseLocalDemoSpreadsheet } from './localSpreadsheet'
 
 interface WorkerReply {
@@ -11,6 +12,7 @@ function parseWithWorker(
   file: File,
   inputSchema: Array<Record<string, unknown>>,
   maxRows: number,
+  selection: SpreadsheetSelectionOptions,
 ): Promise<ImportPreview> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./spreadsheet.worker.ts', import.meta.url), { type: 'module' })
@@ -25,7 +27,7 @@ function parseWithWorker(
       reject(new Error('浏览器文件解析器启动失败'))
     }, { once: true })
     void file.arrayBuffer().then(buffer => {
-      worker.postMessage({ buffer, fileName: file.name, inputSchema, maxRows }, [buffer])
+      worker.postMessage({ buffer, fileName: file.name, inputSchema, maxRows, selection }, [buffer])
     }, reject)
   })
 }
@@ -34,15 +36,16 @@ export async function parseBrowserDemoSpreadsheet(
   file: File,
   inputSchema: Array<Record<string, unknown>> = [],
   maxRows = 50,
+  selection: SpreadsheetSelectionOptions = {},
 ): Promise<ImportPreview> {
   if (typeof Worker === 'undefined' || import.meta.env.MODE === 'test') {
-    return parseLocalDemoSpreadsheet(file, inputSchema, maxRows)
+    return parseLocalDemoSpreadsheet(file, inputSchema, maxRows, selection)
   }
   try {
-    return await parseWithWorker(file, inputSchema, maxRows)
+    return await parseWithWorker(file, inputSchema, maxRows, selection)
   } catch {
     // CSP, browser extensions or unsupported worker module loading must not
     // make local import unavailable; the same pure parser can run inline.
-    return parseLocalDemoSpreadsheet(file, inputSchema, maxRows)
+    return parseLocalDemoSpreadsheet(file, inputSchema, maxRows, selection)
   }
 }

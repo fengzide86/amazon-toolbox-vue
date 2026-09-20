@@ -141,6 +141,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
 
   function chooseTool(tool: BusinessTool): void {
     if (isActive.value) return
+    imports.invalidate()
     selectedTool.value = tool
     importPreview.value = null
     error.value = null
@@ -212,6 +213,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
 
   async function resetWorkspace(): Promise<void> {
     if (isActive.value) throw new Error('当前批次仍在执行')
+    imports.invalidate()
     await demo.reset()
     await live.cancelLocal(snapshot.value.status || 'completed')
     snapshot.value = emptyBatchSnapshot()
