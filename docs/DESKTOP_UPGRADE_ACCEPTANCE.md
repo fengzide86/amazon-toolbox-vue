@@ -22,7 +22,7 @@
     path: test-results/nsis/**
 ```
 
-旧包固定为已发布的 1.8.5：来源、体积和 SHA512 记录在 `scripts/nsis-upgrade-fixture.json`，不能用当前 `latest.yml` 代替旧包。下载失败、校验不符都应让验收失败，而不是跳过升级。
+旧包固定为已发布的 1.8.5 或 1.8.7：来源、体积和 SHA512 分别记录在 `scripts/nsis-upgrade-fixture.json` 和 `scripts/nsis-upgrade-fixture-1.8.7.json`，不能用当前 `latest.yml` 代替旧包。下载失败、校验不符都应让验收失败，而不是跳过升级。
 
 脚本先拒绝已有 KST 安装的 Windows 账户，仅在 GitHub-hosted runner 运行。安装目录、临时解压和应用数据位于 D 盘。NSIS 的 `/D` 并不能隔离同一 AppID 的注册表和快捷方式，因此不得在开发者电脑直接运行真实安装/卸载测试。
 
@@ -36,7 +36,28 @@
 
 `npm run desktop:prepare-nsis` 因此在生成**新**安装包前对已核对的整个模板 SHA256 和库版本做严格校验，再只替换该内存处理块：使用原生 Push/Pop 保护临时寄存器，以 [lstrcpynW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lstrcpynw) 按 NUL 和明确的目标字符容量复制，释放非空 COM 指针。输出 buffer 的容量与 count 均为 `NSIS_MAX_STRLEN` WCHAR（包含结尾 NUL），不使用无限长拷贝。重复执行只验证；版本或模板漂移直接阻止打包。`npm ci` 后会重新应用，不修改 lockfile 或升级依赖。
 
-修复不改变 AppID、安装范围、HKCU/HKLM 已有路径识别、Windows 重定向的每用户 Programs 路径和 `/D` 处理。不得预填注册表绕过该路径，也不得修改原始旧安装包；旧包失败仍需保留并如实报告。
+修复不改变 AppID、安装范围、HKCU/HKLM 已有路径识别、Windows 重定向的每用户 Programs 路径和 `/D` 处理。新候选的全新安装验收不得预填注册表绕过该路径，也不得修改原始旧安装包；旧包失败仍需保留并如实报告。历史覆盖升级基线的显式准备例外和不能代表的结论见下节。
+
+## 历史升级基线的显式安装目录提示
+
+新候选首先在一次性 Windows 环境通过**不带提示的全新安装**。旧 1.8.5/1.8.7 已发布二进制保持原有 SHA512，不能补丁重打后冒充历史包。原包不带提示的失败报告继续保留，例如 [35510523495 的 Windows Job](https://github.com/fengzide86/amazon-toolbox-vue/actions/runs/35510523495/job/106077838214)：1.8.7 原安装器在 `old-version` 首次启动时发生 `System.dll + 0x1581 / 0xC0000005`，新候选尚未运行。
+
+`-LegacyInstallLocationHint` 默认关闭，只允许在 GitHub-hosted Windows、固定 SHA512 的 1.8.5 或 1.8.7 历史基线、单次安装模式下显式启用。它**改变旧安装器的 existing-location 分支**，不验证也不宣称旧原包的无提示全新安装正常：
+
+1. 按锁定 `app-builder-lib 26.8.1` 的 `NsisTarget.js` 源码，以 `UUID.v5('com.amazon.toolbox', UUID.parse('50e065bc-3134-11e6-9bab-38c9862bdaf3'))` 核验 GUID `159e8ec2-4c1f-5b99-a3ea-a9467c2587ec`，不猜测注册表路径。
+2. 拒绝已有安装键、卸载键、快捷方式、非空目标目录和路径联接。目标只能是本次独占的 D 盘隔离安装目录。
+3. **只写一个值**：`HKCU\Software\<GUID>\InstallLocation`。不伪造卸载注册、DisplayVersion、EXE、快捷方式或旧应用数据；将写入范围、原包哈希、分支变化写入 `legacy-install-location-hint.json`。
+4. 真正执行原始旧 NSIS 一次。安装成功后核对旧 ASAR 的 `package.version`、安装器真实生成的 `DisplayVersion` / `UninstallString`、隔离目录内的 EXE 和卸载器、桌面和开始菜单快捷方式，再执行旧运行时 seed → 新 NSIS 覆盖安装 → 新运行时检查 → 卸载。
+5. 新候选阶段不再预填任何值；最终必须验证安装/卸载注册及快捷方式都由真实卸载器清理，同时保留测试用户数据。失败不重试、不手动清掉证据使下一轮变绿。
+
+命令仅用于一次性 CI Windows；不得在用户电脑执行：
+
+```powershell
+# 此前必须先完成不带提示、无 PreviousInstaller 的候选全新安装验收。
+./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.7' -DiagnosticAttempts 1 -LegacyInstallLocationHint
+```
+
+上述命令仍须先由 `prepare-nsis-upgrade.mjs` 校验原旧包并设置 `NSIS_PREVIOUS_INSTALLER`。结果会明确记录 `legacyInstallLocationHint: true`、`oldFreshInstallValidated: false`；它只证明在明确准备的历史安装路径上，原旧版本可被真实安装并由新版本覆盖升级，不代表所有客户电脑或旧包默认目录选择都已验证。
 
 在已下载 NSIS 编译器的 Windows 环境执行 `node scripts/test-nsis-known-folder-copy.mjs`。探针把短 Unicode 字符串和空串放在可读内存页尾，下一页设为不可读，验证复制不会越界；同时核对寄存器/栈平衡及 API 失败回退。它不安装应用、不写注册表和快捷方式，证据留在 D 盘 `installer-smoke`。这个探针不能代替真实新包安装、旧→新升级和卸载 CI。
 

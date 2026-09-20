@@ -286,7 +286,18 @@ jobs:
       - name: Build and audit the real NSIS/update artifacts
         run: npm run desktop:verify-installer
       - name: Verify NSIS pointer copy at protected memory boundaries
-        run: node scripts/test-nsis-known-folder-copy.mjs
+        shell: pwsh
+        run: |
+          node scripts/test-nsis-known-folder-copy.mjs
+          $probeExit = $LASTEXITCODE
+          New-Item -ItemType Directory -Path test-results/nsis-memory -Force | Out-Null
+          Get-ChildItem -LiteralPath 'D:\AmazonToolboxData\installer-smoke' -Directory -Filter 'kst-nsis-memory-probe-*' | ForEach-Object {
+            $probeReport = Join-Path $_.FullName 'result.json'
+            if (Test-Path -LiteralPath $probeReport) {
+              Copy-Item -LiteralPath $probeReport -Destination (Join-Path 'test-results/nsis-memory' ($_.Name + '.json'))
+            }
+          }
+          if ($probeExit -ne 0) { throw 'NSIS memory boundary probe failed' }
       - name: Verify app protocol renderer boot
         run: npm run test:app-protocol
       - name: Verify packaged automation runner protocol
@@ -294,8 +305,9 @@ jobs:
       - name: Verify clean candidate install, packaged runtime and uninstall
         shell: pwsh
         run: ./scripts/nsis-install-smoke.ps1 -PreviousInstaller '' -DiagnosticAttempts 1
-      - name: Cache immutable historical installers (always recheck SHA512)
-        uses: actions/cache@v5
+      - name: Restore immutable historical installers (always recheck SHA512)
+        id: historical-installers
+        uses: actions/cache/restore@v5
         with:
           path: |
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
@@ -305,16 +317,24 @@ jobs:
         run: node scripts/prepare-nsis-upgrade.mjs
         env:
           NSIS_BASELINE_VERSION: '1.8.5'
-      - name: Verify 1.8.5 upgrade, retained data, packaged runtime and uninstall
-        shell: pwsh
-        run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.5' -DiagnosticAttempts 1
       - name: Fetch immutable 1.8.7 release for upgrade acceptance
         run: node scripts/prepare-nsis-upgrade.mjs
         env:
           NSIS_BASELINE_VERSION: '1.8.7'
-      - name: Verify 1.8.7 upgrade, retained data, packaged runtime and uninstall
+      - name: Save only byte-verified historical installer fixtures
+        if: steps.historical-installers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
+            D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.7.exe
+          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture*.json') }}
+      - name: Verify existing-location 1.8.5 baseline and real upgrade, runtime and uninstall
         shell: pwsh
-        run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.7' -DiagnosticAttempts 1
+        run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.5' -PreviousInstaller 'D:\AmazonToolboxData\installer-fixtures\KST Setup 1.8.5.exe' -LegacyInstallLocationHint -DiagnosticAttempts 1
+      - name: Verify existing-location 1.8.7 baseline and real upgrade, runtime and uninstall
+        shell: pwsh
+        run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.7' -PreviousInstaller 'D:\AmazonToolboxData\installer-fixtures\KST Setup 1.8.7.exe' -LegacyInstallLocationHint -DiagnosticAttempts 1
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -324,5 +344,5 @@ jobs:
             release/KST Setup *.exe.blockmap
             release/latest.yml
             test-results/nsis/**
-            D:/AmazonToolboxData/installer-smoke/kst-nsis-memory-probe-*/result.json
+            test-results/nsis-memory/**
           retention-days: 3
