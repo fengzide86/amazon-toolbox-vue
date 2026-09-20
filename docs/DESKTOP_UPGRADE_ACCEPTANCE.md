@@ -28,6 +28,18 @@
 
 失败留下每次安装 SHA512、退出码、耗时、Windows Application Error/WER 事件（若可获取）及文件清单。`0xC0000005` 只能证明访问冲突；没有故障模块、调用栈或转储时，不写成已确定的 Defender、NSIS 或机器原因。
 
+## 1.8.8 候选的 NSIS 已知目录读取修复
+
+固定使用的 `app-builder-lib 26.8.1` 模板仍包含 `SHGetKnownFolderPath` 返回指针上的固定 `NSIS_MAX_STRLEN` WCHAR 数组读取，以及 `System::Store` 私有寄存器栈调用。[上游 #7921](https://github.com/electron-userland/electron-builder/issues/7921) 报告与验收日志一致的 `System.dll + 0x1581 / 0xC0000005`，评论报告移除 Store 调用后不再崩溃。该 issue 未给出已合并的正式修复，不能单凭相同偏移宣称旧包崩溃已完全归因。
+
+不过，[NSIS System 文档](https://nsis.sourceforge.io/Docs/System/System.html) 将 `&wN` 定义为固定 N 个 WCHAR 数组；[微软 SHGetKnownFolderPath 契约](https://learn.microsoft.com/en-us/windows/win32/api/shlobj_core/nf-shlobj_core-shgetknownfolderpath) 只保证返回 NUL 结尾的已分配字符串。固定大数组读取不是有效的该指针读取方式。
+
+`npm run desktop:prepare-nsis` 因此在生成**新**安装包前对已核对的整个模板 SHA256 和库版本做严格校验，再只替换该内存处理块：使用原生 Push/Pop 保护临时寄存器，以 [lstrcpynW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lstrcpynw) 按 NUL 和明确的目标字符容量复制，释放非空 COM 指针。输出 buffer 的容量与 count 均为 `NSIS_MAX_STRLEN` WCHAR（包含结尾 NUL），不使用无限长拷贝。重复执行只验证；版本或模板漂移直接阻止打包。`npm ci` 后会重新应用，不修改 lockfile 或升级依赖。
+
+修复不改变 AppID、安装范围、HKCU/HKLM 已有路径识别、Windows 重定向的每用户 Programs 路径和 `/D` 处理。不得预填注册表绕过该路径，也不得修改原始旧安装包；旧包失败仍需保留并如实报告。
+
+在已下载 NSIS 编译器的 Windows 环境执行 `node scripts/test-nsis-known-folder-copy.mjs`。探针把短 Unicode 字符串和空串放在可读内存页尾，下一页设为不可读，验证复制不会越界；同时核对寄存器/栈平衡及 API 失败回退。它不安装应用、不写注册表和快捷方式，证据留在 D 盘 `installer-smoke`。这个探针不能代替真实新包安装、旧→新升级和卸载 CI。
+
 ## 本机安全验证
 
 ```powershell

@@ -285,10 +285,15 @@ jobs:
         run: npx vitest run src/tests/scripts/toolboxLaunchers.test.ts src/tests/scripts/nsisUpgradeFixtures.test.ts
       - name: Build and audit the real NSIS/update artifacts
         run: npm run desktop:verify-installer
+      - name: Verify NSIS pointer copy at protected memory boundaries
+        run: node scripts/test-nsis-known-folder-copy.mjs
       - name: Verify app protocol renderer boot
         run: npm run test:app-protocol
       - name: Verify packaged automation runner protocol
         run: npm run test:automation-smoke -- --mock
+      - name: Verify clean candidate install, packaged runtime and uninstall
+        shell: pwsh
+        run: ./scripts/nsis-install-smoke.ps1 -PreviousInstaller '' -DiagnosticAttempts 1
       - name: Cache immutable historical installers (always recheck SHA512)
         uses: actions/cache@v5
         with:
@@ -319,4 +324,5 @@ jobs:
             release/KST Setup *.exe.blockmap
             release/latest.yml
             test-results/nsis/**
+            D:/AmazonToolboxData/installer-smoke/kst-nsis-memory-probe-*/result.json
           retention-days: 3
