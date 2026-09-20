@@ -1,6 +1,6 @@
 {
   "name": "amazon-toolbox",
-  "version": "1.8.7",
+  "version": "1.8.8",
   "description": "课赛通 KST · 跨境电商赛训效率平台",
   "author": "课赛通 KST 团队",
   "private": true,
@@ -17,6 +17,13 @@
   "scripts": {
     "dev": "vite --mode development",
     "build:web": "node scripts/with-toolbox-data-root.mjs -- vite build --mode production",
+    "build:marketing": "node scripts/with-toolbox-data-root.mjs -- node scripts/build-marketing.mjs",
+    "preview:marketing": "vite preview --config vite.marketing.config.ts --host 127.0.0.1 --port 4200",
+    "marketing:audit": "node scripts/audit-marketing-build.mjs",
+    "marketing:publish": "node scripts/publish-marketing.mjs",
+    "test:marketing-publish": "node --test scripts/tests/marketing-publish.test.mjs",
+    "test:e2e:marketing": "node scripts/with-toolbox-data-root.mjs -- playwright test --config=playwright.marketing.config.ts",
+    "verify:marketing": "npm run test:marketing-publish && npm run build:marketing && npm run marketing:audit && node scripts/with-toolbox-data-root.mjs --set PLAYWRIGHT_MARKETING_PREBUILT=1 -- playwright test --config=playwright.marketing.config.ts",
     "web:audit": "node scripts/audit-web-build.mjs",
     "build": "node scripts/with-toolbox-data-root.mjs -- vite build --mode production",
     "build:desktop": "node scripts/with-toolbox-data-root.mjs --set TOOLBOX_BUILD_TARGET=electron -- vite build --mode production",
@@ -70,11 +77,11 @@
     "docker:logs": "docker compose --env-file .env.docker -f compose.yaml logs --tail=200 -f api",
     "docker:test:mariadb": "docker compose --env-file .env.docker -f compose.yaml --profile test run --rm backend-tests",
     "build:verify": "npm run build && tsx scripts/verify-build.ts",
-    "verify:backend:static": "python -m ruff check backend && python -m mypy --config-file backend/pyproject.toml backend/app backend/core backend/domains backend/services backend/routers",
+    "verify:backend:static": "node scripts/run-python.mjs -- -m ruff check backend && node scripts/run-python.mjs -- -m mypy --config-file backend/pyproject.toml backend/app backend/core backend/domains backend/services backend/routers",
     "verify:backend": "npm run test:backend && npm run verify:backend:static",
     "verify:quick": "npm test && npm run test:backend",
     "verify": "npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run api-contracts:check && npm run deadcode && npm test && npm run build:desktop && npm run verify:backend",
-    "verify:release": "npm run release:policy && npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run api-contracts:check && npm run deadcode && npm run test:coverage && npm run test:backend:coverage && npm run test:backend:diff-coverage && npm run verify:backend:static && npm run release:mariadb-gate && npm run test:e2e:release && npm run test:e2e:real && npm run desktop:verify-package"
+    "verify:release": "npm run release:policy && npm run security:audit && npm run typecheck && npm run lint -- --max-warnings=0 && npm run architecture:check && npm run openapi:check && npm run api-contracts:check && npm run deadcode && npm run test:coverage && npm run test:backend:coverage && npm run test:backend:diff-coverage && npm run verify:backend:static && npm run release:mariadb-gate && npm run test:e2e:release && npm run test:e2e:real && npm run verify:marketing && npm run desktop:verify-package"
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
@@ -118,7 +125,8 @@
     "vitest": "^4.1.10",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.7",
+    "wrangler": "4.135.0"
   },
   "overrides": {
     "exceljs": {
