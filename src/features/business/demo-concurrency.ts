@@ -140,7 +140,6 @@ export class DemoConcurrencyController {
       const completionPromise = this.callbacks.onItemComplete(completion)
         .catch(error => {
           if (generation === this.generation) this.fail(error)
-          throw error
         })
       this.completionPromises.push(completionPromise)
     }
