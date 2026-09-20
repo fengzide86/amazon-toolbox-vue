@@ -20,15 +20,30 @@ function parseWithWorker(
     worker.addEventListener('message', (event: MessageEvent<WorkerReply>) => {
       finish()
       if (!event.data.ok) reject(new Error(event.data.error || '文件解析失败'))
-      else resolve(importPreviewSchema.parse(event.data.result))
+      else {
+        const parsed = importPreviewSchema.safeParse(event.data.result)
+        if (parsed.success) resolve(parsed.data)
+        else reject(new Error('浏览器文件解析结果格式异常'))
+      }
     }, { once: true })
     worker.addEventListener('error', () => {
       finish()
       reject(new Error('浏览器文件解析器启动失败'))
     }, { once: true })
     void file.arrayBuffer().then(buffer => {
-      worker.postMessage({ buffer, fileName: file.name, inputSchema, maxRows, selection }, [buffer])
-    }, reject)
+      // Vue/Pinia schema arrays are proxies and cannot cross structured-clone
+      // boundaries. Send only the primitive fields consumed by the parser.
+      const fields = inputSchema.map(field => ({
+        key: String(field.key || ''),
+        label: String(field.label || field.key || ''),
+        required: Boolean(field.required),
+      }))
+      const context = { capabilityKey: selection.capabilityKey, worksheetHint: selection.worksheetHint }
+      worker.postMessage({ buffer, fileName: file.name, inputSchema: fields, maxRows, selection: context }, [buffer])
+    }).catch(error => {
+      finish()
+      reject(error)
+    })
   })
 }
 

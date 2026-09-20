@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import { reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseBrowserDemoSpreadsheet } from '@/features/demo/browserSpreadsheet'
@@ -49,5 +50,51 @@ describe('browser spreadsheet boundary', () => {
     expect(result.worksheetName).toBe('当前工具')
     expect(result.rows[0]?.preview.account_label).toBe('ri***@example.com')
     expect(JSON.stringify(result)).not.toContain('right@example.com')
+  })
+
+  it('copies reactive schema and selection into a structured-clone-safe worker message', async () => {
+    vi.stubEnv('MODE', 'production')
+    let reply: (event: MessageEvent) => void = () => {}
+    const sent = vi.fn()
+    vi.stubGlobal('Worker', class {
+      terminate = vi.fn()
+      addEventListener(type: string, listener: (event: MessageEvent) => void) {
+        if (type === 'message') reply = listener
+      }
+      postMessage(message: unknown) {
+        sent(structuredClone(message))
+        reply({ data: { ok: true, result: { importId: 'real-worker', validCount: 1, rows: [], errors: [] } } } as MessageEvent)
+      }
+    })
+    const schema = reactive([{ key: 'account_label', label: '客户简称', required: true, ignored: reactive({ value: 'unused' }) }])
+    const selection = reactive({ capabilityKey: 'logistics_standard' })
+    const buffer = new TextEncoder().encode('客户简称\nlocal@example.com').buffer
+    const file = { name: 'local.csv', size: buffer.byteLength, arrayBuffer: async () => buffer } as File
+    expect((await parseBrowserDemoSpreadsheet(file, schema, 50, selection)).importId).toBe('real-worker')
+    expect(sent).toHaveBeenCalledWith(expect.objectContaining({
+      inputSchema: [{ key: 'account_label', label: '客户简称', required: true }],
+      selection: { capabilityKey: 'logistics_standard', worksheetHint: undefined },
+    }))
+  })
+
+  it.each(['postMessage', 'invalidReply'] as const)('terminates and safely falls back after %s instead of remaining pending', async failure => {
+    vi.stubEnv('MODE', 'production')
+    const terminate = vi.fn()
+    let reply: (event: MessageEvent) => void = () => {}
+    vi.stubGlobal('Worker', class {
+      terminate = terminate
+      addEventListener(type: string, listener: (event: MessageEvent) => void) {
+        if (type === 'message') reply = listener
+      }
+      postMessage() {
+        if (failure === 'postMessage') throw new Error('DataCloneError')
+        reply({ data: { ok: true, result: null } } as MessageEvent)
+      }
+    })
+    const buffer = new TextEncoder().encode('客户简称\nlocal@example.com').buffer
+    const file = { name: 'local.csv', size: buffer.byteLength, arrayBuffer: async () => buffer } as File
+    const result = await parseBrowserDemoSpreadsheet(file)
+    expect(result.rows[0]?.preview.account_label).toBe('lo***@example.com')
+    expect(terminate).toHaveBeenCalledOnce()
   })
 })
