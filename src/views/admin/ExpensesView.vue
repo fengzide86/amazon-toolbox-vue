@@ -202,7 +202,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { Ban, CalendarClock, CircleAlert, Download, FileText, Info, Pencil, Plus, ReceiptText, RefreshCcw, Search, Tags, WalletCards } from '@lucide/vue'
@@ -259,6 +259,21 @@ const newCategoryName = ref('')
 const newCategoryOrder = ref(100)
 let expenseRequestId = 0
 let renewalRequestId = 0
+let summaryRequestId = 0
+let drawerRequestId = 0
+
+watch([drawerVisible, drawerMode], () => { drawerRequestId += 1 }, { flush: 'sync' })
+onUnmounted(() => { drawerRequestId += 1; summaryRequestId += 1 })
+
+function openDrawer(mode: DrawerMode): number {
+  drawerMode.value = mode
+  drawerVisible.value = true
+  return ++drawerRequestId
+}
+
+function isCurrentDrawer(requestId: number): boolean {
+  return drawerVisible.value && drawerRequestId === requestId
+}
 
 const expenseFilters = reactive({ month: currentMonth, category_id: undefined as number | undefined, status: '', q: '' })
 const renewalFilters = reactive({ status: '', due_state: route.query.due === '1' ? 'upcoming' : '', q: '' })
@@ -296,9 +311,15 @@ function dueText(value: ExpenseRenewal['due_state']): string { return ({ upcomin
 function errorText(error: unknown, fallback: string): string { return error instanceof Error && error.message ? error.message : fallback }
 
 async function loadSummary() {
+  const requestId = ++summaryRequestId
+  const month = expenseFilters.month
   summaryError.value = ''
-  try { summary.value = expenseSummarySchema.parse(await getExpenseSummary(expenseFilters.month)) }
-  catch (error) { summaryError.value = errorText(error, '经营概览暂时无法加载') }
+  try {
+    const result = expenseSummarySchema.parse(await getExpenseSummary(month))
+    if (requestId === summaryRequestId) summary.value = result
+  } catch (error) {
+    if (requestId === summaryRequestId) summaryError.value = errorText(error, '经营概览暂时无法加载')
+  }
 }
 
 async function loadCategories() {
@@ -345,8 +366,8 @@ function applyRenewalFilters() { renewalPage.value = 1; void loadRenewals() }
 function switchLedger(value: Ledger) { activeLedger.value = value; if (value === 'renewals' && renewalLoadState.value === 'loading') void loadRenewals() }
 
 function resetExpenseForm() { Object.assign(expenseForm, { amount: 0, expense_date: today, title: '', category_id: activeCategories.value[0]?.id, payee: '', note: '' }); pendingFiles.value = []; editingExpenseId.value = null }
-function openExpenseForm() { resetExpenseForm(); drawerMode.value = 'expense-form'; drawerVisible.value = true }
-function editExpense(item: ExpenseRecord) { Object.assign(expenseForm, { amount: item.amount, expense_date: item.expense_date, title: item.title, category_id: item.category_id, payee: item.payee || '', note: item.note || '' }); pendingFiles.value = []; editingExpenseId.value = item.id; drawerMode.value = 'expense-form' }
+function openExpenseForm() { resetExpenseForm(); openDrawer('expense-form') }
+function editExpense(item: ExpenseRecord) { Object.assign(expenseForm, { amount: item.amount, expense_date: item.expense_date, title: item.title, category_id: item.category_id, payee: item.payee || '', note: item.note || '' }); pendingFiles.value = []; editingExpenseId.value = item.id; openDrawer('expense-form') }
 function selectFiles(event: Event) {
   const files = Array.from((event.target as HTMLInputElement).files || [])
   if (files.length > 5) { showToast('每笔支出最多上传 5 个凭证', 'warning'); pendingFiles.value = files.slice(0, 5); return }
@@ -355,75 +376,112 @@ function selectFiles(event: Event) {
 }
 
 async function saveExpense() {
+  if (saving.value) return
   if (!expenseForm.amount || !expenseForm.title.trim() || !expenseForm.category_id || !expenseForm.expense_date) { showToast('请完整填写金额、日期、事项和分类', 'warning'); return }
+  const requestId = drawerRequestId
+  const editingId = editingExpenseId.value
+  const files = [...pendingFiles.value]
+  const payload = { ...expenseForm, category_id: expenseForm.category_id, payee: expenseForm.payee || null, note: expenseForm.note || null }
   saving.value = true
   try {
-    const payload = { ...expenseForm, category_id: expenseForm.category_id, payee: expenseForm.payee || null, note: expenseForm.note || null }
-    const raw = editingExpenseId.value ? await updateExpense(editingExpenseId.value, payload) : await createExpense(payload)
+    const raw = editingId ? await updateExpense(editingId, payload) : await createExpense(payload)
     const saved = expenseRecordSchema.parse(unwrapApiData(raw))
     let failedUploads = 0
-    for (const file of pendingFiles.value) {
+    for (const file of files) {
       try { await uploadExpenseAttachment(saved.id, file) }
       catch { failedUploads += 1 }
     }
     showToast(
       failedUploads
         ? `支出已保存，${failedUploads} 个凭证上传失败，可编辑记录后重试`
-        : editingExpenseId.value ? '支出已更新' : '支出已入账',
+        : editingId ? '支出已更新' : '支出已入账',
       failedUploads ? 'warning' : 'success',
     )
-    drawerVisible.value = false
+    if (isCurrentDrawer(requestId)) drawerVisible.value = false
     await Promise.all([loadExpenses(), loadSummary()])
   } catch (error) { showToast(errorText(error, '支出保存失败'), 'error') }
   finally { saving.value = false }
 }
 
 async function openExpenseDetail(item: ExpenseRecord) {
-  drawerMode.value = 'expense-detail'; drawerVisible.value = true; selectedExpense.value = item
-  try { selectedExpense.value = expenseRecordSchema.parse(await getExpense(item.id)) }
-  catch (error) { showToast(errorText(error, '支出详情加载失败'), 'error') }
+  const requestId = openDrawer('expense-detail')
+  selectedExpense.value = item
+  try {
+    const detail = expenseRecordSchema.parse(await getExpense(item.id))
+    if (isCurrentDrawer(requestId)) selectedExpense.value = detail
+  } catch (error) {
+    if (isCurrentDrawer(requestId)) showToast(errorText(error, '支出详情加载失败'), 'error')
+  }
 }
 
 async function handleVoidExpense(item: ExpenseRecord) {
+  const requestId = drawerRequestId
   try {
     const result = await ElMessageBox.prompt('请输入作废原因。流水会保留，但不再计入支出统计。', '作废这笔支出？', { inputPattern: /\S{2,}/, inputErrorMessage: '请至少输入 2 个字符', confirmButtonText: '确认作废', cancelButtonText: '取消', type: 'warning' })
     await voidExpense(item.id, result.value)
-    drawerVisible.value = false; showToast('支出已作废', 'success'); await Promise.all([loadExpenses(), loadSummary()])
+    if (isCurrentDrawer(requestId)) drawerVisible.value = false
+    showToast('支出已作废', 'success'); await Promise.all([loadExpenses(), loadSummary()])
   } catch (error) { if (error !== 'cancel' && error !== 'close') showToast(errorText(error, '作废失败'), 'error') }
 }
 
 async function handleDownloadAttachment(file: ExpenseRecord['attachments'][number]) { try { const blob = await downloadExpenseAttachment(file.expense_id, file.id); downloadBlob(blob, file.original_name) } catch (error) { showToast(errorText(error, '凭证下载失败'), 'error') } }
 async function handleDeleteAttachment(attachmentId: number) {
-  if (!selectedExpense.value) return
-  try { await ElMessageBox.confirm('移除后无法从系统恢复这个凭证文件。', '移除凭证？', { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' }); await deleteExpenseAttachment(selectedExpense.value.id, attachmentId); await openExpenseDetail(selectedExpense.value); showToast('凭证已移除', 'success') }
+  const expense = selectedExpense.value
+  if (!expense) return
+  const requestId = drawerRequestId
+  try {
+    await ElMessageBox.confirm('移除后无法从系统恢复这个凭证文件。', '移除凭证？', { confirmButtonText: '移除', cancelButtonText: '取消', type: 'warning' })
+    await deleteExpenseAttachment(expense.id, attachmentId)
+    if (isCurrentDrawer(requestId)) await openExpenseDetail(expense)
+    showToast('凭证已移除', 'success')
+  }
   catch (error) { if (error !== 'cancel' && error !== 'close') showToast(errorText(error, '凭证移除失败'), 'error') }
 }
 
 function resetRenewalForm() { Object.assign(renewalForm, { name: '', vendor: '', default_amount: 0, category_id: activeCategories.value.find(item => item.code === 'tool_membership')?.id || activeCategories.value[0]?.id, cycle: 'monthly', next_due_on: today, reminder_days: 7, note: '' }); editingRenewalId.value = null }
-function openRenewalForm() { resetRenewalForm(); drawerMode.value = 'renewal-form'; drawerVisible.value = true }
-function editRenewal(item: ExpenseRenewal) { Object.assign(renewalForm, { name: item.name, vendor: item.vendor || '', default_amount: item.default_amount, category_id: item.category_id, cycle: item.cycle, next_due_on: item.next_due_on, reminder_days: item.reminder_days, note: item.note || '' }); editingRenewalId.value = item.id; drawerMode.value = 'renewal-form' }
+function openRenewalForm() { resetRenewalForm(); openDrawer('renewal-form') }
+function editRenewal(item: ExpenseRenewal) { Object.assign(renewalForm, { name: item.name, vendor: item.vendor || '', default_amount: item.default_amount, category_id: item.category_id, cycle: item.cycle, next_due_on: item.next_due_on, reminder_days: item.reminder_days, note: item.note || '' }); editingRenewalId.value = item.id; openDrawer('renewal-form') }
 
 async function saveRenewal() {
+  if (saving.value) return
   if (!renewalForm.name.trim() || !renewalForm.default_amount || !renewalForm.category_id || !renewalForm.next_due_on) { showToast('请完整填写名称、金额、分类和到期日', 'warning'); return }
+  const requestId = drawerRequestId
+  const editingId = editingRenewalId.value
+  const payload = { ...renewalForm, category_id: renewalForm.category_id, vendor: renewalForm.vendor || null, note: renewalForm.note || null }
   saving.value = true
   try {
-    const payload = { ...renewalForm, category_id: renewalForm.category_id, vendor: renewalForm.vendor || null, note: renewalForm.note || null }
-    if (editingRenewalId.value) await updateExpenseRenewal(editingRenewalId.value, payload); else await createExpenseRenewal(payload)
-    showToast(editingRenewalId.value ? '续费项目已更新' : '续费项目已创建', 'success'); drawerVisible.value = false; await Promise.all([loadRenewals(), loadSummary()])
+    if (editingId) await updateExpenseRenewal(editingId, payload); else await createExpenseRenewal(payload)
+    showToast(editingId ? '续费项目已更新' : '续费项目已创建', 'success')
+    if (isCurrentDrawer(requestId)) drawerVisible.value = false
+    await Promise.all([loadRenewals(), loadSummary()])
   } catch (error) { showToast(errorText(error, '续费项目保存失败'), 'error') }
   finally { saving.value = false }
 }
 
 async function openRenewalDetail(item: ExpenseRenewal) {
-  drawerMode.value = 'renewal-detail'; drawerVisible.value = true; selectedRenewal.value = item
-  try { selectedRenewal.value = expenseRenewalSchema.parse(await getExpenseRenewal(item.id)) }
-  catch (error) { showToast(errorText(error, '续费详情加载失败'), 'error') }
+  const requestId = openDrawer('renewal-detail')
+  selectedRenewal.value = item
+  try {
+    const detail = expenseRenewalSchema.parse(await getExpenseRenewal(item.id))
+    if (isCurrentDrawer(requestId)) selectedRenewal.value = detail
+  } catch (error) {
+    if (isCurrentDrawer(requestId)) showToast(errorText(error, '续费详情加载失败'), 'error')
+  }
 }
-function openConfirmRenewal(item: ExpenseRenewal) { selectedRenewal.value = item; Object.assign(confirmForm, { amount: item.default_amount, expense_date: today, note: '' }); drawerMode.value = 'renewal-confirm'; drawerVisible.value = true }
+function openConfirmRenewal(item: ExpenseRenewal) { selectedRenewal.value = item; Object.assign(confirmForm, { amount: item.default_amount, expense_date: today, note: '' }); openDrawer('renewal-confirm') }
 async function submitConfirmRenewal() {
+  if (saving.value) return
   if (!selectedRenewal.value || !confirmForm.amount || !confirmForm.expense_date) return
+  const requestId = drawerRequestId
+  const renewalId = selectedRenewal.value.id
+  const payload = { due_on: selectedRenewal.value.next_due_on, ...confirmForm, note: confirmForm.note || null }
   saving.value = true
-  try { await confirmExpenseRenewal(selectedRenewal.value.id, { due_on: selectedRenewal.value.next_due_on, ...confirmForm, note: confirmForm.note || null }); drawerVisible.value = false; showToast('续费已确认并计入支出', 'success'); await Promise.all([loadRenewals(), loadExpenses(), loadSummary()]) }
+  try {
+    await confirmExpenseRenewal(renewalId, payload)
+    if (isCurrentDrawer(requestId)) drawerVisible.value = false
+    showToast('续费已确认并计入支出', 'success')
+    await Promise.all([loadRenewals(), loadExpenses(), loadSummary()])
+  }
   catch (error) { showToast(errorText(error, '续费确认失败'), 'error') }
   finally { saving.value = false }
 }
@@ -432,7 +490,7 @@ async function handlePauseRenewal(item: ExpenseRenewal) { try { await ElMessageB
 async function handleResumeRenewal(item: ExpenseRenewal) { try { const result = await ElMessageBox.prompt('请输入新的下次到期日（YYYY-MM-DD）。', '恢复续费项目', { inputValue: item.next_due_on, inputPattern: /^\d{4}-\d{2}-\d{2}$/, inputErrorMessage: '请输入 YYYY-MM-DD 格式日期', confirmButtonText: '恢复', cancelButtonText: '取消' }); await resumeExpenseRenewal(item.id, result.value); drawerVisible.value = false; await Promise.all([loadRenewals(), loadSummary()]); showToast('续费项目已恢复', 'success') } catch (error) { if (error !== 'cancel' && error !== 'close') showToast(errorText(error, '恢复失败'), 'error') } }
 async function handleEndRenewal(item: ExpenseRenewal) { try { await ElMessageBox.confirm('结束后将永久停止未来提醒，已有支出不会改变。', '结束续费项目？', { confirmButtonText: '确认结束', cancelButtonText: '取消', type: 'warning' }); await endExpenseRenewal(item.id); drawerVisible.value = false; await Promise.all([loadRenewals(), loadSummary()]); showToast('续费项目已结束', 'success') } catch (error) { if (error !== 'cancel' && error !== 'close') showToast(errorText(error, '结束失败'), 'error') } }
 
-function openCategories() { drawerMode.value = 'categories'; drawerVisible.value = true }
+function openCategories() { openDrawer('categories') }
 async function createCategory() { if (!newCategoryName.value.trim()) return; saving.value = true; try { await createExpenseCategory({ name: newCategoryName.value.trim(), sort_order: newCategoryOrder.value }); newCategoryName.value = ''; await loadCategories(); showToast('分类已新增', 'success') } catch (error) { showToast(errorText(error, '分类新增失败'), 'error') } finally { saving.value = false } }
 async function saveCategoryOrder(item: ExpenseCategory) { try { await updateExpenseCategory(item.id, { sort_order: item.sort_order }); await loadCategories(); showToast('分类排序已保存', 'success') } catch (error) { showToast(errorText(error, '排序保存失败'), 'error') } }
 async function toggleCategory(item: ExpenseCategory) { try { await updateExpenseCategory(item.id, { status: item.status === 'active' ? 'archived' : 'active' }); await loadCategories(); showToast(item.status === 'active' ? '分类已停用' : '分类已恢复', 'success') } catch (error) { showToast(errorText(error, '分类状态更新失败'), 'error') } }

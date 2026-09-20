@@ -1,6 +1,7 @@
 import { api, type ApiQueryParams } from './index'
 import type { components } from '@/shared/api/openapi.generated'
 import { downloadApiFile } from './download'
+import { normalizePaginatedResponse, type PaginatedResponse } from '@/shared/api/pagination'
 
 type EntityId = string | number
 type Schemas = components['schemas']
@@ -8,6 +9,11 @@ type OrderWire = Schemas['OrderResponse']
 type OrderEnvelope = Schemas['APIResponse_OrderResponse_']
 
 export const getOrders = (params: ApiQueryParams = {}): Promise<OrderWire[]> => api.get('/api/orders', params)
+
+export async function getOrdersPage(params: ApiQueryParams = {}): Promise<PaginatedResponse<OrderWire>> {
+  const response = await api.get<Schemas['OrderPageResponse']>('/api/orders', params, { responseMode: 'raw' })
+  return normalizePaginatedResponse<OrderWire>(response)
+}
 
 export async function exportOrders(params: ApiQueryParams = {}): Promise<Blob> {
   return downloadApiFile('/api/orders/export', params)

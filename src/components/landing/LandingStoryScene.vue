@@ -5,9 +5,9 @@
       <div class="scene-column">
         <div class="illustration document-illustration" aria-hidden="true">
           <div class="paper paper-back"></div>
-          <div class="paper paper-front"><div class="paper-icon"><FileSpreadsheet :size="24" :stroke-width="1.5" /></div><span>{{ isTeam ? '账号导入资料' : '配送与包裹资料' }}</span><div class="paper-lines"><i></i><i></i><i></i></div><div class="paper-tags"><b>{{ isTeam ? 'Excel' : '配送国家' }}</b><b>{{ isTeam ? 'CSV' : '重量 / 尺寸' }}</b></div></div>
+          <div class="paper paper-front"><div class="paper-icon"><FileSpreadsheet :size="24" :stroke-width="1.5" /></div><span>{{ isTeam ? '账号导入资料' : '物流模板资料' }}</span><div class="paper-lines"><i></i><i></i><i></i></div><div class="paper-tags"><b>{{ isTeam ? 'Excel' : '配送国家' }}</b><b>{{ isTeam ? 'CSV' : '运费规则' }}</b></div></div>
         </div>
-        <div class="scene-caption"><span class="step-dot">1</span><div><h3>{{ isTeam ? '先把账号整理好' : '带上你的任务资料' }}</h3><p>{{ isTeam ? '导入表格，检查字段与问题行。' : '确定配送范围与包裹条件。' }}</p></div></div>
+        <div class="scene-caption"><span class="step-dot">1</span><div><h3>{{ isTeam ? '先把账号整理好' : '带上你的任务资料' }}</h3><p>{{ isTeam ? '导入表格，检查字段与问题行。' : '按所选工具准备配送与运费资料。' }}</p></div></div>
       </div>
       <div class="scene-column middle-column">
         <div class="illustration tool-illustration" aria-hidden="true">

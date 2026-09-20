@@ -93,6 +93,40 @@ describe('taskRun store', () => {
     expect(store.steps[0].status).toBe('active')
   })
 
+  it('等待取消请求完成，重复取消只调用一次适配器', async () => {
+    const store = useTaskRunStore()
+    const adapter = new MockAutomationAdapter({ stepDelay: 100 })
+    await store.start(tool, { adapter })
+    let release!: () => void
+    const cancellation = vi.spyOn(adapter, 'cancel').mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve }))
+    let settled = false
+    const first = store.cancel().then(() => { settled = true })
+    const second = store.cancel()
+    await Promise.resolve()
+    expect(cancellation).toHaveBeenCalledOnce()
+    expect(settled).toBe(false)
+    expect(store.status).toBe('running')
+    release()
+    await Promise.all([first, second])
+    expect(settled).toBe(true)
+    // An acknowledgement is not a fabricated Runner terminal event.
+    expect(store.status).toBe('running')
+  })
+
+  it('取消失败保留运行信息，允许重试并由真实事件结束', async () => {
+    const store = useTaskRunStore()
+    const adapter = new MockAutomationAdapter({ stepDelay: 100 })
+    await store.start(tool, { adapter })
+    const runId = store.runId
+    vi.spyOn(adapter, 'cancel').mockImplementationOnce(() => Promise.reject(new Error('IPC unavailable')))
+    await expect(store.cancel()).rejects.toThrow('IPC unavailable')
+    expect(store.runId).toBe(runId)
+    expect(store.status).toBe('running')
+    expect(store.steps).toHaveLength(6)
+    await store.cancel()
+    expect(store.status).toBe('cancelled')
+  })
+
   it('桌面端 Demo 使用本地 Runner 执行真实交互沙盒', async () => {
     const automation = {
       onEvent: vi.fn(() => vi.fn()),

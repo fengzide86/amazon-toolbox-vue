@@ -50,6 +50,7 @@ export const useTaskRunStore = defineStore('taskRun', () => {
   let adapter: AutomationAdapter | null = null
   let unsubscribe: (() => void) | null = null
   let clockTimer: ReturnType<typeof setInterval> | null = null
+  let cancellation: Promise<void> | null = null
 
   const completedCount = computed(() => steps.value.filter(step => step.status === 'done').length)
   const progressPercent = computed(() => steps.value.length
@@ -197,7 +198,15 @@ export const useTaskRunStore = defineStore('taskRun', () => {
 
   function pause(): void { void adapter?.pause() }
   function resume(): void { void adapter?.resume() }
-  function cancel(): void { void adapter?.cancel() }
+  function cancel(): Promise<void> {
+    if (cancellation) return cancellation
+    const currentAdapter = adapter
+    const pending = Promise.resolve().then(() => currentAdapter?.cancel()).then(() => undefined)
+    cancellation = pending
+    return pending.finally(() => {
+      if (cancellation === pending) cancellation = null
+    })
+  }
   function completeUserAction(): unknown { return adapter?.completeUserAction() }
   function restart(): Promise<unknown> | undefined { return tool.value ? start(tool.value) : undefined }
 
