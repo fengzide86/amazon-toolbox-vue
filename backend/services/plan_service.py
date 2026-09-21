@@ -21,7 +21,13 @@ from models import AuthCode, Order, Plan, PlanStatus
 
 
 class PlanService:
+    # A live plan's price is intentionally editable from the back office.  The
+    # plan price is read when a new order/auth code is created, while existing
+    # orders keep their snapshot amount.  Other commercial terms still require
+    # disabling the plan first because changing them would alter entitlement
+    # and expiry semantics for future activations in the same operation.
     DISPLAY_FIELDS = frozenset({"name", "features", "sort_order"})
+    ACTIVE_EDITABLE_FIELDS = DISPLAY_FIELDS | {"price"}
     COMMERCIAL_FIELDS = frozenset(
         {"price", "duration_days", "code_prefix", "product_type", "entitlements"}
     )
@@ -125,9 +131,9 @@ class PlanService:
         if not data:
             raise ValidationException("没有可更新字段")
         if plan.status == PlanStatus.ACTIVE:
-            forbidden = set(data) - self.DISPLAY_FIELDS
+            forbidden = set(data) - self.ACTIVE_EDITABLE_FIELDS
             if forbidden:
-                raise ConflictException("启用中的套餐只能修改名称、展示说明和排序；请先禁用")
+                raise ConflictException("启用中的套餐只能修改名称、价格、展示说明和排序；有效期与产品权限需先禁用")
 
         before = self.serialize(plan)
         # Pin the old identity before any display-name or entitlement update.

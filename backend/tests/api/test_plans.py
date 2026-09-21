@@ -68,7 +68,7 @@ async def test_only_super_admin_mutates_plans(client, staff_headers_factory):
 
 
 @pytest.mark.asyncio
-async def test_plan_state_machine_and_active_edit_guard(client, auth_headers):
+async def test_plan_state_machine_and_active_price_edit(client, auth_headers):
     created = await client.post(
         "/api/plans",
         headers=auth_headers,
@@ -85,12 +85,20 @@ async def test_plan_state_machine_and_active_edit_guard(client, auth_headers):
         json={"features": "新的展示说明"},
     )
     assert display_update.status_code == 200
-    commercial_update = await client.patch(
+    price_update = await client.patch(
         f"/api/plans/{plan_id}",
         headers=auth_headers,
         json={"price": "120.00"},
     )
-    assert commercial_update.status_code == 409
+    assert price_update.status_code == 200
+    assert Decimal(str(data(price_update)["price"])) == Decimal("120.0")
+
+    duration_update = await client.patch(
+        f"/api/plans/{plan_id}",
+        headers=auth_headers,
+        json={"duration_days": 60},
+    )
+    assert duration_update.status_code == 409
 
     disabled = await client.post(f"/api/plans/{plan_id}/disable", headers=auth_headers)
     assert data(disabled)["status"] == "disabled"

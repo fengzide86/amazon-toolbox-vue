@@ -12,10 +12,11 @@ const basePlan = {
 }
 
 describe('套餐生命周期请求', () => {
-  it('启用中的套餐只发送展示字段，不发送商业字段或 status', () => {
+  it('启用中的套餐发送价格与展示字段，不发送有效期或 status', () => {
     expect(buildDisplayPlanPatch({ ...basePlan, status: 'active' })).toEqual({
       name: '演示专业版',
       features: '模拟批次',
+      price: 199,
     })
   })
 

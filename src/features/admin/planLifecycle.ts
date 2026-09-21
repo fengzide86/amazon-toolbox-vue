@@ -11,8 +11,9 @@ export interface PlanPermissionDraft {
 }
 
 /**
- * Active plans may only change display fields. Commercial terms are included
- * only while the plan is disabled, matching the backend lifecycle invariant.
+ * Active plans may change their price or display fields. The price is used for
+ * new orders/codes; historical order snapshots are not rewritten. Duration
+ * and product permissions remain disabled-plan-only fields.
  */
 export function buildDisplayPlanPatch(plan: AdminPlan): Record<string, unknown> {
   if (plan.status === 'archived') throw new Error('Archived plans are immutable')
@@ -21,10 +22,10 @@ export function buildDisplayPlanPatch(plan: AdminPlan): Record<string, unknown> 
     name: plan.name.trim(),
     features: plan.features || null,
   }
+  if (!Number.isFinite(plan.price) || plan.price <= 0) throw new Error('Plan price must be positive')
+  patch.price = plan.price
   if (plan.status === 'disabled') {
-    if (!Number.isFinite(plan.price) || plan.price <= 0) throw new Error('Plan price must be positive')
     if (!Number.isInteger(plan.duration_days) || Number(plan.duration_days) <= 0) throw new Error('Plan duration must be positive')
-    patch.price = plan.price
     patch.duration_days = plan.duration_days
   }
   return patch

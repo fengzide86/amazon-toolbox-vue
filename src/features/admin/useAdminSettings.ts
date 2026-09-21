@@ -32,6 +32,7 @@ export function useAdminSettings() {
   const plans = ref<AdminPlan[]>([])
   const settings = ref<Array<{ key: string; value?: string | null }>>([])
   const editingPlan = ref<AdminPlan | null>(null)
+  const editingPlanOriginalPrice = ref<number | null>(null)
   const showAddPlan = ref(false)
   const showPlanPermissions = ref(false)
   const planPermissionDraft = ref<PlanPermissionDraft | null>(null)
@@ -125,15 +126,27 @@ export function useAdminSettings() {
     const plan = adminPlanSchema.parse(rawPlan)
     if (plan.status === 'archived') return
     editingPlan.value = { ...plan }
+    editingPlanOriginalPrice.value = plan.price
   }
 
   async function savePlan() {
     const plan = editingPlan.value
     if (!plan) return
     try {
+      if (
+        plan.status === 'active'
+        && editingPlanOriginalPrice.value !== null
+        && Number(plan.price) !== editingPlanOriginalPrice.value
+        && !await confirmAction({
+          title: '确认调整套餐价格？',
+          message: `“${plan.name}”的新价格为 ¥${Number(plan.price).toFixed(2)}。调整只影响之后创建的订单和授权码，历史订单金额不会改变。`,
+          confirmText: '确认调整',
+        })
+      ) return
       await updatePlan(plan.id, buildDisplayPlanPatch(plan))
-      showToast(plan.status === 'active' ? '展示信息已更新' : '套餐已更新', 'success')
+      showToast(plan.status === 'active' ? '套餐价格和展示信息已更新' : '套餐已更新', 'success')
       editingPlan.value = null
+      editingPlanOriginalPrice.value = null
       await loadData()
     } catch {
       showToast('更新失败，请检查套餐状态和输入内容', 'error')

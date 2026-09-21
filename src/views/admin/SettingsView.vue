@@ -50,14 +50,14 @@
         <div class="card-header">
           <div>
             <span>套餐管理</span>
-            <small class="header-hint">新套餐默认禁用；启用后仅能修改展示信息</small>
+            <small class="header-hint">价格可随时调整；有效期和产品权限需先禁用套餐</small>
           </div>
           <el-button type="primary" size="small" @click="showAddPlan = true">+ 新增套餐</el-button>
         </div>
       </template>
 
       <div v-if="editingPlan?.status === 'active'" class="lifecycle-notice">
-        当前套餐正在启用：只会保存名称和功能说明。价格、有效期和产品权限需先禁用套餐再修改。
+        当前套餐正在启用：可保存名称、价格和功能说明；价格调整只影响新订单，历史订单金额保持不变。有效期和产品权限需先禁用套餐再修改。
       </div>
 
       <el-table :data="plans" style="width: 100%">
@@ -77,7 +77,6 @@
               :min="0.01"
               :step="0.01"
               :precision="2"
-              :disabled="row.status !== 'disabled'"
               style="width: 100px;"
             />
             <span v-else>¥{{ row.price }}</span>
