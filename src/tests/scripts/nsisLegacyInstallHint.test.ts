@@ -91,7 +91,7 @@ describe('strict historical installer identity and location hint', () => {
     expect(cachePaths).toHaveLength(2)
     const pinnedFetch = workflow.indexOf("NSIS_BASELINE_VERSION: '1.8.8'")
     expect(pinnedFetch).toBeGreaterThan(0)
-    expect(pinnedFetch).toBeLessThan(workflow.indexOf('Save only byte-verified historical installer fixtures'))
+    expect(pinnedFetch).toBeLessThan(workflow.indexOf('Save only byte-verified 1.8.8 installer fixture'))
   })
 
   it('requires real old ASAR, registered version, uninstaller, EXE and shortcut evidence before seeding', () => {

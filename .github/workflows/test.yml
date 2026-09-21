@@ -332,15 +332,20 @@ jobs:
       - name: Verify clean candidate install, packaged runtime and uninstall
         shell: pwsh
         run: ./scripts/nsis-install-smoke.ps1 -PreviousInstaller '' -DiagnosticAttempts 1
-      - name: Restore immutable historical installers (always recheck SHA512)
+      - name: Restore immutable legacy installers (always recheck SHA512)
         id: historical-installers
         uses: actions/cache/restore@v5
         with:
           path: |
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.7.exe
-            D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.8.exe
-          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture*.json') }}
+          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture.json', 'scripts/nsis-upgrade-fixture-1.8.7.json') }}
+      - name: Restore immutable 1.8.8 installer (always recheck SHA512)
+        id: current-production-installer
+        uses: actions/cache/restore@v5
+        with:
+          path: D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.8.exe
+          key: windows-nsis-baseline-1.8.8-${{ hashFiles('scripts/nsis-upgrade-fixture-1.8.8.json') }}
       - name: Fetch immutable 1.8.5 release for upgrade acceptance
         run: node scripts/prepare-nsis-upgrade.mjs
         env:
@@ -353,15 +358,20 @@ jobs:
         run: node scripts/prepare-nsis-upgrade.mjs
         env:
           NSIS_BASELINE_VERSION: '1.8.8'
-      - name: Save only byte-verified historical installer fixtures
+      - name: Save only byte-verified legacy installer fixtures
         if: steps.historical-installers.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: |
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.7.exe
-            D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.8.exe
-          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture*.json') }}
+          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture.json', 'scripts/nsis-upgrade-fixture-1.8.7.json') }}
+      - name: Save only byte-verified 1.8.8 installer fixture
+        if: steps.current-production-installer.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.8.exe
+          key: windows-nsis-baseline-1.8.8-${{ hashFiles('scripts/nsis-upgrade-fixture-1.8.8.json') }}
       - name: Verify existing-location 1.8.5 baseline and real upgrade, runtime and uninstall
         shell: pwsh
         run: ./scripts/nsis-install-smoke.ps1 -PreviousVersion '1.8.5' -PreviousInstaller 'D:\AmazonToolboxData\installer-fixtures\KST Setup 1.8.5.exe' -LegacyInstallLocationHint -DiagnosticAttempts 1

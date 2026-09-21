@@ -34,6 +34,36 @@ afterEach(() => {
 })
 
 describe('immutable released NSIS upgrade baselines', () => {
+  it('reuses the two-file legacy CI cache and isolates the new production baseline without skipping byte or install checks', () => {
+    const workflow = readFileSync(resolve('.github/workflows/test.yml'), 'utf8')
+    const cacheSteps = workflow.split(/(?=      - name:)/).filter(step => /uses: actions\/cache\/(?:restore|save)@v5/.test(step))
+    const legacy = cacheSteps.filter(step => step.includes('key: windows-nsis-baselines-'))
+    const current = cacheSteps.filter(step => step.includes('key: windows-nsis-baseline-1.8.8-'))
+    expect(legacy).toHaveLength(2)
+    expect(current).toHaveLength(2)
+    for (const step of legacy) {
+      expect(step).toContain("hashFiles('scripts/nsis-upgrade-fixture.json', 'scripts/nsis-upgrade-fixture-1.8.7.json')")
+      expect(step).toContain('KST Setup 1.8.5.exe')
+      expect(step).toContain('KST Setup 1.8.7.exe')
+      expect(step).not.toContain('1.8.8')
+    }
+    for (const step of current) {
+      expect(step).toContain("hashFiles('scripts/nsis-upgrade-fixture-1.8.8.json')")
+      expect(step).toContain('KST Setup 1.8.8.exe')
+      expect(step).not.toContain('1.8.5')
+      expect(step).not.toContain('1.8.7')
+    }
+    expect(workflow).not.toContain("hashFiles('scripts/nsis-upgrade-fixture*.json')")
+    for (const version of ['1.8.5', '1.8.7', '1.8.8']) {
+      const fetchStep = workflow.split(/(?=      - name:)/).find(step => step.includes(`NSIS_BASELINE_VERSION: '${version}'`))
+      expect(fetchStep).toContain('run: node scripts/prepare-nsis-upgrade.mjs')
+      expect(fetchStep).not.toContain('if:')
+      expect(workflow).toContain(`nsis-install-smoke.ps1 -PreviousVersion '${version}'`)
+    }
+    expect(workflow).toContain("if: steps.historical-installers.outputs.cache-hit != 'true'")
+    expect(workflow).toContain("if: steps.current-production-installer.outputs.cache-hit != 'true'")
+  })
+
   it('keeps the original 1.8.5 baseline as the default with its reviewed bytes', async () => {
     expect(await readPinnedUpgradeFixture()).toMatchObject({
       version: '1.8.5', size: 110350703,
