@@ -22,8 +22,9 @@ from models import AuthCode, Order, Plan, PlanStatus
 
 class PlanService:
     # A live plan's price is intentionally editable from the back office.  The
-    # plan price is read when a new order/auth code is created, while existing
-    # orders keep their snapshot amount.  Other commercial terms still require
+    # plan price supplies the default amount for new orders, while existing
+    # orders keep their snapshot amount. Auth codes have no price field.
+    # Other commercial terms still require
     # disabling the plan first because changing them would alter entitlement
     # and expiry semantics for future activations in the same operation.
     DISPLAY_FIELDS = frozenset({"name", "features", "sort_order"})
@@ -128,8 +129,12 @@ class PlanService:
         plan = await self._locked_plan(plan_id)
         if plan.status == PlanStatus.ARCHIVED:
             raise ConflictException("已归档套餐不可修改")
+        data = dict(data)
+        expected_price = data.pop("expected_price", None)
         if not data:
             raise ValidationException("没有可更新字段")
+        if expected_price is not None and plan.price != expected_price:
+            raise ConflictException("套餐价格已被其他管理员修改，请取消编辑、刷新后重新确认")
         if plan.status == PlanStatus.ACTIVE:
             forbidden = set(data) - self.ACTIVE_EDITABLE_FIELDS
             if forbidden:

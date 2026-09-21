@@ -12405,6 +12405,21 @@
             ],
             "title": "Entitlements"
           },
+          "expected_price": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Price"
+          },
           "features": {
             "anyOf": [
               {

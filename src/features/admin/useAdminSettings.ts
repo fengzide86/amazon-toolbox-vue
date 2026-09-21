@@ -32,7 +32,8 @@ export function useAdminSettings() {
   const plans = ref<AdminPlan[]>([])
   const settings = ref<Array<{ key: string; value?: string | null }>>([])
   const editingPlan = ref<AdminPlan | null>(null)
-  const editingPlanOriginalPrice = ref<number | null>(null)
+  const editingPlanOriginal = ref<AdminPlan | null>(null)
+  const savingPlan = ref(false)
   const showAddPlan = ref(false)
   const showPlanPermissions = ref(false)
   const planPermissionDraft = ref<PlanPermissionDraft | null>(null)
@@ -123,37 +124,54 @@ export function useAdminSettings() {
   }
 
   function startEdit(rawPlan: unknown) {
+    if (savingPlan.value) return
     const plan = adminPlanSchema.parse(rawPlan)
     if (plan.status === 'archived') return
     editingPlan.value = { ...plan }
-    editingPlanOriginalPrice.value = plan.price
+    editingPlanOriginal.value = { ...plan }
   }
 
   async function savePlan() {
-    const plan = editingPlan.value
-    if (!plan) return
+    const draft = editingPlan.value
+    const original = editingPlanOriginal.value
+    if (!draft || !original || savingPlan.value) return
+    savingPlan.value = true
     try {
+      // Validate and freeze primitive request values before opening the async confirmation.
+      const plan = { ...draft }
+      const patch = buildDisplayPlanPatch(plan, original)
+      if (Object.keys(patch).length === 0) {
+        showToast('没有需要保存的修改', 'info')
+        return
+      }
       if (
-        plan.status === 'active'
-        && editingPlanOriginalPrice.value !== null
-        && Number(plan.price) !== editingPlanOriginalPrice.value
+        'price' in patch
         && !await confirmAction({
           title: '确认调整套餐价格？',
-          message: `“${plan.name}”的新价格为 ¥${Number(plan.price).toFixed(2)}。调整只影响之后创建的订单和授权码，历史订单金额不会改变。`,
+          message: `“${plan.name.trim()}”：原价 ¥${original.price.toFixed(2)} → 新价 ¥${plan.price.toFixed(2)}。${
+            'duration_days' in patch
+              ? `同时将有效期从 ${original.duration_days} 天改为 ${plan.duration_days} 天；尚未激活的授权码首次激活时使用新有效期。历史订单金额不变。`
+              : '调整仅影响新订单，历史订单金额和已发授权权益保持不变。'
+          }`,
           confirmText: '确认调整',
         })
       ) return
-      await updatePlan(plan.id, buildDisplayPlanPatch(plan))
-      showToast(plan.status === 'active' ? '套餐价格和展示信息已更新' : '套餐已更新', 'success')
-      editingPlan.value = null
-      editingPlanOriginalPrice.value = null
+      await updatePlan(plan.id, patch)
+      showToast('套餐已更新', 'success')
+      if (editingPlan.value === draft) {
+        editingPlan.value = null
+        editingPlanOriginal.value = null
+      }
       await loadData()
-    } catch {
-      showToast('更新失败，请检查套餐状态和输入内容', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '更新失败，请检查套餐状态和输入内容', 'error')
+    } finally {
+      savingPlan.value = false
     }
   }
 
   function openPlanPermissions(rawPlan: unknown) {
+    if (savingPlan.value) return
     const plan = adminPlanSchema.parse(rawPlan)
     if (plan.status !== 'disabled') {
       showToast('请先禁用套餐，再修改产品类型和专业权限', 'warning')
@@ -186,6 +204,7 @@ export function useAdminSettings() {
   }
 
   async function togglePlanStatus(rawPlan: unknown) {
+    if (savingPlan.value) return
     const plan = adminPlanSchema.parse(rawPlan)
     if (plan.status !== 'active' && plan.status !== 'disabled') return
     const enabling = plan.status === 'disabled'
@@ -201,6 +220,7 @@ export function useAdminSettings() {
   }
 
   async function archivePlanStatus(rawPlan: unknown) {
+    if (savingPlan.value) return
     const plan = adminPlanSchema.parse(rawPlan)
     if (plan.status === 'archived') return
     if (!await confirmAction({
@@ -301,6 +321,7 @@ export function useAdminSettings() {
     plans,
     settings,
     editingPlan,
+    savingPlan,
     showAddPlan,
     showPlanPermissions,
     planPermissionDraft,

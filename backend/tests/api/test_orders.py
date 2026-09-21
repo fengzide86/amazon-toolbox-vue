@@ -200,7 +200,35 @@ async def test_plan_price_change_does_not_rewrite_order_snapshot(
         "/api/orders", headers=auth_headers, json={"plan_id": plan.id}
     )
     order_id = created.json()["data"]["id"]
-    plan.price = Decimal("200.00")
-    await db_session.commit()
+    changed = await client.patch(
+        f"/api/plans/{plan.id}", headers=auth_headers,
+        json={"price": "200.00", "expected_price": "100.00"},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["data"]["price"] == 200.0
+
     detail = await client.get(f"/api/orders/{order_id}", headers=auth_headers)
     assert detail.json()["data"]["plan_price_snapshot"] == 100.0
+    assert detail.json()["data"]["amount"] == 100.0
+
+    new_order = await client.post(
+        "/api/orders", headers=auth_headers, json={"plan_id": plan.id},
+    )
+    assert new_order.status_code == 201
+    assert new_order.json()["data"]["plan_price_snapshot"] == 200.0
+    assert new_order.json()["data"]["amount"] == 200.0
+
+    paid = await client.post(f"/api/orders/{order_id}/mark-paid", headers=auth_headers)
+    assert paid.status_code == 200
+    assert paid.json()["data"]["status"] == "paid"
+    assert paid.json()["data"]["plan_price_snapshot"] == 100.0
+    assert paid.json()["data"]["amount"] == 100.0
+    record = (
+        await db_session.execute(select(ProfitRecord).where(ProfitRecord.order_id == order_id))
+    ).scalar_one()
+    assert record.order_amount_snapshot == Decimal("100.00")
+    assert sum(
+        Decimal(str(getattr(record, field))) for field in (
+            "tech_share", "market_share", "product_share", "service_share", "coordination_share", "record_share",
+        )
+    ) == Decimal("100.00")

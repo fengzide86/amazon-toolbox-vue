@@ -29,6 +29,7 @@ class PlanCreate(BaseModel):
 class PlanUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     price: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
+    expected_price: Decimal | None = Field(default=None, gt=0, max_digits=10, decimal_places=2)
     duration_days: int | None = Field(default=None, gt=0, le=3650)
     features: str | None = None
     code_prefix: str | None = Field(default=None, max_length=20)
@@ -37,6 +38,15 @@ class PlanUpdate(BaseModel):
     entitlements: dict[str, Any] | None = None
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name", "price", "expected_price", "duration_days", "sort_order", "product_type", mode="before")
+    @classmethod
+    def reject_explicit_null(cls, value: Any) -> Any:
+        # Omission means no change; explicit null must not reach a non-nullable
+        # database column or silently bypass the optimistic price guard.
+        if value is None:
+            raise ValueError("字段不能为 null；不修改时请省略该字段")
+        return value
 
     @field_validator("name")
     @classmethod

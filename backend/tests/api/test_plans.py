@@ -136,6 +136,69 @@ async def test_plan_with_usable_codes_cannot_be_archived(client, db_session, aut
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["active", "disabled"])
+async def test_plan_price_guard_rejects_stale_edits_without_overwriting_fields(
+    client, db_session, auth_headers, status,
+):
+    plan = Plan(name="并发改价套餐", price=199, duration_days=30, status=status, features="原始说明")
+    db_session.add(plan)
+    await db_session.commit()
+    endpoint = f"/api/plans/{plan.id}"
+
+    first = await client.patch(endpoint, headers=auth_headers, json={
+        "price": "299.00", "expected_price": "199.00",
+    })
+    assert first.status_code == 200
+    assert data(first)["price"] == 299.0
+    assert "expected_price" not in data(first)
+
+    stale = await client.patch(endpoint, headers=auth_headers, json={
+        "price": "249.00", "expected_price": "199.00", "features": "不应写入的说明",
+    })
+    assert stale.status_code == 409
+    await db_session.refresh(plan)
+    assert plan.price == Decimal("299.00")
+    assert plan.features == "原始说明"
+
+    display_only = await client.patch(endpoint, headers=auth_headers, json={"features": "只改说明"})
+    assert display_only.status_code == 200
+    assert data(display_only)["price"] == 299.0
+
+    refreshed = await client.patch(endpoint, headers=auth_headers, json={
+        "price": "249.00", "expected_price": "299.00",
+    })
+    assert refreshed.status_code == 200
+    assert data(refreshed)["price"] == 249.0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [
+    {},
+    {"expected_price": "100.00"},
+    {"price": "120.00", "expected_price": "0"},
+    {"price": "120.00", "expected_price": "100.001"},
+    {"price": "120.00", "expected_price": "100000000.00"},
+    *({field: None} for field in (
+        "name", "price", "expected_price", "duration_days", "sort_order", "product_type",
+    )),
+])
+async def test_plan_patch_rejects_empty_guard_and_explicit_nulls(
+    client, db_session, auth_headers, payload,
+):
+    plan = Plan(name="输入校验套餐", price=100, duration_days=30, status="disabled")
+    db_session.add(plan)
+    await db_session.commit()
+    response = await client.patch(f"/api/plans/{plan.id}", headers=auth_headers, json=payload)
+    assert response.status_code == 422
+    await db_session.refresh(plan)
+    assert plan.name == "输入校验套餐"
+    assert plan.price == Decimal("100.00")
+    assert plan.duration_days == 30
+    assert plan.sort_order == 0
+    assert plan.product_type == "consumer"
+
+
+@pytest.mark.asyncio
 async def test_plan_missing_resources_use_404(client, auth_headers):
     response = await client.patch(
         "/api/plans/99999",

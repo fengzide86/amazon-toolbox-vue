@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import uuid
 from datetime import date
@@ -6,7 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import make_url
@@ -41,6 +42,8 @@ from models import (
 )
 from models.demo import DemoBatch, DemoBatchItem
 from schemas.demo import DemoBatchItemUpdate, DemoBatchResponse, DemoBatchUpdate, DemoEvent
+from schemas.plan import PlanUpdate
+from services.plan_service import PlanService
 from services.staff_service import create_staff_access_token
 
 
@@ -300,6 +303,107 @@ def _mariadb_test_url() -> str:
     if not url.drivername.startswith(("mysql+aiomysql", "mariadb+aiomysql")):
         pytest.fail("MARIADB_TEST_URL must use a real MariaDB/MySQL database with the aiomysql driver")
     return url.render_as_string(hide_password=False)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_plan_price_updates_accept_one_expected_price():
+    engine = create_async_engine(
+        _mariadb_test_url(), pool_size=2, max_overflow=0,
+        pool_pre_ping=True, isolation_level="READ COMMITTED",
+    )
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    suffix = uuid.uuid4().hex[:12]
+    staff_id: int | None = None
+    plan_id: int | None = None
+    original_price = Decimal("199.00")
+    proposals = (Decimal("249.99"), Decimal("299.99"))
+    all_preloaded = asyncio.Event()
+    connection_ids: set[int] = set()
+    tasks: list[asyncio.Task[Any]] = []
+    try:
+        async with engine.begin() as connection:
+            assert connection.dialect.name in {"mysql", "mariadb"}
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as db:
+            staff = StaffUser(
+                username=f"price-concurrency-{suffix}", display_name="Price concurrency test",
+                password_hash=hash_password(f"Concurrency-{suffix}"),
+                role=StaffRole.SUPER_ADMIN, status=StaffStatus.ACTIVE, token_version=1,
+            )
+            plan = Plan(
+                name=f"Price concurrency {suffix}", price=original_price,
+                duration_days=30, status="active", product_type="consumer",
+            )
+            db.add_all([staff, plan])
+            await db.flush()
+            staff_id, plan_id = staff.id, plan.id
+            await db.commit()
+        actor = {
+            "staff_id": staff_id, "username": f"price-concurrency-{suffix}",
+            "role": "super_admin",
+        }
+
+        async def change_price(proposed: Decimal) -> dict | ConflictException:
+            async with sessions() as db:
+                # Both requests retain the same old ORM row in distinct open
+                # transactions. The locked read must refresh that identity map.
+                stale_plan = (await db.execute(select(Plan).where(Plan.id == plan_id))).scalar_one()
+                assert stale_plan.price == original_price
+                connection_ids.add(int((await db.execute(select(func.connection_id()))).scalar_one()))
+                if len(connection_ids) == 2:
+                    all_preloaded.set()
+                await asyncio.wait_for(all_preloaded.wait(), timeout=15)
+                payload = PlanUpdate(price=proposed, expected_price=original_price)
+                try:
+                    return await PlanService(db).update(
+                        plan_id, payload.model_dump(exclude_unset=True), actor,
+                        Request({"type": "http", "headers": [], "method": "PATCH", "path": "/test-plan-price"}),
+                    )
+                except ConflictException as error:
+                    await db.rollback()
+                    return error
+
+        tasks = [asyncio.create_task(change_price(price)) for price in proposals]
+        results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=30)
+        successes = [result for result in results if isinstance(result, dict)]
+        conflicts = [result for result in results if isinstance(result, ConflictException)]
+        assert len(connection_ids) == 2
+        assert len(successes) == len(conflicts) == 1, results
+        assert successes[0]["success"] is True
+        assert conflicts[0].code == 409
+        winning_price = Decimal(str(successes[0]["data"]["price"]))
+        assert winning_price in proposals
+        async with sessions() as db:
+            persisted = (await db.execute(select(Plan).where(Plan.id == plan_id))).scalar_one()
+            assert persisted.price == winning_price
+            assert persisted.status == "active"
+            assert persisted.duration_days == 30
+            audits = (await db.execute(select(AuditLog).where(
+                AuditLog.user_id == staff_id, AuditLog.target_type == "plan",
+                AuditLog.target_id == str(plan_id), AuditLog.action == "plan_update",
+            ))).scalars().all()
+            assert len(audits) == 1
+            detail = json.loads(audits[0].detail)
+            assert Decimal(str(detail["before"]["price"])) == original_price
+            assert Decimal(str(detail["after"]["price"])) == winning_price
+    finally:
+        all_preloaded.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            async with sessions() as db:
+                if staff_id is not None:
+                    await db.execute(delete(AuditLog).where(AuditLog.user_id == staff_id))
+                if plan_id is not None:
+                    await db.execute(delete(Plan).where(Plan.id == plan_id))
+                if staff_id is not None:
+                    await db.execute(delete(StaffUser).where(StaffUser.id == staff_id))
+                await db.commit()
+        finally:
+            await engine.dispose()
 
 
 @pytest.mark.asyncio

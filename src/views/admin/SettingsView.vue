@@ -52,7 +52,7 @@
             <span>套餐管理</span>
             <small class="header-hint">价格可随时调整；有效期和产品权限需先禁用套餐</small>
           </div>
-          <el-button type="primary" size="small" @click="showAddPlan = true">+ 新增套餐</el-button>
+          <el-button type="primary" size="small" :disabled="savingPlan" @click="showAddPlan = true">+ 新增套餐</el-button>
         </div>
       </template>
 
@@ -63,7 +63,7 @@
       <el-table :data="plans" style="width: 100%">
         <el-table-column label="套餐名称" min-width="140">
           <template #default="{ row }">
-            <el-input v-if="editingPlan?.id === row.id" v-model="editingPlan!.name" size="small" />
+            <el-input v-if="editingPlan?.id === row.id" v-model="editingPlan!.name" :disabled="savingPlan" :maxlength="100" size="small" />
             <span v-else>{{ row.name }}</span>
           </template>
         </el-table-column>
@@ -75,6 +75,8 @@
               v-model="editingPlan!.price"
               size="small"
               :min="0.01"
+              :max="99999999.99"
+              :disabled="savingPlan"
               :step="0.01"
               :precision="2"
               style="width: 100px;"
@@ -90,7 +92,10 @@
               v-model="editingPlan!.duration_days"
               size="small"
               :min="1"
-              :disabled="row.status !== 'disabled'"
+              :max="3650"
+              :step="1"
+              step-strictly
+              :disabled="savingPlan || row.status !== 'disabled'"
               style="width: 100px;"
             />
             <span v-else>{{ row.duration_days }} 天</span>
@@ -99,7 +104,7 @@
 
         <el-table-column label="功能" min-width="180">
           <template #default="{ row }">
-            <el-input v-if="editingPlan?.id === row.id" v-model="editingPlan!.features" size="small" />
+            <el-input v-if="editingPlan?.id === row.id" v-model="editingPlan!.features" :disabled="savingPlan" size="small" />
             <span v-else class="feature-text">{{ row.features || '-' }}</span>
           </template>
         </el-table-column>
@@ -121,20 +126,21 @@
         <el-table-column label="操作" width="330" fixed="right">
           <template #default="{ row }">
             <template v-if="editingPlan?.id === row.id">
-              <el-button type="primary" size="small" @click="savePlan">保存</el-button>
-              <el-button size="small" @click="editingPlan = null">取消</el-button>
+              <el-button type="primary" size="small" :loading="savingPlan" @click="savePlan">保存</el-button>
+              <el-button size="small" :disabled="savingPlan" @click="editingPlan = null">取消</el-button>
             </template>
             <template v-else-if="row.status !== 'archived'">
-              <el-button size="small" @click="startEdit(row)">编辑</el-button>
-              <el-button size="small" :disabled="row.status !== 'disabled'" @click="openPlanPermissions(row)">产品权限</el-button>
+              <el-button size="small" :disabled="savingPlan" @click="startEdit(row)">编辑</el-button>
+              <el-button size="small" :disabled="savingPlan || row.status !== 'disabled'" @click="openPlanPermissions(row)">产品权限</el-button>
               <el-button
                 size="small"
                 :type="row.status === 'active' ? 'danger' : 'success'"
+                :disabled="savingPlan"
                 @click="togglePlanStatus(row)"
               >
                 {{ row.status === 'active' ? '禁用' : '启用' }}
               </el-button>
-              <el-button size="small" type="warning" @click="archivePlanStatus(row)">归档</el-button>
+              <el-button size="small" type="warning" :disabled="savingPlan" @click="archivePlanStatus(row)">归档</el-button>
             </template>
             <span v-else class="terminal-state">终态，不可操作</span>
           </template>
@@ -228,6 +234,7 @@ const router = useRouter()
 const {
   plans,
   editingPlan,
+  savingPlan,
   showAddPlan,
   showPlanPermissions,
   planPermissionDraft,

@@ -847,3 +847,107 @@ test('更新发布页仅超级管理员可达，并反馈从待发布到已发�
   await expect(page.getByText('已发布', { exact: true })).toBeVisible()
   await expect(page.getByText('客户端可检查到', { exact: true })).toBeVisible()
 })
+
+test.describe('套餐改价', () => {
+  async function openPlanSettings(page: Page, rejectStalePrice = false) {
+    await installSession(page, 'super_admin')
+    const patches: Array<Record<string, unknown>> = []
+    const plan = {
+      id: 71,
+      name: '改价验收套餐',
+      price: 199,
+      duration_days: 30,
+      features: '原始功能说明',
+      status: 'active',
+      product_type: 'consumer',
+      entitlements: {},
+    }
+    await installApi(page, (request, path) => {
+      if (path === '/api/plans/admin') return wrapped([plan])
+      if (path === '/api/settings') return wrapped([{ key: 'wechat_id', value: 'KST-Support' }])
+      if (path === '/api/profit/policy') {
+        return wrapped({
+          version: 1,
+          ratios: { tech: 0.3, market: 0.25, product: 0.15, service: 0.15, coordination: 0.1, record: 0.05 },
+        })
+      }
+      if (path === '/api/plans/71' && request.method() === 'PATCH') {
+        const patch = parseJsonBody(request)
+        patches.push(patch)
+        if (rejectStalePrice) {
+          return {
+            status: 409,
+            body: { success: false, message: '套餐价格已被其他管理员修改，请取消编辑、刷新后重新确认' },
+          }
+        }
+        for (const field of ['name', 'price', 'features']) {
+          if (field in patch) Object.assign(plan, { [field]: patch[field] })
+        }
+        return wrapped(plan)
+      }
+      return undefined
+    })
+    await page.goto('/#/admin/settings')
+    await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible()
+    const row = page.locator('.el-table__body-wrapper tbody tr').first()
+    await expect(row).toContainText('改价验收套餐')
+    await row.getByRole('button', { name: '编辑', exact: true }).click()
+    await expect(row.getByRole('spinbutton').first()).toBeEnabled()
+    await expect(row.getByRole('spinbutton').nth(1)).toBeDisabled()
+    return { patches, row }
+  }
+
+  test('启用套餐改价先确认，取消不发请求，确认带原价保护', async ({ page }, testInfo) => {
+    const { patches, row } = await openPlanSettings(page)
+    const price = row.getByRole('spinbutton').first()
+    await price.fill('229.50')
+    await row.getByRole('button', { name: '保存', exact: true }).click()
+    const dialog = page.locator('.el-message-box')
+    await expect(dialog).toContainText('确认调整套餐价格？')
+    await expect(dialog).toContainText(/原价.*199\.00.*新价.*229\.50/)
+    await expect(dialog).toContainText('仅影响新订单')
+    await expect(dialog).toContainText('历史订单金额和已发授权权益保持不变')
+    await expect(price).toBeDisabled()
+    expect(patches).toHaveLength(0)
+    await page.screenshot({ path: testInfo.outputPath('plan-price-confirmation.png'), fullPage: true, animations: 'disabled' })
+
+    await dialog.getByRole('button', { name: '取消', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await expect(price).toBeEnabled()
+    await expect(price).toHaveValue('229.50')
+    expect(patches).toHaveLength(0)
+
+    await row.getByRole('button', { name: '保存', exact: true }).click()
+    await dialog.getByRole('button', { name: '确认调整', exact: true }).click()
+    await expect.poll(() => patches).toEqual([{ price: 229.5, expected_price: 199 }])
+    await expect(row.getByRole('button', { name: '编辑', exact: true })).toBeVisible()
+    await expect(row).toContainText('¥229.5')
+    await expect(dialog).toBeHidden()
+    await page.screenshot({ path: testInfo.outputPath('plan-price-saved.png'), fullPage: true, animations: 'disabled' })
+  })
+
+  test('只改功能说明不发送价格且不弹改价确认', async ({ page }) => {
+    const { patches, row } = await openPlanSettings(page)
+    await row.getByRole('textbox').nth(1).fill('只更新展示说明')
+    await row.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(() => patches).toEqual([{ features: '只更新展示说明' }])
+    await expect(page.locator('.el-message-box')).toHaveCount(0)
+    await expect(row.getByRole('button', { name: '编辑', exact: true })).toBeVisible()
+    await expect(row).toContainText('只更新展示说明')
+    await expect(row).toContainText('¥199')
+  })
+
+  test('其他管理员已改价时显示冲突原因并保留当前编辑', async ({ page }) => {
+    const { patches, row } = await openPlanSettings(page, true)
+    const price = row.getByRole('spinbutton').first()
+    await price.fill('249.00')
+    await row.getByRole('button', { name: '保存', exact: true }).click()
+    await page.locator('.el-message-box').getByRole('button', { name: '确认调整', exact: true }).click()
+    await expect.poll(() => patches).toEqual([{ price: 249, expected_price: 199 }])
+    await expect(page.getByText('套餐价格已被其他管理员修改，请取消编辑、刷新后重新确认', { exact: true }).first()).toBeVisible()
+    await expect(price).toBeEnabled()
+    await expect(price).toHaveValue('249.00')
+    await expect(row.getByRole('button', { name: '保存', exact: true })).toBeEnabled()
+    await expect(row.getByRole('button', { name: '取消', exact: true })).toBeEnabled()
+  })
+})
