@@ -17,6 +17,10 @@
 | `官网发布.bat` | 按官网配置发布独立宣传站及上线核验 | 是；配置或认证缺失会失败 |
 | `联合发布.bat` | 先预检官网账号，再完整发布系统，最后发布宣传官网 | 是；任一步失败均中止并说明完成范围 |
 
+### 版本号策略
+
+对外产品保持 **课赛通 KST v1.x** 主线。补丁修复递增第三位（如 `1.8.10`），兼容性功能迭代递增第二位（如 `1.9.0`）；仅当公共 API、数据结构、桌面身份或更新路径发生破坏性不兼容时，才进入 `2.0.0` 评估。功能多不等于第二代，发布器不会自动跳到 v2；官网和日常客户端页面不展示技术版本，只有检测到更新时才展示本次更新版本，管理后台和诊断信息保留精确版本。
+
 这些入口共用 `scripts/launch-toolbox.ps1`：仅在当前进程选择 Node 22，优先使用 `TOOLBOX_NODE_EXE` 显式配置，然后逐一验证 PATH 中的 Node（不会因前面是其他版本而漏掉后面的 22），再按版本查找 D 盘 `TOOLBOX_DATA_ROOT/toolchains` 下已存在的 Node 22；不自动安装、不修改系统 PATH。Python 检查共用 `scripts/run-python.mjs`：先实际执行 `--version` 验证显式 `TOOLBOX_PYTHON`，再尝试项目 `venv`、`.venv`，Windows 下再尝试 `TOOLBOX_DATA_ROOT/venvs/amazon-toolbox-test/Scripts/python.exe`（默认 D 盘），最后检查 PATH 的 Python；Linux 保持 `python3` 回退。纯官网预览、检查与发布仅使用 Node，不因缺少 Python 而无法恢复官网。显式配置无效时直接失败，不静默换解释器；迁移损坏的本地环境会跳过，不删除或重建。
 
 GitHub CLI 优先验证 `TOOLBOX_GH_EXE`，然后依次检查 PATH、Windows 标准安装目录、D 盘工具链（按数值版本排序）；仅使用能实际运行 `gh --version` 的程序。选中的 Python、Node 和已有 GitHub CLI 仅加入本次进程 PATH，本地预览及管理员初始化也使用同一解释器，运行数据目录不变。中文、空格及 `&`、`!` 路径、带空格参数和非零退出码都有 Windows 回归测试。失败默认保留窗口，自动化设置 `TOOLBOX_NO_PAUSE=1` 可禁用暂停，原退出码不会被暂停覆盖。

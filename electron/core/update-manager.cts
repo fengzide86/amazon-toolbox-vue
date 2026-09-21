@@ -126,7 +126,7 @@ export class UpdateManager {
   async check(options: { manual?: boolean } = {}): Promise<UpdateSnapshot> {
     if (!this.snapshot.supported) return this.getState()
     if (this.checking) return this.checking
-    if (this.snapshot.status === 'downloading' || this.snapshot.status === 'installing') return this.getState()
+    if (['downloading', 'downloaded', 'restart_deferred', 'installing'].includes(this.snapshot.status)) return this.getState()
 
     this.manualCheckRequested = Boolean(options.manual)
     const generation = ++this.checkGeneration
@@ -282,13 +282,19 @@ export class UpdateManager {
         lastCheckedAt: new Date().toISOString(),
       })
     })
-    this.updater.on('download-progress', (progress: ProgressInfo) => this.setState({
-      status: 'downloading',
-      percent: Math.max(0, Math.min(100, Math.round(progress.percent * 10) / 10)),
-      transferredBytes: progress.transferred,
-      totalBytes: progress.total,
-    }))
+    this.updater.on('download-progress', (progress: ProgressInfo) => {
+      // electron-updater can deliver a final progress event after a cancelled
+      // request. Never let a stale event resurrect a cancelled/downloaded state.
+      if (this.snapshot.status !== 'downloading') return
+      this.setState({
+        status: 'downloading',
+        percent: Math.max(0, Math.min(100, Math.round(progress.percent * 10) / 10)),
+        transferredBytes: progress.transferred,
+        totalBytes: progress.total,
+      })
+    })
     this.updater.on('update-downloaded', (info: UpdateInfo) => {
+      if (this.snapshot.status !== 'downloading') return
       this.installOnQuitApproved = false
       this.updateInfo = info
       const canRestart = !this.hasActiveWork()
@@ -306,6 +312,7 @@ export class UpdateManager {
     })
     this.updater.on('error', (error: Error) => {
       if (this.cancellationToken?.cancelled) return
+      if (['cancelled', 'downloaded', 'restart_deferred', 'installing'].includes(this.snapshot.status)) return
       if (this.snapshot.status === 'checking' && !this.acceptCheckEvents) return
       if (this.snapshot.status === 'checking' && !this.manualCheckRequested) {
         this.setState({ status: 'idle', errorCode: undefined, canRestart: false, lastCheckedAt: new Date().toISOString() })

@@ -41,7 +41,11 @@ export const useUpdateStore = defineStore('application-updates', () => {
   const initialized = ref(false)
   const installingDeferredForSession = ref(false)
   const overlay = useOverlayCoordinatorStore()
-  const loadedReleaseNoteVersions = new Set<string>()
+  // Main-process progress snapshots are intentionally authoritative for state,
+  // but they may not carry release notes on every event. Keep notes separately
+  // by version so progress updates cannot erase them.
+  const releaseNotesByVersion = new Map<string, string[]>()
+  const loadingReleaseNoteVersions = new Set<string>()
   let removeStateListener: (() => void) | undefined
 
   const supported = computed(() => getRuntimeCapabilities().desktopUpdates && state.value.supported)
@@ -69,21 +73,40 @@ export const useUpdateStore = defineStore('application-updates', () => {
   function applySnapshot(value: unknown): void {
     const parsed = updateSnapshotSchema.safeParse(value)
     if (!parsed.success) return
-    state.value = parsed.data
-    void hydrateReleaseNotes(parsed.data)
+    const snapshot = parsed.data
+    const version = snapshot.availableVersion
+    if (version && snapshot.releaseNotes.length) {
+      releaseNotesByVersion.set(version, [...snapshot.releaseNotes])
+    }
+    const cachedNotes = version ? releaseNotesByVersion.get(version) : undefined
+    state.value = version && !snapshot.releaseNotes.length && cachedNotes?.length
+      ? { ...snapshot, releaseNotes: [...cachedNotes] }
+      : snapshot
+    void hydrateReleaseNotes(state.value)
   }
 
   async function hydrateReleaseNotes(snapshot: UpdateSnapshot): Promise<void> {
     const version = snapshot.availableVersion
-    if (!version || snapshot.releaseNotes.length || loadedReleaseNoteVersions.has(version)) return
-    loadedReleaseNoteVersions.add(version)
+    if (
+      !version
+      || snapshot.releaseNotes.length
+      || !['available', 'downloaded', 'restart_deferred'].includes(snapshot.status)
+      || releaseNotesByVersion.has(version)
+      || loadingReleaseNoteVersions.has(version)
+    ) return
+    loadingReleaseNoteVersions.add(version)
     try {
       const notes = await getVersionReleaseNotes(version)
-      if (state.value.availableVersion === version && !state.value.releaseNotes.length && notes.length) {
-        state.value = { ...state.value, releaseNotes: notes }
+      if (notes.length) {
+        releaseNotesByVersion.set(version, [...notes])
+        if (state.value.availableVersion === version && !state.value.releaseNotes.length) {
+          state.value = { ...state.value, releaseNotes: [...notes] }
+        }
       }
     } catch {
-      // Release notes are optional; update actions stay available.
+      // Release notes are optional; a later manual check may retry this version.
+    } finally {
+      loadingReleaseNoteVersions.delete(version)
     }
   }
 

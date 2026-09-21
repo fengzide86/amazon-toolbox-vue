@@ -50,7 +50,7 @@
       <el-form label-position="top">
         <el-form-item label="发布文件">
           <el-upload v-model:file-list="fileList" drag multiple :auto-upload="false" :disabled="uploading" accept=".exe,.blockmap,.yml">
-            <div class="upload-copy"><UploadCloud :size="24" /><strong>一次选择生成的发布文件</strong><small>至少包含安装文件和版本清单，差分文件会自动识别</small></div>
+            <div class="upload-copy"><UploadCloud :size="24" /><strong>一次选择生成的发布文件</strong><small>需同时包含 Windows 安装文件、对应的 .blockmap 和 latest.yml</small></div>
           </el-upload>
         </el-form-item>
         <div class="security-note"><ShieldCheck :size="18" /><p><strong>发布前硬校验</strong><span>版本、文件名、大小、SHA-512 及 YAML 引用必须全部一致。</span></p></div>
@@ -105,7 +105,12 @@ async function load(): Promise<void> {
 async function validateSelection(): Promise<{ files: File[]; version: string } | null> {
   const files = fileList.value.flatMap(item => item.raw ? [item.raw as File] : [])
   const manifest = files.find(file => file.name.toLowerCase() === 'latest.yml')
-  if (!manifest || !files.some(file => file.name.toLowerCase().endsWith('.exe'))) { ElMessage.warning('请同时选择版本清单和 Windows 安装文件'); return null }
+  const installer = files.find(file => file.name.toLowerCase().endsWith('.exe'))
+  const blockmap = files.find(file => file.name.toLowerCase().endsWith('.blockmap'))
+  if (!manifest || !installer || !blockmap) {
+    ElMessage.warning('请同时选择 Windows 安装文件、对应的 .blockmap 和 latest.yml')
+    return null
+  }
   const version = (await manifest.text()).match(/^version:\s*["']?([^\s"']+)/m)?.[1]
   if (!version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) { ElMessage.warning('版本清单中没有有效的版本号'); return null }
   return { files, version }

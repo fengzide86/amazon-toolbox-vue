@@ -79,6 +79,8 @@ describe('desktop update error contract', () => {
     expect(source.indexOf('await this.prepareForInstall()')).toBeLessThan(source.indexOf('this.updater.quitAndInstall(false, true)'))
     expect(source.indexOf("this.setState({ status: 'installing'")).toBeGreaterThan(source.indexOf('await this.prepareForInstall()'))
     expect(source).toContain("status: errorCode === 'INSTALL_BUSY' ? 'restart_deferred' : 'error'")
+    expect(source).toContain("if (this.snapshot.status !== 'downloading') return")
+    expect(source).toContain("['cancelled', 'downloaded', 'restart_deferred', 'installing'].includes(this.snapshot.status)")
   })
 })
 

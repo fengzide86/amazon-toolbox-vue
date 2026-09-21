@@ -12,7 +12,7 @@
         </header>
 
         <div class="version-track">
-          <span>v{{ store.state.currentVersion }}</span><i aria-hidden="true" /><strong>{{ availableVersion }}</strong>
+          <span>{{ store.state.availableVersion ? `v${store.state.currentVersion}` : '当前版本' }}</span><i aria-hidden="true" /><strong>{{ store.state.availableVersion ? availableVersion : '检查更新' }}</strong>
         </div>
         <p v-if="downloadSizeLabel" class="download-size">下载文件 {{ downloadSizeLabel }}</p>
 
@@ -32,7 +32,7 @@
           <strong>更新已准备好</strong><span>当前工作不会被打断，完成后即可安全重启。</span>
         </div>
         <div v-else-if="store.state.status === 'error'" class="state-notice is-danger">
-          <strong>本次更新未能完成</strong><span>请检查网络后重新尝试。错误编号：{{ store.state.errorCode || 'UPDATE_ERROR' }}</span>
+          <strong>{{ errorCopy.title }}</strong><span>{{ errorCopy.detail }} 错误编号：{{ store.state.errorCode || 'UPDATE_ERROR' }}</span>
         </div>
 
         <section class="release-notes">
@@ -59,6 +59,7 @@
             <button class="button primary" type="button" @click="store.startDownload">重新下载</button>
           </template>
           <template v-else-if="store.state.status === 'error' || store.state.status === 'idle'">
+            <button v-if="store.state.status === 'error' && errorCopy.canUseWebsite" class="button secondary" type="button" @click="openDownloadWebsite">打开官网下载</button>
             <button class="button primary" type="button" @click="store.checkManually">重新检查</button>
           </template>
           <template v-else-if="store.state.status === 'downloaded'">
@@ -99,11 +100,36 @@ watch(visible, async value => {
   }
 })
 const availableVersion = computed(() => store.state.availableVersion ? `v${store.state.availableVersion}` : '检查新版本')
+const errorCopy = computed(() => {
+  switch (store.state.errorCode) {
+    case 'NETWORK_OFFLINE':
+    case 'CHECK_TIMEOUT':
+      return { title: '暂时无法连接更新服务', detail: '请检查网络后重新检查。', canUseWebsite: false }
+    case 'DISK_FULL':
+      return { title: '磁盘空间不足', detail: '请释放磁盘空间后重新下载。', canUseWebsite: false }
+    case 'HASH_MISMATCH':
+      return { title: '下载文件校验失败', detail: '请重新下载；如果仍然失败，可以打开官网下载。', canUseWebsite: true }
+    case 'FEED_INVALID':
+      return { title: '更新清单暂时不可用', detail: '请稍后重新检查，也可以打开官网下载。', canUseWebsite: true }
+    case 'INSTALL_BUSY':
+    case 'INSTALL_QUIESCE_FAILED':
+      return { title: '当前任务尚未结束', detail: '完成或退出当前任务后再安装更新。', canUseWebsite: false }
+    case 'INSTALL_LAUNCH_FAILED':
+      return { title: '安装程序未能启动', detail: '请重新检查，或打开官网下载后手动安装。', canUseWebsite: true }
+    case 'DOWNLOAD_CANCELLED':
+      return { title: '更新下载已取消', detail: '可以重新检查并再次下载。', canUseWebsite: false }
+    case 'DOWNLOAD_FAILED':
+      return { title: '更新下载失败', detail: '请重新检查；如果仍然失败，可以打开官网下载。', canUseWebsite: true }
+    default:
+      return { title: '本次更新未能完成', detail: '请重新检查；如果仍然失败，可以打开官网下载。', canUseWebsite: true }
+  }
+})
 const title = computed(() => ({
   idle: '检查应用更新', checking: '正在检查更新', available: '新版本已经准备发布', downloading: '正在获取新版本',
   downloaded: '更新已下载完成', restart_deferred: '完成当前工作后重启', installing: '正在安全重启',
   cancelled: '更新下载已取消', error: '更新遇到问题',
 })[store.state.status])
+const marketingSiteUrl = computed(() => String(import.meta.env.VITE_MARKETING_SITE_URL || 'https://fengzide86.github.io').trim())
 const transferredLabel = computed(() => {
   if (store.state.transferredBytes == null || store.state.totalBytes == null) return '正在获取下载信息'
   return `${formatBytes(store.state.transferredBytes)} / ${formatBytes(store.state.totalBytes)}`
@@ -120,6 +146,19 @@ async function confirmCancel(): Promise<void> {
     })
     await store.cancelDownload()
   } catch { /* Continue the current download. */ }
+}
+async function openDownloadWebsite(): Promise<void> {
+  const url = marketingSiteUrl.value
+  if (!url) return
+  if (window.electronAPI?.openExternal) {
+    try {
+      await window.electronAPI.openExternal(url)
+    } catch {
+      // Keep the update drawer usable even if the OS browser refuses the link.
+    }
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 </script>
 

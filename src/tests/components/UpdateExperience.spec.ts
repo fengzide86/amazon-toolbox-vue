@@ -62,6 +62,13 @@ describe('non-blocking update experience', () => {
     expect(store.state.totalBytes).toBe(100)
   })
 
+  it('keeps release notes when a progress snapshot omits them', async () => {
+    const store = useUpdateStore()
+    await store.initialize()
+    listener?.({ ...available, status: 'downloading', releaseNotes: [], percent: 18 })
+    expect(store.state.releaseNotes).toEqual(['提升更新体验'])
+  })
+
   it('retries a cancelled download without forcing another update check', async () => {
     const store = useUpdateStore()
     await store.initialize()
