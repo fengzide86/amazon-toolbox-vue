@@ -41,6 +41,7 @@ def test_probe_rejects_shared_or_arbitrary_database(source, replacement):
 def test_schema_gate_disposes_on_the_same_loop_even_when_gate_rejects(monkeypatch, tmp_path):
     import asyncio
     import types
+    from concurrent.futures import ThreadPoolExecutor
 
     events = []
 
@@ -65,6 +66,10 @@ def test_schema_gate_disposes_on_the_same_loop_even_when_gate_rejects(monkeypatc
         return "expected revision mismatch"
 
     monkeypatch.setattr(probe, "run", fake_run)
-    probe.schema_gate(tmp_path, {}, succeeds=False)
+    # asyncio.run() clears its thread's current loop. The application probe
+    # actually runs in a child process; keep this in-process double off pytest's
+    # thread so it cannot clear pytest-asyncio's session-scoped event loop.
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        executor.submit(probe.schema_gate, tmp_path, {}, succeeds=False).result()
     assert [event[0] for event in events] == ["init", "dispose"]
     assert events[0][1] is events[1][1]
