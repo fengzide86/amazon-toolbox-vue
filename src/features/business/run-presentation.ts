@@ -1,4 +1,10 @@
-import type { BatchItem } from './model'
+import type { BatchItem, BusinessBatchSnapshot } from './model'
+
+export function activeInterventionCount(snapshot: BusinessBatchSnapshot): number {
+  if (snapshot.status !== 'running') return 0
+  return snapshot.items.filter(item => item.status === 'waiting_user'
+    && !(snapshot.recordKind === 'demo' && item.simulatedOutcome === 'attention_example')).length
+}
 
 /** Presentation never infers task success from elapsed time or a progress value. */
 export function demoProgress(item: BatchItem): number | null {

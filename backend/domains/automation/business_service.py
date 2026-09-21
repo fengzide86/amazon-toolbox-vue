@@ -202,11 +202,13 @@ async def list_batches(
     context: dict[str, Any],
     *,
     limit: int,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     result = await db.execute(
         select(AutomationBatch)
         .where(AutomationBatch.auth_code_id == context["auth_code_id"])
-        .order_by(desc(AutomationBatch.created_at))
+        .order_by(desc(AutomationBatch.created_at), desc(AutomationBatch.id))
+        .offset(offset)
         .limit(limit)
     )
     return [serialize_batch(item) for item in result.scalars().all()]

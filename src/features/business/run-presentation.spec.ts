@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BatchItem } from './model'
-import { demoProgress, endedAccountCount, executionStage, stagePresentation } from './run-presentation'
+import { activeInterventionCount, demoProgress, endedAccountCount, executionStage, stagePresentation } from './run-presentation'
 
 function item(status: string, overrides: Partial<BatchItem> = {}): BatchItem {
   return { itemId: 'internal-test-id', status, browserReady: false, ...overrides }
 }
 
 describe('business execution presentation', () => {
+  it('never turns a finished Demo intervention example into an actionable overview alert', () => {
+    const items = [item('waiting_user', { simulatedOutcome: 'attention_example', finishedAtMs: 1_000 })]
+    expect(activeInterventionCount({ status: 'completed', recordKind: 'demo', counts: { waiting: 1 }, items })).toBe(0)
+    expect(activeInterventionCount({ status: 'running', recordKind: 'demo', counts: { waiting: 1 }, items })).toBe(0)
+    expect(activeInterventionCount({ status: 'running', recordKind: 'live', counts: { waiting: 1 }, items })).toBe(1)
+    expect(activeInterventionCount({ status: 'cancelled', recordKind: 'live', counts: { waiting: 1 }, items })).toBe(0)
+  })
   it('never substitutes a fixed progress value when no measurement exists', () => {
     expect(demoProgress(item('running'))).toBeNull()
     expect(demoProgress(item('pending'))).toBeNull()

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.logging import set_user_id
 from core.security import verify_token
 from database import get_db
-from models import AuthCode, StaffRole, StaffStatus, StaffUser, User
+from models import Agency, AuthCode, StaffRole, StaffStatus, StaffUser, User
 from services.staff_service import staff_to_dict
 
 security = HTTPBearer(auto_error=False)
@@ -95,7 +95,22 @@ def require_staff_roles(*roles: str) -> Callable:
 
 require_super_admin = require_staff_roles(StaffRole.SUPER_ADMIN)
 require_commerce_operator = require_staff_roles(StaffRole.SUPER_ADMIN, StaffRole.OPERATOR)
-require_any_staff = require_staff_roles(*StaffRole.ALL)
+require_any_staff = require_staff_roles(*StaffRole.INTERNAL)
+
+
+async def require_agency_staff(
+    staff: dict = Depends(get_current_staff),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Partner scopes never inherit the internal administrator compatibility path."""
+    if staff["role"] == StaffRole.SUPER_ADMIN:
+        return staff
+    if staff["role"] != StaffRole.AGENT or not staff.get("agency_id"):
+        raise HTTPException(status_code=403, detail="当前账号无代理工作台权限")
+    agency = await db.get(Agency, staff["agency_id"])
+    if not agency or agency.status != "active":
+        raise HTTPException(status_code=403, detail="代理合作已停用，请联系平台负责人")
+    return staff
 
 
 async def get_current_admin(
@@ -109,6 +124,8 @@ async def get_current_admin(
     """
 
     role = staff["role"]
+    if role not in StaffRole.INTERNAL:
+        raise HTTPException(status_code=403, detail="代理账号不能访问内部管理接口")
     if role == StaffRole.SUPER_ADMIN:
         return staff
     path = request.url.path
@@ -178,7 +195,11 @@ async def get_optional_current_user(
 
     staff = await _resolve_staff_payload(db, payload)
     if staff:
+        if staff["role"] == StaffRole.AGENT:
+            raise HTTPException(status_code=403, detail="代理账号不能作为客户身份操作")
         return staff
+    if payload.get("token_type") == "staff":
+        return None
 
     user_id = payload.get("user_id")
     if not user_id:
@@ -208,7 +229,11 @@ async def get_current_user(
 
     staff = await _resolve_staff_payload(db, payload)
     if staff:
+        if staff["role"] == StaffRole.AGENT:
+            raise HTTPException(status_code=403, detail="代理账号不能作为客户身份操作")
         return staff
+    if payload.get("token_type") == "staff":
+        raise _unauthorized("后台账号凭证已失效")
 
     user_id = payload.get("user_id")
     if not user_id:

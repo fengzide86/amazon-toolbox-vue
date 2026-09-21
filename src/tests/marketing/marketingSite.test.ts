@@ -17,6 +17,8 @@ describe('independent marketing site', () => {
     expect(marketingRoutes).toHaveLength(3)
     expect(router.resolve('/').name).toBe('Landing')
     expect(router.resolve('/terms').name).toBe('MarketingTerms')
+    expect(router.resolve('/terms/').name).toBe('MarketingTerms')
+    expect(router.resolve('/user/terms/').name).toBe('MarketingTerms')
     for (const target of ['/user/login', '/business/workspace', '/admin/login', '/anything']) {
       expect(router.resolve(target).name).toBe('MarketingNotFound')
     }

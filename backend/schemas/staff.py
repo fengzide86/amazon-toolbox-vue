@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.response import APIResponse
 
-StaffRoleValue = Literal["super_admin", "operator", "support"]
+StaffRoleValue = Literal["super_admin", "operator", "support", "agent"]
 StaffStatusValue = Literal["active", "disabled"]
 
 
@@ -26,6 +26,7 @@ class StaffAccountCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=100)
     password: str = Field(min_length=10, max_length=128)
     role: StaffRoleValue
+    agency_id: int | None = Field(default=None, gt=0)
 
     @field_validator("username")
     @classmethod
@@ -42,6 +43,7 @@ class StaffAccountUpdate(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=100)
     role: StaffRoleValue | None = None
     status: StaffStatusValue | None = None
+    agency_id: int | None = Field(default=None, gt=0)
 
     model_config = ConfigDict(extra="forbid")
 
@@ -65,6 +67,8 @@ class StaffAccountResponse(BaseModel):
     username: str
     display_name: str
     role: StaffRoleValue
+    agency_id: int | None = None
+    agency_name: str | None = None
     status: StaffStatusValue
     force_password_reset: bool
     last_login_at: datetime | None = None
@@ -82,6 +86,7 @@ class StaffContextResponse(BaseModel):
     name: str
     display_name: str
     role: StaffRoleValue
+    agency_id: int | None = None
     status: StaffStatusValue
     token_version: int
     force_password_reset: bool

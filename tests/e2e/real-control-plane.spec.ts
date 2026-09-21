@@ -6,6 +6,8 @@ import { expect, test, type Page } from '@playwright/test'
 const runtime = process.env.KST_REAL_E2E_DIR!
 const credentials = JSON.parse(readFileSync(join(runtime, 'credentials.json'), 'utf8')) as {
   consumer: string; business: string; business_cancel: string; staff_username: string; staff_password: string
+  agent_a_username: string; agent_a_password: string; agent_b_username: string; agent_b_password: string
+  agency_a_id: number; agency_b_id: number
 }
 
 interface DatabaseSnapshot {
@@ -151,6 +153,14 @@ test('B 端原生 Excel Worker 导入、八项并发演示及父子结果真实�
   expect(database().live_batch_count).toBe(0)
   expect(payloads.join('\n')).not.toMatch(/模板演示账号|password|cookie|@example|account_label|import_rows/)
   await page.screenshot({ path: join(runtime, 'business-demo-completed.png'), fullPage: true })
+  await page.goto('/#/business/overview')
+  await expect(page.locator('.attention-card')).toHaveCount(0)
+  await expect(page.locator('.batch-count').first()).toHaveText('8/8 已结束')
+  await page.goto('/#/business/license')
+  await expect(page.locator('.limits-grid')).toContainText('已授权')
+  await expect(page.locator('.limits-grid')).toContainText('1 / 5 台设备')
+  await page.getByRole('button', { name: '刷新授权', exact: true }).click()
+  await expect(page.locator('.limits-grid')).toContainText('1 / 5 台设备')
   await page.goto('/#/business/records')
   await expect(page.locator('.records-list article').first()).toContainText('演示完成')
   await page.reload()
@@ -263,4 +273,154 @@ test('后台真实登录、支出记账、创建续费及确认入账，汇总�
   await page.reload()
   await expect(page.getByText('¥438.50', { exact: true }).first()).toBeVisible()
   await page.screenshot({ path: join(runtime, 'admin-expenses-persisted.png'), fullPage: true })
+})
+
+test('代理真实交付闭环：建档、提交订单、负责人收款发放、售后回复及跨代理隔离', async ({ page, context }) => {
+  test.setTimeout(150_000)
+  const customerName = '隔离代理 A 交付客户'
+  const supportContent = '隔离验收：客户已取得授权，请协助说明首次安装步骤。'
+  const supportReply = '已提供首次安装指引，客户可使用授权在本机登录。'
+  const loginStaff = async (target: Page, username: string, password: string, destination: RegExp): Promise<void> => {
+    await target.goto('/#/admin/login')
+    await target.getByLabel('管理账号', { exact: true }).fill(username)
+    await target.getByLabel('管理员密码', { exact: true }).fill(password)
+    const login = target.waitForResponse(response => new URL(response.url()).pathname === '/api/staff/auth/login' && response.request().method() === 'POST')
+    await target.getByRole('button', { name: '登录管理后台' }).click()
+    expect((await login).ok()).toBe(true)
+    await expect(target).toHaveURL(destination)
+  }
+  await loginStaff(page, credentials.agent_a_username, credentials.agent_a_password, /#\/agent\/overview/)
+  await page.getByRole('navigation', { name: '代理导航' }).getByRole('link', { name: '我的客户', exact: true }).click()
+  await page.getByRole('button', { name: '登记客户', exact: true }).click()
+  let drawer = page.locator('.el-drawer:visible').last()
+  await drawer.getByPlaceholder('用于识别和交付的名称').fill(customerName)
+  await drawer.getByPlaceholder('微信、手机号或邮箱').fill('isolated-customer@example.invalid')
+  const createdCustomer = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agency/customers' && response.request().method() === 'POST')
+  await drawer.getByRole('button', { name: '保存提交' }).click()
+  const customerResponse = await createdCustomer
+  expect(customerResponse.status()).toBe(201)
+  const customer = (await customerResponse.json() as { data: { id: number; agency_id: number } }).data
+  expect(customer.agency_id).toBe(credentials.agency_a_id)
+  await expect(page.locator('.el-table__body').getByText(customerName, { exact: true })).toBeVisible()
+
+  await page.getByRole('navigation', { name: '代理导航' }).getByRole('link', { name: '我的订单', exact: true }).click()
+  await page.getByRole('button', { name: '提交订单', exact: true }).click()
+  drawer = page.locator('.el-drawer:visible').last()
+  await drawer.locator('.el-select').nth(0).click()
+  await page.getByRole('option', { name: customerName, exact: true }).click()
+  await drawer.locator('.el-select').nth(1).click()
+  await page.getByRole('option', { name: /Y199/ }).click()
+  const createdOrder = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agency/orders' && response.request().method() === 'POST')
+  await drawer.getByRole('button', { name: '提交待确认订单' }).click()
+  const orderResponse = await createdOrder
+  expect(orderResponse.status()).toBe(201)
+  const order = (await orderResponse.json() as { data: { id: number; order_no: string; status: string; auth_code: null } }).data
+  expect(order.status).toBe('pending')
+  expect(order.auth_code).toBeNull()
+  const ownOrder = page.locator('.el-table__row').filter({ hasText: order.order_no })
+  await expect(ownOrder).toContainText('待确认收款')
+  await ownOrder.getByRole('button', { name: '查看详情' }).click()
+  await expect(page.getByRole('button', { name: '确认已收款', exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
+  // New tabs share the same origin but not the token/profile session.
+  const owner = await context.newPage()
+  const outsider = await context.newPage()
+  try {
+    await loginStaff(owner, credentials.staff_username, credentials.staff_password, /#\/admin\/(?!login)/)
+    await owner.goto('/#/admin/agency')
+    await owner.getByRole('navigation', { name: '代理管理分区' }).getByRole('button', { name: '订单交付' }).click()
+    await owner.locator('.el-table__row').filter({ hasText: order.order_no }).getByRole('button', { name: '查看详情' }).click()
+    let ownerDrawer = owner.locator('.el-drawer:visible').last()
+    await ownerDrawer.getByRole('button', { name: '确认已收款', exact: true }).click()
+    const paidResponse = owner.waitForResponse(response => new URL(response.url()).pathname === `/api/agency/orders/${order.id}/mark-paid`)
+    await owner.getByRole('button', { name: '已核实，确认收款' }).click()
+    expect((await paidResponse).ok()).toBe(true)
+    const deliveryResponse = owner.waitForResponse(response => new URL(response.url()).pathname === `/api/agency/orders/${order.id}/deliver`)
+    await ownerDrawer.getByRole('button', { name: '发放授权', exact: true }).click()
+    const delivered = await deliveryResponse
+    expect(delivered.ok()).toBe(true)
+    const license = (await delivered.json() as { data: { auth_code: { id: number; code: string } } }).data.auth_code
+    expect(license.code.length).toBeGreaterThan(8)
+    await expect(ownerDrawer).toContainText('授权已生成')
+    await owner.keyboard.press('Escape')
+
+    await page.reload()
+    await expect(page).toHaveURL(/#\/agent\/orders/)
+    await expect(page.locator('.agent-main > header')).toContainText('隔离代理 A')
+    await expect(page.locator('.el-table__row').filter({ hasText: order.order_no })).toContainText('已交付')
+    await page.locator('.el-table__row').filter({ hasText: order.order_no }).getByRole('button', { name: '查看详情' }).click()
+    drawer = page.locator('.el-drawer:visible').last()
+    await expect(drawer.locator('.delivery-block code')).toHaveText(license.code)
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+    await page.bringToFront()
+    await drawer.getByRole('button', { name: '复制授权码' }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(license.code)
+    for (const width of [1440, 1280]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(drawer.getByRole('button', { name: '复制授权码' })).toBeInViewport()
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true)
+      await page.screenshot({ path: join(runtime, `agent-delivery-${width}.png`), fullPage: true })
+    }
+    await page.keyboard.press('Escape')
+    await expect(drawer).not.toBeVisible()
+    await page.getByRole('navigation', { name: '代理导航' }).getByRole('link', { name: '售后支持', exact: true }).click()
+    await page.getByRole('button', { name: '提交售后申请', exact: true }).click()
+    drawer = page.locator('.el-drawer:visible').last()
+    await drawer.locator('.el-select').nth(0).click()
+    await page.getByRole('option', { name: customerName, exact: true }).click()
+    await drawer.locator('.el-select').nth(2).click()
+    await page.getByRole('option', { name: new RegExp(order.order_no) }).click()
+    await drawer.getByPlaceholder('描述问题、期望的处理和必要的背景；不要填写客户密码或授权凭据。').fill(supportContent)
+    const createdSupport = page.waitForResponse(response => new URL(response.url()).pathname === '/api/agency/requests' && response.request().method() === 'POST')
+    await drawer.getByRole('button', { name: '保存提交' }).click()
+    const supportResponse = await createdSupport
+    expect(supportResponse.status()).toBe(201)
+    const support = (await supportResponse.json() as { data: { id: number; order_id: number } }).data
+    expect(support.order_id).toBe(order.id)
+    await expect(page.locator('.el-table__row').filter({ hasText: supportContent })).toContainText('待处理')
+
+    await owner.getByRole('navigation', { name: '代理管理分区' }).getByRole('button', { name: '售后申请' }).click()
+    await owner.locator('.el-table__row').filter({ hasText: supportContent }).getByRole('button', { name: '查看详情' }).click()
+    ownerDrawer = owner.locator('.el-drawer:visible').last()
+    await ownerDrawer.getByPlaceholder('说明实际处理情况，不把未完成的退款或延期描述为已完成。').fill(supportReply)
+    const replied = owner.waitForResponse(response => new URL(response.url()).pathname === `/api/agency/requests/${support.id}` && response.request().method() === 'PATCH')
+    await ownerDrawer.getByRole('button', { name: '保存回复' }).click()
+    expect((await replied).ok()).toBe(true)
+    await page.getByRole('button', { name: '刷新', exact: true }).click()
+    const ownSupport = page.locator('.el-table__row').filter({ hasText: supportContent })
+    await expect(ownSupport).toContainText('已回复处理')
+    await ownSupport.getByRole('button', { name: '查看详情' }).click()
+    await expect(page.locator('.el-drawer:visible').last()).toContainText(supportReply)
+
+    await loginStaff(outsider, credentials.agent_b_username, credentials.agent_b_password, /#\/agent\/overview/)
+    await outsider.getByRole('navigation', { name: '代理导航' }).getByRole('link', { name: '我的客户', exact: true }).click()
+    await expect(outsider.locator('.pagination')).toContainText('共 0 条')
+    await expect(outsider.locator('.agent-main')).not.toContainText(customerName)
+    const headers = { Authorization: `Bearer ${await outsider.evaluate(() => sessionStorage.getItem('toolbox_token'))}` }
+    for (const target of ['customers', 'orders', 'licenses', 'requests']) {
+      const response = await outsider.request.get(`/api/agency/${target}`, { headers })
+      expect(response.ok()).toBe(true)
+      expect(await response.json()).toMatchObject({ data: [], total: 0 })
+    }
+    for (const target of [`customers/${customer.id}`, `orders/${order.id}`, `licenses/${license.id}`, `requests/${support.id}`]) {
+      expect((await outsider.request.get(`/api/agency/${target}`, { headers })).status()).toBe(404)
+    }
+    expect((await outsider.request.get(`/api/agency/customers?agency_id=${credentials.agency_a_id}`, { headers })).status()).toBe(403)
+    expect((await outsider.request.get('/api/expenses', { headers })).status()).toBe(403)
+    expect((await outsider.request.post(`/api/agency/orders/${order.id}/mark-paid`, { headers })).status()).toBe(403)
+    const exportResponse = await outsider.request.get('/api/agency/orders/export', { headers })
+    expect(exportResponse.ok()).toBe(true)
+    const exported = await exportResponse.text()
+    expect(exported).not.toContain(customerName)
+    expect(exported).not.toContain(order.order_no)
+    expect(exported).not.toContain(license.code)
+    // The owner and Agent A remain independently authenticated after Agent B signs in.
+    await page.reload()
+    await expect(page.locator('.agent-main > header')).toContainText('隔离代理 A')
+    expect(await api(page, '/api/agency/summary')).toMatchObject({ data: { customers: 1, orders: 1, delivered_orders: 1, open_requests: 0 } })
+  } finally {
+    await owner.close()
+    await outsider.close()
+  }
 })

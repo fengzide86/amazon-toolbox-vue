@@ -53,21 +53,7 @@
               @dom-ready="registerWorkspaceBrowser"
             />
 
-            <div v-else class="browser-mock" aria-label="工具模拟演示页面">
-              <div class="mock-site-header">
-                <strong>{{ platformShortName }}</strong><span></span><i></i>
-              </div>
-              <div class="mock-page">
-                <aside><span v-for="item in 6" :key="item"></span></aside>
-                <div class="mock-content">
-                  <small>控制台 / {{ toolName }}</small>
-                  <h2>{{ stageItems[currentStageIndex]?.label }}</h2>
-                  <p>{{ isBrowserPreview ? '当前为流程预览，画面和反馈仅为示例，不代表平台任务执行结果。' : isDemo ? '可见浏览器中正在真实填写、点击并核验本地沙盒。' : '工具正在独立浏览器中操作比赛模拟平台。' }}</p>
-                  <div class="mock-cards"><i v-for="item in 3" :key="item"></i></div>
-                  <div class="mock-table"><span v-for="item in 6" :key="item"></span></div>
-                </div>
-              </div>
-            </div>
+            <DemoCasePreview v-else :tool-name="toolName" :platform="platformShortName" :stage-label="stageItems[currentStageIndex]?.label" :completed="runStatus === 'completed'" />
 
             <div v-if="interactionLocked && !browserLoading" class="interaction-shield">
               <div><LoaderCircle :size="16" class="spin" />演示正在播放</div>
@@ -160,6 +146,7 @@
 <script setup lang="ts">
 import { ArrowLeft, Check, CircleAlert, LoaderCircle, LockKeyhole, RotateCcw, Square, Zap } from '@lucide/vue'
 import { useSingleAutomationRun } from '@/features/automation/useSingleAutomationRun'
+import DemoCasePreview from '@/components/DemoCasePreview.vue'
 
 const {
   browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,

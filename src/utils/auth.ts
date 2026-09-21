@@ -7,13 +7,13 @@ import {
   authSessionSchema,
   authenticatedUserSchema,
   parseAuthSession,
-  parseStoredUser,
   type AuthenticatedUser,
   type AuthRole,
   type AuthSession,
   isBackofficeRole,
   isSuperAdminRole,
 } from '@/features/auth/model'
+import { readSessionUser } from '@/features/auth/sessionUser'
 
 const AUTH_KEY = 'toolbox_auth'
 const ROLE_KEY = 'toolbox_role'
@@ -61,7 +61,7 @@ class AuthService {
 
   getUser(): AuthenticatedUser | null {
     try {
-      return parseStoredUser(localStorage.getItem(USER_KEY))
+      return readSessionUser()
     } catch (error) {
       console.error('解析用户信息失败:', error)
       return null
@@ -70,7 +70,9 @@ class AuthService {
 
   setUser(user: AuthenticatedUser): void {
     try {
-      localStorage.setItem(USER_KEY, JSON.stringify(authenticatedUserSchema.parse(user)))
+      sessionStorage.setItem(USER_KEY, JSON.stringify(authenticatedUserSchema.parse(user)))
+      localStorage.removeItem(USER_KEY)
+      window.dispatchEvent(new CustomEvent('toolbox:user-updated'))
     } catch (error) {
       console.error('保存用户信息失败:', error)
     }
@@ -120,6 +122,7 @@ class AuthService {
     sessionStorage.removeItem(AUTH_KEY)
     sessionStorage.removeItem(ROLE_KEY)
     sessionStorage.removeItem(TOKEN_KEY)
+    sessionStorage.removeItem(USER_KEY)
     localStorage.removeItem(AUTH_KEY)
     localStorage.removeItem(ROLE_KEY)
     localStorage.removeItem(USER_KEY)

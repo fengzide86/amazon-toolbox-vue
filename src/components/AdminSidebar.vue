@@ -6,7 +6,7 @@
     </div>
 
     <!-- 导航菜单 -->
-    <nav class="sidebar-menu-nav">
+    <nav v-if="role !== 'agent'" class="sidebar-menu-nav">
       <router-link to="/admin/dashboard" class="menu-nav-item" active-class="is-active">
         <LayoutDashboard :size="14" class="menu-icon" />
         <span class="menu-label">行动中心</span>
@@ -66,6 +66,10 @@
       <router-link v-if="can('staff.manage')" to="/admin/staff-accounts" class="menu-nav-item" active-class="is-active">
         <ShieldUser :size="14" class="menu-icon" />
         <span class="menu-label">后台账号管理</span>
+      </router-link>
+      <router-link v-if="can('agency.manage')" to="/admin/agency" class="menu-nav-item" active-class="is-active">
+        <BriefcaseBusiness :size="14" class="menu-icon" />
+        <span class="menu-label">代理与交付</span>
       </router-link>
     </nav>
 

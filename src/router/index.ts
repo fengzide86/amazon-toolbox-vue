@@ -28,6 +28,7 @@ const routes: RouteRecordRaw[] = [
   // 管理员登录路由
   {
     path: '/admin/login',
+    alias: '/agent/login',
     name: 'AdminLogin',
     component: () => import('@/views/admin/AdminLoginView.vue'),
     meta: { title: '管理员登录' }
@@ -84,7 +85,21 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/change-password',
     name: 'AdminChangePassword',
     component: () => import('@/views/admin/ChangePasswordView.vue'),
-    meta: { title: '修改后台密码', roles: ['super_admin', 'operator', 'support'] },
+    meta: { title: '修改后台密码', roles: ['super_admin', 'operator', 'support', 'agent'] },
+  },
+  {
+    path: '/agent',
+    component: () => import('@/features/agency/AgentLayout.vue'),
+    redirect: { name: 'AgentOverview' },
+    meta: { roles: ['agent'] },
+    children: [
+      { path: 'overview', name: 'AgentOverview', component: () => import('@/features/agency/AgentOverviewView.vue'), meta: { title: '我的概览' } },
+      { path: 'customers', name: 'AgentCustomers', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'customers' }, meta: { title: '我的客户' } },
+      { path: 'orders', name: 'AgentOrders', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'orders' }, meta: { title: '我的订单' } },
+      { path: 'licenses', name: 'AgentLicenses', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'licenses' }, meta: { title: '我的授权' } },
+      { path: 'requests', name: 'AgentRequests', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'requests' }, meta: { title: '售后支持' } },
+      { path: 'account', name: 'AgentAccount', component: () => import('@/features/agency/AgentAccountView.vue'), meta: { title: '个人账号' } },
+    ],
   },
   {
     path: '/business',
@@ -124,6 +139,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/layouts/AdminLayout.vue'),
     redirect: '/admin/dashboard',
     children: [
+      {
+        path: 'agency',
+        name: 'AdminAgency',
+        component: () => import('@/features/agency/AgencyManagementView.vue'),
+        meta: { title: '代理与交付', roles: ['super_admin'] },
+      },
       {
         path: 'dashboard',
         name: 'AdminDashboard',
@@ -240,6 +261,7 @@ router.beforeEach((to, from, next) => {
     const isAuthenticated = authService.isAuthenticated()
     const isBackoffice = authService.isBackoffice()
     const role = authService.getRole()
+    const staffHome = role === 'agent' ? 'AgentOverview' : 'AdminDashboard'
     const user = authService.getUser() || {}
     const hasBusinessAccess = hasBusinessWorkspaceAccess(user)
     // The website markets the product; the installed app still opens its
@@ -257,13 +279,27 @@ router.beforeEach((to, from, next) => {
     if (to.name === 'UserLogin' || to.name === 'AdminLogin') {
       if (isAuthenticated) {
         // 已登录，根据角色跳转
-        next({ name: isBackoffice ? (user.force_password_reset ? 'AdminChangePassword' : 'AdminDashboard') : hasBusinessAccess ? 'BusinessOverview' : 'UserTools' })
+        next({ name: isBackoffice ? (user.force_password_reset ? 'AdminChangePassword' : staffHome) : hasBusinessAccess ? 'BusinessOverview' : 'UserTools' })
       } else {
         next()
       }
       return
     }
     
+    if (to.path.startsWith('/agent')) {
+      if (!isAuthenticated) next({ name: 'AdminLogin' })
+      else if (role !== 'agent') next({ name: isBackoffice ? 'AdminDashboard' : hasBusinessAccess ? 'BusinessOverview' : 'UserTools' })
+      else if (user.force_password_reset) next({ name: 'AdminChangePassword' })
+      else next()
+      return
+    }
+
+    // Agent accounts never enter the internal console (except shared password change).
+    if (isAuthenticated && role === 'agent' && to.name !== 'AdminChangePassword') {
+      next({ name: 'AgentOverview' })
+      return
+    }
+
     // 管理后台需要管理员角色
     if (to.path.startsWith('/admin')) {
       if (!isAuthenticated) {
@@ -280,7 +316,7 @@ router.beforeEach((to, from, next) => {
       }
       const allowedRoles = Array.isArray(to.meta.roles) ? to.meta.roles as BackofficeRole[] : ['super_admin', 'operator', 'support']
       if (!allowedRoles.includes(role)) {
-        next({ name: 'AdminDashboard', query: { access: 'role-required' } })
+        next({ name: staffHome, query: { access: 'role-required' } })
         return
       }
       next()

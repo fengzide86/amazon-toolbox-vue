@@ -43,7 +43,7 @@ function fixture(withDependencies = false): string {
 
 function execute(root: string, args: string[], entry?: string, overrides: NodeJS.ProcessEnv = {}) {
   const environment = { ...process.env, TOOLBOX_NO_PAUSE: '1', TOOLBOX_NODE_EXE: process.execPath,
-    TOOLBOX_DRY_RUN: '', TOOLBOX_PREVIEW_BACKEND: 'local', TOOLBOX_RELEASE_VERSION: '', ...overrides }
+    TOOLBOX_GH_EXE: '', TOOLBOX_DRY_RUN: '', TOOLBOX_PREVIEW_BACKEND: 'local', TOOLBOX_RELEASE_VERSION: '', ...overrides }
   return entry
     ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/v:off', '/s', '/c', `call "${path.join(root, entry)}" ${args.join(' ')}`],
       { cwd: os.tmpdir(), env: environment, encoding: 'utf8', timeout: 20_000, windowsVerbatimArguments: true })
@@ -153,6 +153,46 @@ describe('KST local launchers and deployment boundaries', () => {
     const result = execute(root, ['--dry-run'], '开发预览.bat', { TOOLBOX_PYTHON: python })
     expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
     expect(result.stdout).toContain(`[TOOLBOX] Python: ${python}`)
+  })
+
+  it.runIf(windows)('website preview does not require a Python installation', () => {
+    const root = fixture()
+    const result = execute(root, ['--dry-run'], '官网预览.bat', { TOOLBOX_PYTHON: path.join(root, 'missing-python.exe') })
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(result.stdout).not.toContain('[TOOLBOX] Python:')
+    expect(existsSync(path.join(root, 'node_modules'))).toBe(false)
+  })
+
+  it.runIf(windows)('Node discovery skips an invalid first PATH candidate and selects a later Node 22', () => {
+    const root = fixture()
+    const invalidDirectory = path.join(root, 'invalid-node')
+    mkdirSync(invalidDirectory)
+    writeFileSync(path.join(invalidDirectory, 'node.exe'), 'broken migrated executable')
+    const result = execute(root, ['--dry-run'], '官网预览.bat', {
+      TOOLBOX_NODE_EXE: '', TOOLBOX_DATA_ROOT: path.join(root, 'empty-data'),
+      PATH: `${invalidDirectory};${path.dirname(process.execPath)};${process.env.PATH || ''}`,
+    })
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(result.stdout).toContain(`[TOOLBOX] Node 22: ${process.execPath}`)
+  })
+
+  it.runIf(windows)('real launcher rejects an explicitly invalid GitHub CLI instead of using another account tool', () => {
+    const root = fixture()
+    const result = execute(root, ['--dry-run'], '官网预览.bat', { TOOLBOX_GH_EXE: path.join(root, 'missing-gh.exe') })
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('TOOLBOX_GH_EXE')
+    expect(existsSync(path.join(root, 'node_modules'))).toBe(false)
+  })
+
+  it.runIf(windows)('BAT preserves a quoted argument and the exact CLI failure exit code', () => {
+    const root = fixture()
+    writeFileSync(path.join(root, 'scripts', 'toolbox-cli.mjs'), `
+      console.log('FORWARDED=' + JSON.stringify(process.argv.slice(2)))
+      process.exitCode = 37
+    `)
+    const result = execute(root, ['"payload & spaced!"'], '官网预览.bat')
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(37)
+    expect(result.stdout).toContain('FORWARDED=["marketing","preview","payload & spaced!"]')
   })
 
   it.runIf(windows)('build wrapper runs a quoted local .cmd shim and preserves spaced arguments', () => {

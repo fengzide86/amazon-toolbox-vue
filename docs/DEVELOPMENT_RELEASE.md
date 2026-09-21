@@ -4,17 +4,22 @@
 
 唯一源码目录为 `D:\开发项目\amazon-toolbox-vue`；入口均从自身所在目录解析项目，不依赖打开终端的位置，也不复制源码到旧目录。
 
+第一次使用请先看根目录 `00_快捷入口说明.md`。保留全部原入口文件名，已有桌面快捷方式继续有效。
+
 | 入口 | 执行范围 | 是否改线上 |
 | --- | --- | --- |
 | `开发预览.bat` | 本地后端与 Electron 管理员入口 | 否；`remote` 需明确指定 |
+| `dev-preview.bat` | 本地后端与 Electron 用户登录入口；按授权进入 C/B 端 | 否；`remote` 需明确指定 |
 | `检查.bat` / `检查.bat full` | 快速测试 / 完整发布门禁 | 否 |
 | `仅打包.bat` | 当前版本 NSIS、包内容审计、更新清单哈希检查 | 否；不改版本、不提交、不上传 |
 | `一键发布.bat` | 后端、Web 应用和桌面正式更新 | 是；完整生产门禁 |
 | `官网预览.bat` | 独立宣传官网构建、审计和本地预览 | 否 |
-| `官网发布.bat` | 独立 Cloudflare Pages 官网发布及上线核验 | 是；配置或认证缺失会失败 |
+| `官网发布.bat` | 按官网配置发布独立宣传站及上线核验 | 是；配置或认证缺失会失败 |
 | `联合发布.bat` | 先预检官网账号，再完整发布系统，最后发布宣传官网 | 是；任一步失败均中止并说明完成范围 |
 
-这些入口共用 `scripts/launch-toolbox.ps1`：仅在当前进程选择 Node 22，优先使用 `TOOLBOX_NODE_EXE` 显式配置或 PATH 中的 Node 22，再查找 D 盘 `TOOLBOX_DATA_ROOT/toolchains` 下已存在的 Node 22；不自动安装、不修改系统 PATH。Python 与 npm 检查共用 `scripts/run-python.mjs`：先实际执行 `--version` 验证显式 `TOOLBOX_PYTHON`，再尝试项目 `venv`、`.venv`，Windows 下再尝试 `TOOLBOX_DATA_ROOT/venvs/amazon-toolbox-test/Scripts/python.exe`（默认 D 盘），最后检查 PATH 的 Python；Linux 保持 `python3` 回退。显式配置无效时直接失败，不静默换解释器；迁移损坏的本地环境会跳过，不删除或重建。选中的 Python 和已有 GitHub CLI 仅加入本次进程 PATH，本地预览及管理员初始化也使用同一解释器，运行数据目录不变。中文、空格及 `&`、`!` 路径有 Windows 回归测试。失败默认保留窗口，自动化设置 `TOOLBOX_NO_PAUSE=1` 可禁用暂停。
+这些入口共用 `scripts/launch-toolbox.ps1`：仅在当前进程选择 Node 22，优先使用 `TOOLBOX_NODE_EXE` 显式配置，然后逐一验证 PATH 中的 Node（不会因前面是其他版本而漏掉后面的 22），再按版本查找 D 盘 `TOOLBOX_DATA_ROOT/toolchains` 下已存在的 Node 22；不自动安装、不修改系统 PATH。Python 检查共用 `scripts/run-python.mjs`：先实际执行 `--version` 验证显式 `TOOLBOX_PYTHON`，再尝试项目 `venv`、`.venv`，Windows 下再尝试 `TOOLBOX_DATA_ROOT/venvs/amazon-toolbox-test/Scripts/python.exe`（默认 D 盘），最后检查 PATH 的 Python；Linux 保持 `python3` 回退。纯官网预览、检查与发布仅使用 Node，不因缺少 Python 而无法恢复官网。显式配置无效时直接失败，不静默换解释器；迁移损坏的本地环境会跳过，不删除或重建。
+
+GitHub CLI 优先验证 `TOOLBOX_GH_EXE`，然后依次检查 PATH、Windows 标准安装目录、D 盘工具链（按数值版本排序）；仅使用能实际运行 `gh --version` 的程序。选中的 Python、Node 和已有 GitHub CLI 仅加入本次进程 PATH，本地预览及管理员初始化也使用同一解释器，运行数据目录不变。中文、空格及 `&`、`!` 路径、带空格参数和非零退出码都有 Windows 回归测试。失败默认保留窗口，自动化设置 `TOOLBOX_NO_PAUSE=1` 可禁用暂停，原退出码不会被暂停覆盖。
 
 Node 使用 22 系列，CI 固定版本见 `.node-version`。Python CI 使用 3.10，并按 `backend/constraints-py310.txt` 验证生产依赖。使用 `npm ci` 保持依赖锁文件一致；本机其他 Python 版本的测试结果不替代 Python 3.10 CI。
 
@@ -162,9 +167,11 @@ npm run package:audit
 
 ## 独立宣传官网
 
+2026-09-21 实际可访问通道为 `https://fengzide86.github.io`（独立静态仓库），Cloudflare 的 `kesaitong.pages.dev` 当时返回 522。官网通道以本机 `.env.marketing.local` 的当前配置及公开访问核验为准，登录成功不等于域名或站点可用。域名 `kesaitong.top` 是否完成绑定必须另行核验。
+
 官网不再直接搬运业务应用。`官网预览.bat` 依次执行 `build:marketing`、`marketing:audit`、`preview:marketing`，只使用 `dist-marketing`，默认在 `http://127.0.0.1:4200` 预览，不覆盖桌面或业务 Web 产物。
 
-`官网发布.bat` 委托 `marketing:publish`，由独立发布器检查 `.env.marketing.local`、Cloudflare 账号、主分支及版本前置条件，构建并核对线上结果。未配置账号、站点或下载链接时必须明确失败，不生成占位“发布成功”。认证与实际生产发布由发布器控制，不由 BAT 隐式登录或静默跳过。
+`官网发布.bat` 委托 `marketing:publish`，由独立发布器检查 `.env.marketing.local`、所选托管通道账号、主分支及版本前置条件，构建并核对线上结果。未配置账号、站点或无法从正式更新清单取得下载链接时必须明确失败，不生成占位“发布成功”。通常留空可选的 `VITE_DESKTOP_DOWNLOAD_URL`，由当前已发布的 `latest.yml` 自动生成；若显式配置，必须与本轮系统版本一致。认证与实际生产发布由发布器控制，不由 BAT 隐式登录或静默跳过。
 
 ```powershell
 .\官网预览.bat --dry-run
@@ -177,7 +184,7 @@ npm run package:audit
 
 ## 联合发布系统与宣传官网
 
-双击 `联合发布.bat`，默认使用当前 `package.json` 版本。它先通过官网发布器的 `--check-account` 核验本地配置、Cloudflare 登录与已存在项目，再调用原系统 `release --publish` 完整门禁和五阶段，最后运行独立官网发布器。账号预检不要求新系统版本此时已经上线；真正上传官网前仍会核对系统版本、下载清单、同一提交的 CI 与线上文件。
+双击 `联合发布.bat`，默认使用当前 `package.json` 版本。它先通过官网发布器的 `--check-account` 核验本地配置、所选托管通道登录与已存在项目，再调用原系统 `release --publish` 完整门禁和五阶段，最后运行独立官网发布器。账号预检不要求新系统版本此时已经上线；真正上传官网前仍会核对系统版本、下载清单、同一提交的 CI 与线上文件。
 
 ```powershell
 .\联合发布.bat --dry-run
@@ -187,7 +194,7 @@ $releaseVersion=(Get-Content package.json -Raw | ConvertFrom-Json).version
 node scripts/toolbox-cli.mjs joint-release "--version=$releaseVersion"
 ```
 
-联合入口不提交代码、不合并分支、不创建 Cloudflare 项目，也不隐式登录；执行前仍需准备已合入 `main` 且 CI 通过的新版本及 `.env.deploy`、`.env.marketing.local`。`--skip-verify`、`--skip-build` 和未知参数均被拒绝。原系统阶段中断时可以给联合入口传入原 `--resume=<release-id>`，它仍会先预检官网，然后由原发布器校验恢复状态。
+联合入口不提交业务源码、不合并分支、不创建托管项目，也不隐式登录；执行前仍需准备已合入 `main` 且 CI 通过的新版本及 `.env.deploy`、`.env.marketing.local`。GitHub Pages 通道仅向配置好的独立静态仓库提交构建产物，不代替业务源码的提交与 CI。`--skip-verify`、`--skip-build` 和未知参数均被拒绝。原系统阶段中断时可以给联合入口传入原 `--resume=<release-id>`，它仍会先预检官网，然后由原发布器校验恢复状态。
 
 **两个发布器不是全局原子事务。** 系统未成功时绝不上传新官网；系统成功但官网失败时，联合命令返回失败并明确说明系统已经完成，不自动回滚系统，不自动重复发布版本。排除官网问题后只运行 `官网发布.bat`，按官网发布器的公开访问核验结果确认完成；不要因官网失败再不带 `--resume` 执行同一版本的系统发布。
 

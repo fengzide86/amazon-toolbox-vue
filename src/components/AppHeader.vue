@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Lock, Monitor, PriceTag, Refresh, SwitchButton } from '@element-plus/icons-vue'
 import { Crown, Menu, ShieldCheck } from '@lucide/vue'
@@ -91,6 +91,8 @@ const route = useRoute()
 const shellPageHeader = useShellPageHeader()
 const platformStore = usePlatformStore()
 const updateStore = useUpdateStore()
+const currentUser = ref(authService.getUser())
+const refreshProfile = () => { currentUser.value = authService.getUser() }
 const backofficeRole = computed(() => authService.getRole())
 const backofficeLabel = computed(() => staffRoleLabel(backofficeRole.value))
 const currentPageTitle = computed(() => shellPageHeader?.current.value?.title || String(route.meta?.title || (props.isAdmin ? '管理后台' : '跨境电商效率工具')))
@@ -101,9 +103,9 @@ const currentPlatform = computed(() => platformStore.currentPlatform)
 const adminPlatform = computed(() => platformStore.adminPlatform)
 
 const displayName = computed(() => {
-  if (props.isAdmin) return authService.getUser()?.display_name || authService.getUser()?.username || staffRoleLabel(backofficeRole.value)
+  if (props.isAdmin) return currentUser.value?.display_name || currentUser.value?.username || staffRoleLabel(backofficeRole.value)
   try {
-    const user = JSON.parse(localStorage.getItem('toolbox_user') || '{}')
+    const user = currentUser.value || {}
     return user.username || user.name || '用户'
   } catch { return '用户' }
 })
@@ -171,6 +173,8 @@ async function handleLogout(): Promise<void> {
 }
 
 onMounted(() => platformStore.loadPlatforms())
+onMounted(() => window.addEventListener('toolbox:user-updated', refreshProfile))
+onBeforeUnmount(() => window.removeEventListener('toolbox:user-updated', refreshProfile))
 </script>
 
 <style scoped>
@@ -257,6 +261,12 @@ onMounted(() => platformStore.loadPlatforms())
 
 .shell-page-actions {
   min-width: 0;
+}
+
+.shell-page-actions :deep(button),
+.shell-page-actions :deep(a) {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .shell-page-actions:empty { display: none; }

@@ -59,7 +59,7 @@ describe('AdminLoginView', () => {
 
     it('应该显示副标题提示', () => {
       const wrapper = mountWithPinia(AdminLoginView)
-      expect(wrapper.text()).toContain('使用管理账号和密码进入后台')
+      expect(wrapper.text()).toContain('使用自己的后台账号登录，自动进入对应工作台')
     })
 
     it('应该渲染密码输入框', () => {

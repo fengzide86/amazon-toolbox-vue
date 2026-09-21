@@ -21,10 +21,11 @@
 import { computed } from 'vue'
 import { BadgeCheck, ClipboardList, LayoutDashboard, PanelsTopLeft } from '@lucide/vue'
 import BrandLockup from '@/components/brand/BrandLockup.vue'
+import { authService } from '@/utils/auth'
+import { useUserStore } from '@/stores/user'
 
-const user = computed(() => {
-  try { return JSON.parse(localStorage.getItem('toolbox_user') || '{}') } catch { return {} }
-})
+const userStore = useUserStore()
+const user = computed(() => userStore.userInfo || authService.getUser() || {})
 const planName = computed(() => user.value.plan_name || '专业授权')
 const seatLimit = computed(() => user.value.seat_limit || 1)
 </script>

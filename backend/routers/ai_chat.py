@@ -23,6 +23,7 @@ from schemas.ai_chat import (
     ChatReplyResponse,
     ChatSessionCreatedResponse,
     ChatSessionDetailResponse,
+    ChatTransferRequest,
     ChatTransferResponse,
     CreateSessionRequest,
     DebugChatRequest,
@@ -166,13 +167,16 @@ async def resolve_session(
 @router.post("/session/{session_id}/transfer", response_model=ChatTransferResponse)
 async def transfer_to_human(
     session_id: str,
+    req: ChatTransferRequest | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, str | int | None]:
     """转人工（自动创建工单）"""
     await _require_session_owner(db, session_id, current_user)
     user_id = cast(int, current_user.get("user_id"))
-    feedback_id = await ai_chat_service.transfer_to_human(db, session_id, user_id=user_id)
+    feedback_id = await ai_chat_service.transfer_to_human(
+        db, session_id, user_id=user_id, summary=req.summary if req else None,
+    )
     return {"message": "已转人工客服", "feedback_id": feedback_id}
 
 

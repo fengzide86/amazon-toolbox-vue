@@ -3,6 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { hasStaffPermission } from '@/features/auth/permissions'
 
 describe('fixed staff permission matrix', () => {
+  it('gives agents no internal permissions and only the owner agency management', () => {
+    for (const permission of ['orders.write', 'auth_codes.write', 'expenses.read', 'staff.manage', 'agency.manage', 'devices.unbind', 'profit.read', 'settings.manage'] as const) {
+      expect(hasStaffPermission('agent', permission)).toBe(false)
+    }
+    expect(hasStaffPermission('super_admin', 'agency.manage')).toBe(true)
+    expect(hasStaffPermission('operator', 'agency.manage')).toBe(false)
+    expect(hasStaffPermission('support', 'agency.manage')).toBe(false)
+  })
   it('gives super admins account, settings and update control', () => {
     expect(hasStaffPermission('super_admin', 'staff.manage')).toBe(true)
     expect(hasStaffPermission('super_admin', 'settings.manage')).toBe(true)

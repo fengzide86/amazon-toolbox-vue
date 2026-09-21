@@ -40,6 +40,8 @@ export const cancelDemoRun = (runId: EntityId, eventSeq: number): Promise<Schema
 
 export const getDemoRuns = (params: ApiQueryParams = {}): Promise<Schemas['DemoRunResponse'][]> =>
   api.get('/api/demo/runs', params, { cache: false })
+export const getDemoRunsPage = (params: ApiQueryParams = {}): Promise<Schemas['PaginatedDemoRuns']> =>
+  api.get('/api/demo/runs', params, { cache: false, responseMode: 'raw' })
 
 export interface DemoBatchCreatePayload {
   client_demo_batch_id: string
@@ -64,6 +66,8 @@ export const finishDemoBatch = (batchId: EntityId, payload: Schemas['DemoEvent']
 
 export const getDemoBatches = (params: ApiQueryParams = {}): Promise<Schemas['DemoBatchResponse'][]> =>
   api.get('/api/demo/batches', params, { cache: false })
+export const getDemoBatchesPage = (params: ApiQueryParams = {}): Promise<Schemas['PaginatedDemoBatches']> =>
+  api.get('/api/demo/batches', params, { cache: false, responseMode: 'raw' })
 
 export const getDemoBatch = (batchId: EntityId): Promise<Schemas['DemoBatchResponse']> =>
   api.get(`/api/demo/batches/${encodeURIComponent(batchId)}`, {}, { cache: false })

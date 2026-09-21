@@ -66,6 +66,24 @@ async def test_recount_includes_pending_writes_and_unreported_items(db_session: 
 
 
 @pytest.mark.asyncio
+async def test_history_offset_is_stable_and_remains_authorization_scoped(db_session: AsyncSession, live_batch) -> None:
+    _, context = live_batch
+    for index in range(4):
+        db_session.add(AutomationBatch(
+            client_batch_id=f"history-page-{index}", auth_code_id=context["auth_code_id"],
+            device_id="counter-device", tool_id="counter-tool", tool_name="分页测试",
+            total_count=1, pending_count=1,
+        ))
+    await db_session.commit()
+    first = await service.list_batches(db_session, context, limit=2)
+    second = await service.list_batches(db_session, context, limit=2, offset=2)
+    third = await service.list_batches(db_session, context, limit=2, offset=4)
+    assert [len(first), len(second), len(third)] == [2, 2, 1]
+    assert len({item["id"] for item in first + second + third}) == 5
+    assert await service.list_batches(db_session, {"auth_code_id": -1}, limit=20) == []
+
+
+@pytest.mark.asyncio
 async def test_rejects_bad_counters_ids_and_extra_items(db_session: AsyncSession, live_batch) -> None:
     batch_id, context = live_batch
     with pytest.raises(HTTPException) as invalid_count:

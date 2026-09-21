@@ -22,6 +22,7 @@ from models import (
     AuditLog,
     AuthCode,
     AuthSeat,
+    ChatMessage,
     ChatSession,
     Device,
     ExpenseAttachment,
@@ -85,7 +86,9 @@ async def test_twenty_concurrent_chat_handoffs_create_one_scoped_ticket():
                     all_preloaded.set()
                 await asyncio.wait_for(all_preloaded.wait(), timeout=15)
                 try:
-                    return await chat_service.transfer_to_human(db, session_id, user_id=owner_id)
+                    return await chat_service.transfer_to_human(
+                        db, session_id, user_id=owner_id, summary="并发验收问题",
+                    )
                 except ConflictException as error:
                     return error
 
@@ -117,11 +120,171 @@ async def test_twenty_concurrent_chat_handoffs_create_one_scoped_ticket():
             if owner_id is not None:
                 async with sessions() as db:
                     await db.execute(delete(Feedback).where(Feedback.user_id == owner_id))
+                    await db.execute(delete(ChatMessage).where(ChatMessage.session_id == session_id))
                     await db.execute(delete(ChatSession).where(ChatSession.session_id == session_id))
                     await db.execute(delete(User).where(User.id == owner_id))
                     await db.commit()
         finally:
             await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_twenty_concurrent_agency_deliveries_issue_one_authorization():
+    from starlette.requests import Request
+
+    from domains.commerce.agency import AgencyService
+    from models import Agency, AgencyCustomer
+
+    engine = create_async_engine(_mariadb_test_url(), pool_size=20, max_overflow=0, pool_pre_ping=True, isolation_level="READ COMMITTED")
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    suffix = uuid.uuid4().hex[:12]
+    staff_id = agency_id = customer_id = plan_id = order_id = None
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as db:
+            staff = StaffUser(username=f"agency-owner-{suffix}", display_name="Agency test owner", password_hash=hash_password(f"Test-{suffix}"), role="super_admin", status="active", token_version=1)
+            agency = Agency(name=f"Partner {suffix}")
+            plan = Plan(name=f"Partner plan {suffix}", price=Decimal("99"), duration_days=30, status="active", product_type="consumer")
+            db.add_all([staff, agency, plan])
+            await db.flush()
+            staff_id, agency_id, plan_id = staff.id, agency.id, plan.id
+            customer = AgencyCustomer(name=f"Customer {suffix}", agency_id=agency_id, created_by_staff_id=staff_id)
+            db.add(customer)
+            await db.flush()
+            customer_id = customer.id
+            order = Order(order_no=f"AGENCY-CONCURRENT-{suffix}", plan_id=plan_id, plan_name_snapshot=plan.name, plan_price_snapshot=plan.price, plan_duration_days_snapshot=30, amount=plan.price, status="paid", agency_id=agency_id, customer_id=customer_id, platform_key="amazon", created_by_staff_id=staff_id)
+            db.add(order)
+            await db.flush()
+            order_id = order.id
+            await db.commit()
+        actor = {"staff_id": staff_id, "username": f"agency-owner-{suffix}", "role": "super_admin"}
+        async def issue() -> int:
+            async with sessions() as db:
+                result = await AgencyService(db, actor).deliver(order_id, Request({"type": "http", "headers": [], "method": "POST", "path": "/test-agency-deliver"}))
+                assert result.auth_code is not None
+                return result.auth_code.id
+        results = await asyncio.wait_for(asyncio.gather(*(issue() for _ in range(20))), timeout=45)
+        assert len(set(results)) == 1
+        async with sessions() as db:
+            assert (await db.execute(select(func.count(AuthCode.id)).where(AuthCode.order_id == order_id))).scalar_one() == 1
+    finally:
+        async with sessions() as db:
+            if staff_id is not None:
+                await db.execute(delete(AuditLog).where(AuditLog.user_id == staff_id))
+            if order_id is not None:
+                await db.execute(delete(AuthCode).where(AuthCode.order_id == order_id))
+                await db.execute(delete(Order).where(Order.id == order_id))
+            if customer_id is not None:
+                await db.execute(delete(AgencyCustomer).where(AgencyCustomer.id == customer_id))
+            if plan_id is not None:
+                await db.execute(delete(Plan).where(Plan.id == plan_id))
+            if agency_id is not None:
+                await db.execute(delete(Agency).where(Agency.id == agency_id))
+            if staff_id is not None:
+                await db.execute(delete(StaffUser).where(StaffUser.id == staff_id))
+            await db.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_customer_reassignment_and_delivery_share_lock_order_and_new_scope():
+    from starlette.requests import Request
+
+    from domains.commerce.agency import AgencyService
+    from models import Agency, AgencyCustomer
+    from schemas.agency import CustomerUpdate
+
+    engine = create_async_engine(_mariadb_test_url(), pool_size=5, max_overflow=0, pool_pre_ping=True, isolation_level="READ COMMITTED")
+    sessions = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    suffix = uuid.uuid4().hex[:12]
+    staff_id = customer_id = plan_id = order_id = None
+    agency_ids: list[int] = []
+    customer_locked = asyncio.Event()
+    delivery_reached_customer = asyncio.Event()
+    tasks: list[asyncio.Task[Any]] = []
+    try:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+        async with sessions() as db:
+            staff = StaffUser(username=f"transfer-owner-{suffix}", display_name="Transfer test owner", password_hash=hash_password(f"Test-{suffix}"), role="super_admin", status="active", token_version=1)
+            agencies = [Agency(name=f"Transfer {side} {suffix}") for side in ("A", "B")]
+            plan = Plan(name=f"Transfer plan {suffix}", price=Decimal("99"), duration_days=30, status="active", product_type="consumer")
+            db.add_all([staff, *agencies, plan])
+            await db.flush()
+            staff_id, plan_id = staff.id, plan.id
+            agency_ids = [agency.id for agency in agencies]
+            customer = AgencyCustomer(name=f"Transfer customer {suffix}", agency_id=agency_ids[0], created_by_staff_id=staff_id)
+            db.add(customer)
+            await db.flush()
+            customer_id = customer.id
+            order = Order(order_no=f"AGENCY-TRANSFER-{suffix}", plan_id=plan_id, plan_name_snapshot=plan.name, plan_price_snapshot=plan.price, plan_duration_days_snapshot=30, amount=plan.price, status="paid", agency_id=agency_ids[0], customer_id=customer_id, platform_key="amazon", created_by_staff_id=staff_id)
+            db.add(order)
+            await db.flush()
+            order_id = order.id
+            await db.commit()
+        actor = {"staff_id": staff_id, "username": f"transfer-owner-{suffix}", "role": "super_admin"}
+        request = Request({"type": "http", "headers": [], "method": "POST", "path": "/test-agency-transfer"})
+
+        async def transfer() -> None:
+            async with sessions() as db:
+                service = AgencyService(db, actor)
+                original_get = service._get
+                async def hold_customer(model: Any, item_id: int, *, lock: bool = False) -> Any:
+                    item = await original_get(model, item_id, lock=lock)
+                    if model is AgencyCustomer and lock:
+                        customer_locked.set()
+                        await asyncio.wait_for(delivery_reached_customer.wait(), timeout=10)
+                    return item
+                service._get = hold_customer
+                await service.update_customer(customer_id, CustomerUpdate(agency_id=agency_ids[1]), request)
+
+        async def deliver() -> int:
+            await asyncio.wait_for(customer_locked.wait(), timeout=10)
+            async with sessions() as db:
+                service = AgencyService(db, actor)
+                original_get = service._get
+                async def announce_customer(model: Any, item_id: int, *, lock: bool = False) -> Any:
+                    if model is AgencyCustomer and lock:
+                        delivery_reached_customer.set()
+                    return await original_get(model, item_id, lock=lock)
+                service._get = announce_customer
+                result = await service.deliver(order_id, request)
+                assert result.auth_code is not None
+                return result.auth_code.id
+
+        tasks = [asyncio.create_task(transfer()), asyncio.create_task(deliver())]
+        await asyncio.wait_for(asyncio.gather(*tasks), timeout=25)
+        async with sessions() as db:
+            customer = await db.get(AgencyCustomer, customer_id)
+            order = await db.get(Order, order_id)
+            codes = (await db.execute(select(AuthCode).where(AuthCode.order_id == order_id))).scalars().all()
+            assert customer.agency_id == order.agency_id == agency_ids[1]
+            assert len(codes) == 1 and codes[0].agency_id == agency_ids[1]
+            old_agent = {**actor, "role": "agent", "agency_id": agency_ids[0]}
+            assert (await AgencyService(db, old_agent).licenses(1, 20, None, None))["total"] == 0
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        async with sessions() as db:
+            if staff_id is not None:
+                await db.execute(delete(AuditLog).where(AuditLog.user_id == staff_id))
+            if order_id is not None:
+                await db.execute(delete(AuthCode).where(AuthCode.order_id == order_id))
+                await db.execute(delete(Order).where(Order.id == order_id))
+            if customer_id is not None:
+                await db.execute(delete(AgencyCustomer).where(AgencyCustomer.id == customer_id))
+            if plan_id is not None:
+                await db.execute(delete(Plan).where(Plan.id == plan_id))
+            if agency_ids:
+                await db.execute(delete(Agency).where(Agency.id.in_(agency_ids)))
+            if staff_id is not None:
+                await db.execute(delete(StaffUser).where(StaffUser.id == staff_id))
+            await db.commit()
+        await engine.dispose()
 
 
 def _mariadb_test_url() -> str:

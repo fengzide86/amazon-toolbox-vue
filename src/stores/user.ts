@@ -8,7 +8,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
   authenticatedUserSchema,
-  parseStoredUser,
   type AuthenticatedUser,
   type AuthRole,
   type LoginPayload,
@@ -26,7 +25,7 @@ export const useUserStore = defineStore('user', () => {
   const parsedStoredRole = authRoleSchema.safeParse(storedRole)
   const role = ref<AuthRole | null>(parsedStoredRole.success ? parsedStoredRole.data : null)
   const auth = ref<string | null>(sessionStorage.getItem('toolbox_auth'))
-  const userInfo = ref<AuthenticatedUser | null>(parseStoredUser(localStorage.getItem('toolbox_user')))
+  const userInfo = ref<AuthenticatedUser | null>(authService.getUser())
   
   // 用户信息
   const userId = ref<string | number | null>(null)
@@ -67,16 +66,18 @@ export const useUserStore = defineStore('user', () => {
    * @param {Object} data - 登录返回的数据
    */
   function setLogin(data: LoginPayload) {
-    token.value = data.token
-    role.value = data.role
-    auth.value = data.auth_code || data.auth || null
-    const safeUser: AuthenticatedUser | null = data.user ? { ...data.user } : null
+    // Validate the real response before publishing any signed-in state. A
+    // profile contract failure must not leave a token-only partial session.
+    const safeUser: AuthenticatedUser | null = data.user ? authenticatedUserSchema.parse(data.user) : null
     if (safeUser) {
       delete safeUser.token
       delete safeUser.refresh_token
       delete safeUser.auth_code
       delete safeUser.code
     }
+    token.value = data.token
+    role.value = data.role
+    auth.value = data.auth_code || data.auth || null
     userInfo.value = safeUser
     
     // 访问令牌仅保存在当前 Electron/浏览器会话中
@@ -91,7 +92,10 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem('toolbox_role')
     localStorage.removeItem('toolbox_auth')
     if (safeUser) {
-      localStorage.setItem('toolbox_user', JSON.stringify(safeUser))
+      authService.setUser(safeUser)
+    } else {
+      sessionStorage.removeItem('toolbox_user')
+      localStorage.removeItem('toolbox_user')
     }
   }
 
@@ -107,7 +111,7 @@ export const useUserStore = defineStore('user', () => {
     phone.value = parsed.phone ?? null
     authCodeId.value = parsed.auth_code_id ?? null
     
-    localStorage.setItem('toolbox_user', JSON.stringify(parsed))
+    authService.setUser(parsed)
   }
 
   /**
@@ -154,7 +158,7 @@ export const useUserStore = defineStore('user', () => {
     const parsedRole = authRoleSchema.safeParse(restoredRole)
     role.value = parsedRole.success ? parsedRole.data : null
     auth.value = sessionStorage.getItem('toolbox_auth')
-    userInfo.value = parseStoredUser(localStorage.getItem('toolbox_user'))
+    userInfo.value = authService.getUser()
     
     if (userInfo.value) {
       userId.value = userInfo.value.id ?? null

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { assertMarketingMetadata, assertPagesProject, installerFromManifest, marketingToolEnvironment, publicHttpsUrl, readMarketingEnvironment, validateMarketingConfig } from '../marketing-config.mjs'
+import { assertGitHubPagesProject, assertMarketingMetadata, assertPagesProject, installerFromManifest, marketingToolEnvironment, publicHttpsUrl, readMarketingEnvironment, validateMarketingConfig } from '../marketing-config.mjs'
+import { prepareGitHubPagesTree } from '../github-pages-artifact.mjs'
 
 test('marketing config requires explicit HTTPS public origin and valid Pages identity', () => {
   const valid = { CLOUDFLARE_ACCOUNT_ID: 'a'.repeat(32), CLOUDFLARE_PAGES_PROJECT: 'kesaitong', KST_MARKETING_SITE_URL: 'https://kesaitong.pages.dev/' }
@@ -52,4 +53,65 @@ test('Pages project check uses the pinned Wrangler CLI JSON format', () => {
   assert.throws(() => assertPagesProject([{ 'Project Name': 'another-project' }], 'kesaitong', 'https://kesaitong.pages.dev'))
   assert.throws(() => assertPagesProject({ error: 'not logged in' }, 'kesaitong', 'https://kesaitong.pages.dev'))
   assert.throws(() => assertPagesProject([{ 'Project Name': 'kesaitong', 'Project Domains': 'kesaitong.pages.dev' }], 'kesaitong', 'https://unbound.example.test'))
+})
+
+test('GitHub Pages validates the exact public user site and existing branch config', () => {
+  const values = { KST_MARKETING_PROVIDER: 'github-pages', GITHUB_PAGES_REPOSITORY: 'kst-team/kst-team.github.io', KST_MARKETING_SITE_URL: 'https://kst-team.github.io' }
+  const config = validateMarketingConfig(values)
+  assert.equal(config.provider, 'github-pages')
+  assert.equal(config.downloadUrl, '')
+  const pages = { html_url: `${config.publicUrl}/`, source: { branch: 'main', path: '/' }, build_type: 'legacy' }
+  assertGitHubPagesProject(pages, config)
+  for (const invalid of [{ ...values, GITHUB_PAGES_REPOSITORY: 'other/kst-team.github.io' }, { ...values, KST_MARKETING_SITE_URL: 'https://other.github.io' }, { ...values, KST_MARKETING_PROVIDER: 'unknown' }]) assert.throws(() => validateMarketingConfig(invalid))
+  assert.throws(() => assertGitHubPagesProject({ ...pages, source: { branch: 'develop', path: '/' } }, config))
+  assert.throws(() => assertGitHubPagesProject({ ...pages, html_url: 'https://other.github.io' }, config))
+  assert.throws(() => assertGitHubPagesProject({ ...pages, build_type: 'workflow' }, config))
+})
+
+function pagesFixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kst-pages-test-'))
+  const artifact = path.join(root, 'artifact'), checkout = path.join(root, 'checkout')
+  fs.mkdirSync(artifact); fs.mkdirSync(checkout)
+  const metadata = { kind: 'kst-marketing', sourcePolicy: 'marketing-only-v1', publicUrl: 'https://kst.github.io' }
+  for (const directory of [artifact, checkout]) {
+    fs.writeFileSync(path.join(directory, 'marketing-version.json'), JSON.stringify(metadata))
+    fs.writeFileSync(path.join(directory, 'index.html'), '<html><head></head><body>课赛通</body></html>')
+    fs.writeFileSync(path.join(directory, '404.html'), '<html><head></head><body>404</body></html>')
+  }
+  fs.mkdirSync(path.join(checkout, '.git')); fs.writeFileSync(path.join(checkout, '.git', 'HEAD'), 'preserve')
+  return { root, artifact, checkout, publicUrl: metadata.publicUrl, tracked: ['index.html', '404.html', 'marketing-version.json'] }
+}
+
+test('GitHub artifact keeps history, builds direct terms routes and embeds browser policy', () => {
+  const f = pagesFixture()
+  try {
+    fs.mkdirSync(path.join(f.checkout, 'assets'))
+    fs.writeFileSync(path.join(f.checkout, 'assets/old-12345678.js'), 'old')
+    prepareGitHubPagesTree(f.artifact, f.checkout, [...f.tracked, 'assets/old-12345678.js'], f.publicUrl)
+    assert.equal(fs.readFileSync(path.join(f.checkout, '.git/HEAD'), 'utf8'), 'preserve')
+    assert.equal(fs.existsSync(path.join(f.checkout, 'assets/old-12345678.js')), false)
+    assert.equal(fs.existsSync(path.join(f.checkout, '.nojekyll')), true)
+    for (const name of ['index.html', '404.html', 'terms/index.html', 'user/terms/index.html']) assert.match(fs.readFileSync(path.join(f.checkout, name), 'utf8'), /connect-src 'none'/)
+  } finally { fs.rmSync(f.root, { recursive: true, force: true }) }
+})
+
+test('GitHub artifact refuses unknown target or incoming files before changing any file', () => {
+  for (const where of ['checkout', 'artifact']) {
+    const f = pagesFixture()
+    try {
+      fs.writeFileSync(path.join(f[where], 'private.txt'), 'never publish')
+      assert.throws(() => prepareGitHubPagesTree(f.artifact, f.checkout, where === 'checkout' ? [...f.tracked, 'private.txt'] : f.tracked, f.publicUrl))
+      assert.equal(fs.readFileSync(path.join(f.checkout, 'index.html'), 'utf8'), '<html><head></head><body>课赛通</body></html>')
+      assert.equal(fs.readFileSync(path.join(f[where], 'private.txt'), 'utf8'), 'never publish')
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }) }
+  }
+})
+
+test('GitHub artifact rejects a different site and traversal without deleting the old build', () => {
+  const f = pagesFixture()
+  try {
+    assert.throws(() => prepareGitHubPagesTree(f.artifact, f.checkout, f.tracked, 'https://other.github.io'))
+    assert.throws(() => prepareGitHubPagesTree(f.artifact, f.checkout, [...f.tracked, '../index.html'], f.publicUrl))
+    assert.equal(fs.existsSync(path.join(f.checkout, 'index.html')), true)
+  } finally { fs.rmSync(f.root, { recursive: true, force: true }) }
 })

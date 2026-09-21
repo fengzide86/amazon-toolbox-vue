@@ -18,7 +18,14 @@ const apiMocks = vi.hoisted(() => ({
   updateBusinessBatchItem: vi.fn(),
 }))
 
-vi.mock('@/utils/api', () => apiMocks)
+vi.mock('@/utils/api', () => ({
+  ...apiMocks,
+  getDemoBatchesPage: async (params: { page: number; page_size: number }) => {
+    const response = await apiMocks.getDemoBatches(params)
+    const data = Array.isArray(response) ? response : response.data
+    return { page: params.page, page_size: params.page_size, total: response.total ?? data.length, data }
+  },
+}))
 
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { BusinessDemoCoordinator } from '@/features/business/demo-coordinator'

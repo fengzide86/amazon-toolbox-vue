@@ -69,10 +69,11 @@ async def create_batch(
 )
 async def list_batches(
     limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     context: dict[str, Any] = Depends(require_business_access),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return success_response(await business_service.list_batches(db, context, limit=limit))
+    return success_response(await business_service.list_batches(db, context, limit=limit, offset=offset))
 
 
 @router.get(

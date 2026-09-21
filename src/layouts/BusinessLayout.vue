@@ -36,8 +36,12 @@ let removeAfterEach: (() => void) | undefined
 let accessTimer: ReturnType<typeof setInterval> | undefined
 
 async function refreshAccess() {
+  const currentAuth = authService.getAuth()?.token
   const user = authenticatedUserSchema.parse(await getCurrentUser())
-  authService.setUser(user)
+  if (currentAuth !== authService.getAuth()?.token) return false
+  const previous = authService.getUser()
+  const sameIdentity = previous && String(previous.user_id ?? previous.id) === String(user.user_id ?? user.id)
+  authService.setUser(sameIdentity ? { ...previous, ...user } : user)
   const allowed = user?.product_type === 'business'
     && user?.business_workspace_enabled === true
     && user?.entitlements?.batch_execution === true

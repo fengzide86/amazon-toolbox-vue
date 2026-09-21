@@ -2,7 +2,6 @@
 工单反馈服务模块
 包含工单 CRUD、状态管理、分页查询等业务逻辑
 """
-from datetime import datetime
 from typing import Any
 
 from fastapi import Request
@@ -13,6 +12,7 @@ from core.audit import log_admin_action
 from core.logging import get_logger
 from core.pagination import PaginationParams, paginate
 from core.response import ErrorCodes, error_response, success_response
+from core.timestamps import utc_iso, utc_now
 from models import Feedback
 
 logger = get_logger(__name__)
@@ -126,7 +126,7 @@ class FeedbackService:
         
         # 如果有管理员回复，更新回复时间
         if "admin_reply" in data and data["admin_reply"]:
-            feedback.replied_at = datetime.now()
+            feedback.replied_at = utc_now()
         
         try:
             if actor:
@@ -228,7 +228,7 @@ class FeedbackService:
             "status": feedback.status,
             "priority": feedback.priority,
             "admin_reply": feedback.admin_reply,
-            "created_at": feedback.created_at.isoformat() if feedback.created_at else None,
+            "created_at": utc_iso(feedback.created_at),
             "platform_key": feedback.platform_key,
             "capability_key": feedback.capability_key,
             "tool_id": feedback.tool_id,
@@ -238,8 +238,8 @@ class FeedbackService:
             data["screenshot"] = feedback.screenshot
             data["screenshots"] = feedback.screenshots
             data["status_history"] = feedback.status_history
-            data["replied_at"] = feedback.replied_at.isoformat() if feedback.replied_at else None
-            data["updated_at"] = feedback.updated_at.isoformat() if feedback.updated_at else None
+            data["replied_at"] = utc_iso(feedback.replied_at)
+            data["updated_at"] = utc_iso(feedback.updated_at)
             data["run_log_id"] = feedback.run_log_id
         
         return data

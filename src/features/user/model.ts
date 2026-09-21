@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { readSessionUser } from '@/features/auth/sessionUser'
 
 export const deviceSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -68,7 +69,7 @@ export function licensePlanCode(license: z.infer<typeof storedLicenseSchema>): s
 
 export function readStoredLicense() {
   try {
-    return storedLicenseSchema.parse(JSON.parse(localStorage.getItem('toolbox_user') || '{}'))
+    return storedLicenseSchema.parse(readSessionUser() || {})
   } catch {
     return storedLicenseSchema.parse({})
   }

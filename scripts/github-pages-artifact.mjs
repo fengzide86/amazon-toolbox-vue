@@ -1,0 +1,58 @@
+import fs from 'node:fs'
+import path from 'node:path'
+
+const roots = new Set(['index.html', '404.html', '_headers', '_redirects', 'marketing-version.json', 'robots.txt', 'favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png', 'pwa-512x512.png', '.nojekyll', 'terms/index.html', 'user/terms/index.html'])
+const allowed = name => roots.has(name) || /^assets\/[\w.-]+-[\w-]{8,}\.(?:js|css|svg|png|webp|woff2?)$/i.test(name)
+
+// Called only on a fresh clone of the configured public, marketing-only repo.
+// Retain its Git history, and reject unknown content before replacing any file.
+export function prepareGitHubPagesTree(artifact, checkout, trackedFiles, publicUrl) {
+  const previous = JSON.parse(fs.readFileSync(path.join(checkout, 'marketing-version.json'), 'utf8'))
+  if (previous.kind !== 'kst-marketing' || previous.sourcePolicy !== 'marketing-only-v1' || previous.publicUrl !== publicUrl) {
+    throw new Error('目标仓库不是已验证的 KST 宣传站，拒绝覆盖')
+  }
+  for (const name of trackedFiles) {
+    if (!allowed(name)) throw new Error(`官网仓库存在非发布文件，拒绝覆盖：${name}`)
+    const absolute = path.resolve(checkout, name)
+    if (!absolute.startsWith(`${path.resolve(checkout)}${path.sep}`) || fs.lstatSync(absolute).isSymbolicLink()) throw new Error('官网目标路径不安全')
+  }
+  const incoming = []
+  function inspect(directory, prefix = '') {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const relative = prefix + entry.name
+      if (entry.isSymbolicLink()) throw new Error('官网制品不允许符号链接')
+      if (entry.isDirectory()) {
+        if (relative !== 'assets') throw new Error(`官网制品含未知目录：${relative}`)
+        inspect(path.join(directory, entry.name), `${relative}/`)
+      } else {
+        if (!allowed(relative)) throw new Error(`官网制品含未知文件：${relative}`)
+        incoming.push(relative)
+      }
+    }
+  }
+  inspect(artifact)
+  for (const required of ['index.html', '404.html', 'marketing-version.json']) {
+    if (!incoming.includes(required)) throw new Error(`官网制品缺少 ${required}`)
+  }
+  // Single files in this fresh disposable clone only; remote history is intact.
+  for (const name of trackedFiles) fs.unlinkSync(path.join(checkout, name))
+  for (const name of incoming) {
+    const destination = path.join(checkout, name)
+    fs.mkdirSync(path.dirname(destination), { recursive: true })
+    fs.copyFileSync(path.join(artifact, name), destination)
+  }
+  // GitHub Pages does not implement Cloudflare _headers/_redirects. Preserve
+  // the restrictive browser policy and create real files for direct terms URLs.
+  const policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'"
+  for (const filename of ['index.html', '404.html']) {
+    const full = path.join(checkout, filename)
+    const html = fs.readFileSync(full, 'utf8')
+    if (!html.includes('<head>')) throw new Error('官网 HTML 缺少 head')
+    fs.writeFileSync(full, html.replace('<head>', `<head>\n<meta http-equiv="Content-Security-Policy" content="${policy}">`))
+  }
+  fs.writeFileSync(path.join(checkout, '.nojekyll'), '')
+  for (const route of ['terms', 'user/terms']) {
+    fs.mkdirSync(path.join(checkout, route), { recursive: true })
+    fs.copyFileSync(path.join(checkout, 'index.html'), path.join(checkout, route, 'index.html'))
+  }
+}

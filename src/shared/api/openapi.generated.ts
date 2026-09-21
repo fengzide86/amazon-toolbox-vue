@@ -37,6 +37,27 @@ export interface components {
     "AdminDeviceResponse": { "auth_code": string; "auth_code_id": number; "created_at"?: string | null; "device_id": string; "device_name": string; "id": number }
     "AdminLoginRequest": { "password": string; "username"?: string }
     "AdminLoginResponse": { "data"?: components['schemas']["StaffSessionResponse"] | null; "error_code"?: number | null; "message": string; "success": boolean }
+    "AgenciesEnvelope": { "data"?: Array<components['schemas']["AgencyView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "AgencyEnvelope": { "data"?: components['schemas']["AgencyView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "AgencyLicenseEnvelope": { "data"?: components['schemas']["AgencyLicenseView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "AgencyLicenseView": { "activated": boolean; "agency_id": number; "agency_name"?: string; "code": string; "created_at": string | null; "customer_id": number; "customer_name"?: string; "expires_at"?: string | null; "id": number; "order_id": number; "plan_name": string; "status": string }
+    "AgencyLicensesEnvelope": { "data"?: Array<components['schemas']["AgencyLicenseView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "AgencyOrderCreate": { "customer_id": number; "note"?: string | null; "plan_id": number; "platform_key": "amazon" | "aliexpress" }
+    "AgencyOrderEnvelope": { "data"?: components['schemas']["AgencyOrderView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "AgencyOrderView": { "agency_id": number; "agency_name"?: string; "amount": number; "auth_code": components['schemas']["AgencyLicenseView"] | null; "created_at": string | null; "customer_id": number; "customer_name": string; "id": number; "note": string | null; "order_no": string; "paid_at": string | null; "plan_id": number | null; "plan_name": string; "platform_key": string | null; "status": "pending" | "paid" | "refunded" | "cancelled" }
+    "AgencyOrdersEnvelope": { "data"?: Array<components['schemas']["AgencyOrderView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "AgencyPlanView": { "duration_days": number; "id": number; "name": string; "price": number; "product_type": "consumer" | "business" }
+    "AgencyPlansEnvelope": { "data"?: Array<components['schemas']["AgencyPlanView"]> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "AgencyRequestCreate": { "content": string; "customer_id": number; "kind": "support" | "refund" | "extension"; "order_id"?: number | null }
+    "AgencyRequestEnvelope": { "data"?: components['schemas']["AgencyRequestView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "AgencyRequestResolve": { "response": string; "status": "open" | "resolved" | "rejected" }
+    "AgencyRequestView": { "agency_id": number; "agency_name"?: string; "content": string; "created_at": string | null; "customer_id": number; "customer_name"?: string; "id": number; "kind": "support" | "refund" | "extension"; "order_id"?: number | null; "resolved_at"?: string | null; "response"?: string | null; "status": "open" | "resolved" | "rejected" }
+    "AgencyRequestsEnvelope": { "data"?: Array<components['schemas']["AgencyRequestView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "AgencySummary": { "customers": number; "delivered_orders": number; "open_requests": number; "orders": number; "pending_orders": number }
+    "AgencySummaryEnvelope": { "data"?: components['schemas']["AgencySummary"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "AgencyUpdate": { "contact"?: string | null; "name"?: string | null; "notes"?: string | null; "status"?: "active" | "disabled" | null }
+    "AgencyView": { "contact"?: string | null; "created_at": string | null; "id": number; "name": string; "notes"?: string | null; "status": "active" | "disabled" }
+    "AgencyWrite": { "contact"?: string | null; "name": string; "notes"?: string | null }
     "AnnouncementCreate": { "app_version"?: string | null; "audience"?: "all" | "consumer" | "business"; "category"?: "system" | "update" | "activity" | "maintenance" | null; "content": string; "expires_at"?: string | null; "presentation"?: "banner" | "modal" | null; "priority"?: number; "severity"?: "info" | "important" | "critical"; "starts_at"?: string | null; "status"?: "draft" | "published" | "expired"; "title": string; "type"?: string | null }
     "AnnouncementReceiptResponse": { "action": string; "announcement_id": number; "revision": number }
     "AnnouncementResponse": { "app_version"?: string | null; "audience": string; "category"?: string | null; "content": string; "created_at"?: string | null; "expires_at"?: string | null; "id": number; "is_dismissed"?: boolean; "is_read"?: boolean; "presentation": string; "priority": number; "published_at"?: string | null; "revision": number; "severity": string; "starts_at"?: string | null; "status": string; "title": string; "type"?: string | null; "updated_at"?: string | null }
@@ -66,11 +87,17 @@ export interface components {
     "ChatReplyResponse": { "ai_used": boolean; "answer_mode": string; "knowledge_refs": Array<components['schemas']["KnowledgeReferenceResponse"]>; "reply": string; "session_id": string; "should_transfer": boolean }
     "ChatSessionCreatedResponse": { "session_id": string; "status": string; "suggested_questions": Array<string>; "welcome_message": string }
     "ChatSessionDetailResponse": { "ai_resolved": boolean; "created_at": string | null; "message_count": number; "messages": Array<components['schemas']["ChatMessageResponse"]>; "satisfaction": number | null; "session_id": string; "status": string; "transferred_to_human": boolean }
+    "ChatTransferRequest": { "summary"?: string | null }
     "ChatTransferResponse": { "feedback_id": number | null; "message": string }
     "ConfigJsonValue": components['schemas']["JsonValue"]
     "ConfigUpdateResponse": { "success": true }
     "CreateSessionRequest": { "capability_key"?: string | null; "platform_key"?: string | null }
     "CurrentUserInfoResponse": { "data"?: components['schemas']["StaffContextResponse"] | components['schemas']["UserInfoData"] | components['schemas']["LegacyAdminUserInfoData"] | null; "error_code"?: number | null; "message": string; "success": boolean }
+    "CustomerCreate": { "agency_id"?: number | null; "contact"?: string | null; "name": string; "notes"?: string | null }
+    "CustomerEnvelope": { "data"?: components['schemas']["CustomerView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "CustomerUpdate": { "agency_id"?: number | null; "contact"?: string | null; "name"?: string | null; "notes"?: string | null }
+    "CustomerView": { "agency_id": number; "agency_name"?: string; "contact"?: string | null; "created_at": string | null; "id": number; "name": string; "notes"?: string | null }
+    "CustomersEnvelope": { "data"?: Array<components['schemas']["CustomerView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
     "DashboardCharts": { "plan_distribution": Array<components['schemas']["DashboardPlanPoint"]>; "revenue_trend": Array<components['schemas']["DashboardRevenuePoint"]>; "tool_success_rate": Array<components['schemas']["DashboardToolRate"]> }
     "DashboardChartsResponse": { "data"?: components['schemas']["DashboardCharts"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "DashboardDemoActivity": { "today_batch_count": number; "today_single_count": number }
@@ -204,19 +231,19 @@ export interface components {
     "SettingResponse": { "created_at"?: string | null; "description"?: string | null; "id": number; "key": string; "value"?: string | null }
     "SettingUpdate": { "description"?: string | null; "key": string; "value": string }
     "SettingUpdateResponse": { "success": boolean }
-    "StaffAccountCreate": { "display_name": string; "password": string; "role": "super_admin" | "operator" | "support"; "username": string }
+    "StaffAccountCreate": { "agency_id"?: number | null; "display_name": string; "password": string; "role": "super_admin" | "operator" | "support" | "agent"; "username": string }
     "StaffAccountEnvelope": { "data"?: components['schemas']["StaffAccountResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "StaffAccountListEnvelope": { "data"?: Array<components['schemas']["StaffAccountResponse"]> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
-    "StaffAccountResponse": { "created_at"?: string | null; "created_by_staff_id"?: number | null; "display_name": string; "force_password_reset": boolean; "id": number; "last_login_at"?: string | null; "role": "super_admin" | "operator" | "support"; "status": "active" | "disabled"; "updated_at"?: string | null; "username": string }
-    "StaffAccountUpdate": { "display_name"?: string | null; "role"?: "super_admin" | "operator" | "support" | null; "status"?: "active" | "disabled" | null }
-    "StaffContextResponse": { "auth_code_id"?: null; "device_id"?: null; "display_name": string; "force_password_reset": boolean; "name": string; "role": "super_admin" | "operator" | "support"; "staff_id": number; "status": "active" | "disabled"; "token_version": number; "user_id": number; "username": string }
+    "StaffAccountResponse": { "agency_id"?: number | null; "agency_name"?: string | null; "created_at"?: string | null; "created_by_staff_id"?: number | null; "display_name": string; "force_password_reset": boolean; "id": number; "last_login_at"?: string | null; "role": "super_admin" | "operator" | "support" | "agent"; "status": "active" | "disabled"; "updated_at"?: string | null; "username": string }
+    "StaffAccountUpdate": { "agency_id"?: number | null; "display_name"?: string | null; "role"?: "super_admin" | "operator" | "support" | "agent" | null; "status"?: "active" | "disabled" | null }
+    "StaffContextResponse": { "agency_id"?: number | null; "auth_code_id"?: null; "device_id"?: null; "display_name": string; "force_password_reset": boolean; "name": string; "role": "super_admin" | "operator" | "support" | "agent"; "staff_id": number; "status": "active" | "disabled"; "token_version": number; "user_id": number; "username": string }
     "StaffLogin": { "password": string; "username": string }
     "StaffMeEnvelope": { "data"?: components['schemas']["StaffContextResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "StaffOperationEnvelope": { "data"?: null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "StaffPasswordChange": { "current_password": string; "new_password": string }
     "StaffPasswordReset": { "new_password": string }
     "StaffSessionEnvelope": { "data"?: components['schemas']["StaffSessionResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
-    "StaffSessionResponse": { "auth_code_id"?: null; "device_id"?: null; "display_name": string; "force_password_reset": boolean; "name": string; "role": "super_admin" | "operator" | "support"; "staff_id": number; "status": "active" | "disabled"; "token": string; "token_version": number; "user_id": number; "username": string }
+    "StaffSessionResponse": { "agency_id"?: number | null; "auth_code_id"?: null; "device_id"?: null; "display_name": string; "force_password_reset": boolean; "name": string; "role": "super_admin" | "operator" | "support" | "agent"; "staff_id": number; "status": "active" | "disabled"; "token": string; "token_version": number; "user_id": number; "username": string }
     "ToolConfigUpdateResponse": { "data": Array<{ [key: string]: components['schemas']["JsonValue"] }>; "success": true }
     "ToolManifestResponse": { "artifactSha256": string | null; "artifactUrl": string | null; "runnerApiVersion": number; "schemaVersion": number; "scriptKey": string; "toolId": string; "version": string }
     "ToolOperationErrorResponse": { "detail"?: components['schemas']["JsonValue"] | null; "error_code": number; "message": string; "success": false }
@@ -260,6 +287,111 @@ export interface operations {
     parameters: { "path": { "batch_id": number } }
     requestBody: never
     responses: { "200": components['schemas']["FeatureDisabledResponse-Output"]; "409": components['schemas']["domains__platform__action_center_schemas__FeatureDisabledResponse"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "agencies_api_agency_agencies_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "q"?: string | null; "status"?: "active" | "disabled" | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgenciesEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_agency_api_agency_agencies_post": {
+    parameters: never
+    requestBody: components['schemas']["AgencyWrite"]
+    responses: { "201": components['schemas']["AgencyEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "update_agency_api_agency_agencies__item_id__patch": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: components['schemas']["AgencyUpdate"]
+    responses: { "200": components['schemas']["AgencyEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "customers_api_agency_customers_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "q"?: string | null; "agency_id"?: number | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["CustomersEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_customer_api_agency_customers_post": {
+    parameters: never
+    requestBody: components['schemas']["CustomerCreate"]
+    responses: { "201": components['schemas']["CustomerEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "customer_api_agency_customers__item_id__get": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["CustomerEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "update_customer_api_agency_customers__item_id__patch": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: components['schemas']["CustomerUpdate"]
+    responses: { "200": components['schemas']["CustomerEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "licenses_api_agency_licenses_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "agency_id"?: number | null; "status"?: string | null; "q"?: string | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyLicensesEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "license_api_agency_licenses__item_id__get": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyLicenseEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "orders_api_agency_orders_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "agency_id"?: number | null; "status"?: "pending" | "paid" | "delivered" | "refunded" | "cancelled" | null; "q"?: string | null; "customer_id"?: number | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyOrdersEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_order_api_agency_orders_post": {
+    parameters: never
+    requestBody: components['schemas']["AgencyOrderCreate"]
+    responses: { "201": components['schemas']["AgencyOrderEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "export_orders_api_agency_orders_export_get": {
+    parameters: { "query": { "agency_id"?: number | null; "status"?: "pending" | "paid" | "delivered" | "refunded" | "cancelled" | null; "q"?: string | null; "customer_id"?: number | null } }
+    requestBody: never
+    responses: { "200": unknown; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "order_api_agency_orders__item_id__get": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyOrderEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "deliver_api_agency_orders__item_id__deliver_post": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyOrderEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "mark_paid_api_agency_orders__item_id__mark_paid_post": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyOrderEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "plans_api_agency_plans_get": {
+    parameters: never
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyPlansEnvelope"] }
+  }
+  "requests_api_agency_requests_get": {
+    parameters: { "query": { "page"?: number; "page_size"?: number; "agency_id"?: number | null; "status"?: "open" | "resolved" | "rejected" | null; "q"?: string | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyRequestsEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "create_request_api_agency_requests_post": {
+    parameters: never
+    requestBody: components['schemas']["AgencyRequestCreate"]
+    responses: { "201": components['schemas']["AgencyRequestEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "support_request_api_agency_requests__item_id__get": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencyRequestEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "resolve_request_api_agency_requests__item_id__patch": {
+    parameters: { "path": { "item_id": number } }
+    requestBody: components['schemas']["AgencyRequestResolve"]
+    responses: { "200": components['schemas']["AgencyRequestEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "summary_api_agency_summary_get": {
+    parameters: { "query": { "agency_id"?: number | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["AgencySummaryEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
   }
   "get_config_api_ai_chat_admin_config_get": {
     parameters: never
@@ -328,7 +460,7 @@ export interface operations {
   }
   "transfer_to_human_api_ai_chat_session__session_id__transfer_post": {
     parameters: { "path": { "session_id": string } }
-    requestBody: never
+    requestBody: components['schemas']["ChatTransferRequest"] | null
     responses: { "200": components['schemas']["ChatTransferResponse"]; "422": components['schemas']["HTTPValidationError"] }
   }
   "list_announcements_api_announcements_get": {
@@ -427,7 +559,7 @@ export interface operations {
     responses: { "200": components['schemas']["VerifyResponse"]; "422": components['schemas']["HTTPValidationError"] }
   }
   "list_batches_api_business_batches_get": {
-    parameters: { "query": { "limit"?: number } }
+    parameters: { "query": { "limit"?: number; "offset"?: number } }
     requestBody: never
     responses: { "200": components['schemas']["APIResponse_list_BusinessBatchResponse__"]; "422": components['schemas']["HTTPValidationError"] }
   }
@@ -1159,6 +1291,57 @@ export interface paths {
   }
   "/api/admin/business-batches/{batch_id}": {
     get: operations["get_business_batch_api_admin_business_batches__batch_id__get"]
+  }
+  "/api/agency/agencies": {
+    get: operations["agencies_api_agency_agencies_get"]
+    post: operations["create_agency_api_agency_agencies_post"]
+  }
+  "/api/agency/agencies/{item_id}": {
+    patch: operations["update_agency_api_agency_agencies__item_id__patch"]
+  }
+  "/api/agency/customers": {
+    get: operations["customers_api_agency_customers_get"]
+    post: operations["create_customer_api_agency_customers_post"]
+  }
+  "/api/agency/customers/{item_id}": {
+    get: operations["customer_api_agency_customers__item_id__get"]
+    patch: operations["update_customer_api_agency_customers__item_id__patch"]
+  }
+  "/api/agency/licenses": {
+    get: operations["licenses_api_agency_licenses_get"]
+  }
+  "/api/agency/licenses/{item_id}": {
+    get: operations["license_api_agency_licenses__item_id__get"]
+  }
+  "/api/agency/orders": {
+    get: operations["orders_api_agency_orders_get"]
+    post: operations["create_order_api_agency_orders_post"]
+  }
+  "/api/agency/orders/export": {
+    get: operations["export_orders_api_agency_orders_export_get"]
+  }
+  "/api/agency/orders/{item_id}": {
+    get: operations["order_api_agency_orders__item_id__get"]
+  }
+  "/api/agency/orders/{item_id}/deliver": {
+    post: operations["deliver_api_agency_orders__item_id__deliver_post"]
+  }
+  "/api/agency/orders/{item_id}/mark-paid": {
+    post: operations["mark_paid_api_agency_orders__item_id__mark_paid_post"]
+  }
+  "/api/agency/plans": {
+    get: operations["plans_api_agency_plans_get"]
+  }
+  "/api/agency/requests": {
+    get: operations["requests_api_agency_requests_get"]
+    post: operations["create_request_api_agency_requests_post"]
+  }
+  "/api/agency/requests/{item_id}": {
+    get: operations["support_request_api_agency_requests__item_id__get"]
+    patch: operations["resolve_request_api_agency_requests__item_id__patch"]
+  }
+  "/api/agency/summary": {
+    get: operations["summary_api_agency_summary_get"]
   }
   "/api/ai-chat/admin/config": {
     get: operations["get_config_api_ai_chat_admin_config_get"]

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -99,6 +99,7 @@ class OrderService:
 
     async def update_pending(self, order_id: int, data: dict, actor: dict, request: Request) -> Order:
         order = await self._locked_order(order_id)
+        self._require_agency_owner(order, actor)
         if order.status != OrderStatus.PENDING:
             raise ConflictException("只有待收款订单可以修改")
         if not data:
@@ -110,6 +111,8 @@ class OrderService:
             order.plan_name_snapshot = plan.name
             order.plan_price_snapshot = self._money(plan.price)
             order.plan_duration_days_snapshot = plan.duration_days
+            if order.agency_id is not None:
+                order.delivery_entitlements_snapshot = plan.entitlements
             if "amount" not in data:
                 order.amount = self._money(plan.price)
         if "amount" in data:
@@ -133,6 +136,7 @@ class OrderService:
 
     async def mark_paid(self, order_id: int, actor: dict, request: Request) -> Order:
         order = await self._locked_order(order_id)
+        self._require_agency_owner(order, actor)
         if order.status != OrderStatus.PENDING:
             raise ConflictException(f"订单当前状态 {order.status}，不能标记为已收款")
         before = self.serialize(order)
@@ -162,6 +166,7 @@ class OrderService:
 
     async def cancel(self, order_id: int, reason: str, actor: dict, request: Request) -> Order:
         order = await self._locked_order(order_id)
+        self._require_agency_owner(order, actor)
         if order.status != OrderStatus.PENDING:
             raise ConflictException("只有待收款订单可以取消")
         before = self.serialize(order)
@@ -185,6 +190,7 @@ class OrderService:
 
     async def refund(self, order_id: int, reason: str, actor: dict, request: Request) -> Order:
         order = await self._locked_order(order_id)
+        self._require_agency_owner(order, actor)
         if order.status != OrderStatus.PAID:
             raise ConflictException("只有已收款订单可以退款")
         before = self.serialize(order)
@@ -223,6 +229,11 @@ class OrderService:
         if not order:
             raise NotFoundException("订单不存在")
         return order
+
+    @staticmethod
+    def _require_agency_owner(order: Order, actor: dict) -> None:
+        if order.agency_id is not None and actor.get("role") != "super_admin":
+            raise HTTPException(403, "代理订单仅平台负责人可审批或修改")
 
     async def _active_plan(self, plan_id: int) -> Plan:
         result = await self.db.execute(select(Plan).where(Plan.id == plan_id))

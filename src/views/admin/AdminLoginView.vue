@@ -25,7 +25,7 @@
       <div class="logo-section">
         <BrandMark class="logo-icon" :size="64" decorative />
         <h1>管理员登录</h1>
-        <p>使用管理账号和密码进入后台</p>
+        <p>使用自己的后台账号登录，自动进入对应工作台</p>
       </div>
 
         <div class="error-message" :class="{ show: showError }" role="alert" aria-live="assertive">
@@ -108,13 +108,15 @@ import { useUserStore } from '@/stores/user'
 import { z } from 'zod'
 import BrandLockup from '@/components/brand/BrandLockup.vue'
 import BrandMark from '@/components/brand/BrandMark.vue'
+import { backofficeRoleSchema } from '@/features/auth/model'
 
 const adminLoginResponseSchema = z.object({
   success: z.boolean(),
   message: z.string().default('登录失败'),
   data: z.object({
     token: z.string(),
-    role: z.enum(['super_admin', 'operator', 'support']),
+    role: backofficeRoleSchema,
+    agency_id: z.number().int().positive().nullable().optional(),
     username: z.string().optional(),
     display_name: z.string().optional(),
     staff_id: z.union([z.string(), z.number()]).optional(),
@@ -186,7 +188,7 @@ function handleLogin() {
         Auth.set('backoffice')
         
         window.dispatchEvent(new CustomEvent('toolbox:route-track', { detail: { duration: 780 } }))
-        const destination = res.data.force_password_reset ? '/admin/change-password' : '/admin/dashboard'
+        const destination = res.data.force_password_reset ? '/admin/change-password' : res.data.role === 'agent' ? '/agent/overview' : '/admin/dashboard'
         Promise.resolve(router.push(destination)).catch(() => {
           isLoading.value = false
           focusPasswordInput()

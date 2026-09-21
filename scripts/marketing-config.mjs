@@ -1,8 +1,10 @@
 import fs from 'node:fs'
+import process from 'node:process'
+import { URL } from 'node:url'
 import os from 'node:os'
 import path from 'node:path'
 
-const fields = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_PAGES_PROJECT', 'KST_MARKETING_SITE_URL', 'VITE_DESKTOP_DOWNLOAD_URL']
+const fields = ['KST_MARKETING_PROVIDER', 'GITHUB_PAGES_REPOSITORY', 'CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_PAGES_PROJECT', 'KST_MARKETING_SITE_URL', 'VITE_DESKTOP_DOWNLOAD_URL']
 
 export function readMarketingEnvironment(root, environment = process.env) {
   const filename = path.join(root, '.env.marketing.local')
@@ -34,13 +36,32 @@ export function publicHttpsUrl(value, name, { originOnly = false } = {}) {
 }
 
 export function validateMarketingConfig(values) {
+  const provider = values.KST_MARKETING_PROVIDER || 'cloudflare'
+  if (!['cloudflare', 'github-pages'].includes(provider)) throw new Error('未知官网发布渠道')
+  const publicUrl = publicHttpsUrl(values.KST_MARKETING_SITE_URL, 'KST_MARKETING_SITE_URL', { originOnly: true })
+  const downloadUrl = values.VITE_DESKTOP_DOWNLOAD_URL ? publicHttpsUrl(values.VITE_DESKTOP_DOWNLOAD_URL, 'VITE_DESKTOP_DOWNLOAD_URL') : ''
+  if (provider === 'github-pages') {
+    const repository = values.GITHUB_PAGES_REPOSITORY || ''
+    const match = /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\/([a-z0-9-]+\.github\.io)$/i.exec(repository)
+    if (!match || match[2].toLowerCase() !== `${match[1].toLowerCase()}.github.io`
+      || publicUrl !== `https://${match[2].toLowerCase()}`) throw new Error('GitHub Pages 仅支持明确匹配的用户官网仓库与根网址')
+    return { provider, repository, projectName: repository, publicUrl, downloadUrl }
+  }
   if (!/^[a-f0-9]{32}$/i.test(values.CLOUDFLARE_ACCOUNT_ID || '')) throw new Error('请在 .env.marketing.local 配置 Cloudflare Account ID')
   if (!/^[a-z0-9][a-z0-9-]{0,57}[a-z0-9]$/.test(values.CLOUDFLARE_PAGES_PROJECT || '')) throw new Error('Cloudflare Pages 项目名无效')
   return {
+    provider,
     accountId: values.CLOUDFLARE_ACCOUNT_ID,
     projectName: values.CLOUDFLARE_PAGES_PROJECT,
-    publicUrl: publicHttpsUrl(values.KST_MARKETING_SITE_URL, 'KST_MARKETING_SITE_URL', { originOnly: true }),
-    downloadUrl: values.VITE_DESKTOP_DOWNLOAD_URL ? publicHttpsUrl(values.VITE_DESKTOP_DOWNLOAD_URL, 'VITE_DESKTOP_DOWNLOAD_URL') : '',
+    publicUrl,
+    downloadUrl,
+  }
+}
+
+export function assertGitHubPagesProject(pages, config) {
+  if (pages.html_url?.replace(/\/$/, '') !== config.publicUrl || pages.source?.branch !== 'main'
+    || pages.source?.path !== '/' || pages.build_type !== 'legacy') {
+    throw new Error('GitHub Pages 网址或 main 根目录发布来源不匹配；不会改动远端站点配置')
   }
 }
 

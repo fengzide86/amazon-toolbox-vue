@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
 vi.mock('@/utils/api', () => api)
 vi.mock('@/utils', () => ({ showToast: vi.fn() }))
 vi.mock('@/shared/ui/confirm', () => ({ confirmAction: vi.fn() }))
+vi.mock('element-plus', () => ({ ElMessageBox: { prompt: vi.fn().mockResolvedValue({ value: '工具未能保存' }) } }))
 
 function harness() {
   let chat!: ReturnType<typeof useCustomerSupportChat>
@@ -64,7 +65,7 @@ describe('customer support handoff errors', () => {
     await flushPromises()
     await chat.transferToHuman()
     expect(chat.sessionTransferred.value).toBe(true)
-    expect(chat.messages.value.at(-1)?.content).toContain('已为您创建工单')
+    expect(chat.messages.value.at(-1)?.content).toContain('已创建人工支持工单')
     expect(showToast).toHaveBeenCalledWith('已转人工客服', 'success')
     wrapper.unmount()
   })

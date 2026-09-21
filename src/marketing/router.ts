@@ -6,7 +6,7 @@ export const marketingRoutes: RouteRecordRaw[] = [
     props: { marketingOnly: true }, meta: { title: '跨境电商赛训效率平台' },
   },
   {
-    path: '/terms', name: 'MarketingTerms', component: () => import('./MarketingTermsView.vue'),
+    path: '/terms', alias: '/user/terms', name: 'MarketingTerms', component: () => import('./MarketingTermsView.vue'),
     meta: { title: '服务条款' },
   },
   {

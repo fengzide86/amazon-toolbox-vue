@@ -19,7 +19,7 @@ from models.base import Base
 logger = get_logger(__name__)
 
 DATABASE_URL = settings.get_database_url()
-SCHEMA_REVISION = "20260816_data_integrity"
+SCHEMA_REVISION = "20260921_agency_workspace"
 
 logger.info("数据库类型: %s", settings.DB_TYPE)
 logger.info("数据库连接: %s", DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL)
@@ -32,7 +32,11 @@ if settings.DB_TYPE == "mysql":
         "pool_recycle": 900,
         "pool_pre_ping": True,
         "pool_timeout": 5,
-        "connect_args": {"connect_timeout": 10, "charset": "utf8mb4"},
+        "connect_args": {
+            "connect_timeout": 10,
+            "charset": "utf8mb4",
+            "init_command": "SET time_zone = '+00:00'",
+        },
     })
 elif settings.DB_TYPE == "sqlite":
     engine_kwargs.update({"connect_args": {"timeout": 30}})

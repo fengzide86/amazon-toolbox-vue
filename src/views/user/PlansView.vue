@@ -34,21 +34,38 @@
     </div>
 
     <div v-else-if="loadState === 'empty'" class="empty-state">暂无套餐信息</div>
+    <el-dialog v-model="contactVisible" title="套餐购买咨询" width="min(460px, 92vw)" destroy-on-close>
+      <div class="purchase-summary"><small>意向套餐</small><h3>{{ selectedPlan ? cleanPlanName(selectedPlan.name) : '' }}</h3><p>确认工具范围、授权期限和可用设备后，再由工作人员开通授权。</p></div>
+      <p v-if="contactLoading">正在读取官方联系方式…</p>
+      <p v-else-if="contactId">客服微信：<strong>{{ contactId }}</strong></p>
+      <p v-else>暂未提供外部联系方式，你可以直接在系统内提交购买咨询。</p>
+      <template #footer>
+        <el-button v-if="contactId" @click="copyContact">复制微信号</el-button>
+        <el-button type="primary" @click="openPurchaseInquiry">提交购买咨询</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ElButton, ElDialog } from 'element-plus'
 import { Check, LockKeyhole, ShieldCheck } from '@lucide/vue'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { failedDataState, settledDataState, type AsyncDataState } from '@/features/async/state'
-import { getPlans } from '@/utils/api'
+import { getPlans, getPublicSettings } from '@/utils/api'
+import { publicSettingsSchema } from '@/features/auth/model'
 import { showToast } from '@/utils'
 import { customerPlanListSchema, licensePlanCode, readStoredLicense, type CustomerPlan } from '@/features/user/model'
 
 const route = useRoute() || { query: {} }
+const router = useRouter()
+const contactVisible = ref(false)
+const selectedPlan = ref<CustomerPlan | null>(null)
+const contactId = ref('')
+const contactLoading = ref(false)
 const plans = ref<CustomerPlan[]>([])
 const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
@@ -75,8 +92,30 @@ function benefitsOf(plan: CustomerPlan): string[] {
   return String(plan.features).split(/[+\n]/).map(item => item.trim()).filter(Boolean)
 }
 
-function contactService(plan: CustomerPlan) {
-  showToast(`购买 ${cleanPlanName(plan.name)}：请联系客服 AmazonToolbox_Support`, 'info')
+async function contactService(plan: CustomerPlan) {
+  selectedPlan.value = plan
+  contactVisible.value = true
+  contactLoading.value = true
+  contactId.value = ''
+  try {
+    const settings = publicSettingsSchema.parse(await getPublicSettings())
+    contactId.value = settings.find(item => (item.key === 'wechat_id' || item.key === 'service_wechat') && item.value?.trim())?.value?.trim() || ''
+  } catch { /* In-app inquiry remains available when public settings cannot load. */ }
+  finally { contactLoading.value = false }
+}
+
+async function copyContact() {
+  try {
+    await navigator.clipboard.writeText(contactId.value)
+    showToast('已复制客服微信号', 'success')
+  } catch { showToast('复制未成功，请选中微信号手动复制', 'warning') }
+}
+
+function openPurchaseInquiry() {
+  if (!selectedPlan.value) return
+  sessionStorage.setItem('toolbox_purchase_inquiry', `我想咨询「${cleanPlanName(selectedPlan.value.name)}」套餐，请帮我确认工具权限、授权期限和购买方式。`)
+  contactVisible.value = false
+  void router.push('/user/ai-chat')
 }
 
 async function loadPlans() {
@@ -97,6 +136,9 @@ onMounted(loadPlans)
 
 <style scoped>
 .plans-page { width: min(1180px, 100%); margin: 0 auto; }
+.purchase-summary { padding: 18px; border-radius: 12px; background: var(--color-surface-soft); }
+.purchase-summary small, .purchase-summary p { color: var(--color-text-secondary); line-height: 1.7; }
+.purchase-summary h3 { margin: 8px 0; }
 .plans-eyebrow { display: block; margin-bottom: 8px; color: var(--color-premium); font-size:var(--type-meta); font-weight: 800; letter-spacing: .12em; }
 .plans-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
 .plans-header h2 { margin: 0; color: var(--color-text); font-size: var(--type-page); letter-spacing: -.03em; }
