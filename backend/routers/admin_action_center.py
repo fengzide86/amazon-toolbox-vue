@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.dependencies import get_current_admin
 from core.response import success_response
+from core.timestamps import utc_iso
 from database import get_db
 from domains.commerce import ExpenseService
 from domains.platform.action_center_schemas import (
@@ -25,6 +26,8 @@ async def get_action_center(
     _admin: dict[str, Any] = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    # Existing authorization expiry fields use server-local wall time; keep
+    # this business rule until historical authorization dates are reconciled.
     now = datetime.now()
     expiry_limit = now + timedelta(days=7)
     expiring_conditions = (
@@ -93,7 +96,7 @@ async def get_action_center(
                 {
                     "id": item.id,
                     "code_masked": f"{item.code[:4]}***{item.code[-3:]}",
-                    "expires_at": item.expires_at.isoformat() if item.expires_at else None,
+                    "expires_at": item.expires_at.astimezone().isoformat() if item.expires_at else None,
                 }
                 for item in expiring
             ],
@@ -113,7 +116,7 @@ async def get_action_center(
                     "id": item.id,
                     "title": item.title or "用户反馈",
                     "priority": item.priority,
-                    "created_at": item.created_at.isoformat() if item.created_at else None,
+                    "created_at": utc_iso(item.created_at),
                 }
                 for item in tickets
             ],

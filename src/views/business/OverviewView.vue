@@ -13,9 +13,10 @@
     </PageHeader>
     <section class="attention-card" v-if="waitingCount">
       <div class="attention-icon"><BellRing :size="20" /></div>
-      <div><strong>{{ waitingCount }} 个演示项等待确认</strong><p>本地模拟状态已经暂存，其他演示项仍会继续播放。</p></div>
+      <div><strong>{{ waitingCount }} 个账号等待你操作</strong><p>批次仍在运行，请进入工作台查看需要处理的账号。</p></div>
       <router-link to="/business/workspace">去处理</router-link>
     </section>
+    <section v-else-if="store.snapshot.recordKind === 'demo' && store.snapshot.status === 'completed'" class="completion-note" role="status">最近一次批量演示已结束。人工操作与异常案例是演示结果，不是待处理任务；可到记录中复盘。</section>
     <section class="capability-grid">
       <article><FileSpreadsheet :size="20" /><div><span>内置演示样例</span><strong>最多 50 个逻辑并发项</strong></div><small>不启动等量浏览器，不读取真实客户资料</small></article>
       <article><PanelsTopLeft :size="20" /><div><span>批量并发演示</span><strong>全部账号同步推进</strong></div><small>所有页面与结果均为模拟</small></article>
@@ -27,7 +28,7 @@
       <div v-if="(historyState === 'data' || historyState === 'stale') && store.demoHistory.length" class="batch-list">
         <article v-for="batch in store.demoHistory.slice(0, 5)" :key="batch.id">
           <div><strong>{{ batch.tool_name_snapshot }}</strong><span>{{ formatDate(batch.started_at || batch.created_at) }}</span></div>
-          <span class="batch-count">{{ batch.played_count + batch.skipped_count }}/{{ batch.row_count }} 已演示</span>
+          <span class="batch-count">{{ batch.played_count + batch.skipped_count + batch.error_count }}/{{ batch.row_count }} 已结束</span>
           <span :class="['status', `is-${batch.status}`]">{{ batchStatus(batch.status) }}</span>
         </article>
       </div>
@@ -47,8 +48,9 @@ import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import type { AsyncDataState } from '@/features/async/state'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
+import { activeInterventionCount } from '@/features/business/run-presentation'
 const store = useBusinessWorkspaceStore()
-const waitingCount = computed(() => store.snapshot.counts?.waiting || 0)
+const waitingCount = computed(() => activeInterventionCount(store.snapshot))
 const hasTools = computed(() => store.tools.length > 0)
 const historyState = computed<AsyncDataState>(() => {
   if (store.historyLoading) return 'loading'
@@ -67,6 +69,7 @@ onMounted(loadHistory)
 </script>
 
 <style scoped>
+.completion-note{padding:16px 18px;border:1px solid var(--color-border);border-radius:12px;background:var(--color-success-soft);color:var(--color-success);font-size:var(--type-control);line-height:1.6}
 .business-overview{display:grid;gap:20px}.page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px}.eyebrow{display:block;margin-bottom:8px;color:var(--color-primary);font-size:var(--type-micro);font-weight:800;letter-spacing:.12em}.title-line{display:flex;align-items:center;gap:12px}.title-line h1{margin:0;color:var(--color-text);font-size:var(--type-page);letter-spacing:-.04em}.title-line>span,.validation-badge{padding:6px 9px;border:1px solid rgba(169,133,82,.16);border-radius:8px;color:#765d38;background:var(--color-premium-soft);font-size:var(--type-micro);font-weight:800;white-space:nowrap}.page-header p{margin:9px 0 0;color:var(--color-text-secondary);font-size:var(--type-control);line-height:1.6}.page-actions{display:flex;align-items:center;gap:9px}.primary-link,.secondary-link{height:42px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 17px;border-radius:11px;text-decoration:none;font-size:var(--type-control);font-weight:700}.primary-link{color:#fff;background:var(--color-primary);box-shadow:0 8px 20px rgba(45,95,202,.18)}.secondary-link{border:1px solid var(--color-border);color:var(--color-text);background:var(--color-surface)}
 .attention-card{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:18px;border:1px solid rgba(183,121,31,.25);border-radius:15px;background:#fffaf0}.attention-icon{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;color:var(--color-warning);background:#fff0d2}.attention-card strong{color:var(--color-text)}.attention-card p{margin:4px 0 0;color:var(--color-text-secondary);font-size:var(--type-meta)}.attention-card a{color:var(--color-warning);font-weight:700;text-decoration:none}
 .capability-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.capability-grid article{min-height:142px;padding:19px;display:grid;grid-template-columns:auto 1fr;align-content:space-between;gap:13px;border:1px solid var(--color-border);border-radius:15px;background:var(--color-surface);box-shadow:var(--shadow-low)}.capability-grid svg{color:var(--color-primary)}.capability-grid div{display:grid;gap:5px}.capability-grid span,.capability-grid small{color:var(--color-text-tertiary);font-size:var(--type-meta)}.capability-grid strong{color:var(--color-text);font-size:15px}.capability-grid small{grid-column:1/-1;align-self:end}

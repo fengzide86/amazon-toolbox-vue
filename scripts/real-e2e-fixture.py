@@ -33,7 +33,7 @@ async def seed(root: Path) -> None:
     from core.security import hash_password
     from database import async_session_maker, engine, init_db
     from domains.catalog import seed_initial_data
-    from models import AuthCode, Plan, StaffRole, StaffStatus, StaffUser
+    from models import Agency, AuthCode, Plan, StaffRole, StaffStatus, StaffUser
     from sqlalchemy import select
 
     await init_db()
@@ -44,6 +44,10 @@ async def seed(root: Path) -> None:
         "business_cancel": "E2E-X-" + secrets.token_hex(12),
         "staff_username": "real_e2e_operator",
         "staff_password": secrets.token_urlsafe(32),
+        "agent_a_username": "real_e2e_agent_a",
+        "agent_a_password": secrets.token_urlsafe(32),
+        "agent_b_username": "real_e2e_agent_b",
+        "agent_b_password": secrets.token_urlsafe(32),
     }
     async with async_session_maker() as db:
         plans = list((await db.execute(select(Plan))).scalars())
@@ -68,6 +72,22 @@ async def seed(root: Path) -> None:
             token_version=1,
             force_password_reset=False,
         ))
+        # Partners are local acceptance identities, never production accounts.
+        for label in ("a", "b"):
+            agency = Agency(name=f"隔离验收代理 {label.upper()}", status="active")
+            db.add(agency)
+            await db.flush()
+            credentials[f"agency_{label}_id"] = agency.id
+            db.add(StaffUser(
+                username=credentials[f"agent_{label}_username"],
+                display_name=f"隔离代理 {label.upper()}",
+                password_hash=hash_password(credentials[f"agent_{label}_password"]),
+                role=StaffRole.AGENT,
+                agency_id=agency.id,
+                status=StaffStatus.ACTIVE,
+                token_version=1,
+                force_password_reset=False,
+            ))
         await db.commit()
     (root / "credentials.json").write_text(json.dumps(credentials), encoding="utf-8")
     await engine.dispose()

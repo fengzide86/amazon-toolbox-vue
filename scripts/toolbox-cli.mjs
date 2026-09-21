@@ -1386,12 +1386,12 @@ export async function jointRelease(args, actions = {
   if (dryRun) {
     await actions.checkConfig()
     log(`联合发布配置检查通过：${explicitVersion ? `v${explicitVersion}` : resumeId ? `恢复 ${resumeId}` : `v${packageVersion()}`}。`)
-    log('正式运行顺序：官网账号和已有项目预检 → 系统完整生产发布 → 独立官网发布及公开访问核验。')
+    log('正式运行顺序：配置的官网渠道与已有项目预检 → 系统完整生产发布 → 独立官网发布及公开访问核验。')
     log('未连接网络、安装依赖、构建或改动线上；此结果不是发布验收。')
     return
   }
 
-  log('联合发布先核验官网配置、Cloudflare 登录与已有项目；此时不会发布系统或官网。')
+  log('联合发布先核验官网配置、对应渠道登录与已有项目；此时不会发布系统或官网。')
   await actions.checkAccount()
   const systemOptions = [...args, '--publish']
   if (!explicitVersion && !resumeId) systemOptions.push(`--version=${packageVersion()}`)

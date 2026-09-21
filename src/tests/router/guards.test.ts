@@ -6,7 +6,7 @@ import { authService } from '@/utils/auth'
 interface AuthState {
   authenticated?: boolean
   backoffice?: boolean
-  role?: 'super_admin' | 'operator' | 'support' | 'user'
+  role?: 'super_admin' | 'operator' | 'support' | 'agent' | 'user'
   user?: Record<string, unknown>
 }
 
@@ -97,5 +97,39 @@ describe('real route guards', () => {
     expect(router.currentRoute.value.name).toBe('UserLogin')
     expect(clear).toHaveBeenCalledOnce()
     expect(error).toHaveBeenCalledOnce()
+  })
+
+  it('keeps agents in their scoped workspace and allows shared password changes', async () => {
+    mockAuth({ authenticated: true, backoffice: true, role: 'agent', user: { agency_id: 7 } })
+    for (const path of ['/admin/login', '/admin/dashboard', '/admin/expenses', '/admin/agency', '/business/workspace', '/user/tools']) {
+      await router.push(path)
+      expect(router.currentRoute.value.name).toBe('AgentOverview')
+    }
+    await router.push('/agent/orders')
+    expect(router.currentRoute.value.name).toBe('AgentOrders')
+    await router.push('/admin/change-password')
+    expect(router.currentRoute.value.name).toBe('AdminChangePassword')
+  })
+
+  it('forces agent temporary-password changes before workbench access', async () => {
+    mockAuth({ authenticated: true, backoffice: true, role: 'agent', user: { agency_id: 7, force_password_reset: true } })
+    await router.push('/agent/licenses')
+    expect(router.currentRoute.value.name).toBe('AdminChangePassword')
+  })
+
+  it('rejects non-agent access to the partner workspace and limits owner management', async () => {
+    mockAuth({ authenticated: true, backoffice: true, role: 'operator' })
+    await router.push('/agent/overview')
+    expect(router.currentRoute.value.name).toBe('AdminDashboard')
+    await router.push('/admin/agency')
+    expect(router.currentRoute.value.name).toBe('AdminDashboard')
+    vi.restoreAllMocks()
+    mockAuth({ authenticated: true, backoffice: true, role: 'super_admin' })
+    await router.push('/admin/agency')
+    expect(router.currentRoute.value.name).toBe('AdminAgency')
+    vi.restoreAllMocks()
+    mockAuth({})
+    await router.push('/agent/requests')
+    expect(router.currentRoute.value.name).toBe('AdminLogin')
   })
 })

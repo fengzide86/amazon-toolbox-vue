@@ -47,7 +47,7 @@ export function useLicenseLogin() {
   const loginSucceeded = ref(false)
   const deviceName = ref('')
   const deviceId = ref('')
-  const wechatId = ref('AmazonToolbox_Support')
+  const wechatId = ref('')
 
   const connectionStatusClass = computed(() => ({
     online: connection.status === 'online',
@@ -155,6 +155,7 @@ export function useLicenseLogin() {
   }
 
   async function copyWechatId() {
+    if (!wechatId.value) return
     try {
       await navigator.clipboard.writeText(wechatId.value)
       copySuccess.value = true

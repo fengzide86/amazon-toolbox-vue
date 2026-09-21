@@ -25,6 +25,12 @@ npm run preview:marketing
 
 ## Pages 静态托管
 
+发布通道由 `.env.marketing.local` 的 `KST_MARKETING_PROVIDER` 选择：默认 `cloudflare`；`github-pages` 使用 `GITHUB_PAGES_REPOSITORY=账号/账号.github.io` 和匹配的根网址。GitHub 通道只接受已启用 main 根目录 Pages 的现有 KST 宣传站；不自动创建仓库、更改可见性或修改 Pages 设置。
+
+GitHub 通道将已审计宣传制品提交到独立静态仓库，保留 Git 历史、不强推、不上传项目源码；拒绝覆盖含未知文件或其他站点的仓库。发布临时克隆保存在 D 盘数据目录。由于 GitHub 不执行 Cloudflare 的 `_headers` / `_redirects`，适配器提供 `.nojekyll`、真实条款路径文件与 HTML CSP；不宣称 GitHub 可提供相同的自定义响应头和缓存策略。
+
+下载 URL 可以留空。普通构建/预览会读取当前已发布清单；正式发布器仍要求线上清单版本与本次源码版本相同，不会把预览构建直接当作正式发布。
+
 - 构建命令对应 `build:marketing`；发布目录为 `dist-marketing`。可在有授权后由统一发布工具上传已审计目录，不需要 Pages Functions。
 - `_redirects` 只将 `/terms` 重写至首页入口，并兼容旧条款链接。生成的 `404.html` 让未知 URL 返回真实 404，不把 `/api/` 等误请求掩盖为 HTML 200。
 - `_headers` 为 HTML 设置重新验证，为哈希资源设置长期缓存，禁止页面发起 API/遥测连接。未启用 Service Worker，不涉及旧桌面更新器。

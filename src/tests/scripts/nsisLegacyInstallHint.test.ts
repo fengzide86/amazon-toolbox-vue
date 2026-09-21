@@ -77,6 +77,23 @@ describe('strict historical installer identity and location hint', () => {
     expect(hint).toContain('createsUninstallRegistration = $false')
   })
 
+  it('tests current-production 1.8.8 from the original fresh installer without a legacy registry hint', () => {
+    const workflow = readFileSync(resolve('.github/workflows/test.yml'), 'utf8')
+    expect(script).toContain("'1.8.8' = 'nsis-upgrade-fixture-1.8.8.json'")
+    const hint = script.slice(script.indexOf('function Set-LegacyInstallLocationHint'), script.indexOf('function Assert-InstalledIdentity'))
+    expect(hint).not.toContain("'1.8.8'")
+    const currentUpgrade = workflow.split(/\r?\n/).find(line => line.includes("-PreviousVersion '1.8.8'"))
+    expect(currentUpgrade).toBeDefined()
+    expect(currentUpgrade).toContain("-PreviousInstaller 'D:\\AmazonToolboxData\\installer-fixtures\\KST Setup 1.8.8.exe'")
+    expect(currentUpgrade).toContain('-DiagnosticAttempts 1')
+    expect(currentUpgrade).not.toContain('-LegacyInstallLocationHint')
+    const cachePaths = workflow.match(/D:\/AmazonToolboxData\/installer-fixtures\/KST Setup 1\.8\.8\.exe/g)
+    expect(cachePaths).toHaveLength(2)
+    const pinnedFetch = workflow.indexOf("NSIS_BASELINE_VERSION: '1.8.8'")
+    expect(pinnedFetch).toBeGreaterThan(0)
+    expect(pinnedFetch).toBeLessThan(workflow.indexOf('Save only byte-verified historical installer fixtures'))
+  })
+
   it('requires real old ASAR, registered version, uninstaller, EXE and shortcut evidence before seeding', () => {
     const identity = script.indexOf("Assert-InstalledIdentity $fixture.version 'old-version'")
     expect(identity).toBeGreaterThan(script.indexOf("Invoke-Install $PreviousInstaller 'old-version'"))

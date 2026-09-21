@@ -204,8 +204,8 @@
           联系客服
         </h3>
         <div class="contact-info">
-          <p class="contact-desc">如有任何问题，请联系客服：</p>
-          <div class="wechat-id-box">
+          <p class="contact-desc">{{ wechatId ? '如有任何问题，请联系客服：' : '暂未提供公开联系方式，请联系为您开通授权的工作人员。' }}</p>
+          <div v-if="wechatId" class="wechat-id-box">
             <span class="wechat-label">微信号：</span>
             <span class="wechat-id">{{ wechatId }}</span>
             <button class="copy-btn" @click="copyWechatId" :title="copySuccess ? '已复制' : '复制微信号'">

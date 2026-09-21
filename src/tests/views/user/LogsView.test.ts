@@ -1,0 +1,70 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { reactive } from 'vue'
+const mocks = vi.hoisted(() => ({ demo: vi.fn(), live: vi.fn(), platform: vi.fn() }))
+vi.mock('@/utils/api', () => ({ getDemoRunsPage: mocks.demo, getExecutionsPage: mocks.live }))
+vi.mock('@/stores/platform', () => ({ usePlatformStore: mocks.platform }))
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+import LogsView from '@/views/user/LogsView.vue'
+const demoRow = (id: number, name = `演示${id}`) => ({ id, tool_id: 'tool', tool_name_snapshot: name, status: 'completed' })
+const render = () => mount(LogsView, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+let platform: { currentPlatform: string }
+beforeEach(() => {
+  vi.resetAllMocks()
+  platform = reactive({ currentPlatform: 'amazon' })
+  mocks.platform.mockReturnValue(platform)
+  mocks.demo.mockResolvedValue({ data: [], total: 0 })
+  mocks.live.mockResolvedValue({ data: [], total: 0 })
+})
+describe('user paginated history', () => {
+  it('preserves the total, loads more using page/page_size, and deduplicates', async () => {
+    mocks.demo.mockResolvedValueOnce({ data: Array.from({ length: 20 }, (_, i) => demoRow(i)), total: 21 })
+      .mockResolvedValueOnce({ data: [demoRow(19), demoRow(20)], total: 21 })
+    const wrapper = render()
+    await flushPromises()
+    expect(wrapper.text()).toContain('20 / 共 21')
+    await wrapper.get('.record-pagination button').trigger('click')
+    await flushPromises()
+    expect(mocks.demo).toHaveBeenLastCalledWith({ platform_key: 'amazon', page: 2, page_size: 20 })
+    expect(wrapper.findAll('.record-row')).toHaveLength(21)
+    expect(wrapper.text()).toContain('已显示全部记录')
+    wrapper.unmount()
+  })
+  it('queries real executions with supported pagination, never limit', async () => {
+    const wrapper = render()
+    await flushPromises()
+    await wrapper.get('[role="tab"][aria-selected="false"]').trigger('click')
+    await flushPromises()
+    expect(mocks.live).toHaveBeenCalledWith({ platform_key: 'amazon', page: 1, page_size: 20 })
+    wrapper.unmount()
+  })
+  it('does not let an older platform response replace current rows', async () => {
+    let resolve!: (data: unknown) => void
+    mocks.demo.mockReturnValueOnce(new Promise(done => { resolve = done }))
+      .mockResolvedValueOnce({ data: [demoRow(2, '速卖通当前记录')], total: 1 })
+    const wrapper = render()
+    platform.currentPlatform = 'aliexpress'
+    await flushPromises()
+    resolve({ data: [demoRow(1, '亚马逊旧请求')], total: 1 })
+    await flushPromises()
+    expect(wrapper.text()).toContain('速卖通当前记录')
+    expect(wrapper.text()).not.toContain('亚马逊旧请求')
+    wrapper.unmount()
+  })
+  it('keeps existing rows on an append failure and retries the same page', async () => {
+    mocks.demo.mockResolvedValueOnce({ data: [demoRow(1)], total: 2 })
+      .mockRejectedValueOnce(new Error('加载更多失败'))
+      .mockResolvedValueOnce({ data: [demoRow(2)], total: 2 })
+    const wrapper = render()
+    await flushPromises()
+    await wrapper.get('.record-pagination button').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('.record-row')).toHaveLength(1)
+    expect(wrapper.text()).toContain('加载更多失败')
+    await wrapper.get('.record-pagination button').trigger('click')
+    await flushPromises()
+    expect(mocks.demo).toHaveBeenLastCalledWith({ platform_key: 'amazon', page: 2, page_size: 20 })
+    expect(wrapper.findAll('.record-row')).toHaveLength(2)
+    wrapper.unmount()
+  })
+})

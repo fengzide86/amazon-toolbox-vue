@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from core.audit import log_admin_action
 from core.exceptions import ConflictException, NotFoundException
+from core.timestamps import utc_iso
 from models import AuthCode, AuthSeat, Device, User
 
 
@@ -55,7 +56,7 @@ async def list_admin(
             "auth_code": device.auth_code.code if device.auth_code else "未知",
             "device_id": device.device_id,
             "device_name": device.device_name or "未知设备",
-            "created_at": device.created_at.isoformat() if device.created_at else None,
+            "created_at": utc_iso(device.created_at),
         }
         for device in devices
     ]
@@ -81,7 +82,7 @@ async def list_for_user(db: AsyncSession, current_user: dict[str, Any]) -> list[
             "id": device.id,
             "device_id": device.device_id,
             "device_name": device.device_name or "未知设备",
-            "created_at": device.created_at.isoformat() if device.created_at else None,
+            "created_at": utc_iso(device.created_at),
             "is_current": False,
         }
         for device in auth_code.devices

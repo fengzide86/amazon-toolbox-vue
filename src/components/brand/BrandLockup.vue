@@ -78,6 +78,7 @@ const logoSource = computed(() => {
 }
 
 .is-horizontal .kst-lockup-logo {
+  flex-shrink: 0;
   width: 90px;
   height: 32px;
 }
@@ -100,10 +101,10 @@ const logoSource = computed(() => {
 }
 
 .is-horizontal .kst-lockup-subtitle {
-  max-width: 65px;
-  padding-left: 10px;
+  padding-left: 8px;
   border-left: 1px solid var(--color-border-strong);
-  white-space: normal;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .is-stacked .kst-lockup-subtitle {

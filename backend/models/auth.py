@@ -33,6 +33,9 @@ class AuthCode(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String(100), unique=True, nullable=False, index=True)
     plan_id = Column(Integer, ForeignKey("plans.id"), nullable=True, index=True)
+    agency_id = Column(Integer, ForeignKey("agencies.id"), nullable=True, index=True)
+    customer_id = Column(Integer, ForeignKey("agency_customers.id"), nullable=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     device_id = Column(String(200), nullable=True)
     device_name = Column(String(200), nullable=True)
@@ -52,6 +55,7 @@ class AuthCode(Base):
     seats = relationship("AuthSeat", backref="auth_code", lazy="selectin")
 
     __table_args__ = (
+        UniqueConstraint('order_id', name='ux_auth_codes_order_id'),
         Index('ix_auth_codes_status_expires', 'status', 'expires_at'),
     )
 

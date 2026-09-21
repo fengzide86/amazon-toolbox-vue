@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { readSessionUser } from '@/features/auth/sessionUser'
 
 const CACHE_PREFIX = 'toolbox_cache_'
 const DEFAULT_TTL = 5 * 60 * 1000
@@ -98,8 +99,7 @@ export function generateCacheKey(
   let scope: string
   try {
     const role = sessionStorage.getItem('toolbox_role') || localStorage.getItem('toolbox_role') || 'user'
-    const rawUser = localStorage.getItem('toolbox_user')
-    const user = rawUser ? JSON.parse(rawUser) as Record<string, unknown> : {}
+    const user = readSessionUser() || {}
     const userId = user.staff_id ?? user.user_id ?? user.id ?? 'unknown'
     const authCodeId = user.auth_code_id ?? user.authCodeId ?? 'none'
     scope = `${String(role)}:${String(userId)}:${String(authCodeId)}`

@@ -28,6 +28,7 @@ const mockRouter = createRouter({
     { path: '/admin/freight-rates', name: 'AdminFreightRates', component: { template: '<div />' } },
     { path: '/admin/settings', name: 'AdminSettings', component: { template: '<div />' } },
     { path: '/admin/staff-accounts', name: 'AdminStaffAccounts', component: { template: '<div />' } },
+    { path: '/admin/agency', name: 'AdminAgency', component: { template: '<div />' } },
     { path: '/admin/login', name: 'AdminLogin', component: { template: '<div />' } },
   ]
 })
@@ -78,7 +79,7 @@ describe('AdminSidebar', () => {
       await flushPromises()
 
       const menuItems = wrapper.findAll('.menu-nav-item')
-      expect(menuItems.length).toBe(15)
+      expect(menuItems.length).toBe(16)
     })
 
     it('应该显示正确的菜单标签', async () => {
@@ -102,10 +103,11 @@ describe('AdminSidebar', () => {
       expect(labels).toContain('物流费率中心')
       expect(labels).toContain('系统设置')
       expect(labels).toContain('后台账号管理')
+      expect(labels).toContain('代理与交付')
       expect(labels).not.toContain('退出登录')
     })
 
-    it('应该按固定三角色隐藏无权限入口', async () => {
+    it('应该按内部员工角色隐藏无权限入口', async () => {
       sessionStorage.setItem('toolbox_role', 'support')
       const wrapper = mount(AdminSidebar, {
         global: { plugins: [createPinia(), mockRouter] }
@@ -119,7 +121,15 @@ describe('AdminSidebar', () => {
       expect(labels).not.toContain('应用更新')
       expect(labels).not.toContain('系统设置')
       expect(labels).not.toContain('后台账号管理')
+      expect(labels).not.toContain('代理与交付')
       expect(labels).toContain('客服规则管理')
+    })
+
+    it('代理账号不渲染内部后台菜单', async () => {
+      sessionStorage.setItem('toolbox_role', 'agent')
+      const wrapper = mount(AdminSidebar, { global: { plugins: [createPinia(), mockRouter] } })
+      await flushPromises()
+      expect(wrapper.findAll('.menu-nav-item')).toHaveLength(0)
     })
 
     it('当前路由对应的菜单项应该有 is-active 类', async () => {

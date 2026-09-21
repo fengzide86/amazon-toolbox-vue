@@ -784,7 +784,7 @@ test('规则客服覆盖 FAQ、fallback，并通过转人工接口创建工单',
     }
     if (path === '/api/ai-chat/session/session-1/transfer') {
       transferred = true
-      return { body: { success: true, ticket_id: 'ticket-1' } }
+      return { body: { message: '已转人工客服', feedback_id: 1 } }
     }
     return undefined
   })
@@ -807,7 +807,8 @@ test('规则客服覆盖 FAQ、fallback，并通过转人工接口创建工单',
   const dialog = page.locator('.el-message-box')
   await dialog.getByRole('button', { name: '创建工单' }).click()
   await expect.poll(() => transferred).toBe(true)
-  await expect(page.getByText('已为您创建工单，人工客服将尽快与您联系').last()).toBeVisible()
+  await expect(page.locator('.transferred-notice')).toContainText('已创建工单')
+  await expect(page.locator('.transferred-notice').getByRole('button', { name: '我的工单' })).toBeVisible()
 })
 
 test('更新发布页仅超级管理员可达，并反馈从待发布到已发布的状态', async ({ page }) => {

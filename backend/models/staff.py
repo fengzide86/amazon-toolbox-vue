@@ -9,8 +9,10 @@ class StaffRole:
     SUPER_ADMIN = "super_admin"
     OPERATOR = "operator"
     SUPPORT = "support"
+    AGENT = "agent"
 
-    ALL = frozenset({SUPER_ADMIN, OPERATOR, SUPPORT})
+    INTERNAL = frozenset({SUPER_ADMIN, OPERATOR, SUPPORT})
+    ALL = INTERNAL | frozenset({AGENT})
 
 
 class StaffStatus:
@@ -30,6 +32,7 @@ class StaffUser(Base):
     display_name = Column(String(100), nullable=False)
     password_hash = Column(String(255), nullable=False)
     role = Column(String(20), nullable=False, default=StaffRole.SUPPORT, index=True)
+    agency_id = Column(Integer, ForeignKey("agencies.id"), nullable=True, index=True)
     status = Column(String(20), nullable=False, default=StaffStatus.ACTIVE, index=True)
     token_version = Column(Integer, nullable=False, default=1)
     force_password_reset = Column(Boolean, nullable=False, default=False)
@@ -40,7 +43,7 @@ class StaffUser(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "role IN ('super_admin', 'operator', 'support')",
+            "role IN ('super_admin', 'operator', 'support', 'agent')",
             name="ck_staff_users_role",
         ),
         CheckConstraint(
@@ -48,5 +51,6 @@ class StaffUser(Base):
             name="ck_staff_users_status",
         ),
         CheckConstraint("token_version >= 1", name="ck_staff_users_token_version"),
+        CheckConstraint("role != 'agent' OR agency_id IS NOT NULL", name="ck_staff_users_agent_agency"),
         Index("ix_staff_users_role_status", "role", "status"),
     )

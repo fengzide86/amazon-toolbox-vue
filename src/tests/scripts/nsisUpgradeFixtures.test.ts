@@ -49,7 +49,15 @@ describe('immutable released NSIS upgrade baselines', () => {
     })
   })
 
-  it.each(['latest', '1.8.8', '../1.8.7', 'toString', '__proto__'])('rejects unreviewed or unsafe baseline %s', async version => {
+  it('pins the live 1.8.8 release bytes for the next candidate upgrade', async () => {
+    expect(await readPinnedUpgradeFixture('1.8.8')).toEqual({
+      version: '1.8.8', fileName: 'KST Setup 1.8.8.exe',
+      url: 'https://8.130.113.104/updates/KST%20Setup%201.8.8.exe', size: 110558995,
+      sha512: 'a648f5b19e3d2f68e1db068b46578219b63761e629a2cc43999ea140f973c2536826ea5a4fd4f5a32581a7abbcd24272404fa11c636536632724aec6fea66afd',
+    })
+  })
+
+  it.each(['latest', '1.8.9', '../1.8.8', 'toString', '__proto__'])('rejects unreviewed or unsafe baseline %s', async version => {
     await expect(readPinnedUpgradeFixture(version)).rejects.toThrow('Unsupported pinned NSIS baseline')
   })
 
@@ -68,11 +76,11 @@ describe('immutable released NSIS upgrade baselines', () => {
   // The installer-preparation CLI intentionally accepts only a D: destination.
   // Linux CI still runs every metadata/hash test above; Windows also exercises
   // the real CLI cache path without downloading or executing any binary.
-  it.skipIf(process.platform !== 'win32').each(['1.8.5', '1.8.7'])('exports the correct cached %s baseline to subsequent CI steps', version => {
+  it.skipIf(process.platform !== 'win32').each(['1.8.5', '1.8.7', '1.8.8'])('exports the correct cached %s baseline to subsequent CI steps', version => {
     const root = scratch()
     const script = join(root, 'prepare-nsis-upgrade.mjs')
     copyFileSync(resolve('scripts/prepare-nsis-upgrade.mjs'), script)
-    const fixtures = [['1.8.5', 'nsis-upgrade-fixture.json'], ['1.8.7', 'nsis-upgrade-fixture-1.8.7.json']]
+    const fixtures = [['1.8.5', 'nsis-upgrade-fixture.json'], ['1.8.7', 'nsis-upgrade-fixture-1.8.7.json'], ['1.8.8', 'nsis-upgrade-fixture-1.8.8.json']]
     for (const [fixtureVersion, file] of fixtures) writeFileSync(join(root, file), JSON.stringify(syntheticFixture(fixtureVersion)))
     const cache = join(root, 'cache')
     mkdirSync(cache)

@@ -2,6 +2,7 @@
   <div class="ai-chat-container">
     <PageHeader eyebrow="执行支持" title="工具帮助" description="遇到授权、设备或自动操作问题，直接描述你看到的情况。">
       <template #actions>
+        <button class="btn btn-secondary" @click="ticketsVisible = true">我的工单</button>
         <button v-if="sessionId" class="btn btn-secondary" @click="showHistory = true">历史记录</button>
       </template>
     </PageHeader>
@@ -44,7 +45,7 @@
 
         <div v-if="showActions && lastAiMessage && !sessionResolved && !sessionTransferred" class="message-actions">
           <button class="btn btn-success" @click="markResolved">✓ 已解决</button>
-          <button class="btn btn-warning" @click="transferToHuman">转人工客服</button>
+          <button class="btn btn-warning" :disabled="isTransferring" @click="transferToHuman">{{ isTransferring ? '正在提交…' : '转人工客服' }}</button>
         </div>
 
         <div v-if="messages.length <= 1 && !isLoading && !sessionResolved" class="quick-questions">
@@ -65,7 +66,7 @@
         </div>
 
         <div v-if="sessionTransferred" class="transferred-notice">
-          <span></span> 已为您创建工单，人工客服将尽快与您联系
+          已创建工单，可在 <button type="button" class="btn btn-secondary" @click="ticketsVisible = true">我的工单</button> 查看处理状态与回复
         </div>
       </div>
     </div>
@@ -84,6 +85,7 @@
       </button>
     </form>
 
+    <MySupportTickets v-model="ticketsVisible" />
     <!-- History Modal -->
     <div v-if="showHistory" class="modal-overlay" @click.self="showHistory = false">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="history-title">
@@ -105,11 +107,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import MySupportTickets from '@/components/MySupportTickets.vue'
 import { useCustomerSupportChat } from '@/features/ai/useCustomerSupportChat'
 import PageHeader from '@/components/PageHeader.vue'
+const ticketsVisible = ref(false)
 
 const {
-  sessionId, messages, inputMessage, isLoading, showActions, showRating, rating,
+  sessionId, messages, inputMessage, isLoading, isTransferring, showActions, showRating, rating,
   sessionResolved, sessionTransferred, lastAiMessage, messagesContainer, showHistory,
   historySessions, quickQuestions, formatTime, getStatusText, askQuickQuestion,
   sendMessage, markResolved, transferToHuman, submitRating, loadSession,

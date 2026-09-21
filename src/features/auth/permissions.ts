@@ -21,12 +21,13 @@ export type StaffPermission =
   | 'staff.manage'
   | 'updates.manage'
   | 'settings.manage'
+  | 'agency.manage'
 
 const ALL_PERMISSIONS: StaffPermission[] = [
   'auth_codes.write', 'auth_codes.delete', 'business_access.write', 'orders.write', 'plans.read', 'devices.unbind',
   'profit.read', 'profit.policy.write', 'expenses.read', 'expenses.write', 'expenses.categories.manage', 'users.write', 'feedback.write',
   'knowledge.write', 'rules.write', 'announcements.write', 'staff.manage',
-  'updates.manage', 'settings.manage',
+  'updates.manage', 'settings.manage', 'agency.manage',
 ]
 
 const ROLE_PERMISSIONS: Record<BackofficeRole, ReadonlySet<StaffPermission>> = {
@@ -36,6 +37,8 @@ const ROLE_PERMISSIONS: Record<BackofficeRole, ReadonlySet<StaffPermission>> = {
     'feedback.write', 'knowledge.write', 'rules.write',
   ]),
   support: new Set(['plans.read', 'devices.unbind', 'feedback.write', 'knowledge.write', 'rules.write', 'announcements.write']),
+  // Agents use their own scoped workbench, never the internal permission set.
+  agent: new Set(),
 }
 
 export function hasStaffPermission(role: AuthRole | null | undefined, permission: StaffPermission): boolean {
@@ -46,5 +49,6 @@ export function staffRoleLabel(role: AuthRole | null | undefined): string {
   if (role === 'super_admin') return '超级管理员'
   if (role === 'operator') return '运营'
   if (role === 'support') return '客服'
+  if (role === 'agent') return '代理运营'
   return '用户'
 }

@@ -12,6 +12,7 @@
 """
 
 # AI客服相关模型
+from models.agency import Agency, AgencyCustomer, AgencyRequest
 from models.ai_chat import (
     ChatConfig,
     ChatMessage,
@@ -57,6 +58,9 @@ from models.user import User
 __all__ = [
     # Base
     "Base",
+    "Agency",
+    "AgencyCustomer",
+    "AgencyRequest",
     # 状态常量
     "AuthCodeStatus",
     "OrderStatus",

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import {
   getBusinessBootstrap,
   getBusinessBatches,
-  getDemoBatches,
+  getDemoBatchesPage,
   getDemoBatch,
   updateDemoBatch,
 } from '@/utils/api'
@@ -22,7 +22,8 @@ import {
   type ImportPreview,
   type ServerBatchHistory,
 } from '@/features/business/model'
-import { demoBatchListSchema, unwrapApiData, type DemoBatch } from '@/features/demo/model'
+import type { DemoBatch } from '@/features/demo/model'
+import { demoHistoryPageSchema } from '@/features/business/history'
 import { BusinessDemoCoordinator } from '@/features/business/demo-coordinator'
 import { DemoBatchRecovery } from '@/features/business/demo-recovery'
 import { BusinessLiveCoordinator } from '@/features/business/live-coordinator'
@@ -36,6 +37,11 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const bootstrap = ref<BusinessBootstrap | null>(null)
   const history = ref<ServerBatchHistory[]>([])
   const demoHistory = ref<DemoBatch[]>([])
+  const demoHistoryTotal = ref(0)
+  const demoHistoryPage = ref(0)
+  const liveHistoryHasMore = ref(false)
+  let liveHistoryOffset = 0
+  const historyPageSize = 20
   const importPreview = ref<ImportPreview | null>(null)
   const selectedTool = ref<BusinessTool | null>(null)
   const snapshot = ref<BusinessBatchSnapshot>(emptyBatchSnapshot())
@@ -128,6 +134,10 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       bootstrap.value = null
       history.value = []
       demoHistory.value = []
+      demoHistoryTotal.value = 0
+      demoHistoryPage.value = 0
+      liveHistoryHasMore.value = false
+      liveHistoryOffset = 0
       importPreview.value = null
       selectedTool.value = null
       selectedItemId.value = null
@@ -198,15 +208,21 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     }
   }
 
-  async function loadHistory(): Promise<ServerBatchHistory[]> {
+  async function loadHistory(append = false): Promise<ServerBatchHistory[]> {
     const requestSequence = ++historyRequestSequence
+    const owner = getOwnerScope()
     historyLoading.value = true
     historyError.value = null
     try {
-      const nextHistory = historySchema.parse(await getBusinessBatches({ limit: 30 }))
-      if (requestSequence === historyRequestSequence) history.value = nextHistory
+      const offset = append ? liveHistoryOffset : 0
+      const nextHistory = historySchema.parse(await getBusinessBatches({ limit: historyPageSize, offset }))
+      if (requestSequence === historyRequestSequence && owner === getOwnerScope()) {
+        history.value = append ? [...new Map([...history.value, ...nextHistory].map(batch => [String(batch.id), batch])).values()] : nextHistory
+        liveHistoryHasMore.value = nextHistory.length === historyPageSize
+        liveHistoryOffset = offset + nextHistory.length
+      }
     } catch (cause) {
-      if (requestSequence === historyRequestSequence) historyError.value = errorMessage(cause, '执行记录暂时无法加载')
+      if (requestSequence === historyRequestSequence && owner === getOwnerScope()) historyError.value = errorMessage(cause, '执行记录暂时无法加载')
       throw cause
     } finally {
       if (requestSequence === historyRequestSequence) historyLoading.value = false
@@ -214,15 +230,20 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     return history.value
   }
 
-  async function loadDemoHistory(): Promise<DemoBatch[]> {
+  async function loadDemoHistory(append = false): Promise<DemoBatch[]> {
     const requestSequence = ++historyRequestSequence
+    const owner = getOwnerScope()
     historyLoading.value = true
     historyError.value = null
     try {
-      const nextHistory = demoBatchListSchema.parse(unwrapApiData(await getDemoBatches({ page_size: 30 })))
-      if (requestSequence === historyRequestSequence) demoHistory.value = nextHistory
+      const nextPage = demoHistoryPageSchema.parse(await getDemoBatchesPage({ page: append ? demoHistoryPage.value + 1 : 1, page_size: historyPageSize }))
+      if (requestSequence === historyRequestSequence && owner === getOwnerScope()) {
+        demoHistory.value = append ? [...new Map([...demoHistory.value, ...nextPage.data].map(batch => [String(batch.id), batch])).values()] : nextPage.data
+        demoHistoryTotal.value = nextPage.total
+        demoHistoryPage.value = nextPage.page
+      }
     } catch (cause) {
-      if (requestSequence === historyRequestSequence) historyError.value = errorMessage(cause, '演示记录暂时无法加载')
+      if (requestSequence === historyRequestSequence && owner === getOwnerScope()) historyError.value = errorMessage(cause, '演示记录暂时无法加载')
       throw cause
     } finally {
       if (requestSequence === historyRequestSequence) historyLoading.value = false
@@ -355,7 +376,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   function retryRecovery(): void { recovery.retry() }
 
   return {
-    bootstrap, history, demoHistory, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale, historyLoading, historyError,
+    bootstrap, history, demoHistory, demoHistoryTotal, liveHistoryHasMore, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale, historyLoading, historyError,
     entitlements, tools, items, openItems, isActive, isDemoBatch, recoveryPending, recoveryStorageUnavailable, retryRecovery,
     init, refreshBootstrap, loadHistory, loadDemoHistory, chooseTool, loadSampleImport, saveSampleTemplate, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
     completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,

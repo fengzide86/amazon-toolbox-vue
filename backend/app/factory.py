@@ -23,6 +23,7 @@ from core.tasks import task_manager
 from database import check_db_health, get_db_stats
 from routers import (
     admin_action_center,
+    agency,
     ai_chat,
     announcements,
     auth,
@@ -66,6 +67,7 @@ def _register_routers(app: FastAPI) -> None:
     routes = (
         (auth.router, "/api/auth", ["认证"]),
         (staff.router, "/api/staff", ["后台账号"]),
+        (agency.router, "/api/agency", ["代理工作台"]),
         (dashboard.router, "/api/dashboard", ["数据看板"]),
         (plans.router, "/api/plans", ["套餐管理"]),
         (auth_codes.router, "/api/auth-codes", ["授权码管理"]),

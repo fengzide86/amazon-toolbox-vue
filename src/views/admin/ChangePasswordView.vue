@@ -4,7 +4,7 @@
       <BrandLockup class="password-brand" audience="admin" layout="horizontal" />
       <span class="eyebrow">BACKOFFICE SECURITY</span>
       <h1>{{ forced ? '首次登录请修改密码' : '修改后台密码' }}</h1>
-      <p>{{ forced ? '当前临时密码仅用于首次登录。设置新密码后才能进入运营控制中心。' : '修改后其他设备上的旧登录凭证会立即失效。' }}</p>
+      <p>{{ forced ? '当前临时密码仅用于首次登录。设置新密码后才能进入工作台。' : '修改后其他设备上的旧登录凭证会立即失效。' }}</p>
       <div v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</div>
       <form @submit.prevent="submit">
         <label for="current-password">当前密码</label>
@@ -59,7 +59,7 @@ async function submit() {
     })
     Auth.set('backoffice')
     showToast('密码已修改', 'success')
-    await router.replace('/admin/dashboard')
+    await router.replace(response.data.role === 'agent' ? '/agent/overview' : '/admin/dashboard')
   } catch (error) {
     errorMessage.value = error instanceof Error && error.message ? error.message : '密码修改失败'
   } finally { submitting.value = false }

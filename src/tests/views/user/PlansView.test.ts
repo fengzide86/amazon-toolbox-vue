@@ -4,19 +4,22 @@ import PlansView from '@/views/user/PlansView.vue'
 
 const mocks = vi.hoisted(() => ({
   getPlans: vi.fn(),
+  getPublicSettings: vi.fn(),
+  push: vi.fn(),
   showToast: vi.fn(),
   route: { query: {} },
 }))
 
-vi.mock('@/utils/api', () => ({ getPlans: mocks.getPlans }))
+vi.mock('@/utils/api', () => ({ getPlans: mocks.getPlans, getPublicSettings: mocks.getPublicSettings }))
 vi.mock('@/utils', () => ({ showToast: mocks.showToast }))
-vi.mock('vue-router', () => ({ useRoute: () => mocks.route }))
+vi.mock('vue-router', () => ({ useRoute: () => mocks.route, useRouter: () => ({ push: mocks.push }) }))
 
 describe('PlansView 套餐与授权', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.route.query = {}
     mocks.getPlans.mockResolvedValue([])
+    mocks.getPublicSettings.mockResolvedValue([{ key: 'wechat_id', value: 'KST-official-test' }])
     localStorage.setItem('toolbox_user', JSON.stringify({ plan_name: 'Y15 体验包', plan_code: 'Y15' }))
   })
 
@@ -73,15 +76,19 @@ describe('PlansView 套餐与授权', () => {
     expect(wrapper.text()).toContain('当前套餐暂未包含你选择的工具')
   })
 
-  it('购买按钮给出具体套餐的客服提示', async () => {
+  it('购买按钮读取官方配置并打开具体套餐咨询', async () => {
     mocks.getPlans.mockResolvedValue([
       { id: 2, name: 'Y199 冲刺包', plan_code: 'Y199', price: 199, duration_days: 30, status: 'active', benefits: ['完整工具'] },
     ])
     const wrapper = mount(PlansView)
     await flushPromises()
     await wrapper.find('.plan-card button').trigger('click')
-
-    expect(mocks.showToast).toHaveBeenCalledWith('购买 冲刺包：请联系客服 AmazonToolbox_Support', 'info')
+    await flushPromises()
+    expect(mocks.getPublicSettings).toHaveBeenCalled()
+    const dialog = document.body.textContent || wrapper.text()
+    expect(dialog).toContain('KST-official-test')
+    expect(dialog).not.toContain('AmazonToolbox_Support')
+    wrapper.unmount()
   })
 
   it('空权益标识不会从名称推断当前套餐，并保留展示名', async () => {

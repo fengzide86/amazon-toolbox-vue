@@ -53,7 +53,7 @@
           <span class="tool-operational-meta">
             <span><small>目标平台</small><b>{{ toolPlatformLabel(tool) }}</b></span>
             <span><small>输入字段</small><b>{{ toolInputCount(tool) }} 项</b></span>
-            <span><small>执行产出</small><b>结果核验＋截图</b></span>
+            <span><small>执行产出</small><b>{{ isLiveTool(tool) ? '执行记录与核验结果' : runtime.singleLive ? '本地沙盒演示记录' : '示例流程与说明' }}</b></span>
           </span>
         </span>
 

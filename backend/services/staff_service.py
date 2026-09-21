@@ -15,7 +15,7 @@ from core.security import (
     hash_password_async,
     verify_password_fallback_async,
 )
-from models import Setting, StaffRole, StaffStatus, StaffUser
+from models import Agency, Setting, StaffRole, StaffStatus, StaffUser
 from schemas.staff import (
     StaffAccountCreate,
     StaffAccountResponse,
@@ -35,6 +35,7 @@ def staff_to_dict(staff: StaffUser) -> dict[str, object]:
         "name": staff.display_name,
         "display_name": staff.display_name,
         "role": staff.role,
+        "agency_id": staff.agency_id,
         "status": staff.status,
         "token_version": staff.token_version,
         "force_password_reset": bool(staff.force_password_reset),
@@ -63,6 +64,7 @@ def account_snapshot(staff: StaffUser) -> dict[str, object]:
         "username": staff.username,
         "display_name": staff.display_name,
         "role": staff.role,
+        "agency_id": staff.agency_id,
         "status": staff.status,
         "token_version": staff.token_version,
         "force_password_reset": bool(staff.force_password_reset),
@@ -166,7 +168,9 @@ async def list_accounts(
             .limit(page_size)
         )
     ).scalars().all()
-    return [StaffAccountResponse.model_validate(account) for account in accounts], total
+    agency_ids = {account.agency_id for account in accounts if account.agency_id is not None}
+    agency_names = dict((await db.execute(select(Agency.id, Agency.name).where(Agency.id.in_(agency_ids)))).all()) if agency_ids else {}
+    return [StaffAccountResponse.model_validate(account).model_copy(update={"agency_name": agency_names.get(account.agency_id)}) for account in accounts], total
 
 
 async def create_account(
@@ -176,11 +180,13 @@ async def create_account(
     actor: dict[str, Any],
     request: Request,
 ) -> StaffUser:
+    await _validate_agency_assignment(db, data.role, data.agency_id)
     account = StaffUser(
         username=data.username,
         display_name=data.display_name,
         password_hash=await hash_password_async(data.password),
         role=data.role,
+        agency_id=data.agency_id,
         status=StaffStatus.ACTIVE,
         token_version=1,
         force_password_reset=True,
@@ -228,6 +234,8 @@ async def update_account(
     changes = data.model_dump(exclude_unset=True)
     if not changes:
         raise HTTPException(status_code=422, detail="没有可更新字段")
+    if any(field in changes and changes[field] is None for field in ("display_name", "role", "status")):
+        raise HTTPException(status_code=422, detail="姓名、角色和状态不能为空")
     if staff_id == actor["staff_id"] and (
         ("role" in changes and changes["role"] != target.role)
         or ("status" in changes and changes["status"] != StaffStatus.ACTIVE)
@@ -244,11 +252,14 @@ async def update_account(
     if removing_active_super and await _active_super_admin_count(db) <= 1:
         raise HTTPException(status_code=409, detail="必须至少保留一个启用的超级管理员")
     before = account_snapshot(target)
+    await _validate_agency_assignment(
+        db, changes.get("role", target.role), changes.get("agency_id", target.agency_id),
+    )
     invalidates_token = False
     for field, value in changes.items():
         if getattr(target, field) != value:
             setattr(target, field, value)
-            if field in {"role", "status"}:
+            if field in {"role", "status", "agency_id"}:
                 invalidates_token = True
     if invalidates_token:
         target.token_version += 1
@@ -321,6 +332,10 @@ async def authenticate_staff(
     staff = result.scalar_one_or_none()
     if not staff or staff.status != StaffStatus.ACTIVE:
         return None
+    if staff.role == StaffRole.AGENT:
+        agency = await db.get(Agency, staff.agency_id) if staff.agency_id else None
+        if not agency or agency.status != "active":
+            return None
 
     is_valid, _ = await verify_password_fallback_async(password, staff.password_hash)
     if not is_valid:
@@ -347,6 +362,16 @@ async def authenticate_staff(
     await db.commit()
     await db.refresh(staff)
     return staff
+
+
+async def _validate_agency_assignment(db: AsyncSession, role: str, agency_id: int | None) -> None:
+    if role != StaffRole.AGENT:
+        if agency_id is not None:
+            raise HTTPException(status_code=422, detail="内部员工不能关联代理主体")
+        return
+    agency = await db.get(Agency, agency_id) if agency_id else None
+    if not agency or agency.status != "active":
+        raise HTTPException(status_code=422, detail="代理账号必须关联启用中的代理主体")
 
 
 async def migrate_legacy_admin_password(db: AsyncSession) -> bool:

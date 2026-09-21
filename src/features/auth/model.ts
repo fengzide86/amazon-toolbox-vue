@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const backofficeRoleSchema = z.enum(['super_admin', 'operator', 'support'])
+export const backofficeRoleSchema = z.enum(['super_admin', 'operator', 'support', 'agent'])
 export type BackofficeRole = z.infer<typeof backofficeRoleSchema>
 
 export const authRoleSchema = z.union([z.literal('user'), backofficeRoleSchema])
@@ -25,10 +25,12 @@ export const authenticatedUserSchema = z.object({
   username: z.string().optional(),
   role: authRoleSchema.optional(),
   staff_id: z.union([z.string(), z.number()]).optional(),
+  agency_id: z.number().int().positive().nullable().optional(),
   status: z.enum(['active', 'disabled']).optional(),
   force_password_reset: z.boolean().optional(),
   phone: z.string().optional(),
-  auth_code_id: z.union([z.string(), z.number()]).optional(),
+  // Staff contexts explicitly return null: they are not customer licenses.
+  auth_code_id: z.union([z.string(), z.number()]).nullish().transform(value => value ?? undefined).optional(),
   product_type: z.enum(['consumer', 'business']).optional(),
   business_workspace_enabled: z.boolean().optional(),
   entitlements: entitlementsSchema.optional(),

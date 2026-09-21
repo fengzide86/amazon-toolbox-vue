@@ -12,7 +12,7 @@
     </div>
 
     <p v-if="activeTab === 'demo'" class="record-disclosure">仅记录模拟流程是否走完，不代表真实平台任务成功。</p>
-    <AsyncStateNotice v-if="staleError" state="stale" :message="staleError" @retry="loadRecords" />
+    <AsyncStateNotice v-if="staleError" state="stale" :message="staleError" @retry="loadRecords(failedAppend)" />
 
     <section class="records-card" :aria-busy="loading">
       <div v-if="loading" class="records-loading"><LoaderCircle :size="22" class="spin" />正在加载…</div>
@@ -20,7 +20,7 @@
         <CircleAlert :size="42" :stroke-width="1.5" />
         <h3>记录暂时无法加载</h3>
         <p>{{ loadError }}</p>
-        <button type="button" @click="loadRecords">重新加载</button>
+        <button type="button" @click="loadRecords(false)">重新加载</button>
       </div>
       <div v-else-if="rows.length" class="record-list">
         <article v-for="record in rows" :key="`${record.kind}-${record.id}`" class="record-row">
@@ -41,19 +41,22 @@
       </div>
       <div v-else class="empty-records">
         <History :size="42" :stroke-width="1.5" />
-        <h3>{{ activeTab === 'demo' ? '还没有演示记录' : '真实工具尚未接入' }}</h3>
+        <h3>{{ activeTab === 'demo' ? '还没有演示记录' : '还没有真实执行记录' }}</h3>
         <p v-if="activeTab === 'live'">当前没有真实执行记录。</p>
         <router-link v-else to="/user/tools">选择一个工具开始演示</router-link>
       </div>
     </section>
+    <footer v-if="rows.length" class="record-pagination"><span>已显示 {{ rows.length }} / 共 {{ totals[activeTab] }} 条</span><button v-if="rows.length < totals[activeTab]" type="button" :disabled="loadingMore" @click="loadRecords(true)">{{ loadingMore ? '正在加载…' : '加载更多' }}</button><span v-else>已显示全部记录</span></footer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { z } from 'zod'
 import { useRouter } from 'vue-router'
 import { Ban, Check, CircleAlert, History, LoaderCircle, MessageCircle } from '@lucide/vue'
-import { getDemoRuns, getExecutions } from '@/utils/api'
+import { getDemoRunsPage, getExecutionsPage } from '@/utils/api'
+import { authService } from '@/utils/auth'
 import { usePlatformStore } from '@/stores/platform'
 import { demoRunListSchema } from '@/features/demo/model'
 import { executionRecordListSchema } from '@/features/user/model'
@@ -79,6 +82,12 @@ const liveRows = ref<RecordRow[]>([])
 const loading = ref(true)
 const loadError = ref('')
 const staleError = ref('')
+const loadingMore = ref(false)
+const failedAppend = ref(false)
+const totals = ref({ demo: 0, live: 0 })
+const pages = ref({ demo: 0, live: 0 })
+const pageSize = 20
+let requestSequence = 0
 const rows = computed(() => activeTab.value === 'demo' ? demoRows.value : liveRows.value)
 
 function formatTime(value: string | null | undefined): string {
@@ -116,14 +125,27 @@ function contactSupport(record: RecordRow) {
   void router.push('/user/ai-chat')
 }
 
-async function loadRecords() {
+async function loadRecords(append = false) {
+  if (append && loadingMore.value) return
+  const sequence = ++requestSequence
+  const kind = activeTab.value
+  const platform = platformStore.currentPlatform
+  const token = authService.getAuth()?.token
+  const current = (): boolean => sequence === requestSequence && kind === activeTab.value && platform === platformStore.currentPlatform && token === authService.getAuth()?.token
   const hadData = rows.value.length > 0
+  loadingMore.value = append
+  failedAppend.value = append
   loading.value = !hadData
   loadError.value = ''
   staleError.value = ''
   try {
-    if (activeTab.value === 'demo') {
-      demoRows.value = demoRunListSchema.parse(await getDemoRuns({ platform_key: platformStore.currentPlatform, page_size: 100 })).map(record => ({
+    const params = { platform_key: platform, page: append ? pages.value[kind] + 1 : 1, page_size: pageSize }
+    let nextRows: RecordRow[]
+    let total: number
+    if (kind === 'demo') {
+      const response = z.object({ data: demoRunListSchema, total: z.number().int().nonnegative() }).parse(await getDemoRunsPage(params))
+      total = response.total
+      nextRows = response.data.map(record => ({
         id: record.id,
         kind: 'demo',
         toolId: String(record.tool_id),
@@ -133,7 +155,9 @@ async function loadRecords() {
         errorCode: record.error_code,
       }))
     } else {
-      liveRows.value = executionRecordListSchema.parse(await getExecutions({ platform_key: platformStore.currentPlatform, limit: 100 })).map(record => ({
+      const response = z.object({ data: executionRecordListSchema, total: z.number().int().nonnegative() }).parse(await getExecutionsPage(params))
+      total = response.total
+      nextRows = response.data.map(record => ({
         id: record.id,
         kind: 'live',
         toolId: record.tool_id === null || record.tool_id === undefined ? undefined : String(record.tool_id),
@@ -143,25 +167,35 @@ async function loadRecords() {
         errorCode: record.error_code,
       }))
     }
+    if (!current()) return
+    const target = kind === 'demo' ? demoRows : liveRows
+    target.value = append ? [...new Map([...target.value, ...nextRows].map(record => [String(record.id), record])).values()] : nextRows
+    totals.value[kind] = total
+    pages.value[kind] = params.page
   } catch (error) {
+    if (!current()) return
     const message = error instanceof Error && error.message ? error.message : '请检查网络连接后重试。'
     if (hadData) staleError.value = message
     else loadError.value = message
   } finally {
-    loading.value = false
+    if (current()) { loading.value = false; loadingMore.value = false }
   }
 }
 
-watch(activeTab, loadRecords)
+watch(activeTab, () => { void loadRecords() })
 watch(() => platformStore.currentPlatform, () => {
   demoRows.value = []
   liveRows.value = []
+  totals.value = { demo: 0, live: 0 }
+  pages.value = { demo: 0, live: 0 }
   void loadRecords()
 })
-onMounted(loadRecords)
+onMounted(() => loadRecords())
+onUnmounted(() => { requestSequence += 1 })
 </script>
 
 <style scoped>
+.record-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px;color:var(--color-text-secondary);font-size:var(--type-meta)}.record-pagination button{padding:9px 14px;border:1px solid var(--color-border);border-radius:9px;background:var(--color-surface);color:var(--color-primary);cursor:pointer}.record-pagination button:disabled{opacity:.5;cursor:wait}
 .records-page { width: min(1050px, 100%); margin: 0 auto; }
 .records-eyebrow { display: block; margin-bottom: 8px; color: var(--color-primary); font-size:var(--type-meta); font-weight: 800; letter-spacing: .12em; }
 .records-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 22px; }

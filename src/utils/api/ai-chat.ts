@@ -21,8 +21,8 @@ export const resolveChatSession = (
   sessionId: EntityId,
   satisfaction: Schemas['ResolveSessionRequest']['satisfaction'] = null,
 ): Promise<Schemas['ChatActionResponse']> => api.post(`/api/ai-chat/session/${sessionId}/resolve`, { satisfaction })
-export const transferChatToHuman = (sessionId: EntityId): Promise<Schemas['ChatTransferResponse']> =>
-  api.post(`/api/ai-chat/session/${sessionId}/transfer`)
+export const transferChatToHuman = (sessionId: EntityId, data: Schemas['ChatTransferRequest'] = {}): Promise<Schemas['ChatTransferResponse']> =>
+  api.post(`/api/ai-chat/session/${sessionId}/transfer`, data)
 export const rateChatSession = (
   sessionId: EntityId,
   satisfaction: Schemas['RateSessionRequest']['satisfaction'],

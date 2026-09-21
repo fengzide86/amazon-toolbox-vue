@@ -6,7 +6,6 @@ import json
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
 from typing import Any
 
 from fastapi import Request
@@ -16,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
 from core.config import settings
-from core.exceptions import ConflictException
+from core.exceptions import ConflictException, ValidationException
 from core.logging import get_logger
+from core.timestamps import utc_iso, utc_now
 from models import ChatConfig, ChatMessage, ChatSession, Feedback, User
 
 from . import faq_service
@@ -221,7 +221,7 @@ async def get_session(db: AsyncSession, session_id: str) -> dict[str, Any] | Non
         "transferred_to_human": session.transferred_to_human,
         "satisfaction": session.satisfaction,
         "messages": [_message_to_dict(m) for m in messages],
-        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "created_at": utc_iso(session.created_at),
     }
 
 
@@ -370,7 +370,7 @@ async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int |
 
     session.status = "resolved"
     session.ai_resolved = True
-    session.resolved_at = datetime.now()
+    session.resolved_at = utc_now()
     if satisfaction is not None:
         session.satisfaction = satisfaction
 
@@ -378,7 +378,9 @@ async def resolve_session(db: AsyncSession, session_id: str, satisfaction: int |
     return True
 
 
-async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | None = None) -> int | None:
+async def transfer_to_human(
+    db: AsyncSession, session_id: str, user_id: int | None = None, summary: str | None = None,
+) -> int | None:
     """转人工 - 自动创建工单"""
     session = (await db.execute(
         select(ChatSession)
@@ -400,13 +402,23 @@ async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | No
     )
     messages = messages_result.scalars().all()
 
-    # 构建工单内容
+    question = (summary or "").strip()
+    user_messages = [m.content.strip() for m in messages if m.role == "user" and m.content.strip()]
+    if not question and not user_messages:
+        raise ValidationException("请先描述需要人工处理的问题")
+    if question:
+        db.add(ChatMessage(session_id=session_id, role="user", content=question))
+        session.message_count = (session.message_count or 0) + 1
+
+    # 保留问题摘要和对话上下文，不把内部 session UUID 当作工单标题。
     chat_history = []
     for m in messages:
         role_label = "用户" if m.role == "user" else "AI客服" if m.role == "ai" else "系统"
         chat_history.append(f"[{role_label}] {m.content}")
 
-    title = f"AI客服转人工 - 会话 {session_id}"
+    if question:
+        chat_history.append(f"[用户] {question}")
+    title = "人工支持 · " + " ".join((question or user_messages[-1]).split())[:80]
     content = "用户通过 AI 客服咨询后转人工。\n\n对话记录：\n" + "\n".join(chat_history)
 
     # 创建工单
@@ -424,7 +436,7 @@ async def transfer_to_human(db: AsyncSession, session_id: str, user_id: int | No
     # 更新会话状态
     session.status = "transferred"
     session.transferred_to_human = True
-    session.resolved_at = datetime.now()
+    session.resolved_at = utc_now()
 
     await _commit_or_rollback(db)
     return feedback.id
@@ -465,7 +477,7 @@ async def get_user_history(db: AsyncSession, user_id: int, page: int = 1, page_s
             "message_count": s.message_count,
             "ai_resolved": s.ai_resolved,
             "satisfaction": s.satisfaction,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "created_at": utc_iso(s.created_at),
         } for s in sessions]
     return {
         "data": items,
@@ -516,8 +528,8 @@ async def get_admin_sessions(db: AsyncSession, status: str | None = None, page: 
             "ai_resolved": s.ai_resolved,
             "transferred_to_human": s.transferred_to_human,
             "satisfaction": s.satisfaction,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-            "resolved_at": s.resolved_at.isoformat() if s.resolved_at else None,
+            "created_at": utc_iso(s.created_at),
+            "resolved_at": utc_iso(s.resolved_at),
         })
 
     return {
@@ -556,7 +568,7 @@ async def get_admin_stats(db: AsyncSession) -> dict[str, Any]:
         avg_satisfaction = round(float(avg_satisfaction), 1)
 
     # 今日对话数
-    today = datetime.now().date()
+    today = utc_now().date()
     today_result = await db.execute(
         select(func.count(ChatSession.id)).where(
             func.date(ChatSession.created_at) == today
@@ -659,5 +671,5 @@ def _message_to_dict(msg: ChatMessage) -> dict[str, Any]:
         "role": msg.role,
         "content": msg.content,
         "knowledge_ids": knowledge_ids,
-        "created_at": msg.created_at.isoformat() if msg.created_at else None,
+        "created_at": utc_iso(msg.created_at),
     }

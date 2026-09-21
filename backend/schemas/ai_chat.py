@@ -129,6 +129,10 @@ class ResolveSessionRequest(BaseModel):
     satisfaction: int | None = None
 
 
+class ChatTransferRequest(BaseModel):
+    summary: str | None = Field(default=None, min_length=1, max_length=2000)
+
+
 class RateSessionRequest(BaseModel):
     satisfaction: int = Field(ge=1, le=5)
 
