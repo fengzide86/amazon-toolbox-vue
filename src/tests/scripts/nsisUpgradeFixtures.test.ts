@@ -42,7 +42,7 @@ describe('immutable released NSIS upgrade baselines', () => {
     expect(legacy).toHaveLength(2)
     expect(current).toHaveLength(2)
     for (const step of legacy) {
-      expect(step).toContain("hashFiles('scripts/nsis-upgrade-fixture.json', 'scripts/nsis-upgrade-fixture-1.8.7.json')")
+      expect(step).toContain("hashFiles('scripts/nsis-upgrade-fixture-1.8.7.json', 'scripts/nsis-upgrade-fixture.json')")
       expect(step).toContain('KST Setup 1.8.5.exe')
       expect(step).toContain('KST Setup 1.8.7.exe')
       expect(step).not.toContain('1.8.8')
@@ -54,6 +54,15 @@ describe('immutable released NSIS upgrade baselines', () => {
       expect(step).not.toContain('1.8.7')
     }
     expect(workflow).not.toContain("hashFiles('scripts/nsis-upgrade-fixture*.json')")
+    // hashFiles preserves explicit pattern order; match the old wildcard's
+    // 1.8.7-before-default ordering and the already verified Windows cache.
+    if (process.platform === 'win32') {
+      const cacheHash = createHash('sha256')
+      for (const name of ['nsis-upgrade-fixture-1.8.7.json', 'nsis-upgrade-fixture.json']) {
+        cacheHash.update(createHash('sha256').update(readFileSync(resolve('scripts', name))).digest())
+      }
+      expect(cacheHash.digest('hex')).toBe('1387a9067a16876872018ee1a811d89ead4772f661f626fd38f94ae64245c8ac')
+    }
     for (const version of ['1.8.5', '1.8.7', '1.8.8']) {
       const fetchStep = workflow.split(/(?= {6}- name:)/).find(step => step.includes(`NSIS_BASELINE_VERSION: '${version}'`))
       expect(fetchStep).toContain('run: node scripts/prepare-nsis-upgrade.mjs')

@@ -339,7 +339,7 @@ jobs:
           path: |
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.7.exe
-          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture.json', 'scripts/nsis-upgrade-fixture-1.8.7.json') }}
+          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture-1.8.7.json', 'scripts/nsis-upgrade-fixture.json') }}
       - name: Restore immutable 1.8.8 installer (always recheck SHA512)
         id: current-production-installer
         uses: actions/cache/restore@v5
@@ -365,7 +365,7 @@ jobs:
           path: |
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.5.exe
             D:/AmazonToolboxData/installer-fixtures/KST Setup 1.8.7.exe
-          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture.json', 'scripts/nsis-upgrade-fixture-1.8.7.json') }}
+          key: windows-nsis-baselines-${{ hashFiles('scripts/nsis-upgrade-fixture-1.8.7.json', 'scripts/nsis-upgrade-fixture.json') }}
       - name: Save only byte-verified 1.8.8 installer fixture
         if: steps.current-production-installer.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
