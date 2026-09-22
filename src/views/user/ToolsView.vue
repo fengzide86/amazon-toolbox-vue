@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -171,6 +171,7 @@ import {
 import { buildDemoLaunch, buildLiveLaunch, isLiveTool } from '@/features/automation/launch'
 import { getRuntimeCapabilities } from '@/runtime/capabilities'
 import { downloadDesktopInstaller } from '@/runtime/desktop-download'
+import { validateSingleToolInput } from '@/features/automation/input-validation'
 
 const router = useRouter() || { push: () => {} }
 const route = useRoute() || { query: {} }
@@ -187,6 +188,8 @@ const runDialogVisible = ref(false)
 const pendingTool = ref<ToolCatalogItem | null>(null)
 const runInput = ref<Record<string, string | number | undefined>>({})
 const runtime = getRuntimeCapabilities()
+let catalogSequence = 0
+let launchSequence = 0
 
 function numberInput(key: string): number | undefined {
   const value = runInput.value[key]
@@ -327,54 +330,68 @@ function handleToolClick(rawTool: unknown) {
 }
 
 async function loadData() {
+  const sequence = ++catalogSequence
+  const platform = platformStore.currentPlatform
+  const current = () => sequence === catalogSequence && platform === platformStore.currentPlatform
   const hadData = tools.value.length > 0
   loading.value = !hadData
   loadError.value = ''
   staleError.value = ''
   try {
-    tools.value = toolCatalogSchema
-      .parse(await getTools({ platform_key: platformStore.currentPlatform }))
+    const next = toolCatalogSchema
+      .parse(await getTools({ platform_key: platform }))
       .filter(tool => tool.supports_demo_single || tool.supports_live_single)
+    if (current()) tools.value = next
   } catch (error) {
+    if (!current()) return
     const message = errorMessage(error, '请检查网络连接后重试。')
     if (hadData) staleError.value = message
     else loadError.value = message
   } finally {
-    loading.value = false
+    if (current()) loading.value = false
   }
 }
 
 async function confirmRun() {
   const tool = pendingTool.value
   if (!tool) return
-  const missing = (tool.single_input_schema || []).find(field => field.required && (runInput.value[field.key] === undefined || runInput.value[field.key] === ''))
-  if (missing) { showToast(`请填写${missing.label}`, 'warning'); return }
+  const validation = validateSingleToolInput(tool.single_input_schema || [], runInput.value)
+  if (validation) { showToast(validation, 'warning'); return }
   await runTool(tool, { ...runInput.value })
   if (appStore.toolVisible) runDialogVisible.value = false
 }
 
 async function runTool(tool: ToolCatalogItem, input: Record<string, unknown> = {}) {
   if (launchingToolId.value !== null) return
+  const sequence = ++launchSequence
+  const platformKey = platformStore.currentPlatform
   launchingToolId.value = tool.id
   try {
-    const platformKey = platformStore.currentPlatform
     if (isLiveTool(tool) && !runtime.singleLive) throw new Error('真实自动化仅支持已启用本地 Runner 的桌面客户端')
     const launchTool = isLiveTool(tool)
       ? await buildLiveLaunch(tool, platformKey, input)
       : buildDemoLaunch(tool, platformKey, input)
-    appStore.openTool(launchTool)
+    if (sequence === launchSequence && platformKey === platformStore.currentPlatform) appStore.openTool(launchTool)
   } catch (error) {
-    showToast(errorMessage(error, '工具启动失败，请稍后重试'), 'error')
+    if (sequence === launchSequence) showToast(errorMessage(error, '工具启动失败，请稍后重试'), 'error')
   } finally {
-    launchingToolId.value = null
+    if (sequence === launchSequence) launchingToolId.value = null
   }
 }
 
 watch(() => platformStore.currentPlatform, () => {
+  launchSequence += 1
+  launchingToolId.value = null
+  detailsVisible.value = false
+  detailsTool.value = null
+  runDialogVisible.value = false
+  pendingTool.value = null
+  runInput.value = {}
   tools.value = []
   void loadData()
 })
 onMounted(loadData)
+onUnmounted(() => { catalogSequence += 1; launchSequence += 1 })
 </script>
 
 <style scoped>

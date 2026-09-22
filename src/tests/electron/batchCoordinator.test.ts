@@ -40,17 +40,48 @@ function createHarness(recordKind = 'live') {
 }
 
 describe('BatchCoordinator', () => {
-  it('服务端任务编号重映射后保留本地 Excel 输入', () => {
+  it('终态重试明确要求重新导入，不伪造 pending 或重新执行已清理输入', async () => {
+    const { coordinator, runners } = createHarness('demo')
+    await coordinator.startItem('one', {})
+    runners[0].options.onEvent({ type: 'run.failed', error: { message: '失败' } })
+    await coordinator.startItem('two', {})
+    runners[1].options.onEvent({ type: 'run.completed' })
+    expect(coordinator.snapshot().status).toBe('completed')
+    await expect(coordinator.restartItem('one')).rejects.toMatchObject({ code: 'BATCH_REIMPORT_REQUIRED' })
+    expect(coordinator.snapshot().items[0].status).toBe('failed')
+    expect(coordinator.batch.items.every(item => item.input === null)).toBe(true)
+    expect(runners).toHaveLength(2)
+  })
+
+  it('活动批次仍允许失败项重试，全部启动授权失败也正确封闭批次', async () => {
+    const { coordinator } = createHarness()
+    coordinator.failProvision('one')
+    await coordinator.restartItem('one')
+    expect(coordinator.snapshot().items[0].status).toBe('pending')
+    coordinator.failProvision('two')
+    expect(coordinator.snapshot().provisioningItemId).toBe('one')
+    coordinator.failProvision('one')
+    expect(coordinator.snapshot().status).toBe('completed')
+    expect(coordinator.batch.items.every(item => item.input === null)).toBe(true)
+  })
+
+  it('服务端任务编号重映射后保留本地 Excel 输入和源行号，但预览不暴露原始输入', () => {
     const ready = new Set()
     const coordinator = new BatchCoordinator({
       hostManager: { register: vi.fn(), release: vi.fn(), releaseAll: vi.fn(), isReady: itemId => ready.has(itemId), size: () => 0, request: vi.fn() },
     })
-    coordinator.storeImport({ importId: 'source', fileName: 'sample.xlsx', errors: [], rows: [
-      { itemId: 'local-1', input: { account_label: '客户一', sku: 'SKU-001' }, preview: { account_label: '客户一' }, accountLabelMasked: '客户一' },
+    const imported = coordinator.storeImport({ importId: 'source', fileName: 'sample.xlsx', errors: [], rows: [
+      { itemId: 'local-1', sourceRow: 4, input: { account_label: '客户一', sku: 'SKU-001' }, preview: { account_label: '客***' }, accountLabelMasked: '客***' },
     ] })
+    expect(structuredClone(imported).rows[0].sourceRow).toBe(4)
+    expect(JSON.stringify(imported)).not.toMatch(/客户一|SKU-001|"input"/)
     const remapped = coordinator.remapImportItems('source', ['server-item-1'])
+    expect(structuredClone(remapped).rows[0]).toMatchObject({ itemId: 'server-item-1', sourceRow: 4 })
+    expect(JSON.stringify(remapped)).not.toMatch(/客户一|SKU-001|"input"/)
     coordinator.create({ importId: remapped.importId, batchId: 'batch-remap', tool: { id: 'listing' }, recordKind: 'demo' })
-    expect(coordinator.batch.items[0]).toMatchObject({ itemId: 'server-item-1', input: { account_label: '客户一', sku: 'SKU-001' } })
+    expect(coordinator.batch.items[0]).toMatchObject({ itemId: 'server-item-1', sourceRow: 4, input: { account_label: '客户一', sku: 'SKU-001' } })
+    expect(structuredClone(coordinator.snapshot()).items[0]).toMatchObject({ itemId: 'server-item-1', sourceRow: 4 })
+    expect(JSON.stringify(coordinator.snapshot())).not.toMatch(/客户一|SKU-001|"input"/)
   })
 
   it('Demo 批次不需要 webview 就能使用独立 Playwright 沙盒', async () => {

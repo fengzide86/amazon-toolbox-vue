@@ -81,4 +81,18 @@ describe('套餐生命周期请求', () => {
       },
     })
   })
+
+  it.each([1, 1.5, 11, NaN])('拒绝与服务端不一致的现场数 %s', (maxOpenSessions) => {
+    expect(() => buildPlanPermissionsPatch({
+      id: 1, status: 'disabled', product_type: 'business', batchEnabled: true,
+      maxBatchRows: 50, maxOpenSessions, desktopNotification: true,
+    })).toThrow('保留现场数')
+  })
+
+  it.each([0, 1.5, 1001, Infinity])('拒绝非法真实批次行数 %s', (maxBatchRows) => {
+    expect(() => buildPlanPermissionsPatch({
+      id: 1, status: 'disabled', product_type: 'business', batchEnabled: true,
+      maxBatchRows, maxOpenSessions: 2, desktopNotification: true,
+    })).toThrow('单批行数')
+  })
 })

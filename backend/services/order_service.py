@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.audit import log_admin_action
 from core.cache import cache
 from core.exceptions import ConflictException, NotFoundException, ValidationException
+from domains.commerce.agency_commission import AgencyCommissionService
 from models import Order, OrderStatus, Plan, PlanStatus
 from services.profit_service import ProfitService
 
@@ -145,6 +146,7 @@ class OrderService:
         order.updated_by_staff_id = actor["staff_id"]
         try:
             profit = await ProfitService(self.db).create_for_paid_order(order, actor)
+            await AgencyCommissionService(self.db, actor).record_accrual(order, actor.get("staff_id"))
             # The flush used to create the ledger row can expire server-managed
             # order timestamps. Refresh explicitly before synchronous serialization.
             await self.db.refresh(order)
@@ -200,6 +202,7 @@ class OrderService:
         order.refunded_at = datetime.utcnow()
         order.updated_by_staff_id = actor["staff_id"]
         reversed_record = await ProfitService(self.db).reverse_for_refund(order, reason)
+        await AgencyCommissionService(self.db, actor).record_refund(order)
         # The ledger lookup/flush can expire the server-managed ``updated_at``
         # value on the order.  Refresh it before synchronous serialization.
         await self.db.refresh(order)

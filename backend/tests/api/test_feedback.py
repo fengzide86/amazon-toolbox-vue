@@ -10,6 +10,29 @@ from tests.conftest import get_data
 
 
 @pytest.mark.asyncio
+async def test_feedback_old_pending_is_visible_beyond_first_page(client, auth_headers, db_session):
+    from datetime import datetime, timedelta
+
+    now = datetime.utcnow()
+    db_session.add(Feedback(title="旧的待处理", content="不能遗漏", status="pending", platform_key="amazon", created_at=now - timedelta(days=30)))
+    db_session.add_all([
+        Feedback(title=f"近期已解决 {index}", content="已处理", status="resolved", platform_key="amazon", created_at=now)
+        for index in range(25)
+    ])
+    db_session.add(Feedback(title="其他平台", content="隔离筛选", status="pending", platform_key="aliexpress", created_at=now))
+    await db_session.commit()
+    response = await client.get("/api/feedback?platform_key=amazon", headers=auth_headers)
+    assert response.json()["total"] == 26
+    assert get_data(response)[0]["title"] == "旧的待处理"
+    second = await client.get("/api/feedback?platform_key=amazon&page=2", headers=auth_headers)
+    assert len(get_data(second)) == 6
+    assert not ({row["id"] for row in get_data(response)} & {row["id"] for row in get_data(second)})
+    filtered = await client.get("/api/feedback?platform_key=amazon&status=pending", headers=auth_headers)
+    assert filtered.json()["total"] == 1
+    assert get_data(filtered)[0]["title"] == "旧的待处理"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("statuses", [[], ["pending", "pending", "processing", "resolved"]])
 async def test_feedback_stats_count_each_state(client, auth_headers, db_session, statuses):
     db_session.add_all([

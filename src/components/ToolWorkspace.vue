@@ -56,7 +56,7 @@
             <DemoCasePreview v-else :tool-name="toolName" :platform="platformShortName" :stage-label="stageItems[currentStageIndex]?.label" :completed="runStatus === 'completed'" />
 
             <div v-if="interactionLocked && !browserLoading" class="interaction-shield">
-              <div><LoaderCircle :size="16" class="spin" />演示正在播放</div>
+              <div><LoaderCircle :size="16" class="spin" />{{ runningMessage }}</div>
             </div>
           </div>
         </div>
@@ -65,6 +65,11 @@
       <aside class="progress-panel">
         <div class="demo-disclosure" role="note" data-testid="execution-scope-note">
           {{ isBrowserPreview ? '浏览器预览：展示模拟流程，不启动 Runner，不操作外部平台。' : isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
+        </div>
+        <div v-if="isTerminal && (recordPending || recordSyncing)" class="demo-disclosure" role="status" data-testid="record-sync-status">
+          {{ recordSyncing ? '正在同步记录…' : '任务结果不变，记录待同步。无需重新执行任务。' }}
+          <button v-if="isDemo && recordPending" type="button" class="secondary-action" :disabled="recordSyncing" @click="retryRecordSync">仅重试同步记录</button>
+          <span v-if="!isDemo">请保持联网，稍后到工具记录核对。</span>
         </div>
         <template v-if="!isTerminal">
           <header class="panel-heading">
@@ -151,7 +156,7 @@ import DemoCasePreview from '@/components/DemoCasePreview.vue'
 const {
   browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
-  freightQuote, adapterVersion, evidenceSummary,
+  freightQuote, adapterVersion, evidenceSummary, recordPending, recordSyncing, retryRecordSync,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
   failureTitle, failureDescription, technicalError,
   stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport, registerWorkspaceBrowser,

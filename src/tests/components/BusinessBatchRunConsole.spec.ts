@@ -100,6 +100,17 @@ describe('business run console actual-state display', () => {
     expect(store.isActive).toBe(true)
   })
 
+  it('completed batch offers reimport rather than a dead retry button', async () => {
+    const { view, store } = render([item('failed')])
+    store.snapshot.status = 'completed'
+    await view.get('tbody tr').trigger('click')
+    expect(view.find('.primary-action').exists()).toBe(false)
+    const reimport = view.findAll('button').find(button => button.text() === '重新导入并新建')!
+    await reimport.trigger('click')
+    expect(view.emitted('new')).toHaveLength(1)
+    expect(view.text()).toContain('原始输入已清理')
+  })
+
   it('does not count or filter queued accounts as actively running', async () => {
     const { view } = render([item('running'), item('pending')])
     const runningFilter = view.findAll('.status-filters button').find(button => button.text().startsWith('运行中'))!

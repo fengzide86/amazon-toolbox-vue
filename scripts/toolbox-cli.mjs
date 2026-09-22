@@ -30,9 +30,16 @@ function cmdQuote(value) {
 
 function invocation(command, args) {
   if (isWindows && command === 'npm') {
+    // The managed Node 22 toolchain ships npm next to node.exe, while a
+    // fresh Codex/CI shell may intentionally omit npm from PATH. Resolve the
+    // sibling first so launchers and direct CLI calls use the same toolchain;
+    // retain the normal command fallback for user-installed Node setups.
+    const nodeExecutable = process.env.TOOLBOX_NODE_EXE || process.execPath
+    const siblingNpm = path.join(path.dirname(nodeExecutable), 'npm.cmd')
+    const npmExecutable = fs.existsSync(siblingNpm) ? siblingNpm : 'npm'
     return {
       command: process.env.ComSpec || 'cmd.exe',
-      args: ['/d', '/v:off', '/s', '/c', ['npm', ...args].map(cmdQuote).join(' ')],
+      args: ['/d', '/v:off', '/s', '/c', `"${[npmExecutable, ...args].map(cmdQuote).join(' ')}"`],
       windowsVerbatimArguments: true,
     }
   }

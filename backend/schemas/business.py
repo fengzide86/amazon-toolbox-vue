@@ -69,6 +69,7 @@ class BusinessBatchResponse(BaseModel):
     started_at: str | None = None
     finished_at: str | None = None
     last_heartbeat_at: str | None = None
+    detail_accessible: bool = True
     items: list[BusinessBatchItemResponse] | None = None
 
 

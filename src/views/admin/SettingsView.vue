@@ -169,9 +169,9 @@
           </el-select>
         </el-form-item>
         <template v-if="newPlan.product_type === 'business'">
-          <div class="permission-assurance">专业版仅开放模拟批次与本地表格解析；原始单元格、账号信息和 Cookie 不上传。</div>
-          <el-form-item label="单批上限"><el-input-number v-model="newPlan.entitlements.max_batch_rows" :min="1" :max="1000" style="width:100%" /></el-form-item>
-          <el-form-item label="并行演示"><el-input-number v-model="newPlan.entitlements.max_open_sessions" :min="1" :max="10" style="width:100%" /></el-form-item>
+          <div class="permission-assurance">演示最多 50 行逻辑并发；真实任务仅桌面端按顺序执行。保留现场数不代表同时运行数；原始表格、账号信息和 Cookie 不上传。</div>
+          <el-form-item label="真实批次行数"><el-input-number v-model="newPlan.entitlements.max_batch_rows" :min="1" :max="1000" :step="1" step-strictly style="width:100%" /></el-form-item>
+          <el-form-item label="保留现场数"><el-input-number v-model="newPlan.entitlements.max_open_sessions" :min="2" :max="10" :step="1" step-strictly style="width:100%" /></el-form-item>
         </template>
       </el-form>
       <template #footer>
@@ -180,7 +180,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="showPlanPermissions" title="产品与演示权限" width="520px">
+    <el-dialog v-model="showPlanPermissions" title="产品与批量权限" width="520px">
       <el-form v-if="planPermissionDraft" label-position="top">
         <el-form-item label="产品类型">
           <el-radio-group v-model="planPermissionDraft.product_type">
@@ -189,15 +189,15 @@
           </el-radio-group>
         </el-form-item>
         <template v-if="planPermissionDraft.product_type === 'business'">
-          <div class="permission-assurance">B 端是演示工作台：表格只在本机内存解析，服务端仅接收脱敏标识、行数和模拟结果。</div>
-          <el-form-item label="模拟批次"><el-switch v-model="planPermissionDraft.batchEnabled" active-text="开放模拟批次与多账号演示工作台" /></el-form-item>
+          <div class="permission-assurance">演示固定最多 50 行逻辑并发。真实任务还需工具开放与桌面端支持，始终仅一个账号自动执行；等待人工操作时可保留多个现场。表格与凭据不上传。</div>
+          <el-form-item label="批量工作台"><el-switch v-model="planPermissionDraft.batchEnabled" active-text="开放批次与多账号工作台" /></el-form-item>
           <div class="permission-grid">
-            <el-form-item label="单批最大行数"><el-input-number v-model="planPermissionDraft.maxBatchRows" :min="1" :max="1000" /></el-form-item>
-            <el-form-item label="并行演示槽位"><el-input-number v-model="planPermissionDraft.maxOpenSessions" :min="1" :max="10" /></el-form-item>
+            <el-form-item label="真实任务单批最大行数"><el-input-number v-model="planPermissionDraft.maxBatchRows" :min="1" :max="1000" :step="1" step-strictly /></el-form-item>
+            <el-form-item label="真实任务保留现场数"><el-input-number v-model="planPermissionDraft.maxOpenSessions" :min="2" :max="10" :step="1" step-strictly /></el-form-item>
           </div>
-          <el-form-item label="桌面通知"><el-switch v-model="planPermissionDraft.desktopNotification" active-text="演示批次状态变化时提醒" /></el-form-item>
+          <el-form-item label="桌面通知"><el-switch v-model="planPermissionDraft.desktopNotification" active-text="批次状态变化时提醒" /></el-form-item>
         </template>
-        <div v-else class="permission-assurance neutral">普通套餐不会获得批量演示能力。</div>
+        <div v-else class="permission-assurance neutral">普通套餐不会获得批量工作台能力。</div>
       </el-form>
       <template #footer>
         <el-button @click="showPlanPermissions = false">取消</el-button>

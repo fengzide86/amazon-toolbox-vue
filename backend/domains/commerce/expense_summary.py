@@ -45,7 +45,7 @@ class ExpenseSummaryReadModel(ExpenseServiceBase):
         total, count = await total_between(start, end)
         previous_total, _ = await total_between(previous, start)
         if previous_total == 0:
-            change = Decimal("0") if total == 0 else Decimal("100")
+            change = Decimal("0") if total == 0 else None
         else:
             change = ((total - previous_total) / previous_total * 100).quantize(
                 Decimal("0.1"),

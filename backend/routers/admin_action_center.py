@@ -12,6 +12,7 @@ from core.response import success_response
 from core.timestamps import utc_iso
 from database import get_db
 from domains.commerce import ExpenseService
+from domains.commerce.agency import AgencyService
 from domains.platform.action_center_schemas import (
     ActionCenterResponse,
     FeatureDisabledResponse,
@@ -81,6 +82,7 @@ async def get_action_center(
     expense_service = ExpenseService(db)
     renewal_items = await expense_service.due_items() if _admin.get("role") in {"super_admin", "operator"} else []
     renewal_count = await expense_service.due_count() if _admin.get("role") in {"super_admin", "operator"} else 0
+    delivery_tasks = await AgencyService(db, _admin).delivery_tasks() if _admin.get("role") == "super_admin" else []
 
     return success_response(
         {
@@ -125,6 +127,7 @@ async def get_action_center(
             "waiting_interventions": [],
             "stale_batches": [],
             "expense_renewals": renewal_items,
+            "agency_delivery_tasks": delivery_tasks,
         }
     )
 

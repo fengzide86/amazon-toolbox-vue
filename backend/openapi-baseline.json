@@ -386,6 +386,314 @@
         "title": "APIResponse[BusinessBootstrapResponse]",
         "type": "object"
       },
+      "APIResponse_CommissionPolicyView_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommissionPolicyView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[CommissionPolicyView]",
+        "type": "object"
+      },
+      "APIResponse_CommissionSettlementPreview_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommissionSettlementPreview"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[CommissionSettlementPreview]",
+        "type": "object"
+      },
+      "APIResponse_CommissionSettlementView_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommissionSettlementView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[CommissionSettlementView]",
+        "type": "object"
+      },
+      "APIResponse_CommissionSummaryView_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommissionSummaryView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "当前页码",
+            "title": "Page"
+          },
+          "page_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "每页数量",
+            "title": "Page Size"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总数（分页用）",
+            "title": "Total"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "总页数",
+            "title": "Total Pages"
+          }
+        },
+        "title": "APIResponse[CommissionSummaryView]",
+        "type": "object"
+      },
       "APIResponse_ExpenseAttachmentResponse_": {
         "properties": {
           "data": {
@@ -1954,6 +2262,13 @@
       },
       "ActionCenterData": {
         "properties": {
+          "agency_delivery_tasks": {
+            "items": {
+              "$ref": "#/components/schemas/AgencyDeliveryTask"
+            },
+            "title": "Agency Delivery Tasks",
+            "type": "array"
+          },
           "device_anomalies": {
             "items": {
               "$ref": "#/components/schemas/DeviceAnomalyItem"
@@ -2448,6 +2763,39 @@
         "title": "AgenciesEnvelope",
         "type": "object"
       },
+      "AgencyDeliveryTask": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "section": {
+            "title": "Section",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "count",
+          "section",
+          "status"
+        ],
+        "title": "AgencyDeliveryTask",
+        "type": "object"
+      },
       "AgencyEnvelope": {
         "properties": {
           "data": {
@@ -2746,7 +3094,7 @@
         "additionalProperties": false,
         "properties": {
           "customer_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Customer Id",
             "type": "integer"
           },
@@ -2763,7 +3111,7 @@
             "title": "Note"
           },
           "plan_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Plan Id",
             "type": "integer"
           },
@@ -3178,7 +3526,7 @@
             "type": "string"
           },
           "customer_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Customer Id",
             "type": "integer"
           },
@@ -3194,7 +3542,7 @@
           "order_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -3345,7 +3693,7 @@
             "title": "Created At"
           },
           "customer_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Customer Id",
             "type": "integer"
           },
@@ -3370,7 +3718,7 @@
           "order_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -3834,8 +4182,8 @@
           },
           "priority": {
             "default": 0,
-            "maximum": 100,
-            "minimum": 0,
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Priority",
             "type": "integer"
           },
@@ -4163,8 +4511,8 @@
           "priority": {
             "anyOf": [
               {
-                "maximum": 100,
-                "minimum": 0,
+                "maximum": 100.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -4711,8 +5059,8 @@
             "type": "string"
           },
           "total_count": {
-            "maximum": 1000,
-            "minimum": 1,
+            "maximum": 1000.0,
+            "minimum": 1.0,
             "title": "Total Count",
             "type": "integer"
           }
@@ -4806,26 +5154,26 @@
         "properties": {
           "completed_count": {
             "default": 0,
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Completed Count",
             "type": "integer"
           },
           "failed_count": {
             "default": 0,
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Failed Count",
             "type": "integer"
           },
           "pending_count": {
             "default": 0,
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Pending Count",
             "type": "integer"
           },
           "running_count": {
             "default": 0,
-            "maximum": 1,
-            "minimum": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
             "title": "Running Count",
             "type": "integer"
           },
@@ -4848,7 +5196,7 @@
           },
           "waiting_count": {
             "default": 0,
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Waiting Count",
             "type": "integer"
           }
@@ -4993,6 +5341,11 @@
           "completed_count": {
             "title": "Completed Count",
             "type": "integer"
+          },
+          "detail_accessible": {
+            "default": true,
+            "title": "Detail Accessible",
+            "type": "boolean"
           },
           "failed_count": {
             "title": "Failed Count",
@@ -5549,6 +5902,299 @@
         "title": "ChatTransferResponse",
         "type": "object"
       },
+      "CommissionEntryView": {
+        "properties": {
+          "agency_id": {
+            "title": "Agency Id",
+            "type": "integer"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "accrual",
+              "refund"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "occurred_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred At"
+          },
+          "order_amount_snapshot": {
+            "title": "Order Amount Snapshot",
+            "type": "string"
+          },
+          "order_id": {
+            "title": "Order Id",
+            "type": "integer"
+          },
+          "order_no": {
+            "title": "Order No",
+            "type": "string"
+          },
+          "rate_snapshot": {
+            "title": "Rate Snapshot",
+            "type": "string"
+          },
+          "settlement_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Id"
+          }
+        },
+        "required": [
+          "id",
+          "agency_id",
+          "order_id",
+          "order_no",
+          "kind",
+          "amount",
+          "rate_snapshot",
+          "order_amount_snapshot",
+          "occurred_at",
+          "settlement_id"
+        ],
+        "title": "CommissionEntryView",
+        "type": "object"
+      },
+      "CommissionPolicyUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_rate": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Rate"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          }
+        },
+        "required": [
+          "rate",
+          "expected_rate"
+        ],
+        "title": "CommissionPolicyUpdate",
+        "type": "object"
+      },
+      "CommissionPolicyView": {
+        "properties": {
+          "agency_id": {
+            "title": "Agency Id",
+            "type": "integer"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          }
+        },
+        "required": [
+          "agency_id",
+          "rate"
+        ],
+        "title": "CommissionPolicyView",
+        "type": "object"
+      },
+      "CommissionSettlementConfirm": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_revision": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Expected Revision",
+            "type": "string"
+          },
+          "month": {
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Month",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "expected_revision",
+          "note"
+        ],
+        "title": "CommissionSettlementConfirm",
+        "type": "object"
+      },
+      "CommissionSettlementPreview": {
+        "properties": {
+          "agency_id": {
+            "title": "Agency Id",
+            "type": "integer"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "existing_settlement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CommissionSettlementView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agency_id",
+          "month",
+          "amount",
+          "count",
+          "revision"
+        ],
+        "title": "CommissionSettlementPreview",
+        "type": "object"
+      },
+      "CommissionSettlementView": {
+        "properties": {
+          "agency_id": {
+            "title": "Agency Id",
+            "type": "integer"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "agency_id",
+          "month",
+          "amount",
+          "count",
+          "confirmed_at",
+          "note"
+        ],
+        "title": "CommissionSettlementView",
+        "type": "object"
+      },
+      "CommissionSummaryView": {
+        "properties": {
+          "accrued_amount": {
+            "title": "Accrued Amount",
+            "type": "string"
+          },
+          "pending_amount": {
+            "title": "Pending Amount",
+            "type": "string"
+          },
+          "refunded_amount": {
+            "title": "Refunded Amount",
+            "type": "string"
+          },
+          "settled_amount": {
+            "title": "Settled Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pending_amount",
+          "settled_amount",
+          "accrued_amount",
+          "refunded_amount"
+        ],
+        "title": "CommissionSummaryView",
+        "type": "object"
+      },
       "ConfigJsonValue": {
         "$ref": "#/components/schemas/JsonValue",
         "description": "Explicit whitelist for administrator-managed free-form JSON settings.",
@@ -5651,7 +6297,7 @@
           "agency_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -5780,7 +6426,7 @@
           "agency_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -6475,8 +7121,8 @@
             "type": "string"
           },
           "row_count": {
-            "maximum": 50,
-            "minimum": 1,
+            "maximum": 50.0,
+            "minimum": 1.0,
             "title": "Row Count",
             "type": "integer"
           },
@@ -6583,7 +7229,7 @@
         "additionalProperties": false,
         "properties": {
           "event_seq": {
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Event Seq",
             "type": "integer"
           },
@@ -6776,8 +7422,8 @@
           "error_count": {
             "anyOf": [
               {
-                "maximum": 50,
-                "minimum": 0,
+                "maximum": 50.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -6787,15 +7433,15 @@
             "title": "Error Count"
           },
           "event_seq": {
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Event Seq",
             "type": "integer"
           },
           "played_count": {
             "anyOf": [
               {
-                "maximum": 50,
-                "minimum": 0,
+                "maximum": 50.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -6807,8 +7453,8 @@
           "playing_count": {
             "anyOf": [
               {
-                "maximum": 50,
-                "minimum": 0,
+                "maximum": 50.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -6820,8 +7466,8 @@
           "queued_count": {
             "anyOf": [
               {
-                "maximum": 50,
-                "minimum": 0,
+                "maximum": 50.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -6833,8 +7479,8 @@
           "skipped_count": {
             "anyOf": [
               {
-                "maximum": 50,
-                "minimum": 0,
+                "maximum": 50.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -6866,7 +7512,7 @@
         "additionalProperties": false,
         "properties": {
           "event_seq": {
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Event Seq",
             "type": "integer"
           }
@@ -6906,8 +7552,8 @@
           },
           "total_step_count": {
             "default": 1,
-            "maximum": 100,
-            "minimum": 1,
+            "maximum": 100.0,
+            "minimum": 1.0,
             "title": "Total Step Count",
             "type": "integer"
           }
@@ -6925,13 +7571,13 @@
         "additionalProperties": false,
         "properties": {
           "completed_step_count": {
-            "maximum": 100,
-            "minimum": 0,
+            "maximum": 100.0,
+            "minimum": 0.0,
             "title": "Completed Step Count",
             "type": "integer"
           },
           "event_seq": {
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Event Seq",
             "type": "integer"
           },
@@ -7112,8 +7758,8 @@
           "completed_step_count": {
             "anyOf": [
               {
-                "maximum": 100,
-                "minimum": 0,
+                "maximum": 100.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -7147,7 +7793,7 @@
             "title": "Error Code"
           },
           "event_seq": {
-            "minimum": 1,
+            "minimum": 1.0,
             "title": "Event Seq",
             "type": "integer"
           },
@@ -7593,8 +8239,8 @@
           },
           "sort_order": {
             "default": 100,
-            "maximum": 10000,
-            "minimum": 0,
+            "maximum": 10000.0,
+            "minimum": 0.0,
             "title": "Sort Order",
             "type": "integer"
           }
@@ -7718,8 +8364,8 @@
           "sort_order": {
             "anyOf": [
               {
-                "maximum": 10000,
-                "minimum": 0,
+                "maximum": 10000.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -7753,7 +8399,7 @@
           "amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -7763,7 +8409,7 @@
             "title": "Amount"
           },
           "category_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Category Id",
             "type": "integer"
           },
@@ -8029,7 +8675,7 @@
           "amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -8044,7 +8690,7 @@
           "category_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -8112,7 +8758,7 @@
           "amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -8180,7 +8826,7 @@
         "additionalProperties": false,
         "properties": {
           "category_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Category Id",
             "type": "integer"
           },
@@ -8197,7 +8843,7 @@
           "default_amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -8231,8 +8877,8 @@
           },
           "reminder_days": {
             "default": 7,
-            "maximum": 90,
-            "minimum": 0,
+            "maximum": 90.0,
+            "minimum": 0.0,
             "title": "Reminder Days",
             "type": "integer"
           },
@@ -8563,7 +9209,7 @@
           "category_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -8592,7 +9238,7 @@
           "default_amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -8644,8 +9290,8 @@
           "reminder_days": {
             "anyOf": [
               {
-                "maximum": 90,
-                "minimum": 0,
+                "maximum": 90.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -8680,8 +9326,15 @@
             "type": "array"
           },
           "change_percent": {
-            "title": "Change Percent",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Percent"
           },
           "count": {
             "title": "Count",
@@ -11400,7 +12053,7 @@
           "amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -11425,7 +12078,7 @@
             "title": "Channel"
           },
           "plan_id": {
-            "exclusiveMinimum": 0,
+            "exclusiveMinimum": 0.0,
             "title": "Plan Id",
             "type": "integer"
           },
@@ -11735,7 +12388,7 @@
           "amount": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -11762,7 +12415,7 @@
           "plan_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -11859,6 +12512,124 @@
           "total"
         ],
         "title": "PaginatedDemoRuns",
+        "type": "object"
+      },
+      "PaginatedResponse_CommissionEntryView_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CommissionEntryView"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "description": "当前页码",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "每页数量",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "description": "总数",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "总页数",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "PaginatedResponse[CommissionEntryView]",
+        "type": "object"
+      },
+      "PaginatedResponse_CommissionSettlementView_": {
+        "properties": {
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CommissionSettlementView"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "响应数据",
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "description": "响应消息",
+            "title": "Message",
+            "type": "string"
+          },
+          "page": {
+            "description": "当前页码",
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "description": "每页数量",
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "success": {
+            "default": true,
+            "description": "是否成功",
+            "title": "Success",
+            "type": "boolean"
+          },
+          "total": {
+            "description": "总数",
+            "title": "Total",
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "总页数",
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "page_size",
+          "total_pages"
+        ],
+        "title": "PaginatedResponse[CommissionSettlementView]",
         "type": "object"
       },
       "PaginatedResponse_ExpenseRecordResponse_": {
@@ -12063,8 +12834,8 @@
             "title": "Code Prefix"
           },
           "duration_days": {
-            "exclusiveMinimum": 0,
-            "maximum": 3650,
+            "exclusiveMinimum": 0.0,
+            "maximum": 3650.0,
             "title": "Duration Days",
             "type": "integer"
           },
@@ -12099,7 +12870,7 @@
           "price": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -12119,8 +12890,8 @@
           },
           "sort_order": {
             "default": 0,
-            "maximum": 10000,
-            "minimum": -10000,
+            "maximum": 10000.0,
+            "minimum": -10000.0,
             "title": "Sort Order",
             "type": "integer"
           }
@@ -12384,8 +13155,8 @@
           "duration_days": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
-                "maximum": 3650,
+                "exclusiveMinimum": 0.0,
+                "maximum": 3650.0,
                 "type": "integer"
               },
               {
@@ -12404,6 +13175,21 @@
               }
             ],
             "title": "Entitlements"
+          },
+          "expected_price": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Price"
           },
           "features": {
             "anyOf": [
@@ -12432,7 +13218,7 @@
           "price": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "number"
               },
               {
@@ -12462,8 +13248,8 @@
           "sort_order": {
             "anyOf": [
               {
-                "maximum": 10000,
-                "minimum": -10000,
+                "maximum": 10000.0,
+                "minimum": -10000.0,
                 "type": "integer"
               },
               {
@@ -12555,8 +13341,8 @@
           "coordination": {
             "anyOf": [
               {
-                "maximum": 1,
-                "minimum": 0,
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -12568,8 +13354,8 @@
           "market": {
             "anyOf": [
               {
-                "maximum": 1,
-                "minimum": 0,
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -12581,8 +13367,8 @@
           "product": {
             "anyOf": [
               {
-                "maximum": 1,
-                "minimum": 0,
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -12594,8 +13380,8 @@
           "record": {
             "anyOf": [
               {
-                "maximum": 1,
-                "minimum": 0,
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -12607,8 +13393,8 @@
           "service": {
             "anyOf": [
               {
-                "maximum": 1,
-                "minimum": 0,
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -12620,8 +13406,8 @@
           "tech": {
             "anyOf": [
               {
-                "maximum": 1,
-                "minimum": 0,
+                "maximum": 1.0,
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -12919,8 +13705,8 @@
       "RateSessionRequest": {
         "properties": {
           "satisfaction": {
-            "maximum": 5,
-            "minimum": 1,
+            "maximum": 5.0,
+            "minimum": 1.0,
             "title": "Satisfaction",
             "type": "integer"
           }
@@ -12997,8 +13783,8 @@
           },
           "min_score": {
             "default": 0.3,
-            "maximum": 1,
-            "minimum": -1,
+            "maximum": 1.0,
+            "minimum": -1.0,
             "title": "Min Score",
             "type": "number"
           },
@@ -13021,8 +13807,8 @@
           },
           "top_k": {
             "default": 5,
-            "maximum": 20,
-            "minimum": 1,
+            "maximum": 20.0,
+            "minimum": 1.0,
             "title": "Top K",
             "type": "integer"
           }
@@ -13050,8 +13836,8 @@
           },
           "completed_steps": {
             "default": 0,
-            "maximum": 500,
-            "minimum": 0,
+            "maximum": 500.0,
+            "minimum": 0.0,
             "title": "Completed Steps",
             "type": "integer"
           },
@@ -13250,7 +14036,7 @@
           "agency_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -13577,7 +14363,7 @@
           "agency_id": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0,
+                "exclusiveMinimum": 0.0,
                 "type": "integer"
               },
               {
@@ -14404,8 +15190,8 @@
           "max_unmatched": {
             "anyOf": [
               {
-                "maximum": 10,
-                "minimum": 1,
+                "maximum": 10.0,
+                "minimum": 1.0,
                 "type": "integer"
               },
               {
@@ -15860,7 +16646,7 @@
   },
   "info": {
     "title": "课赛通 KST · 跨境电商赛训效率平台",
-    "version": "1.8.8"
+    "version": "1.8.10"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -16084,6 +16870,422 @@
           }
         ],
         "summary": "Create Agency",
+        "tags": [
+          "代理工作台"
+        ]
+      }
+    },
+    "/api/agency/agencies/{agency_id}/commission-policy": {
+      "get": {
+        "operationId": "commission_policy_api_agency_agencies__agency_id__commission_policy_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CommissionPolicyView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commission Policy",
+        "tags": [
+          "代理工作台"
+        ]
+      },
+      "put": {
+        "operationId": "update_commission_policy_api_agency_agencies__agency_id__commission_policy_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommissionPolicyUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CommissionPolicyView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update Commission Policy",
+        "tags": [
+          "代理工作台"
+        ]
+      }
+    },
+    "/api/agency/agencies/{agency_id}/commission-settlement-preview": {
+      "get": {
+        "operationId": "commission_settlement_preview_api_agency_agencies__agency_id__commission_settlement_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "title": "Month",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CommissionSettlementPreview_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commission Settlement Preview",
+        "tags": [
+          "代理工作台"
+        ]
+      }
+    },
+    "/api/agency/agencies/{agency_id}/commission-settlements": {
+      "get": {
+        "operationId": "commission_settlements_api_agency_agencies__agency_id__commission_settlements_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_CommissionSettlementView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commission Settlements",
+        "tags": [
+          "代理工作台"
+        ]
+      },
+      "post": {
+        "operationId": "confirm_commission_settlement_api_agency_agencies__agency_id__commission_settlements_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommissionSettlementConfirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CommissionSettlementView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Commission Settlement",
+        "tags": [
+          "代理工作台"
+        ]
+      }
+    },
+    "/api/agency/agencies/{agency_id}/commission-summary": {
+      "get": {
+        "operationId": "commission_summary_api_agency_agencies__agency_id__commission_summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_CommissionSummaryView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commission Summary",
+        "tags": [
+          "代理工作台"
+        ]
+      }
+    },
+    "/api/agency/agencies/{agency_id}/commissions": {
+      "get": {
+        "operationId": "commission_entries_api_agency_agencies__agency_id__commissions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "agency_id",
+            "required": true,
+            "schema": {
+              "title": "Agency Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "settled",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Settled"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_CommissionEntryView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Commission Entries",
         "tags": [
           "代理工作台"
         ]

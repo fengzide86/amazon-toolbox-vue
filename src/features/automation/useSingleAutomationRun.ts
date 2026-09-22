@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useTaskRunStore } from '@/stores/taskRun'
-import { cancelDemoRun, createDemoRun, finishDemoRun, updateDemoRun } from '@/utils/api'
+import { createDemoRun, updateDemoRun } from '@/utils/api'
 import { showToast } from '@/utils'
 import { confirmAction } from '@/shared/ui/confirm'
 import type { RunStatus } from '@/automation'
@@ -12,6 +12,7 @@ import { demoActivityToken, setDemoActivity } from '@/utils/demoActivity'
 import { refreshLiveLaunch } from '@/features/automation/launch'
 import { getRuntimeCapabilities } from '@/runtime/capabilities'
 import type { FreightQuoteResult } from '@/shared/freight/types'
+import { flushPendingDemoReceipts, queueDemoReceipt, type DemoReceipt } from './demo-receipts'
 
 
 export function useSingleAutomationRun() {
@@ -37,6 +38,9 @@ const taskStarting = ref(false)
  const browserRegistered = ref(false)
  const loggedRunIds = new Set<string>()
  const telemetryRuns = new Map<string, Promise<string | null>>()
+const pendingReceipt = ref<DemoReceipt | null>(null)
+const recordSyncing = ref(false)
+const recordPending = computed(() => Boolean(pendingReceipt.value || runResult.value?.reportWarning))
  let activeDemoToken: string | null = null
 
  const toolName = computed(() => appStore.currentTool?.name || '自动化工具')
@@ -109,6 +113,13 @@ const problemCode = computed(() => {
  const failureTitle = computed(() => isDemo.value ? '交互演示异常' : '自动执行失败')
  const failureDescription = computed(() => {
    const stepId = currentStep.value?.id
+   if (!isDemo.value) {
+     if (stepId === 'prepare') return '执行准备未完成，请检查授权和本机运行环境后重试。'
+     if (stepId === 'open') return '平台页面未能正常载入，自动处理已停止，请检查网络后重试。'
+     if (stepId === 'inspect') return '平台页面暂不符合执行条件，请核对登录状态或联系支持。'
+     if (stepId === 'verify' || stepId === 'summary') return '本次结果未能确认。请先核对平台现场，避免重复处理。'
+     return '自动处理已停止，请核对平台现场后重试，或携带问题编号联系支持。'
+   }
    if (stepId === 'prepare') return '模拟场景在准备阶段停止，可重新加载演示。'
    if (stepId === 'open') return '模拟页面没有正常载入，演示已安全停止。'
    if (stepId === 'inspect') return '模拟页面检查未完成，演示已安全停止。'
@@ -228,7 +239,7 @@ async function openSupport() {
      if (nextTool.executionMode !== 'live') scheduleTelemetry(nextTool)
    } catch {
      await deactivateDemoActivity()
-     showToast('演示启动失败，你可以重新加载或联系客服', 'error')
+     showToast(isDemo.value ? '演示启动失败，你可以重新加载或联系客服' : '自动处理启动失败，请检查授权和运行环境或联系支持', 'error')
    } finally {
      taskStarting.value = false
      browserLoading.value = false
@@ -262,29 +273,38 @@ async function openSupport() {
      await deactivateDemoActivity()
      return
    }
-   loggedRunIds.add(runId)
+   const tool = appStore.currentTool
+   const receipt: DemoReceipt = {
+     localId: runId, toolId: String(tool?.id || ''), toolName: tool?.name || '工具演示',
+     platform: tool?.platformKey || 'amazon', scenario: tool?.scenarioId || 'default',
+     status: status as DemoReceipt['status'], completedSteps: taskRunStore.completedCount,
+   }
+   pendingReceipt.value = receipt
+   recordSyncing.value = true
    try {
     const remoteRunId = await telemetryRuns.get(runId)
-    if (!remoteRunId) return
-    if (status === 'completed') {
-      await finishDemoRun(remoteRunId, { event_seq: 2, completed_step_count: taskRunStore.completedCount })
-    } else if (status === 'cancelled') {
-      await cancelDemoRun(remoteRunId, 2)
-    } else {
-      await updateDemoRun(remoteRunId, {
-        event_seq: 2,
-        status: 'error',
-        current_step_id: taskRunStore.currentStep?.id || null,
-        completed_step_count: taskRunStore.completedCount,
-        error_code: taskRunStore.error?.code || 'DEMO_RUNTIME_ERROR',
-      })
-    }
+    const synced = await queueDemoReceipt(remoteRunId ? { ...receipt, remoteId: remoteRunId } : receipt)
+    if (synced) { loggedRunIds.add(runId); if (pendingReceipt.value?.localId === runId) pendingReceipt.value = null }
    } catch (error) {
      console.warn('[DemoRun] 演示记录上报失败:', errorMessage(error, '未知错误'))
    } finally {
+     recordSyncing.value = false
      await deactivateDemoActivity()
    }
  }
+
+async function retryRecordSync() {
+  if (!pendingReceipt.value || recordSyncing.value) return
+  const receipt = pendingReceipt.value
+  recordSyncing.value = true
+  try {
+    if (await queueDemoReceipt(receipt)) {
+      loggedRunIds.add(receipt.localId)
+      if (pendingReceipt.value?.localId === receipt.localId) pendingReceipt.value = null
+      showToast('演示记录已同步', 'success')
+    } else showToast('记录暂未同步，请联网后重试；无需重新执行任务', 'warning')
+  } finally { recordSyncing.value = false }
+}
 
  function scheduleTelemetry(tool: NonNullable<typeof appStore.currentTool>): void {
    const localRunId = tool.demoRunId
@@ -330,6 +350,8 @@ async function openSupport() {
  }
 
 onMounted(() => {
+  void flushPendingDemoReceipts()
+  window.addEventListener('online', flushPendingDemoReceipts)
   if (!isDesktop.value) void startDemoTask()
 })
 
@@ -341,6 +363,7 @@ watch(runStatus, status => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('online', flushPendingDemoReceipts)
   void deactivateDemoActivity()
   if (browserRegistered.value) void window.electronAPI?.automation?.unregisterBrowser()
   taskRunStore.reset()
@@ -348,7 +371,7 @@ onUnmounted(() => {
   return {
     browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,
     platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
-    freightQuote, adapterVersion, evidenceSummary,
+    freightQuote, adapterVersion, evidenceSummary, recordPending, recordSyncing, retryRecordSync,
     currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
     isBrowserRetryableError, failureTitle, failureDescription, technicalError,
     stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport, registerWorkspaceBrowser,

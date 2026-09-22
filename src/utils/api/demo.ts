@@ -38,6 +38,9 @@ export const finishDemoRun = (runId: EntityId, payload: DemoRunFinishPayload): P
 export const cancelDemoRun = (runId: EntityId, eventSeq: number): Promise<Schemas['DemoRunResponse']> =>
   api.post(`/api/demo/runs/${encodeURIComponent(runId)}/cancel`, { event_seq: eventSeq })
 
+export const getDemoRun = (runId: EntityId): Promise<Schemas['DemoRunResponse']> =>
+  api.get(`/api/demo/runs/${encodeURIComponent(runId)}`, {}, { cache: false })
+
 export const getDemoRuns = (params: ApiQueryParams = {}): Promise<Schemas['DemoRunResponse'][]> =>
   api.get('/api/demo/runs', params, { cache: false })
 export const getDemoRunsPage = (params: ApiQueryParams = {}): Promise<Schemas['PaginatedDemoRuns']> =>

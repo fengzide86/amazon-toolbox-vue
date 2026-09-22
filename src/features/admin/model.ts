@@ -62,6 +62,15 @@ export const profitPolicySchema = z.object({
   }),
 })
 
+export const profitRecordSchema = z.object({
+  id: z.number(), order_id: z.number(), status: z.string(), policy_version: z.number(),
+  order_amount_snapshot: z.coerce.number(),
+  tech_share: z.coerce.number(), market_share: z.coerce.number(), product_share: z.coerce.number(),
+  service_share: z.coerce.number(), coordination_share: z.coerce.number(), record_share: z.coerce.number(),
+  reversal_reason: nullableText, created_at: nullableText,
+})
+export type ProfitRecord = z.infer<typeof profitRecordSchema>
+
 export const adminSettingsSchema = z.array(z.object({
   key: z.string(),
   value: z.string().nullable().optional(),
@@ -78,6 +87,10 @@ const actionSummarySchema = z.object({
 
 export const adminActionCenterSchema = z.object({
   summary: actionSummarySchema,
+  agency_delivery_tasks: z.array(z.object({
+    key: z.string(), label: z.string(), count: z.number().int().nonnegative(),
+    section: z.enum(['orders', 'licenses', 'requests']), status: z.string(),
+  })).default([]),
   expiring_authorizations: z.array(z.object({
     id: entityIdSchema,
     code_masked: z.string(),

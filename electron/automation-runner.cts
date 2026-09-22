@@ -486,19 +486,28 @@ class AutomationRuntime {
     if (MOCK_MODE || this.tool.executionMode !== 'live') return {};
     const token = this.tool.launchGrant?.token;
     if (!token || !this.runId) return {};
+    const receipt = {
+      token,
+      run_id: this.runId,
+      status,
+      error_code: errorCode || null,
+      adapter_version: this.script.version || null,
+      page_fingerprint: typeof result.pageFingerprint === 'string' ? result.pageFingerprint : null,
+      page_changed: result.pageChanged === true,
+      completed_steps: [...this.completedStepIds].filter(stepId => stepId !== 'summary').length,
+    };
+    if (process.env.TOOLBOX_PERSIST_REPORTS === '1') {
+      const report = await this.hostRequest('execution.report', receipt);
+      return {
+        executionId: typeof report.executionId === 'number' ? report.executionId : undefined,
+        warning: typeof report.warning === 'string' ? report.warning : undefined,
+      };
+    }
     const response = await fetch(`${CONTROL_API_BASE}/api/executions/report`, {
       method: 'POST',
+      signal: AbortSignal.timeout(10000),
       headers: { 'Content-Type': 'application/json', 'X-Toolbox-Version': process.env.TOOLBOX_CLIENT_VERSION || 'unknown' },
-      body: JSON.stringify({
-        token,
-        run_id: this.runId,
-        status,
-        error_code: errorCode || null,
-        adapter_version: this.script.version || null,
-        page_fingerprint: typeof result.pageFingerprint === 'string' ? result.pageFingerprint : null,
-        page_changed: result.pageChanged === true,
-        completed_steps: [...this.completedStepIds].filter(stepId => stepId !== 'summary').length,
-      }),
+      body: JSON.stringify(receipt),
     });
     const body = asRecord(await response.json());
     if (!response.ok || body.success !== true) {

@@ -1,4 +1,5 @@
 import type { components } from '@/shared/api/openapi.generated'
+import type { BusinessOutboxStorage } from './outbox-storage'
 
 export type WorkspaceSyncState = 'synced' | 'syncing' | 'offline'
 
@@ -28,6 +29,7 @@ interface WorkspaceOutboxOptions {
   onState: (state: WorkspaceSyncState) => void
   retryDelays?: readonly number[]
   maySync?: () => boolean
+  persistence?: BusinessOutboxStorage
 }
 
 export class BusinessWorkspaceOutbox {
@@ -46,23 +48,32 @@ export class BusinessWorkspaceOutbox {
 
   constructor(private readonly options: WorkspaceOutboxOptions) {
     this.retryDelays = options.retryDelays || [2_000, 5_000, 15_000, 30_000]
+    const saved = options.persistence?.load()
+    for (const item of saved?.items || []) this.itemOutbox.set(JSON.stringify([String(item.batchId), item.itemId]), {
+      batchId: item.batchId, itemId: item.itemId, payload: { ...item.payload, account_label_masked: '账号' },
+    })
+    for (const batch of saved?.batches || []) this.batchOutbox.set(String(batch.batchId), { batchId: batch.batchId, payload: batch.payload })
+    for (const finish of saved?.finishes || []) this.finishOutbox.set(String(finish.batchId), { batchId: finish.batchId, status: finish.status })
   }
 
   queueItem(pending: PendingItemSync): void {
     if (!this.canQueue(pending.batchId)) return
     this.itemOutbox.set(JSON.stringify([String(pending.batchId), pending.itemId]), pending)
+    this.persist()
     void this.flush()
   }
 
   queueBatch(pending: PendingBatchSync): void {
     if (!this.canQueue(pending.batchId)) return
     this.batchOutbox.set(String(pending.batchId), pending)
+    this.persist()
     void this.flush()
   }
 
   queueFinish(pending: PendingFinishSync): void {
     if (!this.canQueue(pending.batchId)) return
     this.finishOutbox.set(String(pending.batchId), pending)
+    this.persist()
   }
 
   /** A late create response must stay with its original owner, even while paused. */
@@ -70,11 +81,28 @@ export class BusinessWorkspaceOutbox {
     const key = String(batchId)
     if (this.finishedBatches.has(key) || this.finishingBatches.has(key)) return
     this.finishOutbox.set(key, { batchId, status: 'cancelled' })
+    this.persist()
     void this.flush()
   }
 
   hasPending(): boolean {
     return this.itemOutbox.size > 0 || this.batchOutbox.size > 0 || this.finishOutbox.size > 0
+  }
+
+  /** Missing host after process restart means interrupted, never replay external work. */
+  recoverInterrupted(activeBatchId?: string | number): void {
+    const batches = new Set([...this.itemOutbox.values(), ...this.batchOutbox.values()].map(item => String(item.batchId)))
+    for (const batchId of batches) {
+      if (batchId === String(activeBatchId) || this.finishOutbox.has(batchId)) continue
+      for (const [key, item] of this.itemOutbox) {
+        if (String(item.batchId) === batchId && ['pending', 'running', 'waiting_user'].includes(item.payload.status)) {
+          this.itemOutbox.set(key, { ...item, payload: { ...item.payload, status: 'cancelled', intervention_type: undefined } })
+        }
+      }
+      this.batchOutbox.delete(batchId)
+      this.finishOutbox.set(batchId, { batchId, status: 'interrupted' })
+    }
+    this.persist()
   }
 
   resume(): void {
@@ -111,12 +139,14 @@ export class BusinessWorkspaceOutbox {
             await this.options.updateItem(pending.batchId, pending.itemId, pending.payload)
             if (!active()) return
             if (this.itemOutbox.get(key) === pending) this.itemOutbox.delete(key)
+            this.persist()
           }
           for (const [key, pending] of [...this.batchOutbox.entries()]) {
             if (!active()) return
             await this.options.updateBatch(pending.batchId, pending.payload)
             if (!active()) return
             if (this.batchOutbox.get(key) === pending) this.batchOutbox.delete(key)
+            this.persist()
           }
           for (const [key, pending] of [...this.finishOutbox.entries()]) {
             if (!active()) return
@@ -130,6 +160,7 @@ export class BusinessWorkspaceOutbox {
               if (!active()) return
               this.finishedBatches.add(key)
               this.finishOutbox.delete(key)
+              this.persist()
             } finally {
               this.finishingBatches.delete(key)
             }
@@ -190,6 +221,10 @@ export class BusinessWorkspaceOutbox {
   }
 
   private maySync(): boolean { return !this.disposed && (this.options.maySync?.() ?? true) }
+
+  private persist(): void {
+    this.options.persistence?.save({ version: 1, items: [...this.itemOutbox.values()], batches: [...this.batchOutbox.values()], finishes: [...this.finishOutbox.values()] })
+  }
 
   private clearRetry(): void {
     if (this.retryTimer) clearTimeout(this.retryTimer)

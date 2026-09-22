@@ -67,6 +67,7 @@
     <footer class="landing-footer"><div class="landing-container"><div class="footer-top"><BrandLockup audience="login" /><div class="footer-links"><RouterLink :to="anchor('workflow')">授权说明</RouterLink><RouterLink :to="anchor('faq')">常见问题</RouterLink><RouterLink :to="marketingOnly ? '/terms' : '/user/terms'">服务条款</RouterLink><RouterLink v-if="!marketingOnly" to="/admin/login">内部运营</RouterLink></div></div><div class="footer-bottom"><span>© {{ currentYear }} 课赛通 KST</span><span>以亚马逊赛训为主 · 速卖通扩展验证中</span><RouterLink to="/">回到顶部 <ArrowUp :size="14" aria-hidden="true" /></RouterLink></div></div></footer>
     <Transition name="download-notice"><div v-if="downloadState !== 'idle'" class="download-notice" :class="{ 'is-error': downloadState === 'error' }"><div><span v-if="isDownloading" class="download-spinner" aria-hidden="true"></span><CircleAlert v-else-if="downloadState === 'error'" :size="19" aria-hidden="true" /><Check v-else :size="19" aria-hidden="true" /><p id="desktop-download-feedback" :role="downloadState === 'error' ? 'alert' : 'status'" aria-atomic="true">{{ downloadFeedback }}</p></div><button v-if="downloadState === 'error'" type="button" @click="downloadDesktop">重试</button><button v-if="!isDownloading" class="notice-close" type="button" aria-label="关闭下载提示" @click="downloadState = 'idle'"><X :size="17" aria-hidden="true" /></button></div></Transition>
     <LandingConsultationDialog :open="consultationOpen" @close="consultationOpen = false" />
+    <LandingDesktopHandoff :open="handoffOpen" :url="handoffUrl" @close="handoffOpen = false" />
   </main>
 </template>
 
@@ -76,8 +77,9 @@ import { ArrowDown, ArrowRight, BookOpen, CornerDownRight, FileSpreadsheet, Hist
 import BrandLockup from '@/components/brand/BrandLockup.vue'
 import LandingStoryScene from '@/components/landing/LandingStoryScene.vue'
 import LandingConsultationDialog from '@/components/landing/LandingConsultationDialog.vue'
+import LandingDesktopHandoff from '@/components/landing/LandingDesktopHandoff.vue'
 import { useLandingMotion } from '@/composables/useLandingMotion'
-import { downloadDesktopInstaller } from '@/runtime/desktop-download'
+import { downloadDesktopInstaller, resolveDesktopInstallerUrl } from '@/runtime/desktop-download'
 
 const props = withDefaults(defineProps<{ marketingOnly?: boolean }>(), { marketingOnly: false })
 const currentYear = new Date().getFullYear()
@@ -86,6 +88,9 @@ const mainContent = ref<HTMLElement | null>(null)
 const navToggle = ref<HTMLButtonElement | null>(null)
 const mobileNavOpen = ref(false)
 const consultationOpen = ref(false)
+const handoffOpen = ref(false)
+const handoffUrl = ref('')
+const mobileDevice = ref(false)
 const { motionReady, motionPaused, reducedMotion, toggleMotion } = useLandingMotion(landingRoot)
 const activeScenario = ref<'personal' | 'team'>('personal')
 const artReplay = ref(0)
@@ -110,7 +115,7 @@ function selectScenario(scenario: 'personal' | 'team'): void {
 }
 const downloadState = ref<'idle' | 'loading' | 'requested' | 'error'>('idle')
 const isDownloading = computed(() => downloadState.value === 'loading')
-const downloadLabel = computed(() => isDownloading.value ? '正在获取安装包…' : downloadState.value === 'error' ? '重试下载桌面端' : '下载 Windows 桌面端')
+const downloadLabel = computed(() => isDownloading.value ? '正在获取安装包…' : downloadState.value === 'error' ? '重试下载安装包' : mobileDevice.value ? '在电脑上安装' : '下载 Windows 桌面端')
 const downloadFeedback = computed(() => downloadState.value === 'loading' ? '正在获取当前发布的安装包…' : downloadState.value === 'error' ? '暂时无法获取安装包，请重试下载。' : '已请求下载，请查看浏览器下载列表。')
 const anchor = (id: string) => ({ name: 'Landing', hash: '#' + id })
 function closeNavigation(restoreFocus = false): void {
@@ -126,6 +131,12 @@ async function downloadDesktop(): Promise<void> {
   if (isDownloading.value) return
   downloadState.value = 'loading'
   try {
+    if (mobileDevice.value) {
+      handoffUrl.value = await resolveDesktopInstallerUrl()
+      handoffOpen.value = true
+      downloadState.value = 'idle'
+      return
+    }
     await downloadDesktopInstaller()
     downloadState.value = 'requested'
   } catch { downloadState.value = 'error' }
@@ -136,6 +147,7 @@ function handleOutsidePointer(event: PointerEvent): void {
 let desktopNavigation: MediaQueryList | undefined
 function handleNavigationResize(): void { if (desktopNavigation?.matches) closeNavigation() }
 onMounted(() => {
+  mobileDevice.value = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
   document.addEventListener('pointerdown', handleOutsidePointer)
   desktopNavigation = window.matchMedia('(min-width: 901px)')
   desktopNavigation.addEventListener('change', handleNavigationResize)

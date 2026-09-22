@@ -22,6 +22,7 @@ import {
   type ImportPreview,
 } from './model'
 import { BusinessWorkspaceOutbox, type WorkspaceSyncState } from './workspace-outbox'
+import { BusinessOutboxStorage } from './outbox-storage'
 import { errorMessage, ipcPayload, requireBatchApi, unwrapData } from './workspace-helpers'
 
 const serverBatchItemStatusSchema = z.enum(['pending', 'running', 'waiting_user', 'completed', 'failed', 'cancelled'])
@@ -36,6 +37,7 @@ export interface BusinessLiveDependencies {
   selectItem(itemId: string): void
   setSyncState(state: WorkspaceSyncState): void
   setError(message: string | null): void
+  setStorageUnavailable?(unavailable: boolean): void
 }
 
 /** Owns Electron batch events, Runner provisioning and in-session API sync. */
@@ -75,9 +77,11 @@ export class BusinessLiveCoordinator {
       updateItem: updateBusinessBatchItem, updateBatch: updateBusinessBatch, finishBatch: finishBusinessBatch,
       maySync: () => this.ownsCurrentSession() && this.ownerScope === owner,
       onState: state => { if (this.ownsCurrentSession() && this.ownerScope === owner) this.dependencies.setSyncState(state) },
+      persistence: new BusinessOutboxStorage(owner, () => localStorage, () => {
+        if (this.ownsCurrentSession() && this.ownerScope === owner) this.dependencies.setStorageUnavailable?.(true)
+      }),
     })
     this.ownerOutboxes.set(owner, this.outbox)
-    this.outbox.resume()
     const batch = window.electronAPI?.batch
     if (!this.removeEventListener && batch) this.removeEventListener = batch.onEvent(event => this.handleEvent(event))
     const localSnapshot = await batch?.getSnapshot()
@@ -117,6 +121,14 @@ export class BusinessLiveCoordinator {
       }
     }
     if (!valid()) return
+    // A missing local host after app restart cannot resume real work. Only
+    // reconcile its saved receipts; the owning device may create a new batch.
+    const scene = this.dependencies.getSnapshot()
+    const ownedScene = scene.recordKind === 'live' && scene.batchId && this.batchOwners.get(scene.batchId) === owner
+    if (!localSnapshot || parsedLocalSnapshot.data?.status === 'idle' || ownedScene) {
+      this.outbox.recoverInterrupted(ownedScene ? scene.serverBatchId : undefined)
+    }
+    this.outbox.resume()
     if (this.initialized) return
     this.initialized = true
     this.startHeartbeat()
@@ -193,6 +205,7 @@ export class BusinessLiveCoordinator {
   async restartItem(itemId: string): Promise<void> {
     const lifecycle = this.lifecycle
     if (!this.ownsCurrentSession()) return
+    if (this.dependencies.getSnapshot().status !== 'running') throw new Error('批次已结束，请重新导入需要处理的账号并新建批次')
     const next = await requireBatchApi().restartItem(itemId)
     if (this.ownsCurrentSession() && lifecycle === this.lifecycle) this.dependencies.setSnapshot(next)
   }

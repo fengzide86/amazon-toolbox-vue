@@ -12,8 +12,10 @@
     </section>
     <section v-if="user && !loading && !loadError" class="limits-grid">
       <article><span>这台电脑</span><strong>{{ deviceAuthorized ? '已授权' : '未识别到本机授权' }}</strong><small>{{ devices.length }} / {{ user.max_devices }} 台设备</small></article>
-      <article><span>单批次上限</span><strong>{{ store.entitlements.max_batch_rows || 50 }}</strong><small>仅统计有效导入行</small></article>
-      <article><span>并发演示上限</span><strong>{{ store.entitlements.max_batch_rows || 50 }}</strong><small>全部演示项同步推进</small></article>
+      <article><span>真实任务单批上限</span><strong>{{ store.entitlements.max_batch_rows || 50 }}</strong><small>仅统计有效导入行，需工具已开放真实执行</small></article>
+      <article><span>并发演示上限</span><strong>50</strong><small>逻辑演示，不代表真实账号并发</small></article>
+      <article><span>真实执行</span><strong>1 个活动任务</strong><small>依次执行；最多保留 {{ store.entitlements.max_open_sessions || 6 }} 个待操作浏览器现场</small></article>
+      <article><span>授权席位</span><strong>{{ user.seat_used ?? '待核对' }} / {{ user.seat_limit ?? '待核对' }}</strong><small>释放或扩容请联系授权提供方，不会自动增加收费</small></article>
     </section>
     <p class="security-note"><ShieldCheck :size="16" />客户密码、Cookie 和 Excel 原文不会上传到服务端。</p>
   </div>

@@ -6,6 +6,14 @@
       </template>
     </PageHeader>
 
+    <section class="license-summary" aria-label="当前授权摘要">
+      <div><small>授权期限</small><strong>{{ licenseExpiry }}</strong></div>
+      <div><small>可用平台</small><strong>{{ licensePlatforms }}</strong></div>
+      <div><small>设备上限</small><strong>{{ userInfo.max_devices ? `${userInfo.max_devices} 台` : '以授权信息为准' }}</strong></div>
+      <p>以上为最近一次授权校验信息；续期不会自动扣款，由工作人员确认后处理。</p>
+      <button type="button" class="btn btn-secondary" @click="renewCurrent">咨询原授权续期</button>
+    </section>
+
     <div v-if="route.query?.tool" class="upgrade-notice">
       <LockKeyhole :size="17" />当前套餐暂未包含你选择的工具，可查看下面的可用套餐。
     </div>
@@ -28,13 +36,13 @@
         <ul>
           <li v-for="benefit in benefitsOf(plan)" :key="benefit"><Check :size="15" />{{ benefit }}</li>
         </ul>
-        <button v-if="isCurrent(plan)" type="button" disabled>当前套餐</button>
+        <button v-if="isCurrent(plan)" type="button" @click="contactService(plan)">咨询原套餐续期</button>
         <button v-else type="button" @click="contactService(plan)">联系客服购买</button>
       </article>
     </div>
 
     <div v-else-if="loadState === 'empty'" class="empty-state">暂无套餐信息</div>
-    <el-dialog v-model="contactVisible" title="套餐购买咨询" width="min(460px, 92vw)" destroy-on-close>
+    <el-dialog v-model="contactVisible" :title="selectedPlan && isCurrent(selectedPlan) ? '原套餐续期咨询' : '套餐购买咨询'" width="min(460px, 92vw)" destroy-on-close>
       <div class="purchase-summary"><small>意向套餐</small><h3>{{ selectedPlan ? cleanPlanName(selectedPlan.name) : '' }}</h3><p>确认工具范围、授权期限和可用设备后，再由工作人员开通授权。</p></div>
       <p v-if="contactLoading">正在读取官方联系方式…</p>
       <p v-else-if="contactId">客服微信：<strong>{{ contactId }}</strong></p>
@@ -48,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElButton, ElDialog } from 'element-plus'
 import { Check, LockKeyhole, ShieldCheck } from '@lucide/vue'
@@ -69,9 +77,28 @@ const contactLoading = ref(false)
 const plans = ref<CustomerPlan[]>([])
 const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
-const userInfo = computed(readStoredLicense)
+const userInfo = ref(readStoredLicense())
 const currentPlanName = computed(() => userInfo.value.plan_name || '当前授权')
 const currentPlanCode = computed(() => licensePlanCode(userInfo.value))
+const licenseExpiry = computed(() => {
+  const value = userInfo.value.expires_at
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) return '以授权信息为准'
+  const date = new Date(value)
+  return `${date.toLocaleDateString('zh-CN')} ${date.getTime() <= Date.now() ? '已到期' : '到期'}`
+})
+const licensePlatforms = computed(() => {
+  const value = userInfo.value.platform_scope
+  const keys: string[] = Array.isArray(value) ? value.filter((key): key is string => typeof key === 'string') : typeof value === 'string' ? value.split(',') : []
+  const names: Record<string, string> = { amazon: '亚马逊', aliexpress: '速卖通' }
+  return keys.map(key => names[key.trim()] || key.trim()).join('、') || '以授权信息为准'
+})
+function refreshLicense() { userInfo.value = readStoredLicense() }
+function renewCurrent() {
+  const plan = plans.value.find(isCurrent)
+  if (plan) { void contactService(plan); return }
+  sessionStorage.setItem('toolbox_purchase_inquiry', `我想咨询当前「${currentPlanName.value}」授权续期，${licenseExpiry.value}。请先核对原授权和可续期方案，不要另建重复授权。`)
+  void router.push('/user/ai-chat')
+}
 
 function cleanPlanName(name = ''): string {
   return name.replace(/^Y\d+\s*/i, '') || name
@@ -113,7 +140,9 @@ async function copyContact() {
 
 function openPurchaseInquiry() {
   if (!selectedPlan.value) return
-  sessionStorage.setItem('toolbox_purchase_inquiry', `我想咨询「${cleanPlanName(selectedPlan.value.name)}」套餐，请帮我确认工具权限、授权期限和购买方式。`)
+  sessionStorage.setItem('toolbox_purchase_inquiry', isCurrent(selectedPlan.value)
+    ? `我想咨询当前「${cleanPlanName(selectedPlan.value.name)}」套餐续期，${licenseExpiry.value}。请先核对原授权、续期期限和费用，不要另建重复授权。`
+    : `我想咨询「${cleanPlanName(selectedPlan.value.name)}」套餐，请帮我确认工具权限、授权期限和购买方式。`)
   contactVisible.value = false
   void router.push('/user/ai-chat')
 }
@@ -131,11 +160,17 @@ async function loadPlans() {
   }
 }
 
-onMounted(loadPlans)
+onMounted(() => { void loadPlans(); window.addEventListener('toolbox:user-updated', refreshLicense) })
+onUnmounted(() => window.removeEventListener('toolbox:user-updated', refreshLicense))
 </script>
 
 <style scoped>
 .plans-page { width: min(1180px, 100%); margin: 0 auto; }
+.license-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-bottom: 20px; padding: 16px 18px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.license-summary div { display: grid; gap: 5px; }
+.license-summary small, .license-summary p { color: var(--color-text-secondary); font-size: var(--type-meta); }
+.license-summary strong { font-size: var(--type-control); }
+.license-summary p { flex: 1 1 240px; margin: 0; line-height: 1.6; }
 .purchase-summary { padding: 18px; border-radius: 12px; background: var(--color-surface-soft); }
 .purchase-summary small, .purchase-summary p { color: var(--color-text-secondary); line-height: 1.7; }
 .purchase-summary h3 { margin: 8px 0; }

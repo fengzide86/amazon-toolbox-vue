@@ -18,7 +18,7 @@
     <section class="summary-grid" aria-label="公账支出概览">
       <article class="summary-card summary-card--primary">
         <span class="summary-card__icon"><WalletCards :size="19" /></span>
-        <div><small>本月实际支出</small><strong>{{ money(summary.total) }}</strong><em :class="summary.change_percent > 0 ? 'is-up' : 'is-down'">{{ changeText }}</em></div>
+        <div><small>本月实际支出</small><strong>{{ money(summary.total) }}</strong><em :class="(summary.change_percent ?? 0) > 0 ? 'is-up' : 'is-down'">{{ changeText }}</em></div>
       </article>
       <article class="summary-card">
         <span class="summary-card__icon"><ReceiptText :size="19" /></span>
@@ -291,6 +291,8 @@ const confirmForm = reactive({ amount: 0, expense_date: today, note: '' })
 const isSuperAdmin = computed(() => authService.getRole() === 'super_admin')
 const activeCategories = computed(() => categories.value.filter(item => item.status === 'active').sort((a, b) => a.sort_order - b.sort_order))
 const changeText = computed(() => {
+  if (summary.value.previous_total === 0 && summary.value.total > 0) return '上月无支出，本月新增';
+  if (summary.value.change_percent === null) return '暂无可比较的上月基数';
   if (!summary.value.previous_total && !summary.value.total) return '与上月持平'
   const direction = summary.value.change_percent > 0 ? '增加' : summary.value.change_percent < 0 ? '减少' : '持平'
   return direction === '持平' ? '与上月持平' : `较上月${direction} ${Math.abs(summary.value.change_percent).toFixed(1)}%`

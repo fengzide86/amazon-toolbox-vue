@@ -211,7 +211,10 @@ async def list_batches(
         .offset(offset)
         .limit(limit)
     )
-    return [serialize_batch(item) for item in result.scalars().all()]
+    return [
+        {**serialize_batch(item), "detail_accessible": item.device_id == (context.get("device_id") or "")}
+        for item in result.scalars().all()
+    ]
 
 
 async def get_batch(

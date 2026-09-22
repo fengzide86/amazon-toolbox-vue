@@ -69,4 +69,66 @@ describe('customer support handoff errors', () => {
     expect(showToast).toHaveBeenCalledWith('已转人工客服', 'success')
     wrapper.unmount()
   })
+
+  it('exposes a retry after initial connection failure', async () => {
+    api.createChatSession.mockRejectedValueOnce(new Error('offline'))
+    const { chat, wrapper } = harness()
+    await flushPromises()
+    expect(chat.sessionError.value).toContain('重试')
+    expect(chat.sessionLoading.value).toBe(false)
+    await chat.startNewSession()
+    expect(chat.sessionId.value).toBe('session-1')
+    expect(chat.sessionError.value).toBe('')
+    wrapper.unmount()
+  })
+
+  it('keeps failed user content and retries without adding a fake AI answer', async () => {
+    api.sendChatMessage.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ session_id: 'session-1', reply: '已收到' })
+    const { chat, wrapper } = harness()
+    await flushPromises()
+    chat.inputMessage.value = '授权无法使用'
+    await chat.sendMessage()
+    const message = chat.messages.value.at(-1)!
+    expect(message).toMatchObject({ role: 'user', content: '授权无法使用', delivery: 'failed' })
+    expect(chat.messages.value.some(item => item.role === 'ai')).toBe(false)
+    await chat.retryMessage(message.id)
+    expect(chat.messages.value.filter(item => item.role === 'user')).toHaveLength(1)
+    expect(message.delivery).toBe('sent')
+    expect(chat.messages.value.at(-1)?.content).toBe('已收到')
+    wrapper.unmount()
+  })
+
+  it('isolates late replies from the newly selected session', async () => {
+    let release!: (value: unknown) => void
+    api.sendChatMessage.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    api.getChatSession.mockResolvedValue({ session_id: 'session-2', status: 'active', messages: [{ role: 'ai', content: '另一个会话' }] })
+    const { chat, wrapper } = harness()
+    await flushPromises()
+    chat.inputMessage.value = '原会话问题'
+    const sending = chat.sendMessage()
+    await chat.loadSession('session-2')
+    release({ session_id: 'session-1', reply: '原会话回答' })
+    await sending
+    expect(chat.sessionId.value).toBe('session-2')
+    expect(chat.messages.value.map(item => item.content)).toEqual(['另一个会话'])
+    expect(chat.lastAiMessage.value).toBe('另一个会话')
+    wrapper.unmount()
+  })
+
+  it('keeps the last selected history when responses arrive backwards', async () => {
+    let release!: (value: unknown) => void
+    api.getChatSession.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+      .mockResolvedValueOnce({ session_id: 'new', status: 'resolved', messages: [] })
+    const { chat, wrapper } = harness()
+    await flushPromises()
+    const old = chat.loadSession('old')
+    await chat.loadSession('new')
+    release({ session_id: 'old', status: 'active', messages: [] })
+    await old
+    expect(chat.sessionId.value).toBe('new')
+    expect(chat.sessionResolved.value).toBe(true)
+    await chat.startNewSession()
+    expect(chat.sessionResolved.value).toBe(false)
+    wrapper.unmount()
+  })
 })

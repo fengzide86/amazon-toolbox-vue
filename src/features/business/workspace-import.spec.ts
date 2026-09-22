@@ -32,6 +32,17 @@ const preview = (id: string) => importPreviewSchema.parse({ importId: id, validC
 describe('business import request ownership', () => {
   afterEach(() => { delete window.electronAPI })
 
+  it('exports problem rows for desktop Demo as well as Live tools', async () => {
+    const exported = vi.fn().mockResolvedValue({ filePath: 'D:/errors.csv' })
+    window.electronAPI = { batch: { exportImportErrors: exported } as unknown as BatchBridge }
+    const errors = [{ rowNumber: 2, message: 'SKU不能为空' }]
+    const coordinator = new WorkspaceImportCoordinator({ getSelectedTool: () => businessToolSchema.parse({ id: 'demo', name: '演示' }),
+      getMaxRows: () => 50, getPreview: () => importPreviewSchema.parse({ importId: 'invalid', validCount: 0, errors }),
+      setPreview: vi.fn(), setLoading: vi.fn(), setError: vi.fn() })
+    expect(await coordinator.exportErrors()).toEqual({ filePath: 'D:/errors.csv' })
+    expect(exported).toHaveBeenCalledWith(errors)
+  })
+
   it.each(['selectFile', 'loadSample'] as const)('does not attach a late %s from tool A to tool B', async action => {
     const context = setup()
     const result = deferred<ImportPreview>()

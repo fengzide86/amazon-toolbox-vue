@@ -36,6 +36,7 @@ export const importPreviewSchema = z.object({
   templateVersion: z.string().nullable().optional(),
   rows: z.array(z.object({
     itemId: z.string(),
+    sourceRow: z.number().int().positive().optional(),
     preview: z.record(z.string(), z.unknown()),
   }).passthrough()).default([]),
   errors: z.array(z.object({
@@ -47,6 +48,7 @@ export type ImportPreview = z.infer<typeof importPreviewSchema>
 
 export const batchItemSchema = z.object({
   itemId: z.string(),
+  sourceRow: z.number().int().positive().optional(),
   accountLabelMasked: z.string().optional(),
   status: z.string(),
   interventionType: z.string().nullable().optional(),
@@ -104,6 +106,7 @@ export const serverBatchHistorySchema = z.object({
   completed_count: z.number().nonnegative().default(0),
   failed_count: z.number().nonnegative().default(0),
   started_at: z.string().nullable().optional(),
+  detail_accessible: z.boolean().default(true),
 }).passthrough()
 export type ServerBatchHistory = z.infer<typeof serverBatchHistorySchema>
 

@@ -7,8 +7,14 @@ import {
   pageSchema, summarySchema, type Agency, type Customer, type AgencyOrder, type AgencyLicense,
   type ServiceRequest, type AgencyPlan, type AgencySummary, type Page,
 } from './model'
+import {
+  commissionPolicySchema, commissionSummarySchema, commissionPreviewSchema,
+  commissionSettlementSchema, commissionPolicyUpdateSchema, commissionSettlementConfirmSchema,
+  commissionMonthSchema, type CommissionPolicy, type CommissionSummary,
+  type CommissionPreview, type CommissionSettlement, type CommissionSettlementConfirm,
+} from './commission-model'
 
-const readOptions = { cache: false, responseMode: 'raw' as const }
+const readOptions: { cache?: boolean; responseMode: 'raw' } = { cache: false, responseMode: 'raw' }
 type Schemas = components['schemas']
 export const agencyApi = {
   async summary(params: ApiQueryParams = {}): Promise<AgencySummary> {
@@ -60,4 +66,20 @@ export const agencyApi = {
     return serviceRequestSchema.parse(await api.patch(`/api/agency/requests/${id}`, payload))
   },
   exportOrders(params: ApiQueryParams): Promise<Blob> { return downloadApiFile('/api/agency/orders/export', params) },
+  async commissionPolicy(agencyId: number): Promise<CommissionPolicy> {
+    return z.object({ data: commissionPolicySchema }).parse(await api.get(`/api/agency/agencies/${agencyId}/commission-policy`, {}, readOptions)).data
+  },
+  async updateCommissionPolicy(agencyId: number, rate: number | null, expectedRate: number | null): Promise<CommissionPolicy> {
+    const payload = commissionPolicyUpdateSchema.parse({ rate, expected_rate: expectedRate })
+    return z.object({ data: commissionPolicySchema }).parse(await api.put(`/api/agency/agencies/${agencyId}/commission-policy`, payload)).data
+  },
+  async commissionSummary(agencyId: number): Promise<CommissionSummary> {
+    return z.object({ data: commissionSummarySchema }).parse(await api.get(`/api/agency/agencies/${agencyId}/commission-summary`, {}, readOptions)).data
+  },
+  async commissionPreview(agencyId: number, month: string): Promise<CommissionPreview> {
+    return z.object({ data: commissionPreviewSchema }).parse(await api.get(`/api/agency/agencies/${agencyId}/commission-settlement-preview`, { month: commissionMonthSchema.parse(month) }, readOptions)).data
+  },
+  async confirmCommissionSettlement(agencyId: number, payload: CommissionSettlementConfirm): Promise<CommissionSettlement> {
+    return z.object({ data: commissionSettlementSchema }).parse(await api.post(`/api/agency/agencies/${agencyId}/commission-settlements`, commissionSettlementConfirmSchema.parse(payload))).data
+  },
 }

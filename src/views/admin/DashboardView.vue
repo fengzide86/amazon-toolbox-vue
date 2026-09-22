@@ -16,6 +16,15 @@
       </button>
     </section>
 
+    <section v-if="loadState !== 'loading' && loadState !== 'error' && data.agency_delivery_tasks.length" class="action-panel delivery-panel" aria-label="销售交付待办">
+      <header><div><span>负责人待办</span><h3>销售与授权交付</h3></div><router-link to="/admin/agency">代理与交付</router-link></header>
+      <div class="delivery-tasks">
+        <router-link v-for="task in data.agency_delivery_tasks" :key="task.key" :to="{ path: '/admin/agency', query: { section: task.section, status: task.status } }">
+          <span>{{ task.label }}</span><strong>{{ task.count }}</strong><ChevronRight :size="17" />
+        </router-link>
+      </div>
+    </section>
+
     <section v-if="loadState !== 'loading' && loadState !== 'error'" class="priority-grid">
       <article id="waiting_interventions" class="action-panel primary-panel">
         <header><div><span>优先处理</span><h3>需要人工介入的执行</h3></div><span class="count-badge warning">{{ data.waiting_interventions?.length || 0 }}</span></header>
@@ -26,7 +35,7 @@
             <span class="row-time">{{ formatRelative(item.updated_at) }}</span><ChevronRight :size="15" />
           </button>
         </div>
-        <EmptyState v-else :icon="CheckCircle2" title="暂时没有需要介入的执行" description="客户端遇到登录或验证时，会出现在这里。" />
+        <EmptyState v-else :icon="CheckCircle2" title="暂无可处理的执行提醒" description="当前控制面不接入旧 Runner 告警。登录或验证请在客户端现场处理。" />
       </article>
 
       <article id="stale_batches" class="action-panel">
@@ -38,7 +47,7 @@
             <span class="row-time">{{ formatRelative(item.last_heartbeat_at) }}</span><ChevronRight :size="15" />
           </button>
         </div>
-        <EmptyState v-else :icon="CheckCircle2" title="批次连接正常" description="当前没有超时未同步的运行批次。" />
+        <EmptyState v-else :icon="CheckCircle2" title="暂无连接异常提醒" description="这里不包含旧 Runner 与 Demo，实际运行状态以客户端为准。" />
       </article>
     </section>
 
@@ -72,7 +81,7 @@
         <div v-if="data.expense_renewals?.length" class="simple-list">
           <div v-for="item in data.expense_renewals.slice(0, 6)" :key="item.id"><span><WalletCards :size="15" />{{ item.name }}</span><strong>{{ formatDate(item.next_due_on) }} · ¥{{ Number(item.default_amount).toFixed(2) }}</strong></div>
         </div>
-        <EmptyState v-else :icon="CheckCircle2" title="近期没有待续费项目" description="未来 7 天与逾期项目都会在这里提醒。" />
+        <EmptyState v-else :icon="CheckCircle2" title="近期没有待续费项目" description="按各项目设置的提前提醒天数展示，逾期项目也会保留。" />
       </article>
     </section>
 
@@ -134,7 +143,7 @@ const summaryCards = computed(() => [
   { key: 'device_anomalies', label: '设备与席位异常', value: data.value.summary?.device_anomalies || 0, hint: '检查授权使用边界', icon: ShieldAlert, tone: 'danger' },
   { key: 'pending_tickets', label: '待处理工单', value: data.value.summary?.pending_tickets || 0, hint: '等待运营回复', icon: TicketCheck, tone: 'neutral' },
   { key: 'waiting_interventions', label: '需要人工介入', value: data.value.summary?.waiting_interventions || 0, hint: '客户执行正在等待', icon: UserRoundCheck, tone: 'warning' },
-  ...(canSeeExpenses ? [{ key: 'expense_renewals', label: '待续费项目', value: data.value.summary?.expense_renewals_due || 0, hint: '7 天内及已逾期', icon: WalletCards, tone: 'premium' }] : []),
+  ...(canSeeExpenses ? [{ key: 'expense_renewals', label: '待续费项目', value: data.value.summary?.expense_renewals_due || 0, hint: '进入提醒期及已逾期', icon: WalletCards, tone: 'premium' }] : []),
 ])
 
 async function loadData() {
@@ -153,6 +162,7 @@ async function loadData() {
       + (data.value.waiting_interventions?.length || 0)
       + (data.value.stale_batches?.length || 0)
       + (data.value.expense_renewals?.length || 0)
+      + data.value.agency_delivery_tasks.reduce((sum, task) => sum + task.count, 0)
     loadState.value = settledDataState(itemCount)
   } catch (error) {
     if (requestSequence !== loadSequence) return
@@ -200,6 +210,7 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.delivery-tasks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:16px}.delivery-tasks a{display:grid;grid-template-columns:1fr auto;gap:8px;padding:14px;border:1px solid var(--color-border);border-radius:10px;color:var(--color-text);text-decoration:none}.delivery-tasks a:hover{background:var(--color-primary-soft)}.delivery-tasks span{grid-column:1/-1;font-size:var(--type-meta);color:var(--color-text-secondary)}.delivery-tasks strong{font-size:24px}.delivery-tasks svg{align-self:center;color:var(--color-primary)}@media(max-width:900px){.delivery-tasks{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:520px){.delivery-tasks{grid-template-columns:1fr}}
 .action-center{display:grid;gap:18px}.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px}.page-heading>div>span{color:var(--color-primary);font-size:var(--type-micro);font-weight:800;letter-spacing:.14em}.page-heading h2{margin:6px 0 0;color:var(--color-text);font-size:var(--type-page);letter-spacing:-.035em}.page-heading p{margin:7px 0 0;color:var(--color-text-secondary);font-size:var(--type-meta)}.refresh-button{height:34px;display:flex;align-items:center;gap:7px;padding:0 11px;border:1px solid var(--color-border);border-radius:9px;color:var(--color-text-secondary);background:var(--color-surface);cursor:pointer}.summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.summary-card{min-height:116px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:16px;border:1px solid var(--color-border);border-radius:15px;background:var(--color-surface);text-align:left;cursor:pointer;box-shadow:var(--shadow-low);transition:transform var(--motion-fast),border-color var(--motion-fast),box-shadow var(--motion-fast)}.summary-card:hover{transform:translateY(-2px);border-color:var(--color-border-strong);box-shadow:var(--shadow-medium)}.summary-icon{width:39px;height:39px;display:grid;place-items:center;border-radius:11px;color:var(--color-primary);background:var(--color-primary-soft)}.summary-card>span:nth-child(2){display:grid;gap:3px}.summary-card small{color:var(--color-text-secondary);font-size:var(--type-micro)}.summary-card strong{color:var(--color-text);font-size:24px;font-variant-numeric:tabular-nums}.summary-card em{color:var(--color-text-secondary);font-size:var(--type-micro);font-style:normal}.summary-card>svg{color:var(--color-border-strong)}.tone-premium .summary-icon{color:var(--color-premium);background:var(--color-premium-soft)}.tone-warning .summary-icon{color:var(--color-warning);background:var(--color-warning-soft)}.tone-danger .summary-icon{color:var(--color-danger);background:var(--color-danger-soft)}.priority-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.75fr);gap:14px}.operations-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.action-panel{min-width:0;border:1px solid var(--color-border);border-radius:15px;background:var(--color-surface);box-shadow:var(--shadow-low);overflow:hidden}.primary-panel{border-color:rgba(183,121,31,.18)}.action-panel>header{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 17px;border-bottom:1px solid var(--color-border)}.action-panel header div{display:grid;gap:4px}.action-panel header span{color:var(--color-text-secondary);font-size:var(--type-micro);letter-spacing:.05em}.action-panel h3{margin:0;color:var(--color-text);font-size:13px}.action-panel header a{color:var(--color-primary);font-size:var(--type-micro);text-decoration:none}.count-badge{min-width:26px;height:26px;display:grid;place-items:center;border-radius:8px;color:var(--color-text-secondary);background:var(--color-canvas);font-size:var(--type-meta);font-weight:800}.count-badge.warning{color:var(--color-warning);background:var(--color-warning-soft)}.action-list{padding:7px}.action-list button{width:100%;min-height:56px;display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:9px;padding:7px 9px;border:0;border-radius:10px;background:transparent;text-align:left;cursor:pointer}.action-list button:hover{background:var(--color-canvas)}.row-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:9px}.row-icon.warning{color:var(--color-warning);background:var(--color-warning-soft)}.row-icon.danger{color:var(--color-danger);background:var(--color-danger-soft)}.row-copy{min-width:0;display:grid;gap:3px}.row-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-text);font-size:var(--type-meta)}.row-copy small,.row-time{color:var(--color-text-secondary);font-size:var(--type-micro)}.action-list button>svg{color:var(--color-border-strong)}.simple-list{padding:8px 13px}.simple-list>div{min-height:43px;display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--color-border)}.simple-list>div:last-child{border:0}.simple-list span{min-width:0;display:flex;align-items:center;gap:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-text);font-size:var(--type-micro)}.simple-list span svg{flex:0 0 auto;color:var(--color-primary)}.simple-list strong{flex:0 0 auto;color:var(--color-text-secondary);font-size:var(--type-micro);font-weight:600}.drawer-loading{min-height:260px;display:grid;place-content:center;justify-items:center;gap:10px;color:var(--color-text-secondary);font-size:var(--type-meta)}.batch-detail{display:grid;gap:16px}.detail-hero{display:grid;gap:5px;padding:17px;border-radius:13px;background:var(--color-primary-soft)}.detail-hero span,.detail-hero small{color:var(--color-text-secondary);font-size:var(--type-micro)}.detail-hero strong{color:var(--color-text);font-size:16px}.privacy-note{display:flex;align-items:flex-start;gap:8px;padding:11px;border-radius:10px;color:var(--color-success);background:var(--color-success-soft);font-size:var(--type-micro);line-height:1.55}.batch-items{display:grid;gap:5px}.batch-items>div{min-height:49px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--color-border);border-radius:10px}.item-state{width:8px;height:8px;border-radius:50%;background:var(--color-border-strong)}.item-state.is-running{background:var(--color-primary)}.item-state.is-waiting_user{background:var(--color-warning)}.item-state.is-completed{background:var(--color-success)}.item-state.is-failed{background:var(--color-danger)}.batch-items>div>span:nth-child(2){display:grid;gap:3px}.batch-items strong{color:var(--color-text);font-size:var(--type-meta)}.batch-items small,.batch-items em{color:var(--color-text-secondary);font-size:var(--type-micro);font-style:normal}.spin{animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:1100px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-grid{grid-template-columns:1fr}.priority-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.summary-grid{grid-template-columns:1fr}.page-heading{display:grid}.refresh-button{width:max-content}.row-time{display:none}}

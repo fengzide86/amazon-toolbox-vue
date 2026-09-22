@@ -38,6 +38,8 @@ async def test_expense_crud_summary_void_and_export(client, auth_headers):
     assert summary.status_code == 200
     assert summary.json()["data"]["total"] == "128.50"
     assert summary.json()["data"]["count"] == 1
+    assert summary.json()["data"]["previous_total"] == "0.00"
+    assert summary.json()["data"]["change_percent"] is None
 
     updated = await client.patch(
         f"/api/expenses/{expense_id}",
@@ -61,6 +63,7 @@ async def test_expense_crud_summary_void_and_export(client, auth_headers):
     summary_after = await client.get(f"/api/expenses/summary?month={today:%Y-%m}", headers=auth_headers)
     assert summary_after.json()["data"]["total"] == "0.00"
     assert summary_after.json()["data"]["count"] == 0
+    assert summary_after.json()["data"]["change_percent"] == "0"
 
 
 @pytest.mark.asyncio

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.audit import log_admin_action
 from core.cache import cache
 from core.response import paginated_response
+from domains.commerce.agency_commission import AgencyCommissionService
 from models import Agency, AgencyCustomer, AgencyRequest, AuthCode, Order, Plan, StaffRole
 from schemas.agency import (
     AgencyOrderCreate,
@@ -240,6 +241,7 @@ class AgencyService:
         order.updated_by_staff_id = self.actor["staff_id"]
         try:
             await ProfitService(self.db).create_for_paid_order(order, self.actor)
+            await AgencyCommissionService(self.db, self.actor).record_accrual(order, self.actor.get("staff_id"))
             await self._save(order, "agency_order_paid", request)
         except Exception:
             await self.db.rollback()
@@ -304,7 +306,9 @@ class AgencyService:
 
     async def licenses(self, page: int, page_size: int, agency_id: int | None, status: str | None, q: str | None = None) -> dict[str, Any]:
         query = self._scope(AuthCode, agency_id).where(AuthCode.order_id.is_not(None))
-        if status:
+        if status == "pending_activation":
+            query = query.where(AuthCode.status == "unused", AuthCode.user_id.is_(None), AuthCode.order_id.in_(select(Order.id).where(Order.status == "paid")))
+        elif status:
             query = query.where(AuthCode.status == status)
         if q:
             query = query.where(or_(AuthCode.code.contains(q, autoescape=True), AuthCode.customer_id.in_(select(AgencyCustomer.id).where(AgencyCustomer.name.contains(q, autoescape=True)))))
@@ -371,6 +375,26 @@ class AgencyService:
         for key, query in queries.items():
             result[key] = int((await self.db.execute(select(func.count()).select_from(query.subquery()))).scalar_one())
         return result
+
+    async def delivery_tasks(self) -> list[dict[str, Any]]:
+        """Owner-only read model; counts are not capped by the list preview."""
+        self._owner()
+        pending_activation = self._scope(AuthCode).where(
+            AuthCode.order_id.is_not(None), AuthCode.status == "unused",
+            AuthCode.user_id.is_(None),
+            AuthCode.order_id.in_(select(Order.id).where(Order.status == "paid")),
+        )
+        entries = (
+            ("pending_orders", "待确认收款", self._orders_query(None, "pending", None), "orders", "pending"),
+            ("paid_orders", "已收款待发码", self._orders_query(None, "paid", None), "orders", "paid"),
+            ("pending_activation", "已交付待激活", pending_activation, "licenses", "pending_activation"),
+            ("open_requests", "待处理代理售后", self._scope(AgencyRequest).where(AgencyRequest.status == "open"), "requests", "open"),
+        )
+        tasks = []
+        for key, label, query, section, state in entries:
+            count = int((await self.db.execute(select(func.count()).select_from(query.subquery()))).scalar_one())
+            tasks.append({"key": key, "label": label, "count": count, "section": section, "status": state})
+        return tasks
 
     def export_orders(self, agency_id: int | None, status: str | None, q: str | None, customer_id: int | None = None) -> AsyncIterator[str]:
         # Validate before StreamingResponse sends a 200 header, not inside its generator.
