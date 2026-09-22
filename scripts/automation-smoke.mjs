@@ -1,13 +1,13 @@
 import { fork } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 const mock = process.argv.includes('--mock')
 const capabilityFlag = process.argv.indexOf('--capability')
 const capability = capabilityFlag >= 0 ? process.argv[capabilityFlag + 1] : 'listing_script'
 if (!capability || !/^[a-z0-9_]+$/.test(capability)) throw new Error('invalid --capability value')
-const root = resolve('.automation-smoke')
-mkdirSync(root, { recursive: true })
+const root = mkdtempSync(resolve(tmpdir(), 'toolbox-automation-smoke-'))
 const child = fork(resolve('dist-electron/electron/automation-runner.cjs'), [], {
   env: {
     ...process.env,
@@ -28,7 +28,11 @@ const finish = (code, payload) => {
   clearTimeout(timeout)
   if (payload) process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`)
   child.send?.({ type: 'command', id: 'smoke-shutdown', command: 'shutdown', payload: {} })
-  setTimeout(() => { child.kill(); process.exit(code) }, 400)
+  setTimeout(() => {
+    child.kill()
+    rmSync(root, { recursive: true, force: true })
+    process.exit(code)
+  }, 400)
 }
 const timeout = setTimeout(() => finish(1, { success: false, error: 'automation smoke timed out' }), 90_000)
 

@@ -8,6 +8,7 @@ import type {
 } from '../src/features/business/model.js'
 import type {
   AutomationStartResult,
+  AutomationPreflightResult,
   AutomationStatusResult,
   BrowserRegistrationResult,
   BrowserReleaseResult,
@@ -108,6 +109,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   ...(automationEnabled ? { automation: {
     start: (tool: AutomationTool): Promise<AutomationStartResult> => invokeDesktop('automation:start', tool),
+    preflight: (tool: AutomationTool): Promise<AutomationPreflightResult> => invokeDesktop('automation:preflight', tool),
     pause: (): Promise<AutomationStatusResult> => invokeDesktop('automation:pause'),
     resume: (): Promise<AutomationStatusResult> => invokeDesktop('automation:resume'),
     completeUserAction: (): Promise<AutomationStatusResult> => invokeDesktop('automation:complete-user-action'),

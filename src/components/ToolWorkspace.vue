@@ -8,7 +8,7 @@
         <div class="tool-mark"><Zap :size="18" /></div>
         <div class="tool-identity">
           <h1>{{ toolName }}</h1>
-          <p>{{ platformName }} · {{ isBrowserPreview ? '浏览器流程预览' : isDemo ? '本地交互演示' : '比赛模拟平台自动执行' }}</p>
+          <p>{{ platformName }} · {{ isPreflight ? '浏览器只读预检' : isBrowserPreview ? '浏览器流程预览' : isDemo ? '本地交互演示' : '比赛模拟平台自动执行' }}</p>
         </div>
       </div>
 
@@ -33,14 +33,14 @@
           <div class="browser-toolbar">
             <LockKeyhole :size="14" />
             <span>{{ displayUrl }}</span>
-            <span class="browser-note">{{ isBrowserPreview ? '流程预览' : isDemo ? '本地沙盒' : '独立本地浏览器' }}</span>
+            <span class="browser-note">{{ isPreflight ? '只读扫描' : isBrowserPreview ? '流程预览' : isDemo ? '本地沙盒' : '独立本地浏览器' }}</span>
           </div>
 
           <div class="browser-viewport">
             <div v-if="browserLoading" class="browser-loading">
               <span class="loading-orbit"><LoaderCircle :size="25" class="spin" /></span>
-              <strong>{{ isBrowserPreview ? '正在准备流程预览' : isDemo ? '正在准备本地交互沙盒' : '正在启动本地自动化浏览器' }}</strong>
-              <p>{{ isBrowserPreview ? '准备完成后播放示例流程，不访问外部平台' : '准备完成后会自动执行，遇到登录或验证时才会暂停' }}</p>
+              <strong>{{ isPreflight ? '正在打开浏览器并扫描页面' : isBrowserPreview ? '正在准备流程预览' : isDemo ? '正在准备本地交互沙盒' : '正在启动本地自动化浏览器' }}</strong>
+              <p>{{ isPreflight ? '只读取页面结构和指纹，不填写、点击或提交业务数据' : isBrowserPreview ? '准备完成后播放示例流程，不访问外部平台' : '准备完成后会自动执行，遇到登录或验证时才会暂停' }}</p>
               <span class="loading-line"></span>
             </div>
 
@@ -64,14 +64,38 @@
 
       <aside class="progress-panel">
         <div class="demo-disclosure" role="note" data-testid="execution-scope-note">
-          {{ isBrowserPreview ? '浏览器预览：展示模拟流程，不启动 Runner，不操作外部平台。' : isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
+          {{ isPreflight ? '浏览器预检：已启动本机 Runner，仅扫描目标页面；脚本完成前不会执行任何业务动作。' : isBrowserPreview ? '浏览器预览：展示模拟流程，不启动 Runner，不操作外部平台。' : isDemo ? '交互演示：执行真实页面操作，但数据只存在本地沙盒。' : '真实执行：只操作比赛模拟平台，登录凭据仅保存在本机。' }}
         </div>
         <div v-if="isTerminal && (recordPending || recordSyncing)" class="demo-disclosure" role="status" data-testid="record-sync-status">
           {{ recordSyncing ? '正在同步记录…' : '任务结果不变，记录待同步。无需重新执行任务。' }}
           <button v-if="isDemo && recordPending" type="button" class="secondary-action" :disabled="recordSyncing" @click="retryRecordSync">仅重试同步记录</button>
           <span v-if="!isDemo">请保持联网，稍后到工具记录核对。</span>
         </div>
-        <template v-if="!isTerminal">
+        <section v-if="isPreflight" class="preflight-card" data-testid="preflight-result">
+          <div :class="['preflight-icon', { ready: preflightResult?.canStart }]"><Check v-if="preflightResult?.canStart" :size="24" /><CircleAlert v-else :size="24" /></div>
+          <span class="eyebrow">只读浏览器预检</span>
+          <h2>{{ preflightResult?.canStart ? '浏览器已准备' : '脚本开发中' }}</h2>
+          <p>{{ preflightMessage }}</p>
+          <dl class="preflight-meta">
+            <div><dt>页面</dt><dd>{{ preflightResult?.pageTitle || '已打开目标页面' }}</dd></div>
+            <div><dt>脚本 Key</dt><dd>{{ preflightResult?.scriptKey || '待识别' }}</dd></div>
+            <div><dt>页面指纹</dt><dd>{{ preflightResult?.pageFingerprint ? preflightResult.pageFingerprint.slice(0, 12) : '已扫描' }}</dd></div>
+          </dl>
+          <div class="preflight-actions">
+            <button v-if="preflightResult?.canStart" class="primary-action" type="button" :disabled="restarting" @click="startReadyScript">
+              <LoaderCircle v-if="restarting" :size="14" class="spin" />
+              {{ restarting ? '正在获取授权…' : '开始执行' }}
+            </button>
+            <button v-else class="primary-action" type="button" :disabled="restarting" @click="restartRun">
+              <LoaderCircle v-if="restarting" :size="14" class="spin" />
+              {{ restarting ? '正在扫描…' : '重新扫描页面' }}
+            </button>
+            <button class="secondary-action" type="button" @click="closeWorkspace">返回工具箱</button>
+          </div>
+          <small>当前不会填写、点击或提交任何业务数据。</small>
+        </section>
+
+        <template v-else-if="!isTerminal">
           <header class="panel-heading">
             <span>当前进度</span>
             <strong>{{ customerStatusText }}</strong>
@@ -154,12 +178,13 @@ import { useSingleAutomationRun } from '@/features/automation/useSingleAutomatio
 import DemoCasePreview from '@/components/DemoCasePreview.vue'
 
 const {
-  browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,
+  browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isPreflight, isDesktop, isBrowserPreview,
   platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
+  preflightResult, preflightMessage,
   freightQuote, adapterVersion, evidenceSummary, recordPending, recordSyncing, retryRecordSync,
   currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
   failureTitle, failureDescription, technicalError,
-  stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport, registerWorkspaceBrowser,
+  stageState, completeUserAction, stopRun, closeWorkspace, restartRun, startReadyScript, openSupport, registerWorkspaceBrowser,
 } = useSingleAutomationRun()
 </script>
 
@@ -301,6 +326,19 @@ const {
 .stage-list li.pending { opacity: .55; }
 .stage-list strong { display: block; padding-top: 3px; font-size: 13px; }
 .stage-list p { margin: 4px 0 0; color: var(--color-text-secondary); font-size:var(--type-control); line-height: 1.5; }
+
+.preflight-card { margin: auto 0; padding: 4px 2px; text-align: left; }
+.preflight-icon { width: 52px; height: 52px; display: grid; place-items: center; margin-bottom: 15px; border-radius: 15px; color: var(--color-warning); background: var(--color-warning-soft); }
+.preflight-icon.ready { color: var(--color-success); background: var(--color-success-soft); }
+.preflight-card .eyebrow { color: var(--color-text-tertiary); font-size: var(--type-micro); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.preflight-card h2 { margin: 7px 0 8px; font-size: 19px; }
+.preflight-card > p { margin: 0 0 16px; color: var(--color-text-secondary); font-size: var(--type-control); line-height: 1.7; }
+.preflight-meta { display: grid; gap: 7px; margin: 0 0 18px; }
+.preflight-meta div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 9px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-soft); }
+.preflight-meta dt { color: var(--color-text-tertiary); font-size: var(--type-micro); }
+.preflight-meta dd { max-width: 68%; margin: 0; overflow: hidden; color: var(--color-text); font: 700 var(--type-micro)/1.4 var(--font-mono); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.preflight-actions { margin-top: auto; }
+.preflight-card > small { display: block; margin-top: 13px; color: var(--color-text-tertiary); font-size: var(--type-micro); line-height: 1.5; }
 
 .running-note, .user-action-card { margin-top: auto; border-radius: 10px; }
 .running-note { display: flex; align-items: center; gap: 10px; padding: 13px; border: 1px solid rgba(45,95,202,.09); color: var(--color-primary); background: var(--color-primary-soft); }

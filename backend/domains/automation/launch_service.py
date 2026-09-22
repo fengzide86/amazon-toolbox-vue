@@ -129,6 +129,17 @@ async def create_launch_grant(
             ErrorCodes.TOOL_UNAVAILABLE,
             {"reason": "demo_only", "availability": target_tool.get("availability")},
         )
+    if target_tool.get("script_status") != "script_ready":
+        return await _error(
+            db,
+            "该工具的自动化脚本尚未就绪",
+            ErrorCodes.TOOL_SCRIPT_NOT_READY,
+            {
+                "code": "TOOL_SCRIPT_NOT_READY",
+                "reason": "script_not_ready",
+                "script_status": target_tool.get("script_status", "script_not_ready"),
+            },
+        )
     if target_tool.get("platform_key") != platform_key:
         return await _error(db, "工具平台与请求平台不一致", 400)
 

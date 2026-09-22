@@ -22,7 +22,7 @@ import type {
   FreightWorkbookIpcOptions,
   NotificationFocusPayload,
 } from './desktop-contract.js'
-import type { RunnerEvent } from './automation-contract.js'
+import type { RunnerEvent, RunnerPreflightResult } from './automation-contract.js'
 import type { UpdateDeferPhase, UpdateSnapshot } from './update-contract.js'
 
 export interface UpdateBridge {
@@ -42,6 +42,8 @@ export interface DemoActivityBridge {
 export interface AutomationStartResult {
   runId: string
 }
+
+export type AutomationPreflightResult = RunnerPreflightResult
 
 export interface AutomationStatusResult {
   status: string
@@ -92,6 +94,7 @@ export interface BatchBridge {
 
 export interface AutomationBridge {
   start(tool: AutomationTool): Promise<AutomationStartResult>
+  preflight(tool: AutomationTool): Promise<AutomationPreflightResult>
   pause(): Promise<AutomationStatusResult>
   resume(): Promise<AutomationStatusResult>
   completeUserAction(): Promise<AutomationStatusResult>

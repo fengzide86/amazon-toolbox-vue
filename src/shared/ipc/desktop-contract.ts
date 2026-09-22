@@ -146,6 +146,7 @@ export const desktopIpcInvocationSchemas = {
   'credential-clear-user-code': z.tuple([]),
   'demo-activity:set-active': z.tuple([ipcIdSchema, z.boolean()]),
   'automation:start': z.tuple([toolSchema]),
+  'automation:preflight': z.tuple([toolSchema]),
   'automation:pause': z.tuple([]),
   'automation:resume': z.tuple([]),
   'automation:complete-user-action': z.tuple([]),

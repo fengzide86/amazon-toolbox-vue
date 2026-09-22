@@ -43,6 +43,7 @@ export const toolCatalogItemSchema = z.object({
   batch_schema_text: z.string().optional(),
   requires_signature: z.boolean().optional(),
   availability: z.enum(['demo_only', 'live_beta', 'live']).default('demo_only'),
+  script_status: z.enum(['demo_ready', 'browser_ready', 'script_ready', 'script_not_ready', 'blocked']).optional(),
   demo_scenario_id: z.string().default('default'),
   supports_demo_single: z.boolean().default(true),
   supports_demo_batch: z.boolean().default(false),

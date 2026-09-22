@@ -28,6 +28,7 @@ export const authenticatedUserSchema = z.object({
   agency_id: z.number().int().positive().nullable().optional(),
   status: z.enum(['active', 'disabled']).optional(),
   force_password_reset: z.boolean().optional(),
+  capabilities: z.array(z.string()).optional(),
   phone: z.string().optional(),
   // Staff contexts explicitly return null: they are not customer licenses.
   auth_code_id: z.union([z.string(), z.number()]).nullish().transform(value => value ?? undefined).optional(),

@@ -42,7 +42,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { LayoutDashboard, Users, Receipt, KeyRound, LifeBuoy, CircleUserRound, ShieldCheck } from '@lucide/vue'
+import { LayoutDashboard, Users, Receipt, KeyRound, LifeBuoy, CircleUserRound, ShieldCheck, WalletCards } from '@lucide/vue'
 import BrandLockup from '@/components/brand/BrandLockup.vue'
 import { useAgentProfile } from './useAgentProfile'
 const route = useRoute()
@@ -51,7 +51,8 @@ const displayName = computed(() => user.value?.display_name || user.value?.usern
 const items = [
   { path: 'overview', label: '我的概览', icon: LayoutDashboard }, { path: 'customers', label: '我的客户', icon: Users },
   { path: 'orders', label: '我的订单', icon: Receipt }, { path: 'licenses', label: '我的授权', icon: KeyRound },
-  { path: 'requests', label: '售后支持', icon: LifeBuoy }, { path: 'account', label: '个人账号', icon: CircleUserRound },
+  { path: 'requests', label: '售后支持', icon: LifeBuoy }, { path: 'commission', label: '返佣结算', icon: WalletCards },
+  { path: 'account', label: '个人账号', icon: CircleUserRound },
 ]
 </script>
 

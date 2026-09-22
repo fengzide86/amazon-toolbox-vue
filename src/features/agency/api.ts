@@ -9,9 +9,9 @@ import {
 } from './model'
 import {
   commissionPolicySchema, commissionSummarySchema, commissionPreviewSchema,
-  commissionSettlementSchema, commissionPolicyUpdateSchema, commissionSettlementConfirmSchema,
+  commissionEntrySchema, commissionSettlementSchema, commissionPolicyUpdateSchema, commissionSettlementConfirmSchema,
   commissionMonthSchema, type CommissionPolicy, type CommissionSummary,
-  type CommissionPreview, type CommissionSettlement, type CommissionSettlementConfirm,
+  type CommissionEntry, type CommissionPreview, type CommissionSettlement, type CommissionSettlementConfirm,
 } from './commission-model'
 
 const readOptions: { cache?: boolean; responseMode: 'raw' } = { cache: false, responseMode: 'raw' }
@@ -75,6 +75,12 @@ export const agencyApi = {
   },
   async commissionSummary(agencyId: number): Promise<CommissionSummary> {
     return z.object({ data: commissionSummarySchema }).parse(await api.get(`/api/agency/agencies/${agencyId}/commission-summary`, {}, readOptions)).data
+  },
+  async commissionEntries(agencyId: number, params: { page?: number; page_size?: number; settled?: boolean } = {}): Promise<Page<CommissionEntry>> {
+    return pageSchema(commissionEntrySchema).parse(await api.get(`/api/agency/agencies/${agencyId}/commissions`, params, readOptions))
+  },
+  async commissionSettlements(agencyId: number, params: { page?: number; page_size?: number } = {}): Promise<Page<CommissionSettlement>> {
+    return pageSchema(commissionSettlementSchema).parse(await api.get(`/api/agency/agencies/${agencyId}/commission-settlements`, params, readOptions))
   },
   async commissionPreview(agencyId: number, month: string): Promise<CommissionPreview> {
     return z.object({ data: commissionPreviewSchema }).parse(await api.get(`/api/agency/agencies/${agencyId}/commission-settlement-preview`, { month: commissionMonthSchema.parse(month) }, readOptions)).data

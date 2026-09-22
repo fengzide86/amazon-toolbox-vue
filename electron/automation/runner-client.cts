@@ -3,11 +3,13 @@ import {
   hostResponseSchema,
   runnerCommandNameSchema,
   runnerCommandSchema,
+  runnerPreflightResultSchema,
   runnerProtocolError,
   runnerToHostMessageSchema,
   type HostRequest,
   type RunnerCommandName,
   type RunnerEvent,
+  type RunnerPreflightResult,
 } from '../../src/shared/ipc/automation-contract.js'
 
 type UnknownRecord = Record<string, unknown>
@@ -143,6 +145,9 @@ export class RunnerClient {
   }
 
   start(tool: UnknownRecord): Promise<unknown> { return this.command('start', { tool }) }
+  async preflight(tool: UnknownRecord): Promise<RunnerPreflightResult> {
+    return runnerPreflightResultSchema.parse(await this.command('preflight', { tool }))
+  }
   pause(): Promise<unknown> { return this.command('pause') }
   resume(): Promise<unknown> { return this.command('resume') }
   completeUserAction(): Promise<unknown> { return this.command('complete-user-action') }

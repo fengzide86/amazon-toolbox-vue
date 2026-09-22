@@ -16,8 +16,9 @@ export interface ActiveTool extends UnknownRecord {
   category?: string
   platformKey?: string
   capabilityKey?: string
+  scriptStatus?: 'demo_ready' | 'browser_ready' | 'script_ready' | 'script_not_ready' | 'blocked'
   targetUrl?: string
-  executionMode?: 'demo' | 'live'
+  executionMode?: 'demo' | 'live' | 'preflight'
   scenarioId?: string
   demoRunId?: string
   launchGrant?: {

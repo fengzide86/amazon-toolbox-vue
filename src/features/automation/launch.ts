@@ -28,7 +28,24 @@ export function buildDemoLaunch(tool: ToolCatalogItem, platformKey: string, inpu
     scenarioId: tool.demo_scenario_id,
     demoRunId: randomId('demo_run_local'),
     scriptKey: tool.script_key,
+    scriptStatus: tool.script_status,
     executionContext: { mode: 'single', sessionId: randomId('demo_session'), input },
+  }
+}
+
+export function buildPreflightLaunch(tool: ToolCatalogItem, platformKey: string, input: UnknownRecord = {}): ActiveTool {
+  return {
+    id: tool.id,
+    name: tool.name,
+    module: tool.module,
+    category: tool.category,
+    platformKey,
+    capabilityKey: tool.capability_key,
+    scriptStatus: tool.script_status || 'script_not_ready',
+    targetUrl: tool.target_url || '',
+    executionMode: 'preflight',
+    scriptKey: tool.script_key || `${platformKey}.${tool.capability_key || tool.id}.v1`,
+    executionContext: { mode: 'single', sessionId: randomId('preflight_session'), input },
   }
 }
 
@@ -54,6 +71,7 @@ export async function buildLiveLaunch(
     capabilityKey: tool.capability_key,
     targetUrl: grant.target_url,
     executionMode: 'live',
+    scriptStatus: 'script_ready',
     scriptKey: grant.script_key,
     launchGrant: {
       token: grant.token,

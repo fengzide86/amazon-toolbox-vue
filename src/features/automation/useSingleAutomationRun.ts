@@ -13,6 +13,7 @@ import { refreshLiveLaunch } from '@/features/automation/launch'
 import { getRuntimeCapabilities } from '@/runtime/capabilities'
 import type { FreightQuoteResult } from '@/shared/freight/types'
 import { flushPendingDemoReceipts, queueDemoReceipt, type DemoReceipt } from './demo-receipts'
+import type { RunnerPreflightResult } from '@/shared/ipc/automation-contract'
 
 
 export function useSingleAutomationRun() {
@@ -35,7 +36,8 @@ const restarting = ref(false)
 const endingRun = ref(false)
 const taskStarted = ref(false)
 const taskStarting = ref(false)
- const browserRegistered = ref(false)
+const browserRegistered = ref(false)
+const preflightResult = ref<RunnerPreflightResult | null>(null)
  const loggedRunIds = new Set<string>()
  const telemetryRuns = new Map<string, Promise<string | null>>()
 const pendingReceipt = ref<DemoReceipt | null>(null)
@@ -44,10 +46,16 @@ const recordPending = computed(() => Boolean(pendingReceipt.value || runResult.v
  let activeDemoToken: string | null = null
 
  const toolName = computed(() => appStore.currentTool?.name || '自动化工具')
- const isDemo = computed(() => appStore.currentTool?.executionMode !== 'live')
+ const isPreflight = computed(() => appStore.currentTool?.executionMode === 'preflight')
+ const isDemo = computed(() => appStore.currentTool?.executionMode === 'demo' || (!isPreflight.value && appStore.currentTool?.executionMode !== 'live'))
  const isDesktop = computed(() => getRuntimeCapabilities().singleLive)
- const isBrowserPreview = computed(() => isDemo.value && !isDesktop.value)
-const stageItems = computed(() => isBrowserPreview.value ? [
+const isBrowserPreview = computed(() => isDemo.value && !isDesktop.value)
+const stageItems = computed(() => isPreflight.value ? [
+  { key: 'prepare', label: '浏览器准备', description: '打开独立浏览器并校验目标页面' },
+  { key: 'inspect', label: '页面扫描', description: '只读扫描页面结构并生成指纹' },
+  { key: 'review', label: '脚本状态', description: '确认当前工具是否已有可执行脚本' },
+  { key: 'complete', label: '预检完成', description: '脚本就绪后再允许开始执行' },
+] : isBrowserPreview.value ? [
   { key: 'prepare', label: '预览准备', description: '载入演示步骤与示例数据' },
   { key: 'process', label: '流程展示', description: '展示工具执行流程，不操作外部页面' },
   { key: 'verify', label: '模拟反馈', description: '了解执行结果和人工介入位置' },
@@ -72,11 +80,13 @@ const evidenceSummary = computed(() => ({
   screenshot: Boolean(runResult.value?.screenshot),
   signatureVerified: runResult.value?.signatureVerified === true,
 }))
-const isActiveRun = computed(() => ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
+const isActiveRun = computed(() => !isPreflight.value && ['idle', 'preparing', 'running', 'waiting_user', 'paused'].includes(runStatus.value))
 const isTerminal = computed(() => ['completed', 'failed', 'cancelled'].includes(runStatus.value))
  const isBrowserRetryableError = computed(() => false)
  const interactionLocked = computed(() => ['preparing', 'running', 'paused'].includes(runStatus.value))
- const displayUrl = computed(() => isBrowserPreview.value
+const displayUrl = computed(() => isPreflight.value
+   ? (preflightResult.value?.targetUrl || appStore.currentTool?.targetUrl || '浏览器预检 · 只读扫描')
+   : isBrowserPreview.value
    ? '浏览器流程预览 · 不执行平台操作'
    : isDemo.value
    ? '本地交互沙盒 · 不访问外部平台'
@@ -91,6 +101,7 @@ const currentStageIndex = computed(() => {
 })
 
  const runningMessage = computed(() => {
+   if (isPreflight.value) return preflightResult.value?.canStart ? '页面扫描完成，可开始执行' : '脚本开发中，仅允许页面预览'
    if (isBrowserPreview.value) return '正在播放流程预览'
    if (runStatus.value === 'preparing' || runStatus.value === 'idle') return isDemo.value ? '正在准备交互沙盒' : '正在准备本地执行器'
    if (runStatus.value === 'paused') return isDemo.value ? '交互演示已暂停' : '自动处理已暂停'
@@ -98,6 +109,7 @@ const currentStageIndex = computed(() => {
    return isDemo.value ? '正在操作本地模拟页面' : '自动处理进行中'
  })
  const customerStatusText = computed(() => {
+   if (isPreflight.value) return preflightResult.value?.canStart ? '脚本已就绪' : '脚本开发中'
    if (isBrowserPreview.value) {
      const preview: Record<string, string> = { idle: '预览准备中', preparing: '预览准备中', running: '流程预览中', waiting_user: '人工介入示例', paused: '预览已暂停', completed: '预览完成', failed: '预览异常', cancelled: '已退出演示' }
      return preview[runStatus.value] || '预览中'
@@ -110,6 +122,7 @@ const problemCode = computed(() => {
   const source = taskRunStore.runId || taskRunStore.error?.code || 'UNKNOWN'
   return String(source).replace(/[^a-z0-9]/gi, '').slice(-8).toUpperCase() || 'UNKNOWN'
 })
+const preflightMessage = computed(() => preflightResult.value?.blockedMessage || '当前工具尚未发布可执行脚本，只能查看页面并生成扫描报告。')
  const failureTitle = computed(() => isDemo.value ? '交互演示异常' : '自动执行失败')
  const failureDescription = computed(() => {
    const stepId = currentStep.value?.id
@@ -179,6 +192,7 @@ async function closeWorkspace() {
       danger: true,
     })) return
     if (isActiveRun.value) await taskRunStore.cancel()
+    if (isPreflight.value) await cancelPreflight()
     await deactivateDemoActivity()
     taskRunStore.reset()
     appStore.closeTool()
@@ -195,12 +209,18 @@ async function restartRun() {
   try {
     const currentTool = appStore.currentTool
     if (!currentTool?.id) throw new Error('当前工具信息不完整')
+    if (currentTool.executionMode === 'preflight') {
+      preflightResult.value = null
+      taskStarted.value = false
+      await startDemoTask()
+      return
+    }
     const nextTool = currentTool.executionMode === 'live'
       ? await refreshLiveLaunch(currentTool)
       : { ...currentTool, demoRunId: createLocalDemoRunId(), executionMode: 'demo' as const }
     appStore.currentTool = nextTool
     if (nextTool.executionMode !== 'live') await activateDemoActivity(nextTool.demoRunId || 'workspace')
-    await taskRunStore.start(nextTool, { mode: nextTool.executionMode || 'demo' })
+    await taskRunStore.start(nextTool, { mode: nextTool.executionMode === 'live' ? 'live' : 'demo' })
     if (nextTool.executionMode !== 'live') scheduleTelemetry(nextTool)
   } catch (error) {
     await deactivateDemoActivity()
@@ -208,6 +228,29 @@ async function restartRun() {
   } finally {
     restarting.value = false
   }
+}
+
+async function startReadyScript() {
+  if (!isPreflight.value || !preflightResult.value?.canStart || restarting.value) return
+  const currentTool = appStore.currentTool
+  if (!currentTool?.id) return
+  restarting.value = true
+  try {
+    await cancelPreflight()
+    const nextTool = await refreshLiveLaunch(currentTool)
+    appStore.currentTool = nextTool
+    preflightResult.value = null
+    await taskRunStore.start(nextTool, { mode: 'live' })
+  } catch (error) {
+    showToast(errorMessage(error, '暂时无法开始执行，请重新预检'), 'error')
+  } finally {
+    restarting.value = false
+  }
+}
+
+async function cancelPreflight(): Promise<void> {
+  if (!isPreflight.value) return
+  try { await window.electronAPI?.automation?.cancel() } catch { /* release is best effort during teardown */ }
 }
 
 async function openSupport() {
@@ -228,18 +271,28 @@ async function openSupport() {
    taskStarting.value = true
    taskStarted.value = true
    try {
-     const currentTool = appStore.currentTool
+    const currentTool = appStore.currentTool
+    if (currentTool?.executionMode === 'preflight') {
+      const api = window.electronAPI?.automation
+      if (!api?.preflight) throw new Error('当前桌面端不支持浏览器预检，请更新课赛通')
+      taskStarted.value = true
+      preflightResult.value = await api.preflight(JSON.parse(JSON.stringify(currentTool)))
+      return
+    }
      const demoRunId = currentTool?.demoRunId || createLocalDemoRunId()
      const nextTool = currentTool?.executionMode === 'live'
        ? currentTool
        : { ...(currentTool || {}), demoRunId, executionMode: 'demo' as const }
      appStore.currentTool = nextTool
      if (nextTool.executionMode !== 'live') await activateDemoActivity(demoRunId)
-     await taskRunStore.start(nextTool, { mode: nextTool.executionMode || 'demo' })
+     await taskRunStore.start(nextTool, { mode: nextTool.executionMode === 'live' ? 'live' : 'demo' })
      if (nextTool.executionMode !== 'live') scheduleTelemetry(nextTool)
-   } catch {
-     await deactivateDemoActivity()
-     showToast(isDemo.value ? '演示启动失败，你可以重新加载或联系客服' : '自动处理启动失败，请检查授权和运行环境或联系支持', 'error')
+    } catch {
+      await deactivateDemoActivity()
+      // A failed preflight must be retryable without remounting the workspace.
+      // Keep the normal task-start guard for an already-running demo/live run.
+      if (appStore.currentTool?.executionMode === 'preflight') taskStarted.value = false
+      showToast(isDemo.value ? '演示启动失败，你可以重新加载或联系客服' : '自动处理启动失败，请检查授权和运行环境或联系支持', 'error')
    } finally {
      taskStarting.value = false
      browserLoading.value = false
@@ -352,6 +405,8 @@ async function retryRecordSync() {
 onMounted(() => {
   void flushPendingDemoReceipts()
   window.addEventListener('online', flushPendingDemoReceipts)
+  // Desktop runs wait for the WebView's dom-ready event so preflight uses the
+  // same embedded host instead of opening a second Playwright window.
   if (!isDesktop.value) void startDemoTask()
 })
 
@@ -365,16 +420,18 @@ watch(runStatus, status => {
 onUnmounted(() => {
   window.removeEventListener('online', flushPendingDemoReceipts)
   void deactivateDemoActivity()
+  void cancelPreflight()
   if (browserRegistered.value) void window.electronAPI?.automation?.unregisterBrowser()
   taskRunStore.reset()
 })
   return {
-    browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isDesktop, isBrowserPreview,
+    browserLoading, restarting, endingRun, stageItems, toolName, isDemo, isPreflight, isDesktop, isBrowserPreview,
+    preflightResult, preflightMessage,
     platformName, platformShortName, isActiveRun, isTerminal, interactionLocked, displayUrl,
     freightQuote, adapterVersion, evidenceSummary, recordPending, recordSyncing, retryRecordSync,
     currentStageIndex, runningMessage, customerStatusText, problemCode, runStatus, userAction,
     isBrowserRetryableError, failureTitle, failureDescription, technicalError,
-    stageState, completeUserAction, stopRun, closeWorkspace, restartRun, openSupport, registerWorkspaceBrowser,
+    stageState, completeUserAction, stopRun, closeWorkspace, restartRun, startReadyScript, openSupport, registerWorkspaceBrowser,
   }
 }
 

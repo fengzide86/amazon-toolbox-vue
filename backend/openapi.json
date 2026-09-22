@@ -14438,6 +14438,13 @@
             "title": "Auth Code Id",
             "type": "null"
           },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
           "device_id": {
             "title": "Device Id",
             "type": "null"
@@ -14803,6 +14810,13 @@
           "auth_code_id": {
             "title": "Auth Code Id",
             "type": "null"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Capabilities",
+            "type": "array"
           },
           "device_id": {
             "title": "Device Id",

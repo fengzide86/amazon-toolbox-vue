@@ -20,6 +20,14 @@ async def test_operator_announcements_read_only_and_control_modules_blocked(
 
 
 @pytest.mark.asyncio
+async def test_staff_session_exposes_capability_matrix(client, staff_headers_factory):
+    operator = await staff_headers_factory(StaffRole.OPERATOR, "capability-operator")
+    payload = (await client.get("/api/staff/auth/me", headers=operator)).json()["data"]
+    assert "expenses.write" in payload["capabilities"]
+    assert "settings.manage" not in payload["capabilities"]
+
+
+@pytest.mark.asyncio
 async def test_support_can_manage_announcements(client, staff_headers_factory):
     headers = await staff_headers_factory(StaffRole.SUPPORT, "matrix-support")
     created = await client.post(
