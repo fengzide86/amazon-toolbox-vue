@@ -20,6 +20,7 @@ interface SmokeRunner {
 let runner: SmokeRunner | null = null;
 let grantServer: import('http').Server | null = null;
 const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'toolbox-embedded-smoke-'));
+const profileRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'toolbox-embedded-profile-'));
 const timeout = setTimeout(() => {
   console.error('embedded browser smoke test timed out');
   runner?.stop().finally(() => app.exit(2));
@@ -49,6 +50,7 @@ async function cleanup(exitCode: number): Promise<void> {
   try { await runner?.stop(); } catch {}
   await new Promise<void>((resolve) => grantServer?.close(() => resolve()) || resolve());
   fs.rmSync(artifactRoot, { recursive: true, force: true });
+  fs.rmSync(profileRoot, { recursive: true, force: true });
   app.exit(exitCode);
 }
 
@@ -69,6 +71,7 @@ app.whenReady().then(async () => {
           env: {
             TOOLBOX_CONTROL_API_URL: `http://127.0.0.1:${grantPort}`,
             TOOLBOX_ARTIFACT_ROOT: artifactRoot,
+            TOOLBOX_PROFILE_ROOT: profileRoot,
           },
           onHostRequest: (action: string, payload: Record<string, unknown>) => host.request(action, payload),
           onEvent: (event: RunnerEvent) => {

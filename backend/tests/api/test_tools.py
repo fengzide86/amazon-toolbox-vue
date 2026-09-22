@@ -74,6 +74,7 @@ async def _seed_live_launch_access(db_session) -> tuple[str, int]:
                             "release_status": "available",
                             "status": "online",
                             "script_key": "amazon.live_tool.v1",
+                            "script_status": "script_ready",
                             "target_url": "https://example.test/live",
                         }
                     ],
@@ -397,6 +398,42 @@ async def test_launch_grant_create_and_verify_preserve_response_contract(
         "message": "Token 已使用",
         "error_code": 403,
     }
+
+
+@pytest.mark.asyncio
+async def test_live_launch_grant_rejects_tool_without_ready_script(
+    client: AsyncClient,
+    db_session,
+    monkeypatch,
+):
+    monkeypatch.setattr(settings, "TOOL_EXECUTION_MODE", "live")
+    access_token, _auth_code_id = await _seed_live_launch_access(db_session)
+    setting = (
+        await db_session.execute(select(Setting).where(Setting.key == "tool_configs"))
+    ).scalar_one()
+    tools = json.loads(setting.value)
+    tools[0]["script_status"] = "script_not_ready"
+    setting.value = json.dumps(tools, ensure_ascii=False)
+    await db_session.commit()
+
+    response = await client.post(
+        "/api/tools/live_tool/launch-grant",
+        params={"platform_key": "amazon"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "success": False,
+        "message": "该工具的自动化脚本尚未就绪",
+        "error_code": 3009,
+        "detail": {
+            "code": "TOOL_SCRIPT_NOT_READY",
+            "reason": "script_not_ready",
+            "script_status": "script_not_ready",
+        },
+    }
+    assert (await db_session.execute(select(LaunchToken))).scalars().all() == []
 
 
 @pytest.mark.asyncio

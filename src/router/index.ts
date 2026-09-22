@@ -98,6 +98,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'orders', name: 'AgentOrders', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'orders' }, meta: { title: '我的订单' } },
       { path: 'licenses', name: 'AgentLicenses', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'licenses' }, meta: { title: '我的授权' } },
       { path: 'requests', name: 'AgentRequests', component: () => import('@/features/agency/AgencyRecordsView.vue'), props: { section: 'requests' }, meta: { title: '售后支持' } },
+      { path: 'commission', name: 'AgentCommission', component: () => import('@/features/agency/AgentCommissionView.vue'), meta: { title: '返佣结算' } },
       { path: 'account', name: 'AgentAccount', component: () => import('@/features/agency/AgentAccountView.vue'), meta: { title: '个人账号' } },
     ],
   },

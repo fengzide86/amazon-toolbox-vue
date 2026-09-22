@@ -164,7 +164,7 @@ describe('ToolsView 一键工具箱', () => {
   it('网页版真实工具只提供桌面端下载，不显示可执行入口', async () => {
     mocks.getTools.mockResolvedValue([{
       id: 'live-listing', name: '真实上品', module: 'listing', status: 'online', availability: 'live',
-      supports_live_single: true, available_plans: ['Y15'],
+      supports_live_single: true, script_status: 'script_ready', available_plans: ['Y15'],
     }])
     const wrapper = mountView()
     await flushPromises()
@@ -193,7 +193,7 @@ describe('ToolsView 一键工具箱', () => {
 
   it('切换平台后，不会打开晚到的旧平台启动授权', async () => {
     Object.defineProperty(window, 'electronAPI', { configurable: true, value: { automation: {} } })
-    mocks.getTools.mockResolvedValueOnce([{ id: 'live', name: '旧平台真实工具', status: 'online', availability: 'live', supports_live_single: true }]).mockResolvedValueOnce([])
+    mocks.getTools.mockResolvedValueOnce([{ id: 'live', name: '旧平台真实工具', status: 'online', availability: 'live', supports_live_single: true, script_status: 'script_ready' }]).mockResolvedValueOnce([])
     let release!: (value: unknown) => void
     mocks.createToolLaunchGrant.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
     const wrapper = mountView()

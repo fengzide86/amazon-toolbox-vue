@@ -64,7 +64,8 @@ interface RunnerTool extends UnknownRecord {
   platformKey?: string;
   targetUrl?: string;
   browserMode?: string;
-  executionMode?: 'demo' | 'live';
+  executionMode?: 'demo' | 'live' | 'preflight';
+  scriptStatus?: 'demo_ready' | 'browser_ready' | 'script_ready' | 'script_not_ready' | 'blocked';
   launchGrant?: RunnerLaunchGrant;
   executionContext?: { mode?: string; batchId?: string; itemId?: string; sessionId?: string; input?: UnknownRecord };
 }
@@ -130,6 +131,32 @@ class AutomationRuntime {
   consecutiveFailures = 0;
   adapterSource: 'embedded' | 'download' | 'cache' = 'embedded';
   completedStepIds = new Set<string>();
+  browserState: 'idle' | 'registering' | 'ready' | 'navigating' | 'inspected' | 'running' | 'waiting_user' | 'completed' | 'closing' | 'closed' | 'error' = 'idle';
+
+  scriptStatus(tool: RunnerTool, script: WorkflowScript): 'ready' | 'not_ready' | 'blocked' {
+    const declared = tool.scriptStatus;
+    if (declared === 'blocked') return 'blocked';
+    if (declared === 'script_not_ready' || declared === 'browser_ready') return 'not_ready';
+    if (declared === 'demo_ready' && tool.executionMode === 'live') return 'not_ready';
+    if (script.key === 'workflow.generic.v1' || !script.steps?.length) return 'not_ready';
+    return 'ready';
+  }
+
+  async resolveAdapter(tool: RunnerTool): Promise<{ adapter: WorkflowScript; source: 'embedded' | 'download' | 'cache' }> {
+    const embeddedScript = resolveScript(tool.launchGrant?.scriptKey || String(tool.scriptKey || ''));
+    const manifest = asRecord(tool.launchGrant?.toolManifest);
+    const hasRemoteArtifact = tool.executionMode === 'live' && manifest.artifactSha256 && manifest.artifactSha256 !== 'embedded';
+    const signature = hasRemoteArtifact
+      ? verifyToolManifest(tool, process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || '')
+      : { verified: false };
+    return resolveSignedAdapter(
+      tool,
+      embeddedScript,
+      path.join(PROFILE_ROOT, 'adapter-cache'),
+      CONTROL_API_BASE,
+      signature.verified,
+    );
+  }
 
   emit(type: string, payload: UnknownRecord = {}): void {
     this.eventSequence += 1;
@@ -156,23 +183,15 @@ class AutomationRuntime {
 
     this.runId = `local_run_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     this.tool = { ...tool };
-    const embeddedScript = resolveScript(tool.launchGrant?.scriptKey || String(tool.scriptKey || ''));
-    const manifest = asRecord(tool.launchGrant?.toolManifest);
-    const hasRemoteArtifact = tool.executionMode === 'live' && manifest.artifactSha256 && manifest.artifactSha256 !== 'embedded';
-    const signature = hasRemoteArtifact
-      ? verifyToolManifest(tool, process.env.TOOLBOX_TOOL_SIGNING_PUBLIC_KEY_B64 || '')
-      : { verified: false };
-    const resolvedAdapter = await resolveSignedAdapter(
-      tool,
-      embeddedScript,
-      path.join(PROFILE_ROOT, 'adapter-cache'),
-      CONTROL_API_BASE,
-      signature.verified,
-    );
+    const resolvedAdapter = await this.resolveAdapter(tool);
     this.script = resolvedAdapter.adapter;
     this.adapterSource = resolvedAdapter.source;
+    if (this.scriptStatus(tool, this.script) !== 'ready') {
+      throw this.runnerError('TOOL_SCRIPT_NOT_READY', '当前工具的自动化脚本尚未就绪，已禁止执行');
+    }
     this.steps = createSteps(tool, this.script);
     this.status = 'running';
+    this.browserState = 'running';
     this.cancelRequested = false;
     this.userActionWaiters = [];
     this.eventSequence = 0;
@@ -194,6 +213,130 @@ class AutomationRuntime {
       if (this.execution === execution) this.execution = null;
     });
     return { runId: this.runId };
+  }
+
+  /**
+   * Read-only preparation used by the workspace before `start`. It may open
+   * and scan the registered embedded browser, but it never executes a form
+   * action or creates an execution record.
+   */
+  async preflight(tool: RunnerTool = {}) {
+    this.browserState = 'registering';
+    if (this.execution) {
+      const previousExecution = this.execution;
+      if (!['completed', 'failed', 'cancelled'].includes(this.status)) await this.cancel(false);
+      try { await previousExecution; } catch {}
+    }
+    await this.closeBrowser();
+    const browserMode = tool.browserMode === 'embedded-cdp' ? 'embedded-cdp' : 'playwright';
+    let targetUrl = String(tool.targetUrl || '');
+    const requestedKey = String(tool.launchGrant?.scriptKey || tool.scriptKey || '');
+    let scriptKey = requestedKey;
+    let scriptStatus: 'ready' | 'not_ready' | 'blocked';
+    let pageTitle: string | undefined;
+    let pageFingerprint: string | undefined;
+    let scanReport: string | undefined;
+    try {
+      this.tool = { ...tool };
+      const resolved = await this.resolveAdapter(tool);
+      this.script = resolved.adapter;
+      this.adapterSource = resolved.source;
+      scriptKey = String(this.script.key || requestedKey);
+      scriptStatus = this.scriptStatus(tool, this.script);
+
+      if (MOCK_MODE) {
+        const mockTarget = targetUrl || 'http://127.0.0.1/mock-automation-sandbox';
+        this.browserState = 'inspected';
+        return {
+          browserMode,
+          browserState: this.browserState,
+          targetUrl: mockTarget,
+          pageTitle: 'Runner Mock Page',
+          pageFingerprint: 'mock-preflight',
+          scriptKey,
+          scriptStatus,
+          canStart: scriptStatus === 'ready',
+          ...(scriptStatus !== 'ready' ? { blockedCode: 'TOOL_SCRIPT_NOT_READY', blockedMessage: '脚本开发中，当前仅可预览页面和扫描结构' } : {}),
+        };
+      }
+
+      if (!targetUrl) {
+        // A missing target is still useful during script development: keep the
+        // browser host visible on an isolated local page, never on a real
+        // marketplace page.
+        const sandbox = await startSandboxServer({ ...this.script, sandbox: true });
+        this.sandbox = sandbox;
+        targetUrl = sandbox.url;
+        this.tool.targetUrl = targetUrl;
+      }
+      const validTarget = this.validTargetUrl();
+      this.assertAllowedTarget(validTarget);
+      this.browserState = 'ready';
+      fs.mkdirSync(ARTIFACT_ROOT, { recursive: true });
+      if (browserMode === 'embedded-cdp') {
+        this.browserState = 'navigating';
+        await this.hostRequest('browser.prepare');
+        await this.hostRequest('browser.navigate', { url: validTarget }, 50000);
+        const pageMap = asRecord(await this.hostRequest('browser.scan'));
+        pageTitle = typeof pageMap.title === 'string' ? pageMap.title : undefined;
+        const scan = persistPageScan(path.join(ARTIFACT_ROOT, 'page-scans'), scriptKey || 'unknown', pageMap);
+        pageFingerprint = typeof scan.fingerprint === 'string' ? scan.fingerprint : undefined;
+        scanReport = typeof scan.reportPath === 'string' ? scan.reportPath : undefined;
+      } else {
+        const executablePaths = findBrowserExecutables();
+        if (!executablePaths.length) throw this.runnerError('BROWSER_NOT_FOUND', '未找到 Chrome 或 Edge，请先安装其中一个浏览器');
+        const profilePath = path.join(PROFILE_ROOT, safeProfileName(this.tool));
+        let launchError: unknown;
+        for (const candidate of executablePaths) {
+          try {
+            this.context = await chromium.launchPersistentContext(profilePath, {
+              executablePath: candidate,
+              headless: false,
+              viewport: null,
+              acceptDownloads: true,
+              args: ['--start-maximized'],
+            });
+            break;
+          } catch (error) { launchError = error; }
+        }
+        if (!this.context) throw this.runnerError('BROWSER_LAUNCH_FAILED', `Chrome/Edge 启动失败：${failure(launchError).message}`);
+        this.page = this.context.pages()[0] || await this.context.newPage();
+        this.browserState = 'navigating';
+        await this.page.goto(validTarget, { waitUntil: 'domcontentloaded', timeout: 45000 });
+        const pageMap = await scanPlaywrightPage(this.page);
+        pageTitle = typeof pageMap.title === 'string' ? pageMap.title : undefined;
+        const scan = persistPageScan(path.join(ARTIFACT_ROOT, 'page-scans'), scriptKey || 'unknown', pageMap);
+        pageFingerprint = typeof scan.fingerprint === 'string' ? scan.fingerprint : undefined;
+        scanReport = typeof scan.reportPath === 'string' ? scan.reportPath : undefined;
+      }
+      this.browserState = 'inspected';
+      return {
+        browserMode,
+        browserState: this.browserState,
+        targetUrl: validTarget,
+        ...(pageTitle ? { pageTitle } : {}),
+        ...(pageFingerprint ? { pageFingerprint } : {}),
+        ...(scanReport ? { scanReport } : {}),
+        scriptKey,
+        scriptStatus,
+        canStart: scriptStatus === 'ready',
+        ...(scriptStatus !== 'ready' ? { blockedCode: 'TOOL_SCRIPT_NOT_READY', blockedMessage: '脚本开发中，当前仅可预览页面和扫描结构' } : {}),
+      };
+    } catch (error) {
+      const reason = failure(error, '浏览器预检失败');
+      this.browserState = 'error';
+      await this.closeBrowser();
+      return {
+        browserMode,
+        browserState: 'error',
+        targetUrl,
+        scriptKey,
+        scriptStatus: 'blocked' as const,
+        canStart: false,
+        blockedCode: reason.code || 'PREFLIGHT_FAILED',
+        blockedMessage: reason.message,
+      };
+    }
   }
 
   async execute(): Promise<void> {
@@ -231,6 +374,7 @@ class AutomationRuntime {
           const browser = await this.hostRequest('browser.prepare');
           result.browser = browser.mode;
           result.webContentsId = browser.webContentsId;
+          this.browserState = 'ready';
           return;
         }
 
@@ -256,9 +400,11 @@ class AutomationRuntime {
         this.page = this.context.pages()[0] || await this.context.newPage();
         result.browser = path.basename(executablePath || 'browser');
         result.profile = safeProfileName(this.tool);
+        this.browserState = 'ready';
       });
 
       await this.runStep('open', async () => {
+        this.browserState = 'navigating';
         const targetUrl = this.validTargetUrl();
         this.assertAllowedTarget(targetUrl);
         if (embedded) {
@@ -290,6 +436,7 @@ class AutomationRuntime {
         if (this.tool.executionMode === 'live' && scan.changed) {
           throw this.runnerError('PAGE_CHANGED', '平台页面结构已变化，已停止当前工具；请根据扫描报告更新适配器后重试');
         }
+        this.browserState = 'inspected';
       });
 
       for (const rawStep of this.script.steps || []) {
@@ -322,6 +469,7 @@ class AutomationRuntime {
       if (report.executionId) result.serverExecutionId = report.executionId;
       if (report.warning) result.reportWarning = report.warning;
       this.status = 'completed';
+      this.browserState = 'completed';
       this.emit(EVENTS.RUN_COMPLETED, {
         result: { ...result, summary: this.script.sandbox ? '本地交互沙盒已完成真实点击、填写和结果核验' : '平台任务已执行并通过结果核验', completedSteps: this.steps.length },
       });
@@ -330,6 +478,7 @@ class AutomationRuntime {
       if (this.cancelRequested || runError.code === 'RUN_CANCELLED') return;
       await this.reportExecution('failed', result, runError.code || 'RUNNER_ERROR').catch(() => undefined);
       this.status = 'failed';
+      this.browserState = 'error';
       this.emit(EVENTS.RUN_FAILED, {
         stepId: runError.stepId,
         error: { code: runError.code || 'RUNNER_ERROR', message: runError.message || '本地任务执行失败', actionId: runError.actionId },
@@ -541,6 +690,7 @@ class AutomationRuntime {
 
   requestUserAction(action: UnknownRecord = {}): Promise<void> {
     this.status = 'waiting_user';
+    this.browserState = 'waiting_user';
     this.emit(EVENTS.USER_ACTION_REQUIRED, { action });
     return new Promise<void>(resolve => this.userActionWaiters.push(resolve));
   }
@@ -548,6 +698,7 @@ class AutomationRuntime {
   completeUserAction() {
     if (this.status !== 'waiting_user') return { status: this.status };
     this.status = 'running';
+    this.browserState = 'running';
     this.userActionWaiters.splice(0).forEach(resolve => resolve());
     this.emit(EVENTS.USER_ACTION_COMPLETED);
     return { status: this.status };
@@ -569,6 +720,19 @@ class AutomationRuntime {
   sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)); }
 
   async closeBrowser() {
+    const hadBrowser = Boolean(this.context || this.page || this.sandbox || this.tool?.browserMode === 'embedded-cdp');
+    if (hadBrowser) this.browserState = 'closing';
+    // A navigation/scan request may still be waiting for the embedded host
+    // while the workspace is closing. Reject it before detaching so a late
+    // response cannot keep a preflight promise or listener alive.
+    if (this.hostPending.size) {
+      const pending = [...this.hostPending.values()];
+      this.hostPending.clear();
+      pending.forEach(item => {
+        clearTimeout(item.timer);
+        item.reject(this.runnerError('BROWSER_HOST_CANCELLED', '浏览器工作区已关闭'));
+      });
+    }
     if (this.tool?.browserMode === 'embedded-cdp' && !MOCK_MODE) { try { await this.hostRequest('browser.detach'); } catch {} }
     const context = this.context;
     this.context = null;
@@ -577,6 +741,7 @@ class AutomationRuntime {
     const sandbox = this.sandbox;
     this.sandbox = null;
     if (sandbox) { try { await sandbox.close(); } catch {} }
+    if (hadBrowser) this.browserState = 'closed';
   }
 
   requirePage(): import('playwright-core').Page { if (!this.page) throw this.runnerError('BROWSER_PAGE_MISSING', '浏览器页面尚未准备好'); return this.page; }
@@ -630,6 +795,7 @@ process.on('message', async (rawMessage: unknown) => {
   try {
     let data;
     if (command === 'start') data = await runtime.start(asRecord(payload.tool));
+    else if (command === 'preflight') data = await runtime.preflight(asRecord(payload.tool));
     else if (command === 'pause') data = runtime.pause();
     else if (command === 'resume') data = runtime.resume();
     else if (command === 'complete-user-action') data = runtime.completeUserAction();

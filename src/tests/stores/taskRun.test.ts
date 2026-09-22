@@ -131,6 +131,10 @@ describe('taskRun store', () => {
     const automation = {
       onEvent: vi.fn(() => vi.fn()),
       start: vi.fn(() => Promise.resolve({ runId: 'local_run_1' })),
+      preflight: vi.fn(() => Promise.resolve({
+        browserMode: 'embedded-cdp', browserState: 'inspected', targetUrl: '',
+        scriptKey: 'demo.test', scriptStatus: 'not_ready', canStart: false,
+      } as const)),
       pause: vi.fn(),
       resume: vi.fn(),
       completeUserAction: vi.fn(),

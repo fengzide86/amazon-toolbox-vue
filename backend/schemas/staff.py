@@ -92,6 +92,7 @@ class StaffContextResponse(BaseModel):
     force_password_reset: bool
     auth_code_id: None = None
     device_id: None = None
+    capabilities: list[str] = Field(default_factory=list)
 
 
 class StaffSessionResponse(StaffContextResponse):

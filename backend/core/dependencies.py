@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.capabilities import has_capability, roles_with
 from core.logging import set_user_id
 from core.security import verify_token
 from database import get_db
@@ -93,9 +94,18 @@ def require_staff_roles(*roles: str) -> Callable:
     return dependency
 
 
-require_super_admin = require_staff_roles(StaffRole.SUPER_ADMIN)
-require_commerce_operator = require_staff_roles(StaffRole.SUPER_ADMIN, StaffRole.OPERATOR)
-require_any_staff = require_staff_roles(*StaffRole.INTERNAL)
+def require_staff_capability(capability: str) -> Callable:
+    """Build a dependency from the shared matrix, retaining stable role errors."""
+
+    allowed = roles_with(capability, StaffRole.ALL)
+    if not allowed:
+        raise ValueError(f"未知后台能力: {capability}")
+    return require_staff_roles(*allowed)
+
+
+require_super_admin = require_staff_capability("settings.manage")
+require_commerce_operator = require_staff_capability("expenses.write")
+require_any_staff = require_staff_capability("backoffice.read")
 
 
 async def require_agency_staff(
@@ -105,7 +115,11 @@ async def require_agency_staff(
     """Partner scopes never inherit the internal administrator compatibility path."""
     if staff["role"] == StaffRole.SUPER_ADMIN:
         return staff
-    if staff["role"] != StaffRole.AGENT or not staff.get("agency_id"):
+    if (
+        staff["role"] != StaffRole.AGENT
+        or not staff.get("agency_id")
+        or not has_capability(staff.get("role"), "agency.workspace.read")
+    ):
         raise HTTPException(status_code=403, detail="当前账号无代理工作台权限")
     agency = await db.get(Agency, staff["agency_id"])
     if not agency or agency.status != "active":
@@ -132,15 +146,18 @@ async def get_current_admin(
 
     # Settings, updater/release control and audit data are super-admin only,
     # including reads. Operational run logs are intentionally not audit logs.
-    super_only_prefixes = (
-        "/api/settings",
-        "/api/updates",
-        "/api/tool-releases",
-        "/api/freight-rate-packs",
-        "/api/audit",
-        "/api/audit-logs",
-    )
-    if path.startswith(super_only_prefixes):
+    super_only_prefixes = {
+        "/api/settings": "settings.manage",
+        "/api/updates": "updates.manage",
+        "/api/tool-releases": "updates.manage",
+        "/api/freight-rate-packs": "settings.manage",
+        "/api/audit": "settings.manage",
+        "/api/audit-logs": "settings.manage",
+    }
+    if any(path.startswith(prefix) for prefix in super_only_prefixes) and not has_capability(
+        role,
+        next(capability for prefix, capability in super_only_prefixes.items() if path.startswith(prefix)),
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="该模块仅超级管理员可访问",
@@ -149,32 +166,32 @@ async def get_current_admin(
     if request.method in {"GET", "HEAD", "OPTIONS"}:
         return staff
 
-    operator_mutation_prefixes = (
-        "/api/auth-codes",
-        "/api/users",
-        "/api/devices/unbind",
-        "/api/feedback",
-        "/api/knowledge",
-        "/api/ai-chat",
-        "/api/dashboard/refresh-cache",
-    )
+    operator_mutation_prefixes = {
+        "/api/auth-codes": "auth_codes.write",
+        "/api/users": "users.write",
+        "/api/devices/unbind": "devices.unbind",
+        "/api/feedback": "feedback.write",
+        "/api/knowledge": "knowledge.write",
+        "/api/ai-chat": "rules.write",
+        "/api/dashboard/refresh-cache": "backoffice.read",
+    }
     if role == StaffRole.OPERATOR:
-        if path.startswith(operator_mutation_prefixes):
+        if any(path.startswith(prefix) and has_capability(role, capability) for prefix, capability in operator_mutation_prefixes.items()):
             return staff
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="运营角色对该模块仅可查看",
         )
 
-    support_mutation_prefixes = (
-        "/api/announcements",
-        "/api/feedback",
-        "/api/knowledge",
-        "/api/ai-chat",
-    )
+    support_mutation_prefixes = {
+        "/api/announcements": "announcements.write",
+        "/api/feedback": "feedback.write",
+        "/api/knowledge": "knowledge.write",
+        "/api/ai-chat": "rules.write",
+    }
     if role == StaffRole.SUPPORT and (
-        path.startswith(support_mutation_prefixes)
-        or path == "/api/devices/unbind"
+        any(path.startswith(prefix) and has_capability(role, capability) for prefix, capability in support_mutation_prefixes.items())
+        or (path == "/api/devices/unbind" and has_capability(role, "devices.unbind"))
     ):
         return staff
     raise HTTPException(

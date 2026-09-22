@@ -6,7 +6,7 @@ from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
 from models import (
     ExpenseCategory,
@@ -27,23 +27,47 @@ class ExpenseSummaryReadModel(ExpenseServiceBase):
         end = shift_month(start, 1)
         previous = shift_month(start, -1)
 
-        async def total_between(begin: date, finish: date) -> tuple[Decimal, int]:
-            row = (
-                await self.db.execute(
-                    select(
-                        func.coalesce(func.sum(ExpenseRecord.amount), 0),
-                        func.count(ExpenseRecord.id),
-                    ).where(
-                        ExpenseRecord.status == ExpenseRecordStatus.ACTIVE,
-                        ExpenseRecord.expense_date >= begin,
-                        ExpenseRecord.expense_date < finish,
-                    )
+        # Keep the six-month trend, current-month totals and previous-month
+        # comparison in one range query.  The previous implementation issued
+        # one aggregate per month (plus two more for current/previous totals),
+        # which made every dashboard refresh perform eight round trips before
+        # categories and renewals were even loaded.
+        trend_start = shift_month(start, -5)
+        dialect = self.db.get_bind().dialect.name
+        if dialect == "sqlite":
+            month_key = func.strftime("%Y-%m", ExpenseRecord.expense_date)
+        elif dialect in {"mysql", "mariadb"}:
+            month_key = func.date_format(ExpenseRecord.expense_date, "%Y-%m")
+        else:
+            # PostgreSQL and compatible engines expose the same ISO month
+            # representation through to_char.  This branch is not used by the
+            # supported test/runtime engines, but keeps the read model useful
+            # for local tooling.
+            month_key = func.to_char(ExpenseRecord.expense_date, "YYYY-MM")
+        trend_rows = (
+            await self.db.execute(
+                select(
+                    month_key.label("month"),
+                    func.coalesce(func.sum(ExpenseRecord.amount), 0),
+                    func.count(ExpenseRecord.id),
                 )
-            ).one()
-            return money(row[0]), int(row[1] or 0)
-
-        total, count = await total_between(start, end)
-        previous_total, _ = await total_between(previous, start)
+                .where(
+                    ExpenseRecord.status == ExpenseRecordStatus.ACTIVE,
+                    ExpenseRecord.expense_date >= trend_start,
+                    ExpenseRecord.expense_date < end,
+                )
+                .group_by(month_key)
+            )
+        ).all()
+        totals_by_month = {
+            str(row[0]): (money(row[1]), int(row[2] or 0)) for row in trend_rows
+        }
+        current_key = start.strftime("%Y-%m")
+        previous_key = previous.strftime("%Y-%m")
+        total, count = totals_by_month.get(current_key, (Decimal("0.00"), 0))
+        previous_total, _ = totals_by_month.get(
+            previous_key, (Decimal("0.00"), 0)
+        )
         if previous_total == 0:
             change = Decimal("0") if total == 0 else None
         else:
@@ -91,37 +115,43 @@ class ExpenseSummaryReadModel(ExpenseServiceBase):
 
         trend = []
         for offset in range(-5, 1):
-            trend_start = shift_month(start, offset)
-            trend_end = shift_month(trend_start, 1)
-            trend_total, _ = await total_between(trend_start, trend_end)
+            point_start = shift_month(start, offset)
+            point_key = point_start.strftime("%Y-%m")
+            trend_total = totals_by_month.get(
+                point_key, (Decimal("0.00"), 0)
+            )[0]
             trend.append(
-                {"month": trend_start.strftime("%Y-%m"), "total": trend_total}
+                {"month": point_key, "total": trend_total}
             )
 
         today = date.today()
-        upcoming = int(
-            (
-                await self.db.execute(
-                    select(func.count(ExpenseRenewal.id)).where(
-                        ExpenseRenewal.status == ExpenseRenewalStatus.ACTIVE,
-                        ExpenseRenewal.next_due_on >= today,
-                        self._days_until_due(today) <= ExpenseRenewal.reminder_days,
-                    )
-                )
-            ).scalar()
-            or 0
-        )
-        overdue = int(
-            (
-                await self.db.execute(
-                    select(func.count(ExpenseRenewal.id)).where(
-                        ExpenseRenewal.status == ExpenseRenewalStatus.ACTIVE,
-                        ExpenseRenewal.next_due_on < today,
-                    )
-                )
-            ).scalar()
-            or 0
-        )
+        due_days = self._days_until_due(today)
+        renewal_counts = (
+            await self.db.execute(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (
+                                    (ExpenseRenewal.next_due_on >= today)
+                                    & (due_days <= ExpenseRenewal.reminder_days),
+                                    1,
+                                ),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                    func.coalesce(
+                        func.sum(
+                            case((ExpenseRenewal.next_due_on < today, 1), else_=0)
+                        ),
+                        0,
+                    ),
+                ).where(ExpenseRenewal.status == ExpenseRenewalStatus.ACTIVE)
+            )
+        ).one()
+        upcoming, overdue = (int(renewal_counts[0] or 0), int(renewal_counts[1] or 0))
         return {
             "month": start.strftime("%Y-%m"),
             "total": total,

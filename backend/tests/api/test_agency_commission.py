@@ -67,8 +67,11 @@ async def test_agent_can_read_only_own_commission_and_cannot_settle(client, agen
     setup = agency_setup
     agency_id = setup["agencies"][0].id
     assert (await client.get(f"/api/agency/agencies/{agency_id}/commission-summary", headers=setup["a"])).status_code == 200
+    assert (await client.get(f"/api/agency/agencies/{agency_id}/commissions", headers=setup["a"])).status_code == 200
+    assert (await client.get(f"/api/agency/agencies/{agency_id}/commission-settlements", headers=setup["a"])).status_code == 200
     assert (await client.put(f"/api/agency/agencies/{agency_id}/commission-policy", headers=setup["a"], json={"rate": "0.100000", "expected_rate": None})).status_code == 403
     assert (await client.get(f"/api/agency/agencies/{setup['agencies'][1].id}/commission-summary", headers=setup["a"])).status_code == 403
+    assert (await client.get(f"/api/agency/agencies/{setup['agencies'][1].id}/commissions", headers=setup["a"])).status_code == 403
 
 
 async def enable_commission(client, setup, rate="0.100000"):

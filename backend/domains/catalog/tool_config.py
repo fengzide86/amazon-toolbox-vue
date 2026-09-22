@@ -18,6 +18,7 @@ DEFAULT_TARGET_URLS: dict[str, str] = {}
 VALID_RELEASE_STATUSES = {"available", "beta", "maintenance", "disabled"}
 VALID_TOOL_STATUSES = {"online", "maintenance", "offline"}
 VALID_AVAILABILITIES = {"demo_only", "live_beta", "live"}
+VALID_SCRIPT_STATUSES = {"demo_ready", "browser_ready", "script_ready", "script_not_ready", "blocked"}
 SENSITIVE_BATCH_KEYS = {"password", "passwd", "pwd", "secret", "token", "cookie"}
 
 
@@ -54,6 +55,14 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
     availability = str(normalized.get("availability") or "demo_only")
     if availability not in VALID_AVAILABILITIES:
         availability = "demo_only"
+    script_status = str(normalized.get("script_status") or "")
+    if availability == "demo_only":
+        script_status = "demo_ready"
+    elif script_status not in VALID_SCRIPT_STATUSES - {"demo_ready"}:
+        # Live tools must opt into an explicitly verified script.  Keeping the
+        # default unavailable prevents a catalog edit from accidentally
+        # granting a Runner token before its adapter has been tested.
+        script_status = "script_not_ready"
     demo_scenario_id = slugify(str(normalized.get("demo_scenario_id") or f"{capability_key}_v1"))
     script_key, target_url = resolve_tool_runtime(
         {**normalized, "id": tool_id, "platform_key": platform_key, "capability_key": capability_key}, platform_key
@@ -69,6 +78,7 @@ def normalize_tool_config(tool: dict[str, Any], index: int = 0) -> dict[str, Any
         "platform_key": platform_key,
         "capability_key": capability_key,
         "availability": availability,
+        "script_status": script_status,
         "demo_scenario_id": demo_scenario_id,
         "supports_demo_single": bool(normalized.get("supports_demo_single", True)),
         "supports_demo_batch": bool(normalized.get("supports_demo_batch", normalized.get("supports_batch", False))),
@@ -156,6 +166,7 @@ def force_demo_only_tool_configs(tools: list[dict[str, Any]]) -> list[dict[str, 
         ))
         tool.update({
             "availability": "demo_only",
+            "script_status": "demo_ready",
             "demo_scenario_id": scenario_id,
             "supports_demo_single": bool(tool.get("supports_demo_single", True)),
             "supports_demo_batch": bool(tool.get("supports_demo_batch", tool.get("supports_batch", False))),

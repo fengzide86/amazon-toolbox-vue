@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
+from sqlalchemy import event
 
-from domains.commerce import validate_expense_attachment_storage
+from domains.commerce import ExpenseService, validate_expense_attachment_storage
 from models import ExpenseRenewal, StaffRole
+from tests.conftest import test_engine
 
 
 async def _category_id(client, headers, code: str = "development") -> int:
@@ -64,6 +66,23 @@ async def test_expense_crud_summary_void_and_export(client, auth_headers):
     assert summary_after.json()["data"]["total"] == "0.00"
     assert summary_after.json()["data"]["count"] == 0
     assert summary_after.json()["data"]["change_percent"] == "0"
+
+
+@pytest.mark.asyncio
+async def test_expense_summary_uses_at_most_four_database_round_trips(db_session):
+    statements: list[str] = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if not statement.lstrip().upper().startswith(("PRAGMA", "SAVEPOINT", "RELEASE")):
+            statements.append(statement)
+
+    event.listen(test_engine.sync_engine, "before_cursor_execute", capture)
+    try:
+        await ExpenseService(db_session).summary()
+    finally:
+        event.remove(test_engine.sync_engine, "before_cursor_execute", capture)
+
+    assert len(statements) <= 4
 
 
 @pytest.mark.asyncio

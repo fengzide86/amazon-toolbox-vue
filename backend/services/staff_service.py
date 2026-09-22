@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.audit import log_admin_action
+from core.capabilities import capabilities_for_role
 from core.logging import get_logger
 from core.security import (
     create_access_token,
@@ -35,6 +36,7 @@ def staff_to_dict(staff: StaffUser) -> dict[str, object]:
         "name": staff.display_name,
         "display_name": staff.display_name,
         "role": staff.role,
+        "capabilities": sorted(capabilities_for_role(staff.role)),
         "agency_id": staff.agency_id,
         "status": staff.status,
         "token_version": staff.token_version,

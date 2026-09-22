@@ -16,6 +16,18 @@ export const commissionSummarySchema = z.object({
   accrued_amount: decimal,
   refunded_amount: decimal,
 })
+export const commissionEntrySchema = z.object({
+  id,
+  agency_id: id,
+  order_id: id,
+  order_no: z.string(),
+  kind: z.enum(['accrual', 'refund']),
+  amount: decimal,
+  rate_snapshot: decimal,
+  order_amount_snapshot: decimal,
+  occurred_at: z.string().nullable().optional(),
+  settlement_id: id.nullable(),
+})
 export const commissionSettlementSchema = z.object({
   id,
   agency_id: id,
@@ -44,6 +56,7 @@ export const commissionSettlementConfirmSchema = z.object({
 })
 export type CommissionPolicy = z.infer<typeof commissionPolicySchema>
 export type CommissionSummary = z.infer<typeof commissionSummarySchema>
+export type CommissionEntry = z.infer<typeof commissionEntrySchema>
 export type CommissionSettlement = z.infer<typeof commissionSettlementSchema>
 export type CommissionPreview = z.infer<typeof commissionPreviewSchema>
 export type CommissionSettlementConfirm = z.infer<typeof commissionSettlementConfirmSchema>

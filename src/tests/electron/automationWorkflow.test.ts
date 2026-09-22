@@ -221,4 +221,49 @@ describe('declarative automation workflow runtime', () => {
     expect(eventTypes.at(-1)).toBe('run.completed')
     expect(result.result).toEqual(expect.objectContaining({ recordKind: 'demo' }))
   }, 50_000)
+
+  it('preflights an unready script without starting a run or executing actions', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'toolbox-preflight-'))
+    temporaryPaths.push(root)
+    const child = fork(resolve('dist-electron/electron/automation-runner.cjs'), [], {
+      env: {
+        ...process.env,
+        TOOLBOX_RUNNER_MOCK: 'true',
+        ELECTRON_RUN_AS_NODE: '1',
+        TOOLBOX_PROFILE_ROOT: join(root, 'profiles'),
+        TOOLBOX_ARTIFACT_ROOT: join(root, 'artifacts'),
+      },
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    })
+    try {
+      const result = await new Promise<Record<string, unknown>>((resolveResult, rejectResult) => {
+        const timer = setTimeout(() => rejectResult(new Error('preflight test timed out')), 10_000)
+        child.once('error', error => { clearTimeout(timer); rejectResult(error) })
+        child.on('message', raw => {
+          const message = raw as { type?: string; id?: string; ok?: boolean; data?: Record<string, unknown>; error?: { message?: string } }
+          if (message.type !== 'response' || message.id !== 'preflight-1') return
+          clearTimeout(timer)
+          if (!message.ok) rejectResult(new Error(message.error?.message || 'preflight failed'))
+          else resolveResult(message.data || {})
+        })
+        child.send({
+          type: 'command', id: 'preflight-1', command: 'preflight', payload: { tool: {
+            id: 'tool_unready', name: '待开发工具', platformKey: 'amazon', executionMode: 'preflight',
+            scriptKey: 'amazon.not_registered.v1', scriptStatus: 'script_not_ready', targetUrl: '',
+          } },
+        })
+      })
+      expect(result).toEqual(expect.objectContaining({
+        browserMode: 'playwright', browserState: 'inspected', scriptStatus: 'not_ready', canStart: false,
+        pageTitle: 'Runner Mock Page', blockedCode: 'TOOL_SCRIPT_NOT_READY',
+      }))
+    } finally {
+      if (child.connected) child.send({ type: 'command', id: 'shutdown-preflight', command: 'shutdown', payload: {} })
+      await new Promise<void>(resolveExit => {
+        if (child.exitCode !== null || child.signalCode !== null) return resolveExit()
+        const timer = setTimeout(() => { child.kill(); resolveExit() }, 2_000)
+        child.once('exit', () => { clearTimeout(timer); resolveExit() })
+      })
+    }
+  }, 15_000)
 })

@@ -28,6 +28,7 @@ type UnknownRecord = Record<string, unknown>
 
 interface RunnerLike {
   start(tool: UnknownRecord): Promise<unknown>
+  preflight(tool: UnknownRecord): Promise<UnknownRecord>
   pause(): Promise<unknown> | unknown
   resume(): Promise<unknown> | unknown
   completeUserAction(): Promise<unknown> | unknown
@@ -287,6 +288,14 @@ export class DesktopAutomationController {
       const tool = asRecord(rawTool)
       if (!tool.id) throw new Error('工具启动数据不完整')
       return this.getRunner().start({
+        ...tool,
+        browserMode: this.embeddedBrowserHost.isReady() ? 'embedded-cdp' : 'playwright',
+      })
+    })
+    register('automation:preflight', async (_event: IpcMainInvokeEvent, rawTool: unknown) => {
+      const tool = asRecord(rawTool)
+      if (!tool.id) throw new Error('工具启动数据不完整')
+      return this.getRunner().preflight({
         ...tool,
         browserMode: this.embeddedBrowserHost.isReady() ? 'embedded-cdp' : 'playwright',
       })
