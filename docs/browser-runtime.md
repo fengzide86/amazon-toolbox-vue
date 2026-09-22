@@ -50,8 +50,11 @@ idle → registering → ready → navigating → inspected
 
 ```powershell
 npm run typecheck
-npm run test:unit -- src/tests/electron/automationWorkflow.test.ts
+npm run electron:compile
+npm run test:electron-workflow
 ```
+
+工作流测试读取 `dist-electron` 中的编译产物，因此先执行 `electron:compile`；`test:unit` 会排除该工作流文件，不能替代这里的专用测试入口。
 
 验收重点：
 
