@@ -52,6 +52,29 @@ describe('BusinessDemoCoordinator failure convergence', () => {
 
   afterEach(() => vi.useRealTimers())
 
+  it('remaps local source rows to server item refs without sending those rows or labels to the control plane', async () => {
+    const localPreview: ImportPreview = { ...preview, rows: [4, 6, 9].map((sourceRow, index) => ({
+      itemId: `local-${index}`, sourceRow, preview: { account_label: `local-only-mask-${index}` },
+    })) }
+    const state = harness()
+    try {
+      const snapshot = await state.coordinator.start(tool, structuredClone(localPreview), 'local')
+      expect(snapshot.items.map(item => ({ itemId: item.itemId, sourceRow: item.sourceRow }))).toEqual([
+        { itemId: 'one', sourceRow: 4 }, { itemId: 'two', sourceRow: 6 }, { itemId: 'three', sourceRow: 9 },
+      ])
+      expect(api.createDemoBatch).toHaveBeenCalledExactlyOnceWith({
+        client_demo_batch_id: 'demo_local', tool_id: 'demo-tool', tool_name: '批量演示',
+        platform_key: 'amazon', scenario_id: 'default', row_count: 3,
+      })
+      await vi.advanceTimersByTimeAsync(6_000)
+      expect(state.getSnapshot().items.map(item => item.sourceRow)).toEqual([4, 6, 9])
+      const controlRequests = JSON.stringify(Object.values(api).flatMap(mock => mock.mock.calls))
+      expect(controlRequests).not.toMatch(/sourceRow|source_row|local-only-mask|local-[012]|account_label/)
+    } finally {
+      state.coordinator.dispose()
+    }
+  })
+
   it('terminalizes a partially started batch and ignores late item responses', async () => {
     const late = deferred<object>()
     api.updateDemoBatchItem.mockRejectedValueOnce(new Error('启动同步失败')).mockReturnValueOnce(late.promise)

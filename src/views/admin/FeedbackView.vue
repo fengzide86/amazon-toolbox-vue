@@ -23,7 +23,7 @@
         <el-option label="处理中" value="processing" />
         <el-option label="已解决" value="resolved" />
       </el-select>
-      <template #summary>共 {{ filteredFeedbacks.length }} 个工单</template>
+      <template #summary>共 {{ total }} 个工单 · 本页 {{ feedbacks.length }} 个</template>
     </DataToolbar>
 
     <el-card
@@ -31,7 +31,7 @@
       class="table-card"
       shadow="never"
     >
-      <el-table :data="filteredFeedbacks" stripe style="width: 100%">
+      <el-table :data="feedbacks" stripe style="width: 100%">
         <el-table-column v-if="!isCompact" prop="id" label="ID" width="80" />
         <el-table-column
           prop="title"
@@ -74,6 +74,9 @@
           <div class="empty-state">暂无工单数据</div>
         </template>
       </el-table>
+      <div class="feedback-pagination">
+        <el-pagination :current-page="page" :page-size="pageSize" :total="total" :pager-count="5" layout="prev, pager, next" @current-change="changePage" />
+      </div>
     </el-card>
 
     <!-- 查看详情 -->
@@ -178,8 +181,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
-import { getFeedbacks, updateFeedback, API_BASE } from "@/utils/api";
+import { ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { getFeedbacksPage, updateFeedback, API_BASE } from "@/utils/api";
 import { showToast } from "@/utils";
 import DataToolbar from "@/components/DataToolbar.vue";
 import AsyncStateNotice from "@/components/AsyncStateNotice.vue";
@@ -203,6 +206,10 @@ const platformStore = usePlatformStore();
 const isCompact = useCompactLayout();
 const feedbacks = ref<AdminFeedback[]>([]);
 const filterStatus = ref("");
+const page = ref(1);
+const pageSize = 20;
+const total = ref(0);
+let loadSequence = 0;
 const showDetailModal = ref(false);
 const showReplyModal = ref(false);
 const currentFeedback = ref<AdminFeedback | null>(null);
@@ -211,11 +218,6 @@ const replyContent = ref("");
 const isSubmitting = ref(false);
 const loadState = ref<AsyncDataState>("loading");
 const loadError = ref("");
-
-const filteredFeedbacks = computed(() => {
-  if (!filterStatus.value) return feedbacks.value;
-  return feedbacks.value.filter((f) => f.status === filterStatus.value);
-});
 
 function getStatusType(status?: string | null): "warning" | "info" | "success" {
   const map: Record<string, "warning" | "info" | "success"> = {
@@ -302,6 +304,7 @@ function parseScreenshots(
 }
 
 async function loadData() {
+  const sequence = ++loadSequence;
   loadState.value = feedbacks.value.length ? "data" : "loading";
   loadError.value = "";
   try {
@@ -309,11 +312,18 @@ async function loadData() {
       platformStore.adminPlatform !== "all"
         ? platformStore.adminPlatform
         : undefined;
-    feedbacks.value = adminFeedbacksSchema.parse(
-      await getFeedbacks({ platform_key: platformKey }),
-    );
+    const result = await getFeedbacksPage({ platform_key: platformKey, status: filterStatus.value || undefined, page: page.value, page_size: pageSize });
+    if (sequence !== loadSequence) return;
+    total.value = result.total;
+    if (page.value > 1 && (page.value - 1) * pageSize >= total.value) {
+      page.value = Math.max(1, Math.ceil(total.value / pageSize));
+      await loadData();
+      return;
+    }
+    feedbacks.value = adminFeedbacksSchema.parse(result.items);
     loadState.value = settledDataState(feedbacks.value.length);
   } catch (error) {
+    if (sequence !== loadSequence) return;
     loadError.value =
       error instanceof Error && error.message
         ? error.message
@@ -323,17 +333,27 @@ async function loadData() {
   }
 }
 
+function changePage(nextPage: number) {
+  page.value = nextPage;
+  void loadData();
+}
+
 watch(
-  () => platformStore.adminPlatform,
+  [() => platformStore.adminPlatform, filterStatus],
   () => {
+    page.value = 1;
+    showDetailModal.value = false;
+    showReplyModal.value = false;
     loadData();
   },
 );
 
 onMounted(loadData);
+onBeforeUnmount(() => { loadSequence += 1; });
 </script>
 
 <style scoped>
+.feedback-pagination { display: flex; justify-content: flex-end; margin-top: 16px; overflow-x: auto; }
 .data-toolbar-v6 {
   margin-bottom: 1rem;
 }

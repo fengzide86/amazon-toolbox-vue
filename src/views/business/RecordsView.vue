@@ -19,7 +19,8 @@
           <div><small>已结束</small><strong>{{ batch.processed }}</strong></div>
           <div><small>{{ activeTab === 'demo' ? '演示异常' : '需要操作' }}</small><strong>{{ batch.attention }}</strong></div>
           <span :class="['status', `is-${batch.status}`]">{{ statusText(batch.status) }}</span>
-          <button class="detail-link" type="button" :aria-label="`查看${batch.toolName}批次详情`" @click="openDetails(batch)">查看详情</button>
+          <button v-if="batch.detailAccessible !== false" class="detail-link" type="button" :aria-label="`查看${batch.toolName}批次详情`" @click="openDetails(batch)">查看详情</button>
+          <small v-else class="detail-link">其他设备执行，仅摘要；详情请在原电脑查看</small>
         </article>
       </div>
       <div v-else class="empty">
@@ -41,9 +42,9 @@
         <h2 class="detail-title">{{ detail.toolName }}</h2>
         <p>{{ detail.kind === 'demo' ? '模拟演示' : '真实执行' }} · {{ statusText(detail.status) }} · {{ detail.total }} 个账号</p>
         <p class="detail-disclosure">{{ detail.kind === 'demo' ? '完成、人工操作、异常均为演示案例，不代表真实平台结果，也无需继续处理历史案例。' : '这里只展示持久化的批次结果。不会从历史记录重新启动浏览器或自动恢复真实任务。' }}</p>
-        <div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>账号序号</th><th>状态</th><th>结果</th></tr></thead><tbody><tr v-for="item in detail.items" :key="item.label"><td>{{ item.label }}</td><td>{{ item.status }}</td><td>{{ item.result }}</td></tr></tbody></table></div>
+        <div class="detail-table-wrap"><table class="detail-table"><thead><tr><th>账号序号</th><th>原表行号</th><th>状态</th><th>结果</th></tr></thead><tbody><tr v-for="item in detail.items" :key="item.label"><td>{{ item.label }}</td><td>{{ item.sourceRow || '本机未保留' }}</td><td>{{ item.status }}</td><td>{{ item.result }}</td></tr></tbody></table></div>
         <p v-if="!detail.items.length">该批次尚无账号结果记录。</p>
-        <p class="detail-disclosure">为保护客户资料，仅展示和导出账号序号，不包含账号、原始表格、内部任务标识或服务端原文。</p>
+        <p class="detail-disclosure">原表行号仅在导入过的本机保留，用于对照源文件。仅导出行号和脱敏结果，不包含账号、原始单元格、内部任务标识或服务端原文。</p>
       </template>
       <template #footer><div v-if="detail" class="detail-actions"><button type="button" @click="exportResults"><Download :size="15" />导出脱敏结果</button><button v-if="detail.kind === 'demo'" type="button" :disabled="store.isActive" @click="demonstrateAgain">重新准备演示</button><button type="button" @click="drawerOpen = false">关闭</button></div></template>
     </el-drawer>
@@ -65,7 +66,7 @@ import { failedDataState, settledDataState, type AsyncDataState } from '@/featur
 const store = useBusinessWorkspaceStore()
 const router = useRouter()
 type RecordTab = 'demo' | 'live'
-interface BatchRow { id: string | number; toolName: string; startedAt?: string | null; total: number; processed: number; attention: number; status: string }
+interface BatchRow { id: string | number; toolName: string; startedAt?: string | null; total: number; processed: number; attention: number; status: string; detailAccessible?: boolean }
 const activeTab = ref<RecordTab>('demo')
 const loadError = ref('')
 const loadState = ref<AsyncDataState>('loading')
@@ -81,7 +82,7 @@ let selectedBatch: BatchRow | null = null
 let detailSequence = 0
 const rows = computed<BatchRow[]>(() => activeTab.value === 'demo'
   ? store.demoHistory.map(batch => ({ id: batch.id, toolName: batch.tool_name_snapshot, startedAt: batch.started_at || batch.created_at, total: batch.row_count, processed: batch.played_count + batch.skipped_count + batch.error_count, attention: batch.error_count, status: batch.status }))
-  : store.history.map(batch => ({ id: batch.id, toolName: batch.tool_name, startedAt: batch.started_at, total: batch.total_count, processed: batch.completed_count + batch.failed_count, attention: batch.waiting_count, status: batch.status })))
+  : store.history.map(batch => ({ id: batch.id, toolName: batch.tool_name, startedAt: batch.started_at, total: batch.total_count, processed: batch.completed_count + batch.failed_count, attention: batch.waiting_count, status: batch.status, detailAccessible: batch.detail_accessible })))
 const load = async (append = false) => {
   if (append && loadingMore.value) return
   const requestSequence = ++loadSequence
@@ -107,6 +108,7 @@ watch(activeTab, () => { closeDetails(); void load() })
 onUnmounted(() => { loadSequence += 1; detailSequence += 1 })
 
 async function openDetails(batch: BatchRow): Promise<void> {
+  if (batch.detailAccessible === false) return
   const sequence = ++detailSequence
   const kind = activeTab.value
   const token = authService.getAuth()?.token
@@ -118,7 +120,7 @@ async function openDetails(batch: BatchRow): Promise<void> {
   try {
     const result = await (kind === 'demo' ? getDemoBatch(batch.id) : getBusinessBatch(batch.id))
     if (sequence !== detailSequence || token !== authService.getAuth()?.token) return
-    detail.value = parseHistoryDetail(kind, unwrapApiData(result))
+    detail.value = parseHistoryDetail(kind, unwrapApiData(result), store.getSourceRows?.(kind, batch.id) || {})
   } catch (error) {
     if (sequence === detailSequence) detailError.value = error instanceof Error ? error.message : '详情暂时无法加载，请重试。'
   } finally {

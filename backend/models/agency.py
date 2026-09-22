@@ -1,6 +1,6 @@
 """Channel partners and pre-activation customer ownership (not internal profit)."""
 
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Integer, Numeric, String, Text, func
 
 from models.base import Base
 
@@ -12,9 +12,13 @@ class Agency(Base):
     name = Column(String(100), nullable=False)
     contact = Column(String(200), nullable=True)
     notes = Column(Text, nullable=True)
+    commission_rate = Column(Numeric(7, 6), nullable=True)
     status = Column(String(20), nullable=False, default="active", server_default="active")
     created_at = Column(DateTime, nullable=False, server_default=func.now())
-    __table_args__ = (CheckConstraint("status IN ('active', 'disabled')", name="ck_agencies_status"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('active', 'disabled')", name="ck_agencies_status"),
+        CheckConstraint("commission_rate IS NULL OR (commission_rate >= 0 AND commission_rate <= 1)", name="ck_agencies_commission_rate"),
+    )
 
 
 class AgencyCustomer(Base):

@@ -30,6 +30,7 @@ import { BusinessLiveCoordinator } from '@/features/business/live-coordinator'
 import { WorkspaceImportCoordinator } from '@/features/business/workspace-import'
 import { createClientBatchId, errorMessage, statusText } from '@/features/business/workspace-helpers'
 import { getRuntimeCapabilities } from '@/runtime/capabilities'
+import { readSourceRows, saveSourceRows } from '@/features/business/source-rows'
 
 const historySchema = z.array(serverBatchHistorySchema)
 
@@ -54,6 +55,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   const historyError = ref<string | null>(null)
   const recoveryPending = ref(0)
   const recoveryStorageUnavailable = ref(false)
+  const liveStorageUnavailable = ref(false)
   let historyRequestSequence = 0
   let startRequestSequence = 0
   let pendingStartMode: 'demo' | 'live' | null = null
@@ -120,6 +122,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
     selectItem: itemId => selectItem(itemId),
     setSyncState: value => { syncState.value = value },
     setError: value => { error.value = value },
+    setStorageUnavailable: value => { liveStorageUnavailable.value = value },
   })
 
   async function init(): Promise<BusinessBootstrap> {
@@ -147,6 +150,7 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       error.value = null
       historyError.value = null
       bootstrapStale.value = false
+      liveStorageUnavailable.value = false
     }
     initializedOwnerScope = owner
     recovery.initialize()
@@ -290,6 +294,10 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
       const nextSnapshot = tool.availability === 'demo_only'
         ? await demo.start(tool, preview, batchId)
         : await live.start(tool, preview, batchId, entitlements.value.max_open_sessions || 6)
+      if (requestSequence === startRequestSequence) {
+        try { saveSourceRows(getOwnerScope(), nextSnapshot) }
+        catch { error.value = '原表行号暂时无法保存在本机，请在关闭本次结果前导出；执行不受影响。' }
+      }
       if (requestSequence === startRequestSequence) importPreview.value = null
       return nextSnapshot
     } catch (cause) {
@@ -374,11 +382,14 @@ export const useBusinessWorkspaceStore = defineStore('businessWorkspace', () => 
   }
 
   function retryRecovery(): void { recovery.retry() }
+  function getSourceRows(kind: 'demo' | 'live', batchId: string | number): Record<string, number> {
+    return readSourceRows(getOwnerScope(), kind, batchId)
+  }
 
   return {
     bootstrap, history, demoHistory, demoHistoryTotal, liveHistoryHasMore, importPreview, selectedTool, snapshot, selectedItemId, selectedItem, loading, syncState, error, bootstrapStale, historyLoading, historyError,
-    entitlements, tools, items, openItems, isActive, isDemoBatch, recoveryPending, recoveryStorageUnavailable, retryRecovery,
+    entitlements, tools, items, openItems, isActive, isDemoBatch, recoveryPending, recoveryStorageUnavailable, liveStorageUnavailable, retryRecovery,
     init, refreshBootstrap, loadHistory, loadDemoHistory, chooseTool, loadSampleImport, saveSampleTemplate, selectImportFile, exportImportErrors, startBatch, registerBrowser, selectItem,
-    completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose,
+    completeUserAction, restartItem, cancelBatch, resetWorkspace, statusText, flushOutboxWithin, dispose, getSourceRows,
   }
 })

@@ -26,6 +26,7 @@ export const demoRunSchema = z.object({
   platform_key: z.string().default('amazon'),
   scenario_id: z.string().default('default'),
   status: demoRunStatusSchema.default('created'),
+  event_seq: z.coerce.number().int().nonnegative().default(0),
   current_step_id: z.string().nullable().optional(),
   completed_step_count: z.coerce.number().nonnegative().default(0),
   total_step_count: z.coerce.number().nonnegative().default(0),

@@ -135,13 +135,21 @@ export function parseDemoWorksheet(
       // 原始单元格到此即被丢弃；store 只接收脱敏标签，不保留账号、Cookie 或其他输入。
       rows.push({
         itemId: localId('demo_item'),
+        sourceRow: rowNumber,
         preview: { account_label: maskLabel(values.get('account_label') || `第 ${rowNumber} 行`) },
       })
     } catch (error) {
-      errors.push({ rowNumber, message: error instanceof Error ? error.message : '无法读取该行' })
+      const message = error instanceof Error ? error.message : '无法读取该行'
+      // Formula cells are a file-level safety violation, not a recoverable
+      // row validation issue. Reject the import so callers cannot accidentally
+      // continue with a workbook that still contains executable formulas.
+      if (message.includes('公式')) throw error
+      errors.push({ rowNumber, message })
     }
   }
-  if (!rows.length) throw new Error(errors[0]?.message || '表格中没有可用于演示的有效数据行')
+  if (!rows.length && !errors.length) throw new Error('表格中没有可用于演示的有效数据行')
+  // Source row numbers are local metadata, and must stay enumerable to cross
+  // the browser Worker boundary. Control-plane requests use separate allowlists.
   return importPreviewSchema.parse({
     importId: localId('demo_import'),
     fileName,

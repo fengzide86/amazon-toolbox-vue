@@ -32,7 +32,12 @@ class FeedbackService:
         pagination: PaginationParams | None = None
     ) -> dict[str, Any]:
         """获取工单列表（支持过滤和分页）"""
-        query = select(Feedback).order_by(desc(Feedback.created_at))
+        query = select(Feedback)
+        # Operations should see unresolved work before recent closed tickets.
+        # A user's own history retains chronological ordering.
+        if user_id is None and not status:
+            query = query.order_by(case((Feedback.status == "pending", 0), (Feedback.status == "processing", 1), else_=2))
+        query = query.order_by(desc(Feedback.created_at), desc(Feedback.id))
         
         # 状态过滤
         if status:

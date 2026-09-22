@@ -34,6 +34,7 @@
             <span :class="['result-badge', statusClass(record.status)]">{{ statusText(record.status, record.kind) }}</span>
           </div>
           <div class="record-actions">
+            <button v-if="record.kind === 'live'" type="button" @click="openDetail(record)">查看结果</button>
             <button type="button" @click="useAgain(record)">{{ record.kind === 'demo' ? '再次演示' : '再次使用' }}</button>
             <button v-if="record.kind === 'live' && record.status === 'failed'" type="button" class="support" @click="contactSupport(record)">联系帮助</button>
           </div>
@@ -47,6 +48,19 @@
       </div>
     </section>
     <footer v-if="rows.length" class="record-pagination"><span>已显示 {{ rows.length }} / 共 {{ totals[activeTab] }} 条</span><button v-if="rows.length < totals[activeTab]" type="button" :disabled="loadingMore" @click="loadRecords(true)">{{ loadingMore ? '正在加载…' : '加载更多' }}</button><span v-else>已显示全部记录</span></footer>
+    <el-drawer v-model="detailVisible" title="执行结果" size="min(480px, 100vw)" destroy-on-close>
+      <div v-if="selectedRecord" class="record-detail">
+        <h3>{{ selectedRecord.toolName }}</h3><p>{{ statusText(selectedRecord.status, 'live') }} · {{ formatTime(selectedRecord.time) }}</p>
+        <p v-if="detailLoading" role="status">正在加载结果…</p>
+        <div v-else-if="detailError" role="alert"><p>{{ detailError }}</p><button type="button" class="btn btn-secondary" @click="openDetail(selectedRecord)">重新加载</button></div>
+        <template v-else-if="detailRecord">
+          <p>{{ detailRecord.verification === 'verified' ? '本条记录由真实 Runner 上报，已通过结果核验链路。' : '本条结果尚未确认，请联系支持核对，不要据此重复操作。' }}</p>
+          <p v-if="detailRecord.status === 'failed'">本次处理未完成。请先核对平台现场，再决定是否重新执行。</p>
+          <p>记录仅保留脱敏结果，不保存客户原始文件、账号凭据或页面原文。</p>
+          <button type="button" class="btn btn-secondary" @click="contactSupport(selectedRecord)">就此结果联系帮助</button>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -55,13 +69,14 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { z } from 'zod'
 import { useRouter } from 'vue-router'
 import { Ban, Check, CircleAlert, History, LoaderCircle, MessageCircle } from '@lucide/vue'
-import { getDemoRunsPage, getExecutionsPage } from '@/utils/api'
+import { getDemoRunsPage, getExecutionsPage, getExecution } from '@/utils/api'
 import { authService } from '@/utils/auth'
 import { usePlatformStore } from '@/stores/platform'
 import { demoRunListSchema } from '@/features/demo/model'
-import { executionRecordListSchema } from '@/features/user/model'
+import { executionRecordListSchema, executionRecordSchema, type ExecutionRecord } from '@/features/user/model'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { flushPendingDemoReceipts } from '@/features/automation/demo-receipts'
 
 type RecordKind = 'demo' | 'live'
 interface RecordRow {
@@ -89,6 +104,30 @@ const pages = ref({ demo: 0, live: 0 })
 const pageSize = 20
 let requestSequence = 0
 const rows = computed(() => activeTab.value === 'demo' ? demoRows.value : liveRows.value)
+const detailVisible = ref(false)
+const detailLoading = ref(false)
+const detailError = ref('')
+const selectedRecord = ref<RecordRow | null>(null)
+const detailRecord = ref<ExecutionRecord | null>(null)
+let detailSequence = 0
+
+async function openDetail(record: RecordRow) {
+  const sequence = ++detailSequence
+  const platform = platformStore.currentPlatform
+  const token = authService.getAuth()?.token
+  const current = () => sequence === detailSequence && detailVisible.value && platform === platformStore.currentPlatform && token === authService.getAuth()?.token
+  selectedRecord.value = record
+  detailVisible.value = true
+  detailLoading.value = true
+  detailError.value = ''
+  detailRecord.value = null
+  try {
+    const result = executionRecordSchema.parse(await getExecution(record.id))
+    if (current()) detailRecord.value = result
+  } catch (error) {
+    if (current()) detailError.value = error instanceof Error ? error.message : '结果暂时无法加载，请重试'
+  } finally { if (current()) detailLoading.value = false }
+}
 
 function formatTime(value: string | null | undefined): string {
   if (!value) return '-'
@@ -97,7 +136,7 @@ function formatTime(value: string | null | undefined): string {
 
 function statusText(status: string, kind: RecordKind): string {
   if (kind === 'demo') return ({ created: '待演示', running: '演示中', paused: '已暂停', completed: '演示完成', cancelled: '已退出', error: '演示异常' } as Record<string, string>)[status] || '演示已结束'
-  return ({ queued: '等待执行', running: '执行中', verifying: '核验中', succeeded: '真实成功', failed: '执行失败', cancelled: '已取消', interrupted: '已中断', inconclusive: '结果未确认' } as Record<string, string>)[status] || '已结束'
+  return ({ queued: '等待执行', running: '执行中', waiting_user: '需要你操作', verifying: '核验中', succeeded: '真实成功', failed: '执行失败', cancelled: '已取消', interrupted: '已中断', inconclusive: '结果未确认' } as Record<string, string>)[status] || '已结束'
 }
 
 function statusClass(status: string): string {
@@ -184,19 +223,22 @@ async function loadRecords(append = false) {
 
 watch(activeTab, () => { void loadRecords() })
 watch(() => platformStore.currentPlatform, () => {
+  detailSequence += 1
+  detailVisible.value = false
   demoRows.value = []
   liveRows.value = []
   totals.value = { demo: 0, live: 0 }
   pages.value = { demo: 0, live: 0 }
   void loadRecords()
 })
-onMounted(() => loadRecords())
-onUnmounted(() => { requestSequence += 1 })
+onMounted(() => { void loadRecords(); void flushPendingDemoReceipts() })
+onUnmounted(() => { requestSequence += 1; detailSequence += 1 })
 </script>
 
 <style scoped>
 .record-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px;color:var(--color-text-secondary);font-size:var(--type-meta)}.record-pagination button{padding:9px 14px;border:1px solid var(--color-border);border-radius:9px;background:var(--color-surface);color:var(--color-primary);cursor:pointer}.record-pagination button:disabled{opacity:.5;cursor:wait}
 .records-page { width: min(1050px, 100%); margin: 0 auto; }
+.record-detail { display: grid; gap: 14px; }.record-detail h3, .record-detail p { margin: 0; line-height: 1.7; }.record-detail p { color: var(--color-text-secondary); }
 .records-eyebrow { display: block; margin-bottom: 8px; color: var(--color-primary); font-size:var(--type-meta); font-weight: 800; letter-spacing: .12em; }
 .records-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 22px; }
 .records-header h2 { margin: 0; color: var(--color-text); font-size: var(--type-page); letter-spacing: -.03em; }

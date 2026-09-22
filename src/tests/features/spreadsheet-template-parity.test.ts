@@ -41,10 +41,12 @@ describe('the shipped multi-sheet template on desktop and Web', () => {
     expect(web.validCount).toBe(desktop.rows.length)
     expect(web.errors).toEqual(desktop.errors)
     for (const row of web.rows) {
-      expect(Object.keys(row).sort()).toEqual(['itemId', 'preview'])
+      expect(Object.keys(row).sort()).toEqual(['itemId', 'preview', 'sourceRow'])
       expect(Object.keys(row.preview)).toEqual(['account_label'])
       expect(row.preview.account_label).toContain('***')
     }
+    expect(structuredClone(web).rows.map(row => row.sourceRow)).toEqual(desktop.rows.map(row => row.sourceRow))
+    expect(web.rows.every(row => Number.isInteger(row.sourceRow) && row.sourceRow! > 1)).toBe(true)
     for (const row of desktop.rows) expect(JSON.stringify(web)).not.toContain(row.input.account_label)
     expect(await readFile(templatePath)).toEqual(source)
   })
@@ -58,6 +60,7 @@ describe('the shipped multi-sheet template on desktop and Web', () => {
     expect(web.validCount).toBe(2)
     expect(desktop.rows).toHaveLength(2)
     expect(web.errors).toHaveLength(6)
+    expect(web.rows.map(row => row.sourceRow)).toEqual(desktop.rows.map(row => row.sourceRow))
     expect(web.errors.map(error => error.rowNumber)).toEqual(desktop.errors.map(error => error.rowNumber))
   })
 })

@@ -21,6 +21,16 @@ afterEach(async () => {
 })
 
 describe('batch importer', () => {
+  it('保留非连续原表行号，全部无效时仍返回可导出的错误清单', async () => {
+    const filePath = await tempFile('invalid.csv', 'account_label,sku\n客户甲,\n客户乙,\n')
+    const result = await parseBatchFile(filePath, [{ key: 'sku', required: true }])
+    expect(result.rows).toEqual([])
+    expect(result.errors.map(item => item.rowNumber)).toEqual([2, 3])
+    const mixedPath = await tempFile('mixed.csv', 'account_label,sku\n客户甲,A\n客户乙,\n客户丙,C\n')
+    const mixed = await parseBatchFile(mixedPath, [{ key: 'sku', required: true }])
+    expect(mixed.rows.map(row => row.sourceRow)).toEqual([2, 4])
+  })
+
   it('按 capabilityKey 从内置多工作表模板读取对应的 8 条数据', async () => {
     const result = await parseBatchFile(resolve('resources/templates/B端批量自动化测试数据.xlsx'), {
       capabilityKey: 'listing_script',

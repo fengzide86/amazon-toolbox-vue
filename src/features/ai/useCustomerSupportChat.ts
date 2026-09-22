@@ -1,4 +1,4 @@
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, computed, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { createChatSession, sendChatMessage, getChatSession, resolveChatSession, transferChatToHuman, getChatHistory } from '@/utils/api'
 import { showToast } from '@/utils'
@@ -20,9 +20,13 @@ export function useCustomerSupportChat() {
 const platformStore = usePlatformStore()
 
 const sessionId = ref<string | null>(null)
-const messages = ref<ChatMessage[]>([])
+type DisplayMessage = ChatMessage & { delivery?: 'sending' | 'sent' | 'failed' }
+const messages = ref<DisplayMessage[]>([])
 const inputMessage = ref('')
-const isLoading = ref(false)
+const sendingSessions = ref(new Set<string>())
+const isLoading = computed(() => Boolean(sessionId.value && sendingSessions.value.has(sessionId.value)))
+const sessionLoading = ref(false)
+const sessionError = ref('')
 const isTransferring = ref(false)
 const showActions = ref(false)
 const showRating = ref(false)
@@ -34,6 +38,9 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const showHistory = ref(false)
 const historySessions = ref<ChatSessionSummary[]>([])
 let nextMsgId = 0
+let sessionSequence = 0
+let mounted = true
+const sessionMessages = new Map<string, DisplayMessage[]>()
 const quickQuestions = ['授权码无法使用', '工具一直没有反应', '本次操作未完成', '需要更换设备', '联系人工客服']
 
 function scrollToBottom() {
@@ -45,16 +52,24 @@ function scrollToBottom() {
 }
 
 async function startNewSession() {
+  const sequence = ++sessionSequence
+  const platform = platformStore.currentPlatform
+  sessionLoading.value = true
+  sessionError.value = ''
   try {
-    const res = chatSessionCreatedSchema.parse(await createChatSession({ platform_key: platformStore.currentPlatform }))
+    const res = chatSessionCreatedSchema.parse(await createChatSession({ platform_key: platform }))
+    if (!mounted || sequence !== sessionSequence || platform !== platformStore.currentPlatform) return false
     sessionId.value = res.session_id
-    nextMsgId = 1
     messages.value = [{
       id: nextMsgId++,
       role: 'system',
       content: res.welcome_message || '您好！我是 AI 客服，请问有什么可以帮您？',
       created_at: new Date().toISOString()
     }]
+    sessionMessages.set(res.session_id, messages.value)
+    inputMessage.value = ''
+    lastAiMessage.value = null
+    rating.value = 0
     showActions.value = false
     showRating.value = false
     sessionResolved.value = false
@@ -62,8 +77,12 @@ async function startNewSession() {
     scrollToBottom()
     return true
   } catch {
+    if (!mounted || sequence !== sessionSequence) return false
+    sessionError.value = '暂时无法连接客服，请检查网络后重试。'
     showToast('创建会话失败', 'error')
     return false
+  } finally {
+    if (mounted && sequence === sessionSequence) sessionLoading.value = false
   }
 }
 
@@ -78,43 +97,57 @@ function askQuickQuestion(question: string) {
 
 async function sendMessage() {
   const text = inputMessage.value.trim()
-  if (!text || isLoading.value) return
+  if (!text || isLoading.value || sessionLoading.value || sessionResolved.value || sessionTransferred.value) return
   if (!sessionId.value && !await startNewSession()) return
   if (!sessionId.value) return
 
-  messages.value.push({
+  const message: DisplayMessage = {
     id: nextMsgId++,
     role: 'user',
     content: text,
-    created_at: new Date().toISOString()
-  })
+    created_at: new Date().toISOString(),
+    delivery: 'sending',
+  }
+  messages.value.push(message)
   inputMessage.value = ''
-  isLoading.value = true
+  await deliverMessage(messages.value[messages.value.length - 1]!)
+}
+
+async function retryMessage(id: number | undefined) {
+  const message = messages.value.find(item => item.id === id && item.delivery === 'failed')
+  if (!message || isLoading.value || sessionLoading.value || sessionResolved.value || sessionTransferred.value) return
+  await deliverMessage(message)
+}
+
+async function deliverMessage(message: DisplayMessage) {
+  const sid = sessionId.value
+  if (!sid) return
+  const platform = platformStore.currentPlatform
+  const target = messages.value
+  const current = () => mounted && sid === sessionId.value && target === messages.value && platform === platformStore.currentPlatform
+  sendingSessions.value.add(sid)
+  message.delivery = 'sending'
   showActions.value = false
   scrollToBottom()
 
   try {
-    const res = chatReplySchema.parse(await sendChatMessage(sessionId.value, text, { platform_key: platformStore.currentPlatform }))
-    messages.value.push({
+    const res = chatReplySchema.parse(await sendChatMessage(sid, message.content, { platform_key: platform }))
+    if (res.session_id !== sid) throw new Error('回复会话不匹配')
+    message.delivery = 'sent'
+    target.push({
       id: nextMsgId++,
       role: 'ai',
       content: res.reply,
       knowledge_refs: res.knowledge_refs || [],
       created_at: new Date().toISOString()
     })
-    lastAiMessage.value = res.reply
-    showActions.value = true
+    if (current()) { lastAiMessage.value = res.reply; showActions.value = true }
   } catch {
-    messages.value.push({
-      id: nextMsgId++,
-      role: 'ai',
-      content: '抱歉，发送消息失败，请检查网络连接后重试。如果问题持续，请点击「转人工客服」。',
-      created_at: new Date().toISOString()
-    })
-    showToast('发送失败', 'error')
+    message.delivery = 'failed'
+    if (current()) showToast('未能确认回复，请稍后重试或联系人工支持', 'error')
   } finally {
-    isLoading.value = false
-    scrollToBottom()
+    sendingSessions.value.delete(sid)
+    if (current()) scrollToBottom()
   }
 }
 
@@ -125,9 +158,11 @@ async function markResolved() {
 
 async function submitRating(star: number) {
   if (!sessionId.value) return
+  const sid = sessionId.value
   rating.value = star
   try {
-    await resolveChatSession(sessionId.value, star)
+    await resolveChatSession(sid, star)
+    if (!mounted || sid !== sessionId.value) return
     showRating.value = false
     sessionResolved.value = true
     showToast('感谢您的反馈！', 'success')
@@ -137,7 +172,8 @@ async function submitRating(star: number) {
 }
 
 async function transferToHuman() {
-  if (!sessionId.value || isLoading.value || isTransferring.value || sessionTransferred.value) return
+  if (!sessionId.value || isLoading.value || sessionLoading.value || isTransferring.value || sessionTransferred.value) return
+  const sid = sessionId.value
   let summary: string | undefined
   if (!messages.value.some(message => message.role === 'user' && message.content.trim())) {
     try {
@@ -153,9 +189,11 @@ async function transferToHuman() {
     message: '系统会把当前问题整理成待处理工单，方便工作人员继续跟进。',
     confirmText: '创建工单',
   })) return
+  if (!mounted || sid !== sessionId.value) return
   isTransferring.value = true
   try {
-    await transferChatToHuman(sessionId.value, summary ? { summary } : {})
+    await transferChatToHuman(sid, summary ? { summary } : {})
+    if (!mounted || sid !== sessionId.value) return
     if (summary) {
       messages.value.push({ id: nextMsgId++, role: 'user', content: summary, created_at: new Date().toISOString() })
       inputMessage.value = ''
@@ -171,6 +209,7 @@ async function transferToHuman() {
     scrollToBottom()
     showToast('已转人工客服', 'success')
   } catch (error) {
+    if (!mounted || sid !== sessionId.value) return
     showToast(error instanceof Error && error.message.trim() ? error.message : '转接失败，请稍后重试', 'error')
   } finally {
     isTransferring.value = false
@@ -180,24 +219,38 @@ async function transferToHuman() {
 async function loadHistory() {
   try {
     const res = chatHistorySchema.parse(await getChatHistory(1, 20))
-    historySessions.value = res.items
+    if (mounted) historySessions.value = res.items
   } catch {
     showToast('加载历史失败', 'error')
   }
 }
 
 async function loadSession(sid: string) {
+  const sequence = ++sessionSequence
+  sessionLoading.value = true
+  sessionError.value = ''
   try {
     const res = chatSessionDetailSchema.parse(await getChatSession(sid))
+    if (!mounted || sequence !== sessionSequence) return
     sessionId.value = sid
-    messages.value = (res.messages || []).map(message => ({ ...message, id: nextMsgId++ }))
+    const cached = sessionMessages.get(sid)
+    messages.value = cached?.some(message => message.delivery === 'failed' || message.delivery === 'sending') || sendingSessions.value.has(sid)
+      ? cached || [] : (res.messages || []).map(message => ({ ...message, id: nextMsgId++ }))
+    sessionMessages.set(sid, messages.value)
+    inputMessage.value = ''
+    lastAiMessage.value = [...messages.value].reverse().find(message => message.role === 'ai')?.content || null
+    showRating.value = false
     sessionResolved.value = res.status === 'resolved'
     sessionTransferred.value = res.status === 'transferred'
     showActions.value = res.status === 'active' && messages.value.some(m => m.role === 'ai')
     showHistory.value = false
     scrollToBottom()
   } catch {
+    if (!mounted || sequence !== sessionSequence) return
+    sessionError.value = '会话暂时无法加载，请重新选择或重试。'
     showToast('加载会话失败', 'error')
+  } finally {
+    if (mounted && sequence === sessionSequence) sessionLoading.value = false
   }
 }
 
@@ -226,10 +279,17 @@ onMounted(async () => {
     localStorage.removeItem('toolbox_support_context')
   }
 })
+watch(() => platformStore.currentPlatform, () => {
+  sessionId.value = null
+  messages.value = []
+  inputMessage.value = ''
+  void startNewSession()
+})
+onUnmounted(() => { mounted = false; sessionSequence += 1 })
   return {
     sessionId, messages, inputMessage, isLoading, isTransferring, showActions, showRating, rating,
     sessionResolved, sessionTransferred, lastAiMessage, messagesContainer, showHistory,
     historySessions, quickQuestions, formatTime, getStatusText, askQuickQuestion,
-    sendMessage, markResolved, transferToHuman, submitRating, loadSession,
+    sendMessage, retryMessage, startNewSession, sessionLoading, sessionError, markResolved, transferToHuman, submitRating, loadSession,
   }
 }

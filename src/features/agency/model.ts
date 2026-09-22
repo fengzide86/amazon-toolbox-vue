@@ -45,16 +45,16 @@ export type AgencyLicense = z.infer<typeof licenseSchema>
 export type ServiceRequest = z.infer<typeof serviceRequestSchema>
 export type AgencyPlan = z.infer<typeof planSchema>
 export type AgencySummary = z.infer<typeof summarySchema>
-export type Section = 'agencies' | 'customers' | 'orders' | 'licenses' | 'requests'
+export type Section = 'agencies' | 'customers' | 'orders' | 'licenses' | 'requests' | 'commission'
 export type AgencyRecord = Agency | Customer | AgencyOrder | AgencyLicense | ServiceRequest
 export interface Page<T> { data: T[]; total: number; page: number; page_size: number }
 
 export const sectionLabels: Record<Section, string> = {
-  agencies: '代理主体', customers: '客户档案', orders: '订单交付', licenses: '授权记录', requests: '售后申请',
+  agencies: '代理主体', customers: '客户档案', orders: '订单交付', licenses: '授权记录', requests: '售后申请', commission: '返佣结算',
 }
 export function statusLabel(value: string): string {
   return ({ active: '启用', disabled: '停用', pending: '待确认收款', paid: '已收款', delivered: '已交付',
-    cancelled: '已取消', refunded: '已退款', used: '已激活', unused: '待激活', expired: '已到期', frozen: '已冻结', deleted: '已停用',
+    cancelled: '已取消', refunded: '已退款', used: '已激活', unused: '未激活', pending_activation: '已交付待激活', expired: '已到期', frozen: '已冻结', deleted: '已停用',
     open: '待处理', resolved: '已回复处理', rejected: '未通过' } as Record<string, string>)[value] || value
 }
 export function requestKindLabel(value: ServiceRequest['kind']): string {

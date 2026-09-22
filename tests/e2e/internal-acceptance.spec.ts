@@ -848,6 +848,38 @@ test('更新发布页仅超级管理员可达，并反馈从待发布到已发�
   await expect(page.getByText('客户端可检查到', { exact: true })).toBeVisible()
 })
 
+test('返佣切换代理时旧请求不会覆盖当前代理', async ({ page }) => {
+  await installSession(page, 'super_admin')
+  let releaseOldPolicy!: () => void
+  let releaseOldSummary!: () => void
+  const oldPolicy = new Promise<void>(resolve => { releaseOldPolicy = resolve })
+  const oldSummary = new Promise<void>(resolve => { releaseOldSummary = resolve })
+  await installApi(page, async (_request, path) => {
+    if (path === '/api/agency/agencies') {
+      return { body: { data: [{ id: 1, name: '代理 A', status: 'active', created_at: '2026-09-01T00:00:00Z' }, { id: 2, name: '代理 B', status: 'active', created_at: '2026-09-01T00:00:00Z' }], total: 2, page: 1, page_size: 100 } }
+    }
+    if (path.endsWith('/1/commission-policy')) {
+      await oldPolicy
+      return { body: { success: true, data: { agency_id: 1, rate: '0.01' } } }
+    }
+    if (path.endsWith('/1/commission-summary')) {
+      await oldSummary
+      return { body: { success: true, data: { pending_amount: '1', settled_amount: '0', accrued_amount: '1', refunded_amount: '0' } } }
+    }
+    if (path.endsWith('/2/commission-policy')) return { body: { success: true, data: { agency_id: 2, rate: '0.2' } } }
+    if (path.endsWith('/2/commission-summary')) return { body: { success: true, data: { pending_amount: '2', settled_amount: '0', accrued_amount: '2', refunded_amount: '0' } } }
+    return undefined
+  })
+  await page.goto('/#/admin/agency?section=commission')
+  await page.locator('#commission-agency').click()
+  await page.getByRole('option', { name: '代理 B' }).click()
+  await expect(page.getByText('当前：20%', { exact: true })).toBeVisible()
+  releaseOldPolicy()
+  releaseOldSummary()
+  await expect(page.getByText('当前：20%', { exact: true })).toBeVisible()
+  await expect(page.getByText('当前：1%', { exact: true })).toHaveCount(0)
+})
+
 test.describe('套餐改价', () => {
   async function openPlanSettings(page: Page, rejectStalePrice = false) {
     await installSession(page, 'super_admin')

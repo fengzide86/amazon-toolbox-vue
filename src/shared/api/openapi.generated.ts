@@ -7,6 +7,10 @@ export interface components {
     "APIResponse_BusinessBatchItemResponse_": { "data"?: components['schemas']["BusinessBatchItemResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_BusinessBatchResponse_": { "data"?: components['schemas']["BusinessBatchResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_BusinessBootstrapResponse_": { "data"?: components['schemas']["BusinessBootstrapResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_CommissionPolicyView_": { "data"?: components['schemas']["CommissionPolicyView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_CommissionSettlementPreview_": { "data"?: components['schemas']["CommissionSettlementPreview"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_CommissionSettlementView_": { "data"?: components['schemas']["CommissionSettlementView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
+    "APIResponse_CommissionSummaryView_": { "data"?: components['schemas']["CommissionSummaryView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_ExpenseAttachmentResponse_": { "data"?: components['schemas']["ExpenseAttachmentResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_ExpenseCategoryResponse_": { "data"?: components['schemas']["ExpenseCategoryResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_ExpenseRecordResponse_": { "data"?: components['schemas']["ExpenseRecordResponse"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
@@ -27,7 +31,7 @@ export interface components {
     "APIResponse_list_UpdateFileResponse__": { "data"?: Array<components['schemas']["UpdateFileResponse"]> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_list_UpdateReleaseResponse__": { "data"?: Array<components['schemas']["UpdateReleaseResponse"]> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "APIResponse_list_dict_str__Any___": { "data"?: Array<{  }> | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
-    "ActionCenterData": { "device_anomalies": Array<components['schemas']["DeviceAnomalyItem"]>; "expense_renewals": Array<components['schemas']["ExpenseRenewalResponse"]>; "expiring_authorizations": Array<components['schemas']["ExpiringAuthorizationItem"]>; "pending_tickets": Array<components['schemas']["PendingTicketItem"]>; "stale_batches": Array<unknown>; "summary": components['schemas']["ActionCenterSummary"]; "waiting_interventions": Array<unknown> }
+    "ActionCenterData": { "agency_delivery_tasks"?: Array<components['schemas']["AgencyDeliveryTask"]>; "device_anomalies": Array<components['schemas']["DeviceAnomalyItem"]>; "expense_renewals": Array<components['schemas']["ExpenseRenewalResponse"]>; "expiring_authorizations": Array<components['schemas']["ExpiringAuthorizationItem"]>; "pending_tickets": Array<components['schemas']["PendingTicketItem"]>; "stale_batches": Array<unknown>; "summary": components['schemas']["ActionCenterSummary"]; "waiting_interventions": Array<unknown> }
     "ActionCenterResponse": { "data": components['schemas']["ActionCenterData"]; "message": string; "success": boolean }
     "ActionCenterSummary": { "device_anomalies": number; "expense_renewals_due": number; "expiring_authorizations": number; "pending_tickets": number; "stale_batches": number; "waiting_interventions": number }
     "AdminChatSessionItemResponse": { "ai_resolved": boolean; "created_at": string | null; "message_count": number; "resolved_at": string | null; "satisfaction": number | null; "session_id": string; "status": string; "transferred_to_human": boolean; "user_id": number | null; "user_name": string }
@@ -38,6 +42,7 @@ export interface components {
     "AdminLoginRequest": { "password": string; "username"?: string }
     "AdminLoginResponse": { "data"?: components['schemas']["StaffSessionResponse"] | null; "error_code"?: number | null; "message": string; "success": boolean }
     "AgenciesEnvelope": { "data"?: Array<components['schemas']["AgencyView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "AgencyDeliveryTask": { "count": number; "key": string; "label": string; "section": string; "status": string }
     "AgencyEnvelope": { "data"?: components['schemas']["AgencyView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "AgencyLicenseEnvelope": { "data"?: components['schemas']["AgencyLicenseView"] | null; "message"?: string; "page"?: number | null; "page_size"?: number | null; "success"?: boolean; "total"?: number | null; "total_pages"?: number | null }
     "AgencyLicenseView": { "activated": boolean; "agency_id": number; "agency_name"?: string; "code": string; "created_at": string | null; "customer_id": number; "customer_name"?: string; "expires_at"?: string | null; "id": number; "order_id": number; "plan_name": string; "status": string }
@@ -76,7 +81,7 @@ export interface components {
     "Body_add_expense_attachment_api_expenses__expense_id__attachments_post": { "file": string }
     "Body_stage_release_api_updates_releases_stage_post": { "files": Array<string>; "version"?: string | null }
     "BusinessBatchItemResponse": { "account_label_masked"?: string | null; "client_item_id": string; "completed_at"?: string | null; "customer_message"?: string | null; "intervention_type"?: string | null; "started_at"?: string | null; "status": string; "updated_at"?: string | null; [key: string]: unknown }
-    "BusinessBatchResponse": { "client_batch_id": string; "completed_count": number; "failed_count": number; "finished_at"?: string | null; "id": number; "items"?: Array<components['schemas']["BusinessBatchItemResponse"]> | null; "last_heartbeat_at"?: string | null; "pending_count": number; "running_count": number; "started_at"?: string | null; "status": string; "tool_id": string; "tool_name": string; "total_count": number; "waiting_count": number; [key: string]: unknown }
+    "BusinessBatchResponse": { "client_batch_id": string; "completed_count": number; "detail_accessible"?: boolean; "failed_count": number; "finished_at"?: string | null; "id": number; "items"?: Array<components['schemas']["BusinessBatchItemResponse"]> | null; "last_heartbeat_at"?: string | null; "pending_count": number; "running_count": number; "started_at"?: string | null; "status": string; "tool_id": string; "tool_name": string; "total_count": number; "waiting_count": number; [key: string]: unknown }
     "BusinessBootstrapResponse": { "entitlements": {  }; "product_type": string; "seat_limit": number; "tools": Array<{  }>; [key: string]: unknown }
     "ChatActionResponse": { "message": string }
     "ChatConfigResponse": { "max_unmatched": string | null; "suggested_questions": string | null; "support_mode": string | null; "transfer_keywords": string | null; "transfer_rules": string | null; "welcome_message": string | null }
@@ -89,6 +94,13 @@ export interface components {
     "ChatSessionDetailResponse": { "ai_resolved": boolean; "created_at": string | null; "message_count": number; "messages": Array<components['schemas']["ChatMessageResponse"]>; "satisfaction": number | null; "session_id": string; "status": string; "transferred_to_human": boolean }
     "ChatTransferRequest": { "summary"?: string | null }
     "ChatTransferResponse": { "feedback_id": number | null; "message": string }
+    "CommissionEntryView": { "agency_id": number; "amount": string; "id": number; "kind": "accrual" | "refund"; "occurred_at": string | null; "order_amount_snapshot": string; "order_id": number; "order_no": string; "rate_snapshot": string; "settlement_id": number | null }
+    "CommissionPolicyUpdate": { "expected_rate": number | string | null; "rate": number | string | null }
+    "CommissionPolicyView": { "agency_id": number; "rate": string | null }
+    "CommissionSettlementConfirm": { "expected_revision": string; "month": string; "note": string }
+    "CommissionSettlementPreview": { "agency_id": number; "amount": string; "count": number; "existing_settlement"?: components['schemas']["CommissionSettlementView"] | null; "month": string; "revision": string }
+    "CommissionSettlementView": { "agency_id": number; "amount": string; "confirmed_at": string | null; "count": number; "id": number; "month": string; "note": string }
+    "CommissionSummaryView": { "accrued_amount": string; "pending_amount": string; "refunded_amount": string; "settled_amount": string }
     "ConfigJsonValue": components['schemas']["JsonValue"]
     "ConfigUpdateResponse": { "success": true }
     "CreateSessionRequest": { "capability_key"?: string | null; "platform_key"?: string | null }
@@ -145,7 +157,7 @@ export interface components {
     "ExpenseRenewalResumeRequest": { "next_due_on": string }
     "ExpenseRenewalSkipRequest": { "due_on": string; "note"?: string | null }
     "ExpenseRenewalUpdate": { "category_id"?: number | null; "cycle"?: "monthly" | "quarterly" | "semiannual" | "annual" | null; "default_amount"?: number | string | null; "name"?: string | null; "next_due_on"?: string | null; "note"?: string | null; "reminder_days"?: number | null; "vendor"?: string | null }
-    "ExpenseSummaryResponse": { "categories": Array<components['schemas']["ExpenseCategoryTotal"]>; "change_percent": string; "count": number; "month": string; "overdue_renewals": number; "previous_total": string; "total": string; "trend": Array<components['schemas']["ExpenseTrendPoint"]>; "upcoming_renewals": number }
+    "ExpenseSummaryResponse": { "categories": Array<components['schemas']["ExpenseCategoryTotal"]>; "change_percent": string | null; "count": number; "month": string; "overdue_renewals": number; "previous_total": string; "total": string; "trend": Array<components['schemas']["ExpenseTrendPoint"]>; "upcoming_renewals": number }
     "ExpenseTrendPoint": { "month": string; "total": string }
     "ExpenseVoidRequest": { "reason": string }
     "ExpiringAuthorizationItem": { "code_masked": string; "expires_at"?: string | null; "id": number }
@@ -203,6 +215,8 @@ export interface components {
     "OrderUpdate": { "amount"?: number | string | null; "channel"?: string | null; "plan_id"?: number | null; "platform_key"?: string | null; "responsible"?: string | null }
     "PaginatedDemoBatches": { "data": Array<components['schemas']["DemoBatchResponse"]>; "page": number; "page_size": number; "total": number }
     "PaginatedDemoRuns": { "data": Array<components['schemas']["DemoRunResponse"]>; "page": number; "page_size": number; "total": number }
+    "PaginatedResponse_CommissionEntryView_": { "data"?: Array<components['schemas']["CommissionEntryView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
+    "PaginatedResponse_CommissionSettlementView_": { "data"?: Array<components['schemas']["CommissionSettlementView"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
     "PaginatedResponse_ExpenseRecordResponse_": { "data"?: Array<components['schemas']["ExpenseRecordResponse"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
     "PaginatedResponse_ExpenseRenewalResponse_": { "data"?: Array<components['schemas']["ExpenseRenewalResponse"]> | null; "message"?: string; "page": number; "page_size": number; "success"?: boolean; "total": number; "total_pages": number }
     "PendingTicketItem": { "created_at"?: string | null; "id": number; "priority"?: string | null; "title": string }
@@ -297,6 +311,41 @@ export interface operations {
     parameters: never
     requestBody: components['schemas']["AgencyWrite"]
     responses: { "201": components['schemas']["AgencyEnvelope"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "commission_policy_api_agency_agencies__agency_id__commission_policy_get": {
+    parameters: { "path": { "agency_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_CommissionPolicyView_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "update_commission_policy_api_agency_agencies__agency_id__commission_policy_put": {
+    parameters: { "path": { "agency_id": number } }
+    requestBody: components['schemas']["CommissionPolicyUpdate"]
+    responses: { "200": components['schemas']["APIResponse_CommissionPolicyView_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "commission_settlement_preview_api_agency_agencies__agency_id__commission_settlement_preview_get": {
+    parameters: { "path": { "agency_id": number }; "query": { "month": string } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_CommissionSettlementPreview_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "commission_settlements_api_agency_agencies__agency_id__commission_settlements_get": {
+    parameters: { "path": { "agency_id": number }; "query": { "page"?: number; "page_size"?: number } }
+    requestBody: never
+    responses: { "200": components['schemas']["PaginatedResponse_CommissionSettlementView_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "confirm_commission_settlement_api_agency_agencies__agency_id__commission_settlements_post": {
+    parameters: { "path": { "agency_id": number } }
+    requestBody: components['schemas']["CommissionSettlementConfirm"]
+    responses: { "201": components['schemas']["APIResponse_CommissionSettlementView_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "commission_summary_api_agency_agencies__agency_id__commission_summary_get": {
+    parameters: { "path": { "agency_id": number } }
+    requestBody: never
+    responses: { "200": components['schemas']["APIResponse_CommissionSummaryView_"]; "422": components['schemas']["HTTPValidationError"] }
+  }
+  "commission_entries_api_agency_agencies__agency_id__commissions_get": {
+    parameters: { "path": { "agency_id": number }; "query": { "page"?: number; "page_size"?: number; "settled"?: boolean | null } }
+    requestBody: never
+    responses: { "200": components['schemas']["PaginatedResponse_CommissionEntryView_"]; "422": components['schemas']["HTTPValidationError"] }
   }
   "update_agency_api_agency_agencies__item_id__patch": {
     parameters: { "path": { "item_id": number } }
@@ -1295,6 +1344,23 @@ export interface paths {
   "/api/agency/agencies": {
     get: operations["agencies_api_agency_agencies_get"]
     post: operations["create_agency_api_agency_agencies_post"]
+  }
+  "/api/agency/agencies/{agency_id}/commission-policy": {
+    get: operations["commission_policy_api_agency_agencies__agency_id__commission_policy_get"]
+    put: operations["update_commission_policy_api_agency_agencies__agency_id__commission_policy_put"]
+  }
+  "/api/agency/agencies/{agency_id}/commission-settlement-preview": {
+    get: operations["commission_settlement_preview_api_agency_agencies__agency_id__commission_settlement_preview_get"]
+  }
+  "/api/agency/agencies/{agency_id}/commission-settlements": {
+    get: operations["commission_settlements_api_agency_agencies__agency_id__commission_settlements_get"]
+    post: operations["confirm_commission_settlement_api_agency_agencies__agency_id__commission_settlements_post"]
+  }
+  "/api/agency/agencies/{agency_id}/commission-summary": {
+    get: operations["commission_summary_api_agency_agencies__agency_id__commission_summary_get"]
+  }
+  "/api/agency/agencies/{agency_id}/commissions": {
+    get: operations["commission_entries_api_agency_agencies__agency_id__commissions_get"]
   }
   "/api/agency/agencies/{item_id}": {
     patch: operations["update_agency_api_agency_agencies__item_id__patch"]

@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASELINE_COMMIT = "5da800e87c74efa7086c3d6772985f9bfbf29c21"
 BASELINE_VERSION = "1.8.8"
 OLD_REVISION = "20260816_data_integrity"
-NEW_REVISION = "20260921_agency_workspace"
+NEW_REVISION = "20260922_agency_commission"
 TEST_DATABASE = "toolbox_upgrade_test"
 
 
@@ -198,6 +198,14 @@ def assert_new_contract(connection: Connection) -> None:
     expect_constraint(connection, staff.insert().values(**agent), {4025, 3819})
     expect_constraint(connection, staff.insert().values(**agent, agency_id=999999), {1452})
     connection.execute(staff.insert().values(**agent, agency_id=906))
+    # The upgrade must not adopt paid history into the opt-in commission ledger.
+    entries = table(connection, "agency_commission_entries")
+    assert connection.execute(sa.select(sa.func.count()).select_from(entries)).scalar_one() == 0
+    assert connection.execute(sa.select(agencies.c.commission_rate).where(agencies.c.id == 906)).scalar_one() is None
+    expect_constraint(connection, agencies.update().where(agencies.c.id == 906).values(commission_rate=Decimal("1.01")), {4025, 3819})
+    commission = {"agency_id": 906, "order_id": 902, "order_no": "MIGRATION-COMMISSION-PROBE", "kind": "accrual", "amount": Decimal("1.00"), "rate_snapshot": Decimal("0.1"), "order_amount_snapshot": Decimal("10.00")}
+    connection.execute(entries.insert().values(**commission))
+    expect_constraint(connection, entries.insert().values(**commission), {1062})
     expect_constraint(connection, staff.update().where(staff.c.id == 907).values(role="unknown"), {4025, 3819})
     connection.execute(auth_codes.insert().values(id=908, code="MIGRATION-NEW-AUTH", order_id=902))
     expect_constraint(connection, auth_codes.insert().values(id=909, code="MIGRATION-DUPLICATE-AUTH", order_id=902), {1062})
@@ -257,8 +265,8 @@ def main() -> None:
                 raise AssertionError("Old runtime did not reject the new schema")
             run([sys.executable, "-m", "alembic", "upgrade", "head"], ROOT / "backend", current_env)
             rejection = run([sys.executable, "-m", "alembic", "downgrade", OLD_REVISION], ROOT / "backend", current_env, succeeds=False)
-            if "Agency history exists" not in rejection:
-                raise AssertionError("Downgrade did not preserve agency history for the expected reason")
+            if "Commission history exists" not in rejection:
+                raise AssertionError("Downgrade did not preserve commission history for the expected reason")
             with engine.connect() as connection:
                 if revision(connection) != NEW_REVISION:
                     raise AssertionError("Rejected downgrade changed the revision")

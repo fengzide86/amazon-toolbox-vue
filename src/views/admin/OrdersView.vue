@@ -126,12 +126,12 @@
             <el-button size="small" @click="openOrderDetail(row)">详情</el-button>
             <el-dropdown v-if="canWrite && isCompact && (row.status === 'pending' || row.status === 'paid')" trigger="click" @command="command => handleOrderCommand(command, row)">
               <el-button size="small">更多</el-button>
-                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-if="row.status === 'pending'" command="paid">标记已收款</el-dropdown-item><el-dropdown-item v-if="row.status === 'pending'" command="cancel">取消订单</el-dropdown-item><el-dropdown-item v-if="row.status === 'paid'" command="refund">退款</el-dropdown-item></el-dropdown-menu></template>
+                  <template #dropdown><el-dropdown-menu><el-dropdown-item v-if="row.status === 'pending'" command="paid">标记已收款</el-dropdown-item><el-dropdown-item v-if="row.status === 'pending'" command="cancel">取消订单</el-dropdown-item><el-dropdown-item v-if="row.status === 'paid'" command="refund">登记退款</el-dropdown-item></el-dropdown-menu></template>
             </el-dropdown>
             <template v-else-if="canWrite && !isCompact">
               <el-button v-if="row.status === 'pending'" size="small" @click="markPaid(row)">标记已收款</el-button>
               <el-button v-if="row.status === 'pending'" size="small" type="warning" @click="cancel(row)">取消</el-button>
-              <el-button v-if="row.status === 'paid'" size="small" type="danger" @click="refund(row)">退款</el-button>
+              <el-button v-if="row.status === 'paid'" size="small" type="danger" @click="refund(row)">登记退款</el-button>
             </template>
           </template>
         </el-table-column>
@@ -365,13 +365,13 @@ async function refund(order: unknown) {
   const selectedOrder = adminOrderSchema.parse(order)
   if (selectedOrder.status !== 'paid') return
   try {
-    const reason = await promptTransitionReason('确认退款', `将退款 ¥${selectedOrder.amount}，请输入退款原因。`)
+    const reason = await promptTransitionReason('确认退款', `请先确认已在线下退还 ¥${selectedOrder.amount}，再登记退款原因。本操作只登记退款并冲正分润，不会转账，也不会自动停用授权；关联授权需另行核对处理。`)
     if (!reason) return
     await refundOrder(selectedOrder.id, reason)
-    showToast('退款成功', 'success')
+    showToast('线下退款已登记，关联授权请另行核对', 'success')
     await loadData()
   } catch {
-    showToast('退款失败', 'error')
+    showToast('退款登记失败，未执行任何转账', 'error')
   }
 }
 

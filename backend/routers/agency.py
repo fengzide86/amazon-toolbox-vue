@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.dependencies import require_agency_staff, require_super_admin
 from database import get_db
 from domains.commerce.agency import AgencyService
+from domains.commerce.agency_commission import AgencyCommissionService
 from schemas.agency import (
     AgenciesEnvelope,
     AgencyEnvelope,
@@ -30,6 +31,16 @@ from schemas.agency import (
     CustomersEnvelope,
     CustomerUpdate,
 )
+from schemas.agency_commission import (
+    CommissionEntriesEnvelope,
+    CommissionPolicyEnvelope,
+    CommissionPolicyUpdate,
+    CommissionSettlementConfirm,
+    CommissionSettlementEnvelope,
+    CommissionSettlementPreviewEnvelope,
+    CommissionSettlementsEnvelope,
+    CommissionSummaryEnvelope,
+)
 
 router = APIRouter()
 Page = Annotated[int, Query(ge=1)]
@@ -48,6 +59,15 @@ def owner_workspace(db: AsyncSession = Depends(get_db), actor: dict[str, Any] = 
 
 Service = Annotated[AgencyService, Depends(workspace)]
 OwnerService = Annotated[AgencyService, Depends(owner_workspace)]
+
+def commission_workspace(db: AsyncSession = Depends(get_db), actor: dict[str, Any] = Depends(require_agency_staff)) -> AgencyCommissionService:
+    return AgencyCommissionService(db, actor)
+
+def commission_owner(db: AsyncSession = Depends(get_db), actor: dict[str, Any] = Depends(require_super_admin)) -> AgencyCommissionService:
+    return AgencyCommissionService(db, actor)
+
+CommissionService = Annotated[AgencyCommissionService, Depends(commission_workspace)]
+CommissionOwnerService = Annotated[AgencyCommissionService, Depends(commission_owner)]
 
 
 def envelope(data: Any) -> dict[str, Any]:
@@ -77,6 +97,34 @@ async def update_agency(item_id: int, data: AgencyUpdate, request: Request, serv
 @router.get("/plans", response_model=AgencyPlansEnvelope)
 async def plans(service: Service) -> dict[str, Any]:
     return envelope(await service.plans())
+
+@router.get("/agencies/{agency_id}/commission-policy", response_model=CommissionPolicyEnvelope)
+async def commission_policy(agency_id: int, service: CommissionService) -> dict[str, Any]:
+    return envelope(await service.policy(agency_id))
+
+@router.put("/agencies/{agency_id}/commission-policy", response_model=CommissionPolicyEnvelope)
+async def update_commission_policy(agency_id: int, data: CommissionPolicyUpdate, service: CommissionOwnerService) -> dict[str, Any]:
+    return envelope(await service.update_policy(agency_id, data.rate, data.expected_rate))
+
+@router.get("/agencies/{agency_id}/commissions", response_model=CommissionEntriesEnvelope)
+async def commission_entries(agency_id: int, service: CommissionService, page: Page = 1, page_size: PageSize = 20, settled: bool | None = None) -> dict[str, Any]:
+    return await service.entries(agency_id, page, page_size, settled)
+
+@router.get("/agencies/{agency_id}/commission-summary", response_model=CommissionSummaryEnvelope)
+async def commission_summary(agency_id: int, service: CommissionService) -> dict[str, Any]:
+    return envelope(await service.summary(agency_id))
+
+@router.get("/agencies/{agency_id}/commission-settlement-preview", response_model=CommissionSettlementPreviewEnvelope)
+async def commission_settlement_preview(agency_id: int, month: str, service: CommissionOwnerService) -> dict[str, Any]:
+    return envelope(await service.settlement_preview(agency_id, month))
+
+@router.get("/agencies/{agency_id}/commission-settlements", response_model=CommissionSettlementsEnvelope)
+async def commission_settlements(agency_id: int, service: CommissionService, page: Page = 1, page_size: PageSize = 20) -> dict[str, Any]:
+    return await service.settlements(agency_id, page, page_size)
+
+@router.post("/agencies/{agency_id}/commission-settlements", response_model=CommissionSettlementEnvelope, status_code=201)
+async def confirm_commission_settlement(agency_id: int, data: CommissionSettlementConfirm, service: CommissionOwnerService) -> dict[str, Any]:
+    return envelope(await service.confirm_settlement(agency_id, data))
 
 
 @router.get("/customers", response_model=CustomersEnvelope)

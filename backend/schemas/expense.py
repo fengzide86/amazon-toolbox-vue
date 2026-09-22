@@ -169,7 +169,7 @@ class ExpenseSummaryResponse(BaseModel):
     month: str
     total: Decimal
     previous_total: Decimal
-    change_percent: Decimal
+    change_percent: Decimal | None
     count: int
     upcoming_renewals: int
     overdue_renewals: int

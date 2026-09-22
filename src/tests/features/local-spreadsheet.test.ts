@@ -17,6 +17,7 @@ describe('local demo spreadsheet parser', () => {
 
     expect(result.validCount).toBe(1)
     expect(result.rows[0]?.preview.account_label).toBe('se***@example.com')
+    expect(structuredClone(result).rows[0]?.sourceRow).toBe(2)
     expect(JSON.stringify(result)).not.toContain('seller@example.com')
     expect(JSON.stringify(result)).not.toContain('sensitive-cookie-value')
   })
@@ -55,6 +56,7 @@ describe('local demo spreadsheet parser', () => {
     expect(result.worksheetName).toBe('商品上架')
     expect(result.validCount).toBe(1)
     expect(result.rows[0]?.preview).toEqual({ account_label: 'se***@example.com' })
+    expect(structuredClone(result).rows[0]?.sourceRow).toBe(4)
     expect(JSON.stringify(result)).not.toContain('source-sku')
     expect(JSON.stringify(result)).not.toContain('hidden@example.com')
   })

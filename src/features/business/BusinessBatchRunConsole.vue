@@ -19,6 +19,7 @@
         </button>
         <button v-else class="new-button" type="button" @click="emit('new')"><Plus :size="15" />新建批次</button>
       </div>
+      <small v-if="store.liveStorageUnavailable" class="storage-warning" role="alert">本机回执保存暂不可用，请保持窗口打开并等待同步完成。</small>
     </header>
 
     <div class="metric-strip" aria-label="批次状态汇总">
@@ -36,6 +37,8 @@
           <span>{{ store.isDemoBatch ? '账号并发演示，点击查看案例过程' : '账号依次处理；需人工操作时保留现场，点击账号继续' }}</span>
         </div>
         <div class="toolbar-controls">
+          <button class="utility-button" type="button" @click="helpOpen = true">帮助与求助</button>
+          <button class="utility-button" type="button" @click="exportResults">导出结果</button>
           <label class="search-control">
             <Search :size="15" />
             <input v-model.trim="query" type="search" placeholder="搜索账号" aria-label="搜索账号" />
@@ -133,17 +136,19 @@
               </div>
             </div>
             <button v-if="!store.isDemoBatch && store.selectedItem.status === 'waiting_user'" class="primary-action warning" type="button" @click="completeAction">我已完成，继续处理</button>
-            <button v-else-if="!store.isDemoBatch && store.selectedItem.status === 'failed'" class="primary-action" type="button" @click="restartItem">重新发起此账号</button>
+            <button v-else-if="!store.isDemoBatch && store.selectedItem.status === 'failed' && store.isActive" class="primary-action" type="button" @click="restartItem">重新发起此账号</button>
+            <div v-else-if="!store.isDemoBatch && store.selectedItem.status === 'failed'" class="scope-note"><span>批次已结束，原始输入已清理。请先导出结果核对，再重新导入需要处理的账号。</span><button type="button" @click="closeDetails(); emit('new')">重新导入并新建</button></div>
             <div class="scope-note"><ShieldCheck :size="15" /><span>{{ store.isDemoBatch ? '这是本地逻辑演示，不会启动外部平台浏览器。' : '账号登录现场仅保存在本机，服务器只接收脱敏状态。' }}</span></div>
           </template>
         </aside>
       </div>
     </Teleport>
+    <BusinessHelpDrawer v-model="helpOpen" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref } from 'vue'
 import {
   Check,
   ChevronRight,
@@ -165,12 +170,15 @@ import type { BatchItem } from '@/features/business/model'
 import { demoProgress, endedAccountCount, executionStage, stagePresentation } from '@/features/business/run-presentation'
 import { useBusinessWorkspaceStore } from '@/stores/businessWorkspace'
 import { showToast } from '@/utils'
+import { historyCsv, snapshotHistoryDetail } from './history'
+const BusinessHelpDrawer = defineAsyncComponent(() => import('./BusinessHelpDrawer.vue'))
 
 type StatusFilter = 'all' | 'running' | 'attention' | 'failed' | 'completed'
 
 const emit = defineEmits<{ exit: []; new: [] }>()
 const store = useBusinessWorkspaceStore()
 const drawerOpen = ref(false)
+const helpOpen = ref(false)
 const query = ref('')
 const activeFilter = ref<StatusFilter>('all')
 const now = ref(Date.now())
@@ -211,7 +219,7 @@ const actionDescription = computed(() => {
   if (item.status === 'running') return store.isDemoBatch ? '该账号正在与其他账号同时推进演示步骤。' : '正在自动操作该账号的平台页面。'
   if (item.status === 'waiting_user') return item.message || (store.isDemoBatch ? '该账号展示了需要关注的人工操作案例。' : '请在下方页面完成操作，再点击继续处理。当前任务尚未完成。')
   if (item.status === 'completed') return item.message || (store.isDemoBatch ? '该账号已展示完成案例。' : '该账号的执行已完成。')
-  if (item.status === 'failed') return item.message || (store.isDemoBatch ? '该账号展示了异常结果案例。' : '该账号未能完成。可查看执行现场并重新发起。')
+  if (item.status === 'failed') return item.message || (store.isDemoBatch ? '该账号展示了异常结果案例。' : store.isActive ? '该账号未能完成，可以重新发起。' : '批次已结束，请核对结果后重新导入需要处理的账号。')
   if (item.status === 'cancelled') return '该账号已随批次退出。'
   return '账号等待进入执行流程。'
 })
@@ -256,6 +264,14 @@ function durationFor(item: BatchItem): string {
 }
 function openDetails(itemId: string): void { store.selectItem(itemId); drawerOpen.value = true }
 function closeDetails(): void { drawerOpen.value = false }
+function exportResults(): void {
+  const url = URL.createObjectURL(new Blob([historyCsv(snapshotHistoryDetail(store.snapshot))], { type: 'text/csv;charset=utf-8' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `KST-${store.isDemoBatch ? '演示' : '真实'}-批次结果.csv`
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 function handleKeydown(event: KeyboardEvent): void { if (event.key === 'Escape' && drawerOpen.value) closeDetails() }
 function batchPartition(itemId: string): string { return `batch-${itemId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80)}` }
 function registerBatchBrowser(itemId: string, event: Event): void {
@@ -285,6 +301,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.utility-button{min-height:34px;padding:6px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-primary);font-size:var(--type-meta);white-space:nowrap;cursor:pointer}.storage-warning{grid-column:1/-1;color:var(--color-warning)}
 .progress-description{color:var(--color-text-secondary);font-size:var(--type-meta);white-space:nowrap}
 .run-console{height:100%;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px}
 .run-header{min-height:62px;display:grid;grid-template-columns:minmax(230px,1fr) minmax(260px,420px) minmax(230px,1fr);align-items:center;gap:22px;padding:10px 15px;border:1px solid var(--color-border);border-radius:14px;background:var(--color-surface);box-shadow:var(--shadow-low)}

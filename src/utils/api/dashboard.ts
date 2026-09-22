@@ -1,5 +1,6 @@
 import { api, type ApiQueryParams } from './index'
 import type { components } from '@/shared/api/openapi.generated'
+import { normalizePaginatedResponse, type PaginatedResponse } from '@/shared/api/pagination'
 
 type Schemas = components['schemas']
 
@@ -9,6 +10,10 @@ export const getDashboardCharts = (params: ApiQueryParams = {}): Promise<Schemas
   api.get('/api/dashboard/charts', params)
 export const getProfit = (params: ApiQueryParams = {}): Promise<Schemas['ProfitRecordPageResponse']['data']> =>
   api.get('/api/profit', params)
+export async function getProfitPage(params: ApiQueryParams = {}): Promise<PaginatedResponse<Schemas['ProfitRecordResponse']>> {
+  const response = await api.get<Schemas['ProfitRecordPageResponse']>('/api/profit', params, { responseMode: 'raw', cache: false })
+  return normalizePaginatedResponse<Schemas['ProfitRecordResponse']>(response)
+}
 export const getProfitSummary = (params: ApiQueryParams = {}): Promise<Schemas['ProfitSummaryResponse']> =>
   api.get('/api/profit/summary', params)
 export const getProfitPolicy = (): Promise<Schemas['APIResponse_ProfitPolicyResponse_']['data']> =>

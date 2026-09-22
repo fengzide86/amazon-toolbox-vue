@@ -198,8 +198,8 @@ export function useAdminSettings() {
       showPlanPermissions.value = false
       showToast('产品权限已更新', 'success')
       await loadData()
-    } catch {
-      showToast('请先禁用套餐，再保存产品权限', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : '产品权限保存失败，请刷新后重试', 'error')
     }
   }
 

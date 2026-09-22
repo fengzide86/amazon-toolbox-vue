@@ -55,6 +55,32 @@ async def test_partner_delivery_requires_owner_payment_and_is_idempotent(client:
     assert (await client.get("/api/agency/orders?status=paid", headers=setup["a"])).json()["total"] == 0
 
 
+async def test_owner_action_center_delivery_tasks_match_filtered_records(client: AsyncClient, agency_setup: dict, staff_headers_factory) -> None:
+    setup = agency_setup
+    _, pending = await customer_and_order(client, setup)
+    _, paid = await customer_and_order(client, setup)
+    customer, delivered = await customer_and_order(client, setup)
+    _, refunded = await customer_and_order(client, setup)
+    for order in (paid, delivered, refunded):
+        assert (await client.post(f"/api/agency/orders/{order['id']}/mark-paid", headers=setup["owner"])).status_code == 200
+    for order in (delivered, refunded):
+        assert (await client.post(f"/api/agency/orders/{order['id']}/deliver", headers=setup["owner"])).status_code == 200
+    assert (await client.post(f"/api/orders/{refunded['id']}/refund", headers=setup["owner"], json={"reason": "已在线下退款"})).status_code == 200
+    await client.post("/api/agency/requests", headers=setup["a"], json={"customer_id": customer["id"], "kind": "support", "content": "需要安装支持"})
+    response = await client.get("/api/admin/action-center", headers=setup["owner"])
+    assert response.status_code == 200, response.text
+    tasks = response.json()["data"]["agency_delivery_tasks"]
+    assert {task["key"]: task["count"] for task in tasks} == {"pending_orders": 1, "paid_orders": 1, "pending_activation": 1, "open_requests": 1}
+    for task in tasks:
+        target = await client.get(f"/api/agency/{task['section']}?status={task['status']}", headers=setup["owner"])
+        assert target.json()["total"] == task["count"]
+    for role in ("operator", "support"):
+        headers = await staff_headers_factory(role, f"delivery-{role}")
+        response = await client.get("/api/admin/action-center", headers=headers)
+        assert response.status_code == 200
+        assert response.json()["data"]["agency_delivery_tasks"] == []
+
+
 async def test_partner_customer_order_license_request_and_export_are_scoped(client: AsyncClient, agency_setup: dict) -> None:
     setup = agency_setup
     customer_a, order_a = await customer_and_order(client, setup)

@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ToolsView from '@/views/user/ToolsView.vue'
 import { useAppStore } from '@/stores/app'
+import { usePlatformStore } from '@/stores/platform'
 
 const mocks = vi.hoisted(() => ({
   getTools: vi.fn(),
@@ -55,6 +56,7 @@ function mountView() {
 describe('ToolsView 一键工具箱', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.removeItem('toolbox_current_platform')
     mocks.route.query = {}
     mocks.getTools.mockResolvedValue([])
     mocks.createDemoRun.mockResolvedValue({ id: 'demo-1', tool_id: 'register', status: 'created' })
@@ -173,6 +175,36 @@ describe('ToolsView 一键工具箱', () => {
     await flushPromises()
     expect(mocks.downloadDesktopInstaller).toHaveBeenCalledOnce()
     expect(useAppStore().toolVisible).toBe(false)
+  })
+
+  it('逆序完成的平台请求不会覆盖当前工具目录', async () => {
+    let release!: (value: unknown) => void
+    mocks.getTools.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+      .mockResolvedValueOnce([{ id: 'ali', name: '当前速卖通工具', status: 'online' }])
+    const wrapper = mountView()
+    usePlatformStore().setPlatform('aliexpress')
+    await flushPromises()
+    release([{ id: 'old', name: '旧亚马逊工具', status: 'online' }])
+    await flushPromises()
+    expect(wrapper.text()).toContain('当前速卖通工具')
+    expect(wrapper.text()).not.toContain('旧亚马逊工具')
+    wrapper.unmount()
+  })
+
+  it('切换平台后，不会打开晚到的旧平台启动授权', async () => {
+    Object.defineProperty(window, 'electronAPI', { configurable: true, value: { automation: {} } })
+    mocks.getTools.mockResolvedValueOnce([{ id: 'live', name: '旧平台真实工具', status: 'online', availability: 'live', supports_live_single: true }]).mockResolvedValueOnce([])
+    let release!: (value: unknown) => void
+    mocks.createToolLaunchGrant.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="tool-card-旧平台真实工具"]').trigger('click')
+    usePlatformStore().setPlatform('aliexpress')
+    await flushPromises()
+    release({ grant: { token: 'test', target_url: 'https://example.test', script_key: 'listing' } })
+    await flushPromises()
+    expect(useAppStore().toolVisible).toBe(false)
+    wrapper.unmount()
   })
 
   it('只展示真实能力标签和说明入口，不向普通用户暴露批量能力', async () => {

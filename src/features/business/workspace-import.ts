@@ -106,7 +106,6 @@ export class WorkspaceImportCoordinator {
     const preview = this.dependencies.getPreview()
     if (!preview?.errors.length) return null
     if (!window.electronAPI?.batch) return downloadLocalImportErrors(preview.errors)
-    if (this.dependencies.getSelectedTool()?.availability === 'demo_only') return null
     return requireBatchApi().exportImportErrors(ipcPayload(preview.errors))
   }
 

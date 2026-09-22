@@ -45,6 +45,12 @@ export function buildDisplayPlanPatch(plan: AdminPlan, original: AdminPlan): Rec
 export function buildPlanPermissionsPatch(draft: PlanPermissionDraft): Record<string, unknown> {
   if (draft.status !== 'disabled') throw new Error('Plan must be disabled')
   const isBusiness = draft.product_type === 'business'
+  if (isBusiness && (!Number.isInteger(draft.maxBatchRows) || draft.maxBatchRows < 1 || draft.maxBatchRows > 1000)) {
+    throw new Error('真实任务单批行数需为 1–1000 的整数')
+  }
+  if (isBusiness && (!Number.isInteger(draft.maxOpenSessions) || draft.maxOpenSessions < 2 || draft.maxOpenSessions > 10)) {
+    throw new Error('真实任务保留现场数需为 2–10 的整数，不代表并发执行数')
+  }
   return {
     product_type: draft.product_type,
     entitlements: {

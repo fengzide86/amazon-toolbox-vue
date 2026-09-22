@@ -1,6 +1,6 @@
 """管理端行动中心的只读响应契约。"""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from schemas.expense import ExpenseRenewalResponse
 
@@ -36,6 +36,14 @@ class PendingTicketItem(BaseModel):
     created_at: str | None = None
 
 
+class AgencyDeliveryTask(BaseModel):
+    key: str
+    label: str
+    count: int
+    section: str
+    status: str
+
+
 class ActionCenterData(BaseModel):
     summary: ActionCenterSummary
     expiring_authorizations: list[ExpiringAuthorizationItem]
@@ -44,6 +52,7 @@ class ActionCenterData(BaseModel):
     waiting_interventions: list[object]
     stale_batches: list[object]
     expense_renewals: list[ExpenseRenewalResponse]
+    agency_delivery_tasks: list[AgencyDeliveryTask] = Field(default_factory=list)
 
 
 class ActionCenterResponse(BaseModel):

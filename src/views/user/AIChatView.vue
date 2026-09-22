@@ -8,12 +8,14 @@
     </PageHeader>
 
     <div ref="messagesContainer" class="chat-messages" role="log" aria-live="polite" :aria-busy="isLoading">
-      <div v-if="!sessionId" class="welcome-message">
-        <div class="typing-indicator"><span></span><span></span><span></span></div>
-        <p>正在连接客服…</p>
+      <div v-if="!sessionId" class="welcome-message" :role="sessionError ? 'alert' : 'status'">
+        <template v-if="sessionError"><p>{{ sessionError }}</p><button type="button" class="btn btn-primary" :disabled="sessionLoading" @click="startNewSession">重新连接</button></template>
+        <template v-else><div class="typing-indicator"><span></span><span></span><span></span></div><p>正在连接客服…</p></template>
       </div>
 
       <div v-else>
+        <p v-if="sessionError" role="alert">{{ sessionError }}</p>
+        <p v-if="sessionLoading" role="status">正在加载会话…</p>
         <div v-for="msg in messages" :key="msg.id" :class="['message', msg.role]">
           <div class="message-avatar" aria-hidden="true">
             {{ msg.role === 'user' ? '' : msg.role === 'ai' ? '' : '⚙️' }}
@@ -31,6 +33,8 @@
               <span v-for="kid in msg.knowledge_ids" :key="kid" class="ref-tag">#{{ kid }}</span>
             </div>
             <div class="message-time">{{ formatTime(msg.created_at) }}</div>
+            <div v-if="msg.delivery === 'sending'" class="message-delivery" role="status">正在发送…</div>
+            <div v-if="msg.delivery === 'failed'" class="message-delivery" role="alert">未能确认回复 <button type="button" class="btn btn-secondary" :disabled="isLoading || sessionLoading" @click="retryMessage(msg.id)">重新发送</button></div>
           </div>
         </div>
 
@@ -68,6 +72,7 @@
         <div v-if="sessionTransferred" class="transferred-notice">
           已创建工单，可在 <button type="button" class="btn btn-secondary" @click="ticketsVisible = true">我的工单</button> 查看处理状态与回复
         </div>
+        <div v-if="sessionResolved || sessionTransferred" class="message-actions"><button type="button" class="btn btn-primary" :disabled="sessionLoading" @click="startNewSession">咨询新问题</button></div>
       </div>
     </div>
 
@@ -78,9 +83,10 @@
         v-model="inputMessage"
         type="text"
         placeholder="输入您的问题..."
-        :disabled="isLoading"
+        :disabled="isLoading || sessionLoading"
+        maxlength="2000"
       />
-      <button type="submit" class="btn btn-primary" :disabled="isLoading || !inputMessage.trim()">
+      <button type="submit" class="btn btn-primary" :disabled="isLoading || sessionLoading || !inputMessage.trim()">
         发送
       </button>
     </form>
@@ -117,7 +123,7 @@ const {
   sessionId, messages, inputMessage, isLoading, isTransferring, showActions, showRating, rating,
   sessionResolved, sessionTransferred, lastAiMessage, messagesContainer, showHistory,
   historySessions, quickQuestions, formatTime, getStatusText, askQuickQuestion,
-  sendMessage, markResolved, transferToHuman, submitRating, loadSession,
+  sendMessage, retryMessage, startNewSession, sessionLoading, sessionError, markResolved, transferToHuman, submitRating, loadSession,
 } = useCustomerSupportChat()
 </script>
 
@@ -218,6 +224,7 @@ const {
   line-height: 1.5;
   word-break: break-word;
 }
+.message-delivery { margin-top: 8px; font-size: var(--type-meta); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 .message-refs {
   margin-top: 0.5rem;

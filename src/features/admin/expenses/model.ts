@@ -57,7 +57,7 @@ export const expenseSummarySchema = z.object({
   month: z.string(),
   total: z.coerce.number().nonnegative(),
   previous_total: z.coerce.number().nonnegative(),
-  change_percent: z.coerce.number(),
+  change_percent: z.coerce.number().nullable(),
   count: z.coerce.number().int().nonnegative(),
   upcoming_renewals: z.coerce.number().int().nonnegative(),
   overdue_renewals: z.coerce.number().int().nonnegative(),

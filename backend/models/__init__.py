@@ -13,6 +13,7 @@
 
 # AI客服相关模型
 from models.agency import Agency, AgencyCustomer, AgencyRequest
+from models.agency_commission import AgencyCommissionEntry, AgencyCommissionSettlement
 from models.ai_chat import (
     ChatConfig,
     ChatMessage,
@@ -61,6 +62,8 @@ __all__ = [
     "Agency",
     "AgencyCustomer",
     "AgencyRequest",
+    "AgencyCommissionEntry",
+    "AgencyCommissionSettlement",
     # 状态常量
     "AuthCodeStatus",
     "OrderStatus",

@@ -118,6 +118,7 @@ export class BusinessDemoCoordinator {
           counts: { total: itemRefs.length, pending: itemRefs.length, running: 0, waiting: 0, completed: 0, failed: 0 },
           items: itemRefs.map((itemId, index) => ({
             itemId,
+            sourceRow: preview.rows[index]?.sourceRow,
             accountLabelMasked: String(preview.rows[index]?.preview.account_label || `演示账号 ${index + 1}`),
             status: 'pending',
             browserReady: false,

@@ -585,11 +585,13 @@ const selectedOrderNotice = computed(() => {
 })
 const selectedLicense = computed(() => props.section === 'licenses' && selected.value ? licenseSchema.parse(selected.value) : null)
 const selectedRequest = computed(() => props.section === 'requests' && selected.value ? serviceRequestSchema.parse(selected.value) : null)
-const descriptions: Record<Section, string> = { agencies: '先建立代理主体，再到后台账号管理为代理关联登录账号。', customers: '以客户为中心管理归属、联系信息与交付备注。', orders: '提交订单 → 平台确认收款 → 发放授权 → 跟进激活。', licenses: '只展示已发放的授权，便于发送给客户并跟进激活。', requests: '集中跟进使用问题、退款和延期申请，保留处理记录。' }
-const description = computed(() => descriptions[props.section])
-const createLabel = computed(() => ({ agencies: '新建代理', customers: '登记客户', orders: '提交订单', licenses: '', requests: '提交售后申请' })[props.section])
+type RecordSection = Exclude<Section, 'commission'>
+const recordSection = computed(() => props.section as RecordSection)
+const descriptions: Record<RecordSection, string> = { agencies: '先建立代理主体，再到后台账号管理为代理关联登录账号。', customers: '以客户为中心管理归属、联系信息与交付备注。', orders: '提交订单 → 平台确认收款 → 发放授权 → 跟进激活。', licenses: '只展示已发放的授权，便于发送给客户并跟进激活。', requests: '集中跟进使用问题、退款和延期申请，保留处理记录。' }
+const description = computed(() => descriptions[recordSection.value])
+const createLabel = computed(() => ({ agencies: '新建代理', customers: '登记客户', orders: '提交订单', licenses: '', requests: '提交售后申请' } as Record<RecordSection, string>)[recordSection.value])
 const statusOptions = computed(() => {
-  const values = props.section === 'agencies' ? ['active', 'disabled'] : props.section === 'orders' ? ['pending', 'paid', 'delivered', 'refunded', 'cancelled'] : props.section === 'requests' ? ['open', 'resolved', 'rejected'] : []
+  const values = props.section === 'agencies' ? ['active', 'disabled'] : props.section === 'orders' ? ['pending', 'paid', 'delivered', 'refunded', 'cancelled'] : props.section === 'licenses' ? ['pending_activation', 'unused', 'active', 'expired', 'frozen', 'deleted'] : props.section === 'requests' ? ['open', 'resolved', 'rejected'] : []
   return values.map(value => ({ value, label: statusLabel(value) }))
 })
 function formatDate(value: string | null | undefined): string {
@@ -609,7 +611,7 @@ function params() { return { page: page.value, page_size: 20, q: query.value.tri
 async function load(): Promise<void> {
   const revision = ++loadRevision
   loading.value = true; loadError.value = ''
-  try { const result = await agencyApi[props.section](params()); if (revision === loadRevision) { rows.value = result.data; total.value = result.total } }
+  try { const result = await agencyApi[recordSection.value](params()); if (revision === loadRevision) { rows.value = result.data; total.value = result.total } }
   catch (cause) { if (revision === loadRevision) { rows.value = []; total.value = 0; loadError.value = errorText(cause) } }
   finally { if (revision === loadRevision) loading.value = false }
 }
@@ -644,7 +646,7 @@ async function openCreate(): Promise<void> {
 function openDetail(raw: unknown): void {
   detailRevision++
   const schemas = { agencies: agencySchema, customers: customerSchema, orders: orderSchema, licenses: licenseSchema, requests: serviceRequestSchema }
-  selected.value = schemas[props.section].parse(raw); actionError.value = ''; detailVisible.value = true
+  selected.value = schemas[recordSection.value].parse(raw); actionError.value = ''; detailVisible.value = true
   if (selectedRequest.value) Object.assign(responseForm, { status: selectedRequest.value.status === 'open' ? 'resolved' : selectedRequest.value.status, response: selectedRequest.value.response || '' })
 }
 function editRecord(): void {

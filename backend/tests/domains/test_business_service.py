@@ -33,6 +33,25 @@ async def live_batch(db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch) 
 
 
 @pytest.mark.asyncio
+async def test_foreign_device_has_summary_but_no_detail_or_write(db_session: AsyncSession, live_batch) -> None:
+    batch_id, context = live_batch
+    other_device = {**context, "device_id": "another-device"}
+    own = await service.list_batches(db_session, context, limit=20)
+    foreign = await service.list_batches(db_session, other_device, limit=20)
+    assert own[0]["detail_accessible"] is True
+    assert foreign[0]["detail_accessible"] is False
+    assert "device_id" not in foreign[0]
+    assert "items" not in foreign[0]
+    with pytest.raises(HTTPException) as detail:
+        await service.get_batch(db_session, batch_id, other_device)
+    assert detail.value.status_code == 404
+    with pytest.raises(HTTPException) as write:
+        await service.finish_batch(db_session, batch_id, BatchFinish(status="cancelled"), other_device)
+    assert write.value.status_code == 404
+    assert await service.list_batches(db_session, {"auth_code_id": -1}, limit=20) == []
+
+
+@pytest.mark.asyncio
 async def test_recount_includes_pending_writes_and_unreported_items(db_session: AsyncSession, live_batch) -> None:
     batch_id, context = live_batch
     running = BatchItemUpdate(account_label_masked="客户", status="running")

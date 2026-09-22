@@ -3,6 +3,7 @@ import { reactive } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { parseBrowserDemoSpreadsheet } from '@/features/demo/browserSpreadsheet'
+import { parseDemoSpreadsheetBuffer } from '@/features/demo/localSpreadsheet'
 
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -10,6 +11,45 @@ afterEach(() => {
 })
 
 describe('browser spreadsheet boundary', () => {
+  it('retains non-contiguous source rows through the worker structured-clone round trip', async () => {
+    vi.stubEnv('MODE', 'production')
+    const terminate = vi.fn()
+    let reply: (event: MessageEvent) => void = () => {}
+    vi.stubGlobal('Worker', class {
+      terminate = terminate
+      addEventListener(type: string, listener: (event: MessageEvent) => void) {
+        if (type === 'message') reply = listener
+      }
+      postMessage(message: { buffer: ArrayBuffer; fileName: string; inputSchema: Array<Record<string, unknown>>; maxRows: number }) {
+        const request = structuredClone(message)
+        void parseDemoSpreadsheetBuffer(request.buffer, request.fileName, request.inputSchema, request.maxRows)
+          .then(result => reply({ data: structuredClone({ ok: true, result }) } as MessageEvent))
+          .catch(error => reply({ data: { ok: false, error: String(error) } } as MessageEvent))
+      }
+    })
+    const workbook = new ExcelJS.Workbook()
+    workbook.addWorksheet('导入数据').addRows([
+      ['填写说明'], [], ['客户简称', '密码'], ['first@example.com', 'first-secret'], [],
+      ['invalid@example.com', ''], ['last@example.com', 'last-secret'],
+    ])
+    const buffer = await workbook.xlsx.writeBuffer()
+    const arrayBuffer = vi.fn(async () => buffer)
+    const file = { name: 'local.xlsx', size: buffer.byteLength, arrayBuffer } as unknown as File
+    const result = await parseBrowserDemoSpreadsheet(file, [
+      { key: 'password', label: '密码', required: true, sensitive: true },
+    ])
+
+    expect(result.rows.map(row => row.sourceRow)).toEqual([4, 7])
+    expect(result.errors.map(error => error.rowNumber)).toEqual([6])
+    expect(result.rows.map(row => Object.keys(row).sort())).toEqual([
+      ['itemId', 'preview', 'sourceRow'], ['itemId', 'preview', 'sourceRow'],
+    ])
+    expect(JSON.stringify(result)).not.toMatch(/first@example.com|invalid@example.com|last@example.com|first-secret|last-secret/)
+    // A successful worker parse must not be rescued by the inline fallback.
+    expect(arrayBuffer).toHaveBeenCalledOnce()
+    expect(terminate).toHaveBeenCalledOnce()
+  })
+
   it('passes worksheet context and transfers bytes to the existing worker', async () => {
     vi.stubEnv('MODE', 'production')
     const terminate = vi.fn()

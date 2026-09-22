@@ -29,6 +29,7 @@ interface BatchImportError {
 
 interface BatchImportRow {
   itemId: string;
+  sourceRow: number;
   input: Record<string, string>;
   preview: Record<string, string>;
   accountLabelMasked: string;
@@ -141,12 +142,12 @@ async function parseBatchFile(
         preview[field.key] = field.sensitive ? '••••••' : (input[field.key] ?? '');
       }
       preview.account_label = maskLabel(input.account_label);
-      rows.push({ itemId, input, preview, accountLabelMasked: preview.account_label ?? '' });
+      rows.push({ itemId, sourceRow: rowNumber, input, preview, accountLabelMasked: preview.account_label ?? '' });
     } catch (error) {
       errors.push({ rowNumber, message: error instanceof Error ? error.message : '无法读取该行' });
     }
   }
-  if (!rows.length) throw Object.assign(new Error('没有可执行的有效数据行'), { code: 'BATCH_ROWS_EMPTY', errors });
+  if (!rows.length && !errors.length) throw Object.assign(new Error('没有可执行的有效数据行'), { code: 'BATCH_ROWS_EMPTY' });
   return {
     importId: `import_${crypto.randomBytes(8).toString('hex')}`,
     fileName: path.basename(filePath),

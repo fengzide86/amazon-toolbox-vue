@@ -1,6 +1,7 @@
 import {
   app,
   net,
+  safeStorage,
   shell,
   webContents,
   type BrowserWindow,
@@ -21,6 +22,7 @@ import type {
 } from '../ipc/trusted-ipc.cjs'
 import { DesktopBatchController } from './desktop-batch-controller.cjs'
 import { RunnerClient } from './runner-client.cjs'
+import { ExecutionReportOutbox } from './execution-report-outbox.cjs'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -93,9 +95,16 @@ export class DesktopAutomationController {
   private readonly demoActivityTokens = new Set<string>()
   private runner: RunnerLike | null = null
   private singleRunActive = false
+  private readonly reportOutbox: ExecutionReportOutbox
 
   constructor(options: DesktopAutomationControllerOptions) {
     this.options = options
+    this.reportOutbox = new ExecutionReportOutbox({
+      directory: join(app.getPath('userData'), 'pending-records'),
+      apiBase: options.controlApiBase,
+      version: app.getVersion(),
+      codec: safeStorage,
+    })
     this.batchController = new DesktopBatchController({
       getWindow: options.getWindow,
       runnerEnvironment: () => this.runnerEnvironment(),
@@ -106,6 +115,7 @@ export class DesktopAutomationController {
   }
 
   registerIpc(): void {
+    if (this.options.automationEnabled) this.reportOutbox.start()
     this.registerToolLaunchIpc()
     this.registerSingleRunIpc()
     this.registerDemoActivityIpc()
@@ -141,6 +151,7 @@ export class DesktopAutomationController {
   }
 
   async cleanup(): Promise<void> {
+    this.reportOutbox.dispose()
     this.embeddedBrowserHost.release()
     const cleanupTasks: Promise<unknown>[] = [this.batchController.cleanup()]
     if (this.runner) cleanupTasks.push(this.runner.stop())
@@ -185,7 +196,7 @@ export class DesktopAutomationController {
     if (this.runner) return this.runner
     this.runner = new RunnerClient({
       scriptPath: join(__dirname, '..', 'automation-runner.cjs'),
-      env: this.runnerEnvironment(),
+      env: { ...this.runnerEnvironment(), TOOLBOX_PERSIST_REPORTS: '1' },
       onEvent: (rawEvent: unknown) => {
         const event = parseDesktopIpcEvent('automation:event', rawEvent)
         if (event.type === 'run.started' || event.type === 'run.preparing') this.singleRunActive = true
@@ -202,7 +213,9 @@ export class DesktopAutomationController {
           })
         }
       },
-      onHostRequest: (action: string, payload: UnknownRecord) => this.embeddedBrowserHost.request(action, payload),
+      onHostRequest: (action: string, payload: UnknownRecord) => action === 'execution.report'
+        ? this.reportOutbox.submit(payload)
+        : this.embeddedBrowserHost.request(action, payload),
     }) as RunnerLike
     return this.runner
   }

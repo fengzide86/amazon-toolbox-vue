@@ -21,8 +21,8 @@
             <dd>{{ platformLabel }}</dd>
           </div>
           <div>
-            <dt>策略版本</dt>
-            <dd>V{{ policyVersion }}</dd>
+            <dt>计算依据</dt>
+            <dd>每笔收款时快照</dd>
           </div>
         </dl>
       </section>
@@ -31,8 +31,8 @@
         <template #header>
           <div class="distribution-header">
             <div>
-              <h3>分润构成</h3>
-              <p>金额按订单收款时生效的策略快照计算</p>
+              <h3>历史有效分润构成</h3>
+              <p>占比按当前有效分润金额计算，不随策略编辑重算历史订单。</p>
             </div>
             <router-link v-if="canEditPolicy" to="/admin/settings" class="settings-link">编辑比例</router-link>
           </div>
@@ -42,11 +42,11 @@
           <article v-for="item in profitItems" :key="item.key" class="distribution-item">
             <div class="distribution-item__header">
               <span>{{ item.label }}</span>
-              <span>{{ profitRatios[item.key] }}%</span>
+              <span>{{ historicalRatio(item.amountKey) }}%</span>
             </div>
             <strong>¥{{ formatMoney(summary[item.amountKey]) }}</strong>
             <div class="ratio-track" aria-hidden="true">
-              <span :style="{ width: `${profitRatios[item.key]}%` }" />
+              <span :style="{ width: `${historicalRatio(item.amountKey)}%` }" />
             </div>
           </article>
         </div>
@@ -55,16 +55,40 @@
           暂无有效分润记录。订单标记为已收款后，系统会按当时的策略生成分润。
         </div>
       </el-card>
+      <section class="current-policy" aria-label="当前分润策略">
+        <h3>当前策略 V{{ policyVersion }}</h3>
+        <p>仅用于后续收款订单，与上方历史金额占比不同。</p>
+        <div><span v-for="item in profitItems" :key="item.key">{{ item.label }} {{ profitRatios[item.key] }}%</span></div>
+      </section>
+      <el-card class="ledger-card" shadow="never">
+        <template #header>
+          <div class="distribution-header">
+            <div><h3>分润明细</h3><p>共 {{ recordTotal }} 笔 · 含已冲正记录，保留原成交快照。</p></div>
+            <el-select v-model="recordStatus" aria-label="分润状态" style="width: 132px">
+              <el-option label="全部状态" value="" /><el-option label="有效" value="active" /><el-option label="已冲正" value="reversed" />
+            </el-select>
+          </div>
+        </template>
+        <AsyncStateNotice :state="recordState" :message="recordError" loading-text="正在加载分润明细…" @retry="loadRecords" />
+        <el-table v-if="recordState !== 'error' && recordState !== 'loading'" :data="records" stripe>
+          <el-table-column prop="order_id" label="关联订单" width="100" />
+          <el-table-column label="收款金额" width="120"><template #default="{ row }">¥{{ formatMoney(row.order_amount_snapshot) }}</template></el-table-column>
+          <el-table-column prop="policy_version" label="策略版本" width="100" />
+          <el-table-column v-for="item in profitItems" :key="item.key" :label="item.label" width="100"><template #default="{ row }">¥{{ formatMoney(row[`${item.key}_share`]) }}</template></el-table-column>
+          <el-table-column label="状态" min-width="160"><template #default="{ row }">{{ row.status === 'reversed' ? '已冲正' : '有效' }}<small v-if="row.reversal_reason"> · {{ row.reversal_reason }}</small></template></el-table-column>
+        </el-table>
+        <div class="ledger-pagination"><el-pagination :current-page="recordPage" :page-size="20" :total="recordTotal" :pager-count="5" layout="prev, pager, next" @current-change="changeRecordPage" /></div>
+      </el-card>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { getProfitPolicy, getProfitSummary } from '@/utils/api'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { getProfitPage, getProfitPolicy, getProfitSummary } from '@/utils/api'
 import { usePlatformStore } from '@/stores/platform'
 import { authService } from '@/utils/auth'
-import { profitPolicySchema, profitSummarySchema } from '@/features/admin/model'
+import { profitPolicySchema, profitRecordSchema, profitSummarySchema, type ProfitRecord } from '@/features/admin/model'
 import { hasStaffPermission } from '@/features/auth/permissions'
 import { failedDataState, type AsyncDataState } from '@/features/async/state'
 import AsyncStateNotice from '@/components/AsyncStateNotice.vue'
@@ -83,6 +107,14 @@ const summary = ref(profitSummarySchema.parse({}))
 const loadState = ref<AsyncDataState>('loading')
 const loadError = ref('')
 const hasLoaded = ref(false)
+const records = ref<ProfitRecord[]>([])
+const recordPage = ref(1)
+const recordTotal = ref(0)
+const recordStatus = ref('')
+const recordState = ref<AsyncDataState>('loading')
+const recordError = ref('')
+let loadSequence = 0
+let recordSequence = 0
 const policyVersion = ref(1)
 const profitRatios = ref<Record<ProfitKey, number>>({
   tech: 30,
@@ -113,7 +145,34 @@ function formatMoney(value: number | null | undefined): string {
   return Number(value || 0).toFixed(2)
 }
 
+function historicalRatio(key: ProfitAmountKey): string {
+  return summary.value.grand_total > 0 ? (summary.value[key] / summary.value.grand_total * 100).toFixed(1) : '0.0'
+}
+
+async function loadRecords() {
+  const sequence = ++recordSequence
+  recordState.value = records.value.length ? 'data' : 'loading'
+  recordError.value = ''
+  try {
+    const response = await getProfitPage({ page: recordPage.value, page_size: 20, status: recordStatus.value || undefined, platform_key: platformStore.adminPlatform === 'all' ? undefined : platformStore.adminPlatform })
+    if (sequence !== recordSequence) return
+    records.value = response.items.map(item => profitRecordSchema.parse(item))
+    recordTotal.value = response.total
+    recordState.value = records.value.length ? 'data' : 'empty'
+  } catch (error) {
+    if (sequence !== recordSequence) return
+    recordError.value = error instanceof Error ? error.message : '分润明细加载失败'
+    recordState.value = failedDataState(records.value.length > 0)
+  }
+}
+
+function changeRecordPage(page: number) {
+  recordPage.value = page
+  void loadRecords()
+}
+
 async function loadData() {
+  const sequence = ++loadSequence
   loadState.value = hasLoaded.value ? 'data' : 'loading'
   loadError.value = ''
   try {
@@ -123,6 +182,7 @@ async function loadData() {
       getProfitSummary(params),
       getProfitPolicy(),
     ])
+    if (sequence !== loadSequence) return
     summary.value = profitSummarySchema.parse(summaryRes)
 
     const policy = profitPolicySchema.parse(policyRes)
@@ -136,16 +196,24 @@ async function loadData() {
     hasLoaded.value = true
     loadState.value = summary.value.grand_total > 0 ? 'data' : 'empty'
   } catch (error) {
+    if (sequence !== loadSequence) return
     loadError.value = error instanceof Error && error.message ? error.message : '分润汇总与策略暂时无法加载'
     loadState.value = failedDataState(hasLoaded.value)
   }
 }
 
-watch(() => platformStore.adminPlatform, loadData)
-onMounted(loadData)
+watch(() => platformStore.adminPlatform, () => { void loadData() })
+watch([() => platformStore.adminPlatform, recordStatus], () => { recordPage.value = 1; void loadRecords() })
+onMounted(() => { void loadData(); void loadRecords() })
+onBeforeUnmount(() => { loadSequence += 1; recordSequence += 1 })
 </script>
 
 <style scoped>
+.current-policy { margin: 20px 0; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); }
+.current-policy h3 { margin: 0; font-size: 1rem; }
+.current-policy p { color: var(--color-text-secondary); font-size: .85rem; }
+.current-policy > div { display: flex; gap: 16px; flex-wrap: wrap; font-size: .85rem; }
+.ledger-pagination { margin-top: 16px; display: flex; justify-content: flex-end; overflow-x: auto; }
 .profit-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

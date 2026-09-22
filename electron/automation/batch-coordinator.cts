@@ -27,6 +27,7 @@ interface HostManagerLike {
 
 interface ImportedRow {
   itemId: string;
+  sourceRow?: number;
   input: UnknownRecord;
   preview: UnknownRecord;
   accountLabelMasked: string;
@@ -43,6 +44,7 @@ interface ParsedImport {
 
 interface BatchItem {
   itemId: string;
+  sourceRow?: number;
   input: UnknownRecord | null;
   accountLabelMasked: string;
   status: string;
@@ -113,7 +115,7 @@ class BatchCoordinator {
       fileName: parsed.fileName,
       validCount: parsed.rows.length,
       errorCount: parsed.errors.length,
-      rows: parsed.rows.map(row => ({ itemId: row.itemId, preview: row.preview, accountLabelMasked: row.accountLabelMasked })),
+      rows: parsed.rows.map(row => ({ itemId: row.itemId, sourceRow: row.sourceRow, preview: row.preview, accountLabelMasked: row.accountLabelMasked })),
       errors: parsed.errors,
       worksheetName: parsed.worksheetName,
       templateVersion: parsed.templateVersion,
@@ -132,7 +134,7 @@ class BatchCoordinator {
       importId: nextImportId,
       validCount: rows.length,
       errorCount: 0,
-      rows: rows.map(row => ({ itemId: row.itemId, preview: row.preview, accountLabelMasked: row.accountLabelMasked })),
+      rows: rows.map(row => ({ itemId: row.itemId, sourceRow: row.sourceRow, preview: row.preview, accountLabelMasked: row.accountLabelMasked })),
       errors: [],
     };
   }
@@ -151,6 +153,7 @@ class BatchCoordinator {
       maxOpenSessions: Math.min(Math.max(Number(maxOpenSessions) || 6, 2), 10),
       items: importedRows.map(row => ({
         itemId: row.itemId,
+        sourceRow: row.sourceRow,
         input: row.input,
         accountLabelMasked: row.accountLabelMasked,
         status: 'pending',
@@ -220,12 +223,7 @@ class BatchCoordinator {
     const item = this.requireItem(itemId);
     if (this.provisioningItemId !== itemId) return this.snapshot();
     this.provisioningItemId = null;
-    item.status = 'failed';
-    item.message = message;
-    item.interventionType = null;
-    item.readyToResume = false;
-    this.emit('batch.item_updated', { itemId });
-    this.schedule();
+    this.finishItem(item, 'failed', message);
     return this.snapshot();
   }
 
@@ -241,6 +239,9 @@ class BatchCoordinator {
 
   async restartItem(itemId: string) {
     const item = this.requireItem(itemId);
+    if (this.batch?.status !== 'running' || !item.input) {
+      throw this.error('BATCH_REIMPORT_REQUIRED', '批次已结束，请重新导入需要处理的账号并新建批次');
+    }
     if (item.status !== 'failed') throw this.error('BATCH_ITEM_NOT_FAILED', '只有未完成账号可以重新发起');
     await item.runner?.stop?.().catch(() => {});
     item.runner = null;
@@ -362,6 +363,7 @@ class BatchCoordinator {
     if (!this.batch) return { status: 'idle', items: [] };
     const items = this.batch.items.map(item => ({
       itemId: item.itemId,
+      sourceRow: item.sourceRow,
       accountLabelMasked: item.accountLabelMasked,
       status: item.status,
       interventionType: item.interventionType,
