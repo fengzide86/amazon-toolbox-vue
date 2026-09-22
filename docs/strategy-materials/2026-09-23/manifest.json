@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-09-23",
+  "sourceCodeBaseline": "ebc756dc338a7da690b2cbc6ffbec362e4ef5cf9",
+  "sourceCount": 7,
+  "totalBytes": 10070523,
+  "integrity": "Original bytes preserved; SHA256 checked against supplied source files.",
+  "files": [
+    {
+      "path": "sources/1高分物流模板2026版.pdf",
+      "bytes": 2236392,
+      "sha256": "7adef1770a21ff01fa8a47b2774ca95a2e68040967baeb31bdc10ebbf8266dbf",
+      "pdfPages": 8,
+      "readablePages": 8
+    },
+    {
+      "path": "sources/2亚马逊商品发布高分技巧_.pdf",
+      "bytes": 956822,
+      "sha256": "2822a35344125473bc3f60db440b66fabf51d1825868059670ed91dee1fbc13e",
+      "pdfPages": 6,
+      "readablePages": 6
+    },
+    {
+      "path": "sources/3订单处理及店铺运营高分技巧.pdf",
+      "bytes": 639554,
+      "sha256": "ecb5436ffd2d2576671b4fc7bdbe156dacdfe4c7845f369bc9511232b5db7e68",
+      "pdfPages": 3,
+      "readablePages": 3
+    },
+    {
+      "path": "sources/4亚马逊营销能力高分技巧(2).pdf",
+      "bytes": 4939154,
+      "sha256": "c32624cd6527b167aec6a3696db586aeeb7de34af578dfca1a66eed606d77826",
+      "pdfPages": 19,
+      "readablePages": 13,
+      "unreadablePageRange": [
+        14,
+        19
+      ],
+      "note": "Invalid image resource /Im14 references object 79 containing number 92, not image data; original bytes preserved."
+    },
+    {
+      "path": "sources/5亚马逊FBA管理能力高分技巧.pdf",
+      "bytes": 989344,
+      "sha256": "52d474cd7e89c51d16a2ae6786ade763c6efeecdd98798a98f2c3bf70cdedd80",
+      "pdfPages": 5,
+      "readablePages": 5
+    },
+    {
+      "path": "sources/亚马逊热销商品合集.xlsx",
+      "bytes": 10813,
+      "sha256": "0bbbc3d20d2fe8ba83954854eb3f85d65d26f253cd2cc2a714c1ce724a3d8dd9"
+    },
+    {
+      "path": "sources/7c18a6c00f5dcb6e1635aaea08a0c857.jpg",
+      "bytes": 298444,
+      "sha256": "44be18d7d1a69fdd54d1788427fd020ca330a22b44b5452a27d1872bc20ceb0e"
+    }
+  ]
+}
